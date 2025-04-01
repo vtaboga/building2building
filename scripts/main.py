@@ -16,10 +16,10 @@ def parse_arguments():
                        help='Building area in square feet')
     parser.add_argument('--num-floors', type=int, default=6,
                        help='Number of floors')
-    parser.add_argument('--aspect-ratio', type=float, default=None,
-                       help='Aspect ratio (optional)')
-    parser.add_argument('--wwr', type=float, default=1,
-                       help='Window-to-wall ratio')
+    parser.add_argument('--height', type=float, default=None,
+                       help='Height of the building')
+    parser.add_argument('--n-buildings', type=int, default=1,
+                       help='Number of buildings to search for')
     
     return parser.parse_args()
 
@@ -48,6 +48,6 @@ if __name__ == "__main__":
         building_type=args.building_type,
         area=args.area,
         num_floors=args.num_floors,
-        aspect_ratio=args.aspect_ratio,
-        wwr=args.wwr
+        height=args.height,
+        n_buildings=args.n_buildings
     )
