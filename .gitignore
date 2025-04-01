@@ -1,0 +1,12 @@
+/.env/
+/.venv/
+/.conda/
+/.idea/
+/.vscode/
+__pycache__/
+/.pytest_cache/
+*.py[cod]
+*$py.class
+data/
+logs
+energyplus/singularity_eplus.sif

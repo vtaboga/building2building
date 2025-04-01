@@ -1,0 +1,41 @@
+* Building2Building 
+
+
+
+** Prerequisites
+
+Before you begin, ensure you have one of the following container engines installed:
+- Singularity (version 3.0 or later)
+- Apptainer (the open-source continuation of Singularity)
+
+** Installation Steps
+
+1. Clone the repository
+   #+begin_src bash
+   git clone https://github.com/YOUR-USERNAME/Building2Building.git
+   cd Building2Building
+   #+end_src
+
+2. Verify container engine installation
+   For Singularity:
+   #+begin_src bash
+   singularity --version
+   #+end_src
+   
+   For Apptainer:
+   #+begin_src bash
+   apptainer --version
+   #+end_src
+
+3. Run the setup script
+   #+begin_src bash
+   chmod +x setup.sh
+   ./setup.sh
+   #+end_src
+
+** minergym
+
+The gym wrapper of energyplus is based on the minergym repository https://github.com/Terramorpha/minergym
+
+
+
