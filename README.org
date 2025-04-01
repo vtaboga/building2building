@@ -60,7 +60,7 @@ setup.sh will create a virtual environment, install the requirements, download e
 
 ** minergym
 
-The gym wrapper of energyplus is based on the minergym repository https://github.com/Terramorpha/minergym
+The gym wrapper of energyplus in src/simulator is based on the minergym repository https://github.com/Terramorpha/minergym
 
 
 
