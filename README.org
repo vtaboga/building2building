@@ -22,7 +22,7 @@ Example:
    python -m scripts.main --state "AL" --county "Pike" --building type "Small Hotel" --num_floors 6 --height None --n_buildings 1
 #+end_src
 
-/!\ The first a state is specified, the metadata take a while (~30min to 1h) to be processed. This is because the database is organised per county while the metadata are per state.
+/!\ The first time a state is specified, the metadata take a while (~30min to 1h) to be processed. This is because the database is organised per county while the metadata per state.
 An API is being used to fetch the county given the position of each building.
 
 
