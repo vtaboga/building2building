@@ -1,14 +1,37 @@
 * Building2Building 
 
+Benchmarking transfer learning in RL on milions of buildings.
 
 
-** Prerequisites
+** Generating IDF files
+
+The environments are based on the EnergyPlus models provided by the [Model America project on ESS-DIVE](https://data.ess-dive.lbl.gov/view/doi:10.15485/2283980). 
+One can specify the state, county, building type, area, number of floors, heights, and number of buildings to consider. 
+
+1. download the idf files of the county
+2. download the metadata of the state
+3. process the meta data to add the county of each building given its location (longitude/latitude)
+4. search the meta data for the n buildings matching the description best
+5. process the idf files found to update the E+ version and convert to epjson.
+
+Note that files are kept in memory in the data folder to only do the download and processing steps once.
+
+Example:
+
+#+begin_src bash
+   python -m scripts.main --state "AL" --county "Pike" --building type "Small Hotel" --num_floors 6 --height None --n_buildings 1
+#+end_src
+
+/!\ The first a state is specified, the metadata take a while (~30min to 1h) to be processed. This is because the database is organised per county while the metadata are per state.
+An API is being used to fetch the county given the position of each building.
+
+
+
+** Installation Steps
 
 Before you begin, ensure you have one of the following container engines installed:
 - Singularity (version 3.0 or later)
 - Apptainer (the open-source continuation of Singularity)
-
-** Installation Steps
 
 1. Clone the repository
    #+begin_src bash
@@ -32,6 +55,8 @@ Before you begin, ensure you have one of the following container engines install
    chmod +x setup.sh
    ./setup.sh
    #+end_src
+
+setup.sh will create a virtual environment, install the requirements, download energyplus and build a singularity container for energyplus.
 
 ** minergym
 
