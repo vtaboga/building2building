@@ -60,6 +60,17 @@ echo "🏗️ Building Singularity container..."
 CONTAINER_PATH="energyplus/singularity_eplus.sif"
 DEF_FILE="energyplus/singularity_eplus.def"
 
+# Create energyplus directory if it doesn't exist
+mkdir -p energyplus
+
+# Download EnergyPlus installer if it doesn't exist
+EPLUS_INSTALLER="energyplus/EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu20.04-x86_64.sh"
+if [ ! -f "$EPLUS_INSTALLER" ]; then
+    echo "Downloading EnergyPlus installer..."
+    wget -O "$EPLUS_INSTALLER" https://github.com/NREL/EnergyPlus/releases/download/v24.1.0/EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu20.04-x86_64.sh
+    chmod +x "$EPLUS_INSTALLER"
+fi
+
 if [ ! -f "$CONTAINER_PATH" ]; then
     if command -v singularity &> /dev/null; then
         sudo singularity build "$CONTAINER_PATH" "$DEF_FILE"

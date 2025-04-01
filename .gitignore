@@ -11,3 +11,4 @@ __pycache__/
 data/
 logs
 energyplus/singularity_eplus.sif
+energyplus/*.sh
