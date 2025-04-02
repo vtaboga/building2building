@@ -9,7 +9,7 @@ This module only cares about control.
 
 import pyenergyplus.api
 import threading
-import simulator.template as template
+import src.simulator.template as template
 import collections
 from dataclasses import dataclass, field
 import typing

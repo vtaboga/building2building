@@ -13,10 +13,10 @@ This module collects functions useful to creates those 4-tuples.
 
 """
 
-import simulator.query_info as query_info
+import src.simulator.query_info as query_info
 import rdflib
 import typing
-import simulator.simulation as simulation
+import src.simulator.simulation as simulation
 
 
 def auto_get_actuators(
