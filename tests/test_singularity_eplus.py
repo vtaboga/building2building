@@ -28,7 +28,7 @@ def test_energyplus_simulation(output_dir):
     project_root = get_project_root()
     idf_path = project_root / "tests" / "fixtures" / "small_office.idf"
     weather_path = project_root / "tests" / "fixtures" / "weather_small_office.epw"
-    container_path = project_root / "energyplus" / "singularity_eplus.sif"
+    container_path = project_root / "container" / "singularity_eplus.sif"
     
     # Verify container exists
     assert container_path.exists(), "Singularity container not found"
