@@ -111,7 +111,7 @@ def download_epw(state_code, city_name=None, save_dir="data/weather"):
     else:
         logger.warning(f"No ZIP file found for city: {city_name}, state: {state_code}")
     
-    return None
+    return None  # Explicitly return None when no file is found
 
 
 def get_available_counties() -> list[tuple[str, str]]:
