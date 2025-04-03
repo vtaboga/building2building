@@ -2,6 +2,9 @@ import argparse
 from datetime import datetime
 from src.generator.search_idf import search_idf
 from src.core.logging import setup_logger
+from src.simulator.create_simulator import create_simulator
+from src.generator.processing import add_hvac_meters_to_epjson, add_outdoor_air_meters_to_epjson, modify_timestep
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Generate IDF files based on specified parameters')
@@ -39,10 +42,10 @@ if __name__ == "__main__":
     # It will inherit handlers from root
     generator_logger = setup_logger('generator', filename=log_filename, add_handlers=False)
     
-    root_logger.info("Starting IDF generation process...")
+    # root_logger.info("Starting IDF generation process...")
     
     # Call search_idf with parsed arguments
-    search_idf(
+    buildings, path_to_weather = search_idf(
         state=args.state,
         county=args.county,
         building_type=args.building_type,
@@ -51,3 +54,21 @@ if __name__ == "__main__":
         height=args.height,
         n_buildings=args.n_buildings
     )
+
+    root_logger.info("Create simulator...")
+
+    simulators = []
+
+    for building in buildings:
+
+
+        add_hvac_meters_to_epjson(building)
+        add_outdoor_air_meters_to_epjson(building)
+        modify_timestep(building)
+    
+        simulators.append(
+            create_simulator(
+                path_to_building=building,
+                path_to_weather=path_to_weather
+            )
+        )
