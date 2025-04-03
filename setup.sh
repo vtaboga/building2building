@@ -5,9 +5,9 @@ set -e
 
 echo "🚀 Starting setup process..."
 
-# Check if Python is installed
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python3 is not installed. Please install Python3 first."
+# Check if Python 3.10 is installed
+if ! command -v python3.10 &> /dev/null; then
+    echo "❌ Python 3.10 is not installed. Please install Python 3.10 first."
     exit 1
 fi
 
@@ -26,7 +26,7 @@ fi
 # Create and activate virtual environment for local development
 echo "📦 Creating virtual environment..."
 if [ ! -d ".venv" ]; then
-    python3 -m venv .venv
+    python3.10 -m venv .venv
     echo "✨ Virtual environment created"
 else
     echo "ℹ️ Virtual environment already exists"

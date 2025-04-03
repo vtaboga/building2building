@@ -1,6 +1,6 @@
 * Building2Building 
 
-
+Benchmarking transfer learning in Reinforcement Learning on milions of buildings.
 
 ** Prerequisites
 
@@ -33,9 +33,7 @@ Before you begin, ensure you have one of the following container engines install
    ./setup.sh
    #+end_src
 
-** minergym
+** Minergym
 
 The gym wrapper of energyplus is based on the minergym repository https://github.com/Terramorpha/minergym
-
-
 

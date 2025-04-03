@@ -1,0 +1,86 @@
+Bootstrap: debootstrap
+OSVersion: focal
+MirrorURL: https://us.archive.ubuntu.com/ubuntu/
+
+%files
+    # Copy only essential repository files
+    src/ /opt/repository/src
+    scripts/ /opt/repository/scripts
+    tests/ /opt/repository/tests
+    requirements.txt /opt/repository/requirements.txt
+    setup.sh /opt/repository/setup.sh
+    # Assuming EnergyPlus installer is in the container directory
+    container/*.sh /opt/
+
+%post
+    # Set up proper repositories
+    cat > /etc/apt/sources.list << EOF
+deb https://us.archive.ubuntu.com/ubuntu/ focal main restricted universe multiverse
+deb https://us.archive.ubuntu.com/ubuntu/ focal-updates main restricted universe multiverse
+deb https://us.archive.ubuntu.com/ubuntu/ focal-security main restricted universe multiverse
+EOF
+
+    # Add deadsnakes PPA with retry logic
+    apt-get update
+    apt-get install -y software-properties-common gnupg
+
+    # Retry logic for adding PPA
+    for i in {1..3}; do
+        if add-apt-repository -y ppa:deadsnakes/ppa; then
+            break
+        fi
+        echo "Attempt $i failed. Waiting 5 seconds before retry..."
+        sleep 5
+    done
+
+    # Update after successful PPA addition
+    apt-get update || (sleep 5 && apt-get update)
+
+    # Install Python 3.10 and dependencies
+    apt-get install -y python3.10 python3.10-venv python3.10-dev wget git build-essential
+
+    # Additional system dependencies that might be needed for aiohttp
+    apt-get install -y python3.10-distutils gcc libc-dev
+
+    # Print Python version for debugging
+    python3.10 --version
+    
+    # Install EnergyPlus using the exact command
+    cd /opt
+    chmod +x EnergyPlus-*.sh
+    echo "y" | ./EnergyPlus-*.sh --prefix=/usr/local
+    
+    # Setup Python virtual environment
+    cd /opt/repository
+    python3.10 -m venv .venv
+    . .venv/bin/activate
+    pip install --upgrade pip
+    
+    # Install requirements with retry logic
+    for i in {1..3}; do
+        if pip install -r requirements.txt; then
+            break
+        fi
+        echo "Attempt $i failed. Waiting 5 seconds before retry..."
+        sleep 5
+    done
+    
+    # Create directories for bind mounting
+    mkdir -p /opt/repository/data
+    mkdir -p /opt/repository/logs
+    
+    # Cleanup to reduce container size
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+    rm -f /opt/*.sh
+
+%environment
+    # Set environment variables
+    export PATH=/usr/local/EnergyPlus-*/bin:$PATH
+    export PYTHONPATH=/opt/repository:$PYTHONPATH
+    
+%runscript
+    # Default run command activates venv and executes the main script
+    cd /opt/repository
+    . .venv/bin/activate
+    python3 scripts/main.py "$@"
