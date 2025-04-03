@@ -10,5 +10,5 @@ __pycache__/
 *$py.class
 data/
 logs
-energyplus/singularity_eplus.sif
-energyplus/*.sh
+container/*.sif
+container/*.sh

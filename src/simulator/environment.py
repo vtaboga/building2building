@@ -7,7 +7,7 @@ trouble to any gymnasium consumer.
 
 
 import typing
-import simulator.simulation as simulation
+import src.simulator.simulation as simulation
 import gymnasium
 
 

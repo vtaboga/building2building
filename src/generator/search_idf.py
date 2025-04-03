@@ -85,11 +85,15 @@ def search_idf(state: str, county:str, building_type: str, area: float, num_floo
         logger.info(f"Successfully processed {len(processed_files)} IDF files")
 
         # Download associated weather files
-        download_epw(state_code=state)
+        weather_file = download_epw(state_code=state)
         logger.info(f"Successfully downloaded weather files")
         
     except Exception as e:
         logger.error(f"Error during IDF search and processing: {e}")
         raise
+
+    building_files = [os.path.join("data/processed_idf", f"{state}", f"{county}", f"{idf_file}.epJSON") for idf_file in idf_files]
+
+    return building_files, weather_file
 
     

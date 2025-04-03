@@ -23,24 +23,33 @@ def output_dir():
     if output_dir.exists():
         shutil.rmtree(output_dir)
 
+def get_singularity_cmd():
+    """Get the appropriate singularity command (singularity or apptainer)"""
+    if shutil.which("singularity"):
+        return "singularity"
+    elif shutil.which("apptainer"):
+        return "apptainer"
+    raise RuntimeError("Neither singularity nor apptainer found in PATH")
+
 def test_energyplus_simulation(output_dir):
     """Test that EnergyPlus can run a simulation successfully in the container."""
     project_root = get_project_root()
     idf_path = project_root / "tests" / "fixtures" / "small_office.idf"
     weather_path = project_root / "tests" / "fixtures" / "weather_small_office.epw"
-    container_path = project_root / "container" / "singularity_eplus.sif"
+    container_path = project_root / "container" / "container.sif"
     
     # Verify container exists
-    assert container_path.exists(), "Singularity container not found"
+    assert container_path.exists(), "Container not found at: {}".format(container_path)
     
     # Run EnergyPlus simulation
+    singularity_cmd = get_singularity_cmd()
     cmd = [
-        "singularity", "exec",
+        singularity_cmd, "exec",
         "-B", f"{idf_path.parent}:/input",
         "-B", f"{output_dir}:/output",
         "--pwd", "/input",
         str(container_path),
-        "/usr/local/EnergyPlus-24-1-0/energyplus",
+        "energyplus",
         "-w", "/input/weather_small_office.epw",
         "-d", "/output",
         "-r",
@@ -76,6 +85,52 @@ def test_energyplus_simulation(output_dir):
             
     except subprocess.CalledProcessError as e:
         pytest.fail(f"EnergyPlus simulation failed with error:\n"
+                   f"STDOUT:\n{e.stdout}\n"
+                   f"STDERR:\n{e.stderr}\n"
+                   f"Return code: {e.returncode}")
+
+def test_python_environment(output_dir):
+    """Test that the Python environment in the container works correctly."""
+    project_root = get_project_root()
+    container_path = project_root / "container" / "container.sif"
+    
+    # Verify container exists
+    assert container_path.exists(), "Container not found at: {}".format(container_path)
+    
+    # Test Python version and imports
+    test_script = """
+import sys
+import numpy
+import pandas
+import matplotlib
+
+version = sys.version_info
+if version.major != 3 or version.minor != 10:
+    raise RuntimeError(f"Expected Python 3.10, but got {version.major}.{version.minor}")
+
+print('Python environment test successful!')
+"""
+    
+    singularity_cmd = get_singularity_cmd()
+    cmd = [
+        singularity_cmd, "exec",
+        str(container_path),
+        "/opt/repository/.venv/bin/python", "-c", test_script
+    ]
+    
+    try:
+        result = subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        
+        assert result.returncode == 0, "Python environment test failed"
+        assert "Python environment test successful!" in result.stdout
+        
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"Python environment test failed with error:\n"
                    f"STDOUT:\n{e.stdout}\n"
                    f"STDERR:\n{e.stderr}\n"
                    f"Return code: {e.returncode}") 

@@ -2,7 +2,8 @@ import os
 import pandas as pd
 import subprocess
 import logging
-from typing import List
+import json
+from typing import List, Dict, Any, Optional
 from src.generator.utils import get_counties_from_coords_batch
 
 logger = logging.getLogger('generator')
@@ -272,9 +273,9 @@ def process_idf(idf_files: List[int], state: str, county: str):
     processed_paths = []
     for idf_id in idf_files:
         # Check if processed file already exists
-        processed_path = os.path.join(processed_dir, f"{idf_id}.idf")
+        processed_path = os.path.join(processed_dir, f"{idf_id}.epJSON")
         if os.path.exists(processed_path):
-            logger.info(f"Skipping {idf_id}.idf - already processed")
+            logger.info(f"Skipping {idf_id}.epJSON - already processed")
             processed_paths.append(processed_path)
             continue
             
@@ -341,3 +342,394 @@ def convert_to_epjson(idf_path: str) -> str:
     except Exception as e:
         logger.error(f"Error during conversion: {e}")
         return None
+    
+
+def add_hvac_meters_to_epjson(epjson_path: str, output_path: str = None) -> None:
+    """
+    Check if HVAC energy consumption meters exist in an epJSON file.
+    If not, add the meters and save the modified epJSON.
+    
+    Args:
+        epjson_path: Path to the input epJSON file
+        output_path: Path to save the modified epJSON file (if None, will overwrite the input file)
+    """
+    # Set default output path if not provided
+    if output_path is None:
+        output_path = epjson_path
+    
+    # Load the epJSON file
+    with open(epjson_path, 'r') as f:
+        epjson = json.load(f)
+    
+    # Check if we already have the necessary meters
+    has_elec_hvac_meter = False
+    has_gas_hvac_meter = False
+    
+    # First, check existing Output:Meter objects
+    if "Output:Meter" in epjson:
+        for meter_key, meter_data in epjson["Output:Meter"].items():
+            if meter_data.get("key_name") == "Electricity:HVAC" and meter_data.get("reporting_frequency") == "Timestep":
+                has_elec_hvac_meter = True
+                print("Found existing Electricity:HVAC meter with Timestep reporting.")
+            
+            if meter_data.get("key_name") == "NaturalGas:HVAC" and meter_data.get("reporting_frequency") == "Timestep":
+                has_gas_hvac_meter = True
+                print("Found existing NaturalGas:HVAC meter with Timestep reporting.")
+    
+    # Check Output:Meter:MeterFileOnly objects as well
+    if "Output:Meter:MeterFileOnly" in epjson:
+        for meter_key, meter_data in epjson["Output:Meter:MeterFileOnly"].items():
+            if meter_data.get("key_name") == "Electricity:HVAC" and meter_data.get("reporting_frequency") == "Timestep":
+                has_elec_hvac_meter = True
+                print("Found existing Electricity:HVAC meter file only with Timestep reporting.")
+            
+            if meter_data.get("key_name") == "NaturalGas:HVAC" and meter_data.get("reporting_frequency") == "Timestep":
+                has_gas_hvac_meter = True
+                print("Found existing NaturalGas:HVAC meter file only with Timestep reporting.")
+    
+    # Add meters if they don't exist
+    modified = False
+    
+    # Make sure the Output:Meter category exists
+    if "Output:Meter" not in epjson:
+        epjson["Output:Meter"] = {}
+    
+    # Add electricity HVAC meter if needed
+    if not has_elec_hvac_meter:
+        new_meter_name = f"Output:Meter:ElectricityHVAC"
+        epjson["Output:Meter"][new_meter_name] = {
+            "key_name": "Electricity:HVAC",
+            "reporting_frequency": "Timestep"
+        }
+        print(f"Added Electricity:HVAC meter with Timestep reporting.")
+        modified = True
+    
+    # Add natural gas HVAC meter if needed
+    if not has_gas_hvac_meter:
+        new_meter_name = f"Output:Meter:NaturalGasHVAC"
+        epjson["Output:Meter"][new_meter_name] = {
+            "key_name": "NaturalGas:HVAC",
+            "reporting_frequency": "Timestep"
+        }
+        print(f"Added NaturalGas:HVAC meter with Timestep reporting.")
+        modified = True
+    
+    # Save the modified epJSON if changes were made
+    if modified:
+        with open(output_path, 'w') as f:
+            json.dump(epjson, f, indent=2)
+        print(f"Modified epJSON saved to {output_path}")
+    else:
+        print("No changes needed. All required meters already exist.")
+
+def check_meter_availability(epjson_path: str) -> Dict[str, bool]:
+    """
+    Check the availability of all end-use meters in an epJSON file.
+    Returns a dictionary of meter names and whether they exist.
+    
+    Args:
+        epjson_path: Path to the epJSON file
+        
+    Returns:
+        Dictionary mapping meter names to boolean (True if present)
+    """
+    # List of common end-use meters to check
+    meter_list = [
+        "Electricity:Facility",
+        "Electricity:HVAC",
+        "Electricity:Heating",
+        "Electricity:Cooling", 
+        "Electricity:Fans",
+        "Electricity:InteriorLights",
+        "Electricity:ExteriorLights",
+        "Electricity:InteriorEquipment",
+        "NaturalGas:Facility",
+        "NaturalGas:HVAC",
+        "NaturalGas:Heating",
+        "Fans:Electricity",
+        "Cooling:Electricity",
+        "Heating:Electricity",
+        "Heating:NaturalGas"
+    ]
+    
+    # Initialize results dictionary
+    meter_availability = {meter: False for meter in meter_list}
+    
+    # Load the epJSON file
+    with open(epjson_path, 'r') as f:
+        epjson = json.load(f)
+    
+    # Check Output:Meter objects
+    if "Output:Meter" in epjson:
+        for meter_key, meter_data in epjson["Output:Meter"].items():
+            meter_name = meter_data.get("key_name")
+            if meter_name in meter_availability:
+                meter_availability[meter_name] = True
+    
+    # Check Output:Meter:MeterFileOnly objects
+    if "Output:Meter:MeterFileOnly" in epjson:
+        for meter_key, meter_data in epjson["Output:Meter:MeterFileOnly"].items():
+            meter_name = meter_data.get("key_name")
+            if meter_name in meter_availability:
+                meter_availability[meter_name] = True
+    
+    return meter_availability
+
+
+
+def add_outdoor_air_meters_to_epjson(epjson_path: str, output_path: str = None) -> None:
+    """
+    Check if outdoor air temperature and humidity output variables exist in an epJSON file.
+    If not, add them and save the modified epJSON.
+    
+    Args:
+        epjson_path: Path to the input epJSON file
+        output_path: Path to save the modified epJSON file (if None, will overwrite the input file)
+    """
+    # Set default output path if not provided
+    if output_path is None:
+        output_path = epjson_path
+    
+    # Load the epJSON file
+    with open(epjson_path, 'r') as f:
+        epjson = json.load(f)
+    
+    # Define outdoor air variables we want to check/add
+    outdoor_vars = [
+        # Variable Name, Key Value (usually "Environment")
+        ("Site Outdoor Air Drybulb Temperature", "Environment"),
+        ("Site Outdoor Air Humidity Ratio", "Environment"),
+        ("Site Outdoor Air Relative Humidity", "Environment"),
+        ("Site Outdoor Air Wetbulb Temperature", "Environment"),
+        ("Site Outdoor Air Dewpoint Temperature", "Environment")
+    ]
+    
+    # Check if we already have the necessary output variables
+    has_outdoor_vars = {var[0]: False for var in outdoor_vars}
+    
+    # Check existing Output:Variable objects
+    if "Output:Variable" in epjson:
+        for var_key, var_data in epjson["Output:Variable"].items():
+            var_name = var_data.get("variable_name")
+            for outdoor_var, _ in outdoor_vars:
+                if var_name == outdoor_var and var_data.get("reporting_frequency") == "Timestep":
+                    has_outdoor_vars[outdoor_var] = True
+                    print(f"Found existing output variable: {var_name} with Timestep reporting.")
+    
+    # Add variables if they don't exist
+    modified = False
+    
+    # Make sure the Output:Variable category exists
+    if "Output:Variable" not in epjson:
+        epjson["Output:Variable"] = {}
+    
+    # Add missing variables
+    for var_name, key_value in outdoor_vars:
+        if not has_outdoor_vars[var_name]:
+            new_var_key = f"Output:Variable {var_name}"
+            
+            # Ensure the key is unique by adding a suffix if needed
+            suffix = 1
+            while new_var_key in epjson["Output:Variable"]:
+                new_var_key = f"Output:Variable {var_name} {suffix}"
+                suffix += 1
+            
+            epjson["Output:Variable"][new_var_key] = {
+                "key_value": key_value,
+                "variable_name": var_name,
+                "reporting_frequency": "Timestep"
+            }
+            print(f"Added output variable: {var_name} with Timestep reporting.")
+            modified = True
+    
+    # Save the modified epJSON if changes were made
+    if modified:
+        with open(output_path, 'w') as f:
+            json.dump(epjson, f, indent=2)
+        print(f"Modified epJSON saved to {output_path}")
+    else:
+        print("No changes needed. All required outdoor air variables already exist.")
+
+def check_output_variables_availability(epjson_path: str) -> Dict[str, bool]:
+    """
+    Check the availability of common output variables in an epJSON file.
+    Returns a dictionary of variable names and whether they exist.
+    
+    Args:
+        epjson_path: Path to the epJSON file
+        
+    Returns:
+        Dictionary mapping variable names to boolean (True if present)
+    """
+    # List of common variables to check
+    variable_list = [
+        "Site Outdoor Air Drybulb Temperature",
+        "Site Outdoor Air Humidity Ratio",
+        "Site Outdoor Air Relative Humidity",
+        "Site Outdoor Air Wetbulb Temperature",
+        "Site Outdoor Air Dewpoint Temperature",
+        "Zone Air Temperature",
+        "Zone Air Humidity Ratio",
+        "Zone Air Relative Humidity",
+        "Zone Thermostat Heating Setpoint Temperature",
+        "Zone Thermostat Cooling Setpoint Temperature",
+        "Zone Thermal Comfort Mean Radiant Temperature",
+        "Zone People Occupant Count",
+        "Zone Air System Sensible Heating Energy",
+        "Zone Air System Sensible Cooling Energy",
+        "System Node Temperature",
+        "System Node Relative Humidity",
+        "System Node Mass Flow Rate",
+        "Fan Electricity Rate"
+    ]
+    
+    # Initialize results dictionary
+    var_availability = {var: False for var in variable_list}
+    
+    # Load the epJSON file
+    with open(epjson_path, 'r') as f:
+        epjson = json.load(f)
+    
+    # Check Output:Variable objects
+    if "Output:Variable" in epjson:
+        for var_key, var_data in epjson["Output:Variable"].items():
+            var_name = var_data.get("variable_name")
+            if var_name in var_availability:
+                var_availability[var_name] = True
+    
+    return var_availability
+
+def add_outdoor_air_nodes_if_missing(epjson_path: str, output_path: str = None) -> None:
+    """
+    Check if outdoor air node exists and add it if missing.
+    This ensures that outdoor air can be properly monitored.
+    
+    Args:
+        epjson_path: Path to the input epJSON file
+        output_path: Path to save the modified epJSON file (if None, will overwrite the input file)
+    """
+    # Set default output path if not provided
+    if output_path is None:
+        output_path = epjson_path
+    
+    # Load the epJSON file
+    with open(epjson_path, 'r') as f:
+        epjson = json.load(f)
+    
+    # Check if we have an OutdoorAir:Node defined
+    has_outdoor_air_node = "OutdoorAir:Node" in epjson and len(epjson["OutdoorAir:Node"]) > 0
+    
+    # Add OutdoorAir:Node if not present
+    modified = False
+    if not has_outdoor_air_node:
+        # Create the OutdoorAir:Node category if it doesn't exist
+        if "OutdoorAir:Node" not in epjson:
+            epjson["OutdoorAir:Node"] = {}
+        
+        epjson["OutdoorAir:Node"]["Model Outdoor Air Node"] = {}
+        print("Added OutdoorAir:Node for monitoring outdoor conditions.")
+        modified = True
+    else:
+        print("Found existing OutdoorAir:Node.")
+    
+    # Check if we have an OutdoorAir:NodeList defined
+    has_outdoor_air_nodelist = "OutdoorAir:NodeList" in epjson and len(epjson["OutdoorAir:NodeList"]) > 0
+    
+    # Add OutdoorAir:NodeList if not present
+    if not has_outdoor_air_nodelist:
+        # Create the OutdoorAir:NodeList category if it doesn't exist
+        if "OutdoorAir:NodeList" not in epjson:
+            epjson["OutdoorAir:NodeList"] = {}
+        
+        epjson["OutdoorAir:NodeList"]["OutdoorAir:NodeList"] = {
+            "nodes": [
+                {
+                    "node_or_nodelist_name": "Model Outdoor Air Node"
+                }
+            ]
+        }
+        print("Added OutdoorAir:NodeList referencing outdoor air node.")
+        modified = True
+    else:
+        print("Found existing OutdoorAir:NodeList.")
+    
+    # Save the modified epJSON if changes were made
+    if modified:
+        with open(output_path, 'w') as f:
+            json.dump(epjson, f, indent=2)
+        print(f"Modified epJSON saved to {output_path}")
+    else:
+        print("No changes needed to outdoor air nodes configuration.")
+        
+
+def modify_timestep(epjson_path: str, output_path: Optional[str] = None, timesteps_per_hour: int = 4) -> None:
+    """
+    Modifies the timestep in an epJSON file to a specific value.
+    
+    Args:
+        epjson_path: Path to the input epJSON file
+        output_path: Path to save the modified epJSON file (if None, will overwrite the input file)
+        timesteps_per_hour: Number of timesteps per hour (default: 4, which is 15-minute timesteps)
+    
+    Returns:
+        None
+    """
+    # Set default output path if not provided
+    if output_path is None:
+        output_path = epjson_path
+    
+    # Load the epJSON file
+    try:
+        with open(epjson_path, 'r') as f:
+            epjson = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: Input file '{epjson_path}' not found.")
+        return
+    except json.JSONDecodeError:
+        print(f"Error: '{epjson_path}' is not a valid JSON file.")
+        return
+    
+    # Check for existing Timestep object
+    timestep_found = False
+    timestep_modified = False
+    
+    if "Timestep" in epjson:
+        timestep_found = True
+        # Process all timestep objects (usually there's just one)
+        for timestep_key, timestep_data in epjson["Timestep"].items():
+            current_timestep = timestep_data.get("number_of_timesteps_per_hour", 1)
+            if current_timestep != timesteps_per_hour:
+                print(f"Changing timestep from {current_timestep} to {timesteps_per_hour} timesteps per hour")
+                epjson["Timestep"][timestep_key]["number_of_timesteps_per_hour"] = timesteps_per_hour
+                timestep_modified = True
+            else:
+                print(f"Timestep already set to {timesteps_per_hour} timesteps per hour")
+    
+    # If no Timestep object found, create one
+    if not timestep_found:
+        print(f"No Timestep object found. Creating one with {timesteps_per_hour} timesteps per hour")
+        epjson["Timestep"] = {
+            "Timestep 1": {
+                "number_of_timesteps_per_hour": timesteps_per_hour
+            }
+        }
+        timestep_modified = True
+    
+    # Check if we need to update RunPeriod objects to match timestep
+    # Some EnergyPlus simulations may have issues if RunPeriod doesn't align with timestep
+    if "RunPeriod" in epjson:
+        for runperiod_key, runperiod_data in epjson["RunPeriod"].items():
+            # Just noting this - we don't need to change anything in RunPeriod for timestep
+            pass
+    
+    # Save the modified epJSON if changes were made
+    if timestep_modified:
+        try:
+            with open(output_path, 'w') as f:
+                json.dump(epjson, f, indent=2)
+            print(f"Modified epJSON saved to {output_path}")
+        except Exception as e:
+            print(f"Error saving modified file: {e}")
+    else:
+        print("No changes were made to the epJSON file")
+        
