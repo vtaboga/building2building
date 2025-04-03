@@ -1,5 +1,8 @@
 import pytest
 import numpy as np
+import os
+import glob
+import shutil
 from src.simulator.create_simulator import create_simulator
 
 def test_gym_wrapper():
@@ -20,8 +23,6 @@ def test_gym_wrapper():
         
         # Take a step
         obs, reward, terminated, truncated, info = env.step([25.0])
-        print(f"Observation: {obs}")
-        print(f"Reward: {reward}")
         # Basic assertions to verify step output
         assert isinstance(obs, np.ndarray)
         assert isinstance(reward, float)
@@ -34,3 +35,11 @@ def test_gym_wrapper():
     
     # Clean up
     env.close()
+    
+    # Delete the eplus_output directory and all its contents
+    eplus_output_dir = "eplus_output"
+    if os.path.exists(eplus_output_dir):
+        try:
+            shutil.rmtree(eplus_output_dir)
+        except OSError:
+            pass  # Ignore errors if directory can't be deleted

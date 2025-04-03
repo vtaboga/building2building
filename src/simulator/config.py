@@ -32,18 +32,6 @@ def auto_get_actuators(
     return act
 
 
-def auto_add_temperature(
-    rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
-) -> None:
-    """Add zone air temperatures to the observation template."""
-    if "temperature" not in obs_template:
-        obs_template["temperature"] = {}
-
-    temps = obs_template["temperature"]
-    for z in query_info.rdf_zones(rdf):
-        temps[z] = simulation.VariableHole("ZONE AIR TEMPERATURE", z)
-
-
 def auto_add_setpoint_variables(
     rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
 ) -> None:
@@ -65,21 +53,17 @@ def auto_add_setpoint_variables(
         )
 
 
-def auto_add_comfort(
+def auto_add_temperature(
     rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
 ) -> None:
-    if "comfort" not in obs_template:
-        obs_template["comfort"] = {}
+    """Add zone air temperatures to the observation template."""
+    if "temperature" not in obs_template:
+        obs_template["temperature"] = {}
 
-    comfort = obs_template["comfort"]
+    temps = obs_template["temperature"]
     for z in query_info.rdf_zones(rdf):
-        comfort[z + "_comfort"] = simulation.VariableHole(
-            "Zone Thermal Comfort Pierce Model Thermal Sensation Index", z
-        )
-        comfort[z + "_discomfort"] = simulation.VariableHole(
-            "Zone Thermal Comfort Pierce Model Discomfort Index", z
-        )
-
+        temps[z] = simulation.VariableHole("ZONE AIR TEMPERATURE", z)
+        
 
 def auto_add_energy(
     rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]

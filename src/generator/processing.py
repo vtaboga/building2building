@@ -3,7 +3,7 @@ import pandas as pd
 import subprocess
 import logging
 import json
-from typing import List, Dict
+from typing import List, Dict, Any, Optional
 from src.generator.utils import get_counties_from_coords_batch
 
 logger = logging.getLogger('generator')
@@ -660,4 +660,76 @@ def add_outdoor_air_nodes_if_missing(epjson_path: str, output_path: str = None) 
         print(f"Modified epJSON saved to {output_path}")
     else:
         print("No changes needed to outdoor air nodes configuration.")
+        
+
+def modify_timestep(epjson_path: str, output_path: Optional[str] = None, timesteps_per_hour: int = 4) -> None:
+    """
+    Modifies the timestep in an epJSON file to a specific value.
+    
+    Args:
+        epjson_path: Path to the input epJSON file
+        output_path: Path to save the modified epJSON file (if None, will overwrite the input file)
+        timesteps_per_hour: Number of timesteps per hour (default: 4, which is 15-minute timesteps)
+    
+    Returns:
+        None
+    """
+    # Set default output path if not provided
+    if output_path is None:
+        output_path = epjson_path
+    
+    # Load the epJSON file
+    try:
+        with open(epjson_path, 'r') as f:
+            epjson = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: Input file '{epjson_path}' not found.")
+        return
+    except json.JSONDecodeError:
+        print(f"Error: '{epjson_path}' is not a valid JSON file.")
+        return
+    
+    # Check for existing Timestep object
+    timestep_found = False
+    timestep_modified = False
+    
+    if "Timestep" in epjson:
+        timestep_found = True
+        # Process all timestep objects (usually there's just one)
+        for timestep_key, timestep_data in epjson["Timestep"].items():
+            current_timestep = timestep_data.get("number_of_timesteps_per_hour", 1)
+            if current_timestep != timesteps_per_hour:
+                print(f"Changing timestep from {current_timestep} to {timesteps_per_hour} timesteps per hour")
+                epjson["Timestep"][timestep_key]["number_of_timesteps_per_hour"] = timesteps_per_hour
+                timestep_modified = True
+            else:
+                print(f"Timestep already set to {timesteps_per_hour} timesteps per hour")
+    
+    # If no Timestep object found, create one
+    if not timestep_found:
+        print(f"No Timestep object found. Creating one with {timesteps_per_hour} timesteps per hour")
+        epjson["Timestep"] = {
+            "Timestep 1": {
+                "number_of_timesteps_per_hour": timesteps_per_hour
+            }
+        }
+        timestep_modified = True
+    
+    # Check if we need to update RunPeriod objects to match timestep
+    # Some EnergyPlus simulations may have issues if RunPeriod doesn't align with timestep
+    if "RunPeriod" in epjson:
+        for runperiod_key, runperiod_data in epjson["RunPeriod"].items():
+            # Just noting this - we don't need to change anything in RunPeriod for timestep
+            pass
+    
+    # Save the modified epJSON if changes were made
+    if timestep_modified:
+        try:
+            with open(output_path, 'w') as f:
+                json.dump(epjson, f, indent=2)
+            print(f"Modified epJSON saved to {output_path}")
+        except Exception as e:
+            print(f"Error saving modified file: {e}")
+    else:
+        print("No changes were made to the epJSON file")
         

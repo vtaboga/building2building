@@ -25,9 +25,6 @@ def create_simulator(path_to_building: str, path_to_weather: str) -> gym.Env:
     # Add actuators
     actuators = config.auto_get_actuators(rdf)
 
-    print(f"{obs_template=}")
-    print(f"{actuators=}")
-
     observation_space = create_observation_space(obs_template)
     action_space = create_action_space(actuators)
 

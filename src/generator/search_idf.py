@@ -92,7 +92,7 @@ def search_idf(state: str, county:str, building_type: str, area: float, num_floo
         logger.error(f"Error during IDF search and processing: {e}")
         raise
 
-    building_files = [os.path.join("data/processed_idf", f"{state}", f"{county}", f"{idf_file}.epjson") for idf_file in idf_files]
+    building_files = [os.path.join("data/processed_idf", f"{state}", f"{county}", f"{idf_file}.epJSON") for idf_file in idf_files]
 
     return building_files, weather_file
 
