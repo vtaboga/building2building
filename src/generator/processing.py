@@ -273,9 +273,9 @@ def process_idf(idf_files: List[int], state: str, county: str):
     processed_paths = []
     for idf_id in idf_files:
         # Check if processed file already exists
-        processed_path = os.path.join(processed_dir, f"{idf_id}.idf")
+        processed_path = os.path.join(processed_dir, f"{idf_id}.epJSON")
         if os.path.exists(processed_path):
-            logger.info(f"Skipping {idf_id}.idf - already processed")
+            logger.info(f"Skipping {idf_id}.epJSON - already processed")
             processed_paths.append(processed_path)
             continue
             
