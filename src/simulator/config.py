@@ -35,15 +35,13 @@ def auto_get_actuators(
 def auto_add_temperature(
     rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
 ) -> None:
-    """Add a "ZONE AIR TEMPERATURE" for each zone in the graph."""
-    temps = {}
-    temps["environment"] = simulation.VariableHole(
-        "SITE OUTDOOR AIR DRYBULB TEMPERATURE",
-        "ENVIRONMENT",
-    )
+    """Add zone air temperatures to the observation template."""
+    if "temperature" not in obs_template:
+        obs_template["temperature"] = {}
+
+    temps = obs_template["temperature"]
     for z in query_info.rdf_zones(rdf):
         temps[z] = simulation.VariableHole("ZONE AIR TEMPERATURE", z)
-        obs_template["temperature"] = temps
 
 
 def auto_add_setpoint_variables(
@@ -86,29 +84,24 @@ def auto_add_comfort(
 def auto_add_energy(
     rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
 ) -> None:
-    if "reward" not in obs_template:
+    """Add HVAC energy consumption meters to the observation template."""
+    if "energy" not in obs_template:
         obs_template["energy"] = {}
 
-    r = obs_template["energy"]
-
-    r["whole_building"] = simulation.MeterHole("Electricity:HVAC")
-
-    for z in query_info.rdf_zones(rdf):
-        r[z + "_cooling"] = simulation.VariableHole(
-            "Zone Air System Sensible Cooling Energy", z
-        )
-        r[z + "_heating"] = simulation.VariableHole(
-            "Zone Air System Sensible Heating Energy", z
-        )
+    energy = obs_template["energy"]
+    # Add whole building HVAC energy meters only
+    energy["HVAC_electricity"] = simulation.MeterHole("Electricity:HVAC")
+    energy["HVAC_natural_gas"] = simulation.MeterHole("NaturalGas:HVAC")
 
 
 def auto_add_time(
     rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
 ) -> None:
-    """Add ubiquitous variables."""
+    """Add time variables to the observation template."""
+    if "time" not in obs_template:
+        obs_template["time"] = {}
 
-    time: typing.Any = {}
-    obs_template["time"] = time
+    time = obs_template["time"]
     time["current_time"] = simulation.FunctionHole(simulation.api.exchange.current_time)
     time["day_of_year"] = simulation.FunctionHole(simulation.api.exchange.day_of_year)
 
@@ -118,3 +111,19 @@ def auto_add_time(
     # time["day_of_week"] = myeplus.Function(myeplus.api.exchange.day_of_week)
     # time["actual_date_time"] = myeplus.Function(myeplus.api.exchange.actual_date_time)
     # time["year"] = myeplus.Function(myeplus.api.exchange.year)
+
+
+def auto_add_weather(
+    rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
+) -> None:
+    """Add outdoor air measurements to the observation template."""
+    if "weather" not in obs_template:
+        obs_template["weather"] = {}
+
+    weather = obs_template["weather"]
+    weather["drybulb_temp"] = simulation.VariableHole(
+        "Site Outdoor Air Drybulb Temperature", "Environment"
+    )
+    weather["relative_humidity"] = simulation.VariableHole(
+        "Site Outdoor Air Relative Humidity", "Environment"
+    )

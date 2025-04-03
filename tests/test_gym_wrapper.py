@@ -17,13 +17,11 @@ def test_gym_wrapper():
     
     # Run a few simulation steps
     for _ in range(5):
-        # Sample a random action within the action space
-        action = env.action_space.sample()
-        print(f"Action: {action}")
         
         # Take a step
         obs, reward, terminated, truncated, info = env.step([25.0])
-        
+        print(f"Observation: {obs}")
+        print(f"Reward: {reward}")
         # Basic assertions to verify step output
         assert isinstance(obs, np.ndarray)
         assert isinstance(reward, float)
