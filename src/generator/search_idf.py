@@ -8,25 +8,38 @@ logger = logging.getLogger('generator')
 
 def search_metadata(metadata: pd.DataFrame, building_type: str, area: float, num_floors: int, height: float=None, n_buildings: int=1):
     """
-    Search metadata for buildings matching the given criteria.
+    Search metadata for buildings matching the given criteria in order:
+    1. Building type (required)
+    2. Number of floors (if provided)
+    3. Area (if provided)
+    4. Height (if provided)
     """
-    # Filter by building type
+    # Filter by building type (required)
     filtered = metadata[metadata['BuildingType'] == building_type].copy()
     
     if filtered.empty:
         logger.warning(f"No buildings found of type: {building_type}")
         return []
 
-    # Compute distances for sorting
-    filtered['Area_diff'] = (filtered['Area'] - area).abs()
-    filtered['Floors_diff'] = (filtered['NumFloors'] - num_floors).abs()
+    # Initialize difference columns with 0 (no difference)
+    filtered['Floors_diff'] = 0
+    filtered['Area_diff'] = 0
+    filtered['Height_diff'] = 0
+
+    # Calculate differences for provided criteria
+    if num_floors is not None:
+        filtered['Floors_diff'] = (filtered['NumFloors'] - num_floors).abs()
+    
+    if area is not None:
+        filtered['Area_diff'] = (filtered['Area'] - area).abs()
+    
     if height is not None:
         filtered['Height_diff'] = (filtered['Height'] - height).abs()
-    else:
-        filtered['Height_diff'] = 0 
 
-    # Sort by area difference, then floors, then height
-    sorted_filtered = filtered.sort_values(by=['Area_diff', 'Floors_diff', 'Height_diff'])
+    # Sort by criteria in specified order: floors, area, height
+    sorted_filtered = filtered.sort_values(
+        by=['Floors_diff', 'Area_diff', 'Height_diff']
+    )
 
     # Get the top n_buildings IDs
     result = sorted_filtered['ID'].head(n_buildings).tolist()
