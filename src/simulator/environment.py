@@ -9,6 +9,8 @@ trouble to any gymnasium consumer.
 import typing
 import src.simulator.simulation as simulation
 import gymnasium
+import os
+import sys
 
 
 ObsType = typing.TypeVar("ObsType")
@@ -56,6 +58,20 @@ class EnergyPlusEnvironment(gymnasium.Env, typing.Generic[ObsType, ActType]):
         [ActType],  # Action space
         typing.Any,  # Raw action
     ]
+
+    ENERGYPLUS_PATH = '/usr/local/EnergyPlus-24.1.0'
+    
+    @classmethod
+    def setup(cls):
+        # Use container path when in container, otherwise use env variable
+        in_container = os.getenv('SINGULARITY_CONTAINER', '') != ''
+        if in_container:
+            path = '/usr/local/EnergyPlus-24.1.0'
+        else:
+            path = os.getenv('ENERGYPLUS_PATH')
+            
+        if path and os.path.exists(path):
+            sys.path.append(path)
 
     def __init__(
         self,

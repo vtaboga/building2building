@@ -5,6 +5,7 @@ import profile
 import rdflib
 import rdflib.namespace
 import json
+import urllib.parse
 
 
 def eprint(*args, **kwargs):
@@ -73,18 +74,23 @@ def rdf_from_json(jsonfile):
 
     for typename, elems in j.items():
         for name, keyvals in elems.items():
-            rTypename = rdflib.Literal(typename)
-            rName = rdflib.Literal(name)
-            # rTypename = n[typename]
-            # rName = n[name]
+            # Encode the type and name to create valid URIs
+            safe_typename = urllib.parse.quote(typename)
+            safe_name = urllib.parse.quote(name)
+            
+            rTypename = ns[safe_typename]
+            rName = ns[safe_name]
             g.add((rName, isa, rTypename))
             for key, val in keyvals.items():
                 if type(val) in [str, float, int]:
                     name = rdflib.Literal(val)
-                    g.add((rName, ns[key], name))
+                    # Encode the key for the predicate
+                    safe_key = urllib.parse.quote(key)
+                    g.add((rName, ns[safe_key], name))
                 if type(val) == list:
                     name = rdflib.BNode()
-                    g.add((rName, ns[key], name))
+                    safe_key = urllib.parse.quote(key)
+                    g.add((rName, ns[safe_key], name))
                     _intern_object(g, name, val)
 
     return g
@@ -131,15 +137,16 @@ def rdf_zones(rdf: rdflib.Graph) -> list[str]:
     """Return a list of all the zones in the building"""
     q = """# -*- mode: sparql -*-
 SELECT ?name WHERE {
-  ?name a "Zone" .
+    ?name a ns:Zone .
 }"""
-    return list(set(str(x) for (x,) in rdf.query(q)))
+    # Strip the URI prefix from zone names
+    return list(set(str(x).replace(str(ns), '') for (x,) in rdf.query(q, initNs={"ns": ns})))
 
 
 def rdf_schedules(rdf: rdflib.Graph):
     """Return a list of all the scheduler names in the building"""
     q = """# -*- mode: sparql -*-
 SELECT ?name WHERE {
-  ?name a "Schedule:Compact" .
+    ?name a ns:Schedule:Compact .
 }"""
-    return list(set(x.value for (x,) in rdf.query(q)))
+    return list(set(x.value for (x,) in rdf.query(q, initNs={"ns": ns})))

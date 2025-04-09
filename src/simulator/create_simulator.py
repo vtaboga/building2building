@@ -2,7 +2,7 @@ import gymnasium as gym
 import typing
 
 from src.simulator.utils import setup_energyplus_path
-from src.simulator.simulation import EnergyPlusSimulation
+from src.simulator.simulation import EnergyPlusSimulation, ActuatorHole
 from src.simulator.environment import EnergyPlusEnvironment
 from src.simulator.rewards import base_reward_function
 from src.simulator import query_info, config
@@ -22,8 +22,16 @@ def create_simulator(path_to_building: str, path_to_weather: str) -> gym.Env:
     config.auto_add_temperature(rdf, obs_template)
     config.auto_add_energy(rdf, obs_template)
     config.auto_add_weather(rdf, obs_template)
-    # Add actuators
-    actuators = config.auto_get_actuators(rdf)
+    # Get controllable setpoints instead of all actuators
+    setpoints = config.get_controllable_setpoints_rdf(rdf)
+    actuators = {}
+    for zone_setpoints in setpoints.values():
+        for setpoint in zone_setpoints:
+            actuators[setpoint['schedule_name']] = ActuatorHole(
+                "Schedule:Compact",
+                "Schedule Value",
+                setpoint['schedule_name']
+            )
 
     observation_space = create_observation_space(obs_template)
     action_space = create_action_space(actuators)
@@ -46,7 +54,7 @@ def create_simulator(path_to_building: str, path_to_weather: str) -> gym.Env:
         observation_space,
         observation_transform,
         action_space,
-        action_transform,
+        lambda act: action_transform(act, actuators),
     )
 
     return gymenv
