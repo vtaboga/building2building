@@ -16,7 +16,7 @@ def find_energyplus_path():
         # Container/Linux path
         '/usr/local/EnergyPlus-24-1-0',
         # Default Linux path
-        '/usr/local/energy-plus-24.1.0',
+        '/usr/local/energy-plus-24-1-0',
         # Default macOS path
         '/Applications/EnergyPlus-24-1-0',
         # Default Windows path
@@ -36,6 +36,17 @@ def find_energyplus_path():
         "2. Install EnergyPlus in one of the standard locations:\n"
         f"   {possible_paths}"
     )
+
+def get_energyplus_env():
+    """
+    Get the EnergyPlus path in a format suitable for environment variables.
+    Returns a tuple of (variable_name, path).
+    """
+    try:
+        path = find_energyplus_path()
+        return "ENERGYPLUS_PATH", path
+    except RuntimeError as e:
+        return None
 
 def setup_energyplus_path():
     """

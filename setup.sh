@@ -39,13 +39,40 @@ source .venv/bin/activate
 # Create .env file
 echo "📝 Creating .env file..."
 if [ ! -f ".env" ]; then
+    # First create the basic .env file
     cat > .env << EOF
 # Environment Variables
 PYTHONPATH=${PWD}
 VIRTUAL_ENV=${PWD}/.venv
 PATH=${PWD}/.venv/bin:${PATH}
-# Add other environment variables here
 EOF
+
+    # Now try to add EnergyPlus path
+    echo "🔍 Looking for EnergyPlus installation..."
+    EPLUS_ENV=$(python3 -c '
+import os
+from pathlib import Path
+
+def find_energyplus_path():
+    if "ENERGYPLUS_PATH" in os.environ:
+        return os.environ["ENERGYPLUS_PATH"]
+    path = "/usr/local/EnergyPlus-24-1-0"
+    if os.path.exists(path):
+        return path
+    return None
+
+result = find_energyplus_path()
+if result:
+    print(f"ENERGYPLUS_PATH={result}")
+')
+    
+    if [ ! -z "$EPLUS_ENV" ]; then
+        echo "$EPLUS_ENV" >> .env
+        echo "✨ Added EnergyPlus path to .env"
+    else
+        echo "⚠️  EnergyPlus installation not found. Will be installed later in container."
+    fi
+    
     echo "✨ Created .env file"
 else
     echo "ℹ️ .env file already exists, skipping..."
