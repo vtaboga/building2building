@@ -67,8 +67,18 @@ if result:
 ')
     
     if [ ! -z "$EPLUS_ENV" ]; then
-        echo "$EPLUS_ENV" >> .env
-        echo "✨ Added EnergyPlus path to .env"
+        EPLUS_PATH=$(echo "$EPLUS_ENV" | cut -d'=' -f2)
+        
+        # Add both EnergyPlus paths to PYTHONPATH
+        cat > .env << EOF
+# Environment Variables
+PYTHONPATH=${PWD}:${EPLUS_PATH}
+VIRTUAL_ENV=${PWD}/.venv
+PATH=${PWD}/.venv/bin:${PATH}
+${EPLUS_ENV}
+EOF
+        
+        echo "✨ Added EnergyPlus paths to .env"
     else
         echo "⚠️  EnergyPlus installation not found. Will be installed later in container."
     fi
@@ -82,6 +92,10 @@ fi
 echo "📦 Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
+
+# Install the package in development mode
+echo "📦 Installing package in development mode..."
+pip install -e .
 
 echo "🏗️ Building Singularity containers..."
 mkdir -p container
@@ -116,5 +130,6 @@ fi
 
 echo "🧪 Running validation tests..."
 pytest tests/test_container.py -v
+pytest tests/test_gym_wrapper.py -v
 
 echo "✅ Setup completed successfully!" 

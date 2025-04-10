@@ -7,7 +7,7 @@ from src.simulator.environment import EnergyPlusEnvironment
 from src.simulator.rewards import base_reward_function
 from src.simulator import query_info, config
 from src.simulator.observation_spaces import observation_transform, create_observation_space
-from src.simulator.action_spaces import action_transform, create_action_space
+from src.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints_rdf
 
 
 def create_simulator(path_to_building: str, path_to_weather: str) -> gym.Env:
@@ -23,7 +23,7 @@ def create_simulator(path_to_building: str, path_to_weather: str) -> gym.Env:
     config.auto_add_energy(rdf, obs_template)
     config.auto_add_weather(rdf, obs_template)
     # Get controllable setpoints instead of all actuators
-    setpoints = config.get_controllable_setpoints_rdf(rdf)
+    setpoints = get_controllable_setpoints_rdf(rdf)
     actuators = {}
     for zone_setpoints in setpoints.values():
         for setpoint in zone_setpoints:
