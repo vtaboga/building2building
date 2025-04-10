@@ -15,7 +15,7 @@ def extract_ordered_observations(obs):
     - HVAC Electricity Consumption
     - HVAC Natural Gas Consumption
     """
-    # Get sorted list of zones to ensure consistent order
+    # Get sorted list of zones to ensure consistent order - zones are already decoded
     zones = sorted(obs["temperature"].keys())
     
     return (

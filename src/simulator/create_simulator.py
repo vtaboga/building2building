@@ -48,9 +48,13 @@ def create_simulator(path_to_building: str, path_to_weather: str) -> gym.Env:
             actuators,
         )
 
+
+    def reward_function(obs):
+        return base_reward_function(obs, setpoints)
+
     gymenv = EnergyPlusEnvironment[typing.Any, typing.Any](
         make_energyplus,
-        base_reward_function,
+        reward_function, 
         observation_space,
         observation_transform,
         action_space,

@@ -18,7 +18,6 @@ import rdflib
 import typing
 import src.simulator.simulation as simulation
 from typing import Dict, List
-from src.simulator.query_info import ns
 import urllib.parse
 import logging
 from src.core.logging import setup_logger
@@ -52,12 +51,12 @@ def auto_add_setpoint_variables(
     setpoints["cooling"] = cooling
 
     for z in query_info.rdf_zones(rdf):
-        # URL-decode the zone name
+        # URL-decode the zone name and use it as the key
         decoded_zone = urllib.parse.unquote(z)
-        heating[z] = simulation.VariableHole(
+        heating[decoded_zone] = simulation.VariableHole(
             "Zone Thermostat Heating Setpoint Temperature", decoded_zone
         )
-        cooling[z] = simulation.VariableHole(
+        cooling[decoded_zone] = simulation.VariableHole(
             "Zone Thermostat Cooling Setpoint Temperature", decoded_zone
         )
 
@@ -71,9 +70,9 @@ def auto_add_temperature(
 
     temps = obs_template["temperature"]
     for z in query_info.rdf_zones(rdf):
-        # URL-decode the zone name
+        # URL-decode the zone name and use it as the key
         decoded_zone = urllib.parse.unquote(z)
-        temps[z] = simulation.VariableHole("ZONE AIR TEMPERATURE", decoded_zone)
+        temps[decoded_zone] = simulation.VariableHole("ZONE AIR TEMPERATURE", decoded_zone)
         
 
 def auto_add_energy(
