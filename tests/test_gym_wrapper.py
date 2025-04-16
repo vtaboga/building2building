@@ -5,17 +5,14 @@ import glob
 import shutil
 import gymnasium as gym
 import sys
+import src.simulator  
 
-print("Python path:", sys.path)  # Debug print
-print("Importing simulator package...")  # Debug print
-import src.simulator  # This should trigger the registration
-print("Available gym envs:", gym.envs.registry.keys())  # Debug print
 
 def test_gym_wrapper():
     # Create environment using gym registration - note the exact ID match
     env = gym.make(
         'EnergyPlus-v0',  
-        path_to_building="tests/fixtures/building.epJSON",
+        path_to_building="tests/fixtures/small_office.epJSON",
         path_to_weather="tests/fixtures/alaska.epw"
     )
     
@@ -32,6 +29,7 @@ def test_gym_wrapper():
     # Run a few simulation steps with random actions
     for _ in range(5):
         action = action_space.sample()  # Use random actions from action space
+        print(action)
         
         # Take a step
         obs, reward, terminated, truncated, info = env.step(action)
