@@ -92,7 +92,7 @@ def find_transitioned_file(original_file: str, to_ver: str) -> str:
 def transition_idf(idf_path: str, state: str, county: str, target_version: str = "24.1") -> str:
     """
     Transition an IDF file to the target EnergyPlus version using the transition executables.
-    Saves the processed file in data/processed_idf/state/county/ directory.
+    Saves the processed file in data/processed_buildings/state/county/ directory.
 
     Args:
         idf_path (str): Path to the input IDF file
@@ -101,11 +101,11 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
         target_version (str): Target EnergyPlus version (default: "24.1")
 
     Returns:
-        str: Path to the transitioned file in the processed_idf directory
+        str: Path to the transitioned file in the processed_buildigns directory
     """
 
     # Create the output directory structure
-    processed_dir = os.path.join("data", "processed_idf", state, county)
+    processed_dir = os.path.join("data", "processed_buildings", state, county)
     os.makedirs(processed_dir, exist_ok=True)
 
     idf_dir = os.path.dirname(idf_path)
@@ -216,7 +216,7 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
                 if os.path.exists(to_idd_link):
                     os.remove(to_idd_link)
         
-        # Copy the final file to the processed_idf directory instead of original location
+        # Copy the final file to the processed_buildigs directory instead of original location
         with open(working_file, 'r') as src, open(final_output_path, 'w') as dst:
             dst.write(src.read())
         
@@ -255,7 +255,7 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
     
     return final_output_path
 
-def process_idf(idf_files: List[int], state: str, county: str):
+def process_idf(building_files: List[tuple], state: str, county: str):
     """
     Process IDF files if they haven't been processed already.
     
@@ -267,11 +267,11 @@ def process_idf(idf_files: List[int], state: str, county: str):
     Returns:
         List[str]: List of paths to processed IDF files
     """
-    processed_dir = os.path.join("data", "processed_idf", state, county)
+    processed_dir = os.path.join("data", "processed_buildings", state, county)
     os.makedirs(processed_dir, exist_ok=True)
     
     processed_paths = []
-    for idf_id in idf_files:
+    for idf_id, characteristics in building_files:
         # Check if processed file already exists
         processed_path = os.path.join(processed_dir, f"{idf_id}.epJSON")
         if os.path.exists(processed_path):
@@ -289,6 +289,12 @@ def process_idf(idf_files: List[int], state: str, county: str):
         processed_path = transition_idf(original_path, state, county)
         if processed_path:
             processed_paths.append(processed_path)
+
+            # Save the building characteristics as a JSON file
+            characteristics_path = os.path.join(processed_dir, f"{idf_id}.json")
+            with open(characteristics_path, 'w') as json_file:
+                json.dump(characteristics, json_file, indent=4)
+            logger.info(f"Saved characteristics to {characteristics_path}")
             
     return processed_paths
 
