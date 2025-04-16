@@ -154,7 +154,7 @@ class EnergyPlusSimulation:
     actuators: typing.Dict[str, ActuatorHole]
 
     """ A PyTree of the same shape, but containing the associated handles."""
-    observation_handles: typing.Any = None
+    observation_template_with_handles: typing.Any = None
 
     number_of_warmup_phases_completed: int = 0
 
@@ -164,12 +164,9 @@ class EnergyPlusSimulation:
     max_steps: int = 10_000
 
     """The directory in which energyplus will write its log files."""
-    log_dir: str = "eplus_output"
+    log_dir: str = "results/eplus_output"
 
-    """Wether to let energyplus print a bunch of stuff to stdout."""
-    verbose: bool = True
-
-    actuator_handles: typing.Dict[str, int] = field(default_factory=dict)
+    actuator_control_handles: typing.Dict[str, int] = field(default_factory=dict)
 
     obs_chan: Channel = field(default_factory=Channel)
     act_chan: Channel = field(default_factory=Channel)
@@ -192,18 +189,18 @@ class EnergyPlusSimulation:
             if self.number_of_warmup_phases_completed < 5:
                 return
 
-            if self.observation_handles is None:
+            if self.observation_template_with_handles is None:
                 self.construct_handles(state)
 
             # We replace each Variable handle by its value,
-            var_replaced = template.search_replace(
-                self.observation_handles,
+            var_values = template.search_replace(
+                self.observation_template_with_handles,
                 VariableHandle,
-                lambda han: api.exchange.get_variable_value(state, han.handle),
+                lambda handle: api.exchange.get_variable_value(state, handle.handle),
             )
             # then each Meter handle by its value
             meter_replaced = template.search_replace(
-                var_replaced,
+                var_values,
                 MeterHandle,
                 lambda han: api.exchange.get_meter_value(state, han.handle),
             )
@@ -241,8 +238,8 @@ class EnergyPlusSimulation:
                 return
 
             # And we send the simulation the actuator values
-            for k, v in act.items():
-                api.exchange.set_actuator_value(state, self.actuator_handles[k], v)
+            for actuator_name, value in act.items():
+                api.exchange.set_actuator_value(state, self.actuator_control_handles[actuator_name], value)
 
             self.n_steps += 1
 
@@ -252,64 +249,78 @@ class EnergyPlusSimulation:
             self.obs_chan.put(_ExceptionResult(tb_exc, e))
 
     def construct_handles(self, state: int) -> None:
+        """
+        Prepare the simulation by:
+        1. Converting observation template entries to their respective handles
+        2. Creating a lookup dictionary for actuator control
+        """
         if self.verbose:
-            print("constructing handles")
+            print("Preparing observation and actuator handles")
 
-        # Most of Variable, Meter, Actuator need to be converted (by a
-        # running simulation) into a not-so-human-readable numerical handle.
-        # This is what we do here.
-
-        def get_var_handle(var: VariableHole) -> VariableHandle:
-            han = api.exchange.get_variable_handle(
+        # Step 1: Process the observation template
+        # Convert each variable specification into its numeric handle
+        def replace_variables_with_handles(var: VariableHole) -> VariableHandle:
+            handle = api.exchange.get_variable_handle(
                 state,
                 var.variable_name,
                 var.variable_key,
             )
-            if han < 0:
+            if handle < 0:
                 raise InvalidVariable(var)
-            return VariableHandle(han)
+            return VariableHandle(handle)
 
-        with_variable_handles = template.search_replace(
+        obs_with_variable_handles = template.search_replace(
             self.observation_template,
             VariableHole,
-            get_var_handle,
+            replace_variables_with_handles,
         )
 
-        def get_meter_handle(met: MeterHole) -> MeterHandle:
-            han = api.exchange.get_meter_handle(state, met.meter_name)
-            if han < 0:
-                raise InvalidMeter(met)
-            return MeterHandle(han)
+        # Convert each meter specification into its numeric handle
+        def replace_meters_with_handles(meter: MeterHole) -> MeterHandle:
+            handle = api.exchange.get_meter_handle(state, meter.meter_name)
+            if handle < 0:
+                raise InvalidMeter(meter)
+            return MeterHandle(handle)
 
-        with_meter_handles = template.search_replace(
-            with_variable_handles,
+        obs_with_variable_and_meter_handles = template.search_replace(
+            obs_with_variable_handles,
             MeterHole,
-            get_meter_handle,
+            replace_meters_with_handles,
         )
 
-        def get_actuator_handle(act: ActuatorHole) -> ActuatorHandle:
-            han = api.exchange.get_actuator_handle(
+        # Convert any actuator specifications in the observation template
+        def replace_actuators_with_handles(actuator: ActuatorHole) -> ActuatorHandle:
+            handle = api.exchange.get_actuator_handle(
                 state,
-                act.component_type,
-                act.control_type,
-                act.actuator_key,
+                actuator.component_type,
+                actuator.control_type,
+                actuator.actuator_key,
             )
-            if han < 0:
-                raise InvalidActuator(act)
-            return ActuatorHandle(han)
+            if handle < 0:
+                raise InvalidActuator(actuator)
+            return ActuatorHandle(handle)
 
-        with_actuator_handles = template.search_replace(
-            with_meter_handles,
+        obs_template_with_all_handles = template.search_replace(
+            obs_with_variable_and_meter_handles,
             ActuatorHole,
-            get_actuator_handle,
+            replace_actuators_with_handles,
         )
-        self.observation_handles = with_actuator_handles
-
-        for k, act in self.actuators.items():
-            han = api.exchange.get_actuator_handle(
-                state, act.component_type, act.control_type, act.actuator_key
+        
+        # Store the processed observation template for use in callbacks
+        self.observation_template_with_handles = obs_template_with_all_handles
+        
+        # Step 2: Create a separate dictionary for controlling actuators
+        # This maps actuator names to their respective handles for direct control
+        self.actuator_control_handles = {}
+        
+        for actuator_name, actuator_spec in self.actuators.items():
+            handle = api.exchange.get_actuator_handle(
+                state, 
+                actuator_spec.component_type, 
+                actuator_spec.control_type, 
+                actuator_spec.actuator_key
             )
-            self.actuator_handles[k] = han
+            self.actuator_control_handles[actuator_name] = handle
 
     def start(self) -> typing.Tuple[typing.Any, bool]:
         state = api.state_manager.new_state()

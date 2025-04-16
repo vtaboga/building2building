@@ -106,7 +106,6 @@ class EnergyPlusEnvironment(gymnasium.Env, typing.Generic[ObsType, ActType]):
         # Do something about the actions
         a = self.action_transform(action)
         obs, finished = self.ep.step(a)
-        # print(f"{obs}, {finished}")
         if not finished:
             transformed_obs = self.observation_transform(obs)
             self.last_obs = transformed_obs
