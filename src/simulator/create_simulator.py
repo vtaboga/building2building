@@ -10,7 +10,7 @@ from src.simulator.observation_spaces import observation_transform, create_obser
 from src.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints_rdf
 
 
-def create_simulator(path_to_building: str, path_to_weather: str) -> gym.Env:
+def create_simulator(path_to_building: str, path_to_weather: str, building_characteristics: dict) -> gym.Env:
     """
     Create a simulator for a given building and weather file.
     """
@@ -50,7 +50,7 @@ def create_simulator(path_to_building: str, path_to_weather: str) -> gym.Env:
 
 
     def reward_function(obs):
-        return base_reward_function(obs, setpoints)
+        return base_reward_function(obs, setpoints, building_characteristics)
 
     gymenv = EnergyPlusEnvironment[typing.Any, typing.Any](
         make_energyplus,
