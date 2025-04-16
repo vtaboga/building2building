@@ -30,17 +30,17 @@ class Args:
     """the wandb's project name"""
     wandb_entity: str = None
     """the entity (team) of wandb's project"""
-    capture_video: bool = False
-    """whether to capture videos of the agent performances (check out `videos` folder)"""
     save_model: bool = False
     """whether to save model into the `runs/{run_name}` folder"""
     upload_model: bool = False
     """whether to upload the saved model to huggingface"""
     hf_entity: str = ""
     """the user or org name of the model repository from the Hugging Face Hub"""
+    results_dir: str = "results"
+    """the base directory for storing all results"""
 
     # Algorithm specific arguments
-    env_id: str = "HalfCheetah-v4"
+    env_id: str = "EnergyPlus-v0"
     """the id of the environment"""
     total_timesteps: int = 1000000
     """total timesteps of the experiments"""
@@ -88,11 +88,13 @@ class Args:
     """the path to the EnergyPlus building file"""
     path_to_weather: str = None
     """the path to the EnergyPlus weather file"""
+    building_characteristics: dict = None
+    """the characteristics of the building"""
 
 
-def make_env(env_id, path_to_building, path_to_weather):
+def make_env(env_id, path_to_building, path_to_weather, building_characteristics):
     def thunk():
-        env = gym.make(env_id, path_to_building=path_to_building, path_to_weather=path_to_weather)
+        env = gym.make(env_id, path_to_building=path_to_building, path_to_weather=path_to_weather, building_characteristics=building_characteristics)
         return env
 
     return thunk
@@ -137,11 +139,11 @@ class Agent(nn.Module):
 
 
 def main(args: Args):
-
-    args.batch_size = int(args.num_envs * args.num_steps)
-    args.minibatch_size = int(args.batch_size // args.num_minibatches)
-    args.num_iterations = args.total_timesteps // args.batch_size
+    # Create directories for logs and outputs
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+    run_dir = os.path.join(args.results_dir, run_name)
+    os.makedirs(run_dir, exist_ok=True)
+
     if args.track:
         import wandb
 
@@ -154,7 +156,7 @@ def main(args: Args):
             monitor_gym=True,
             save_code=True,
         )
-    writer = SummaryWriter(f"runs/{run_name}")
+    writer = SummaryWriter(os.path.join(run_dir, "logs"))
     writer.add_text(
         "hyperparameters",
         "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
@@ -170,7 +172,7 @@ def main(args: Args):
 
     # env setup
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, args.path_to_building, args.path_to_weather) for _ in range(args.num_envs)]
+        [make_env(args.env_id, args.path_to_building, args.path_to_weather, args.building_characteristics) for _ in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
@@ -191,6 +193,10 @@ def main(args: Args):
     next_obs, _ = envs.reset(seed=args.seed)
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
+
+    args.batch_size = int(args.num_envs * args.num_steps)
+    args.minibatch_size = int(args.batch_size // args.num_minibatches)
+    args.num_iterations = args.total_timesteps // args.batch_size
 
     for iteration in range(1, args.num_iterations + 1):
         # Annealing the rate if instructed to do so.
@@ -319,7 +325,7 @@ def main(args: Args):
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
     if args.save_model:
-        model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
+        model_path = os.path.join(run_dir, f"{args.exp_name}.cleanrl_model")
         torch.save(agent.state_dict(), model_path)
         print(f"model saved to {model_path}")
         from cleanrl_utils.evals.ppo_eval import evaluate
@@ -342,7 +348,7 @@ def main(args: Args):
 
             repo_name = f"{args.env_id}-{args.exp_name}-seed{args.seed}"
             repo_id = f"{args.hf_entity}/{repo_name}" if args.hf_entity else repo_name
-            push_to_hub(args, episodic_returns, repo_id, "PPO", f"runs/{run_name}", f"videos/{run_name}-eval")
+            push_to_hub(args, episodic_returns, repo_id, "PPO", run_dir, f"videos/{run_name}-eval")
 
     envs.close()
     writer.close()
