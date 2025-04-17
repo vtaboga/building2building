@@ -4,7 +4,7 @@ import src.simulator.utils
 from src.generator.search_idf import search_idf
 from src.core.run_manager import RunManager
 from src.simulator.create_simulator import create_simulator
-from src.generator.processing import add_hvac_meters_to_epjson, add_outdoor_air_meters_to_epjson, modify_timestep
+from src.generator.processing import add_hvac_meters_to_epjson, add_outdoor_air_meters_to_epjson, modify_timestep, add_setpoint_control_to_epjson
 import numpy as np
 import os
 import json
@@ -84,6 +84,7 @@ if __name__ == "__main__":
     add_hvac_meters_to_epjson(building)
     add_outdoor_air_meters_to_epjson(building)
     modify_timestep(building)
+    add_setpoint_control_to_epjson(building)
 
     # Import gymnasium and create registered environment
     import gymnasium as gym

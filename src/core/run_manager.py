@@ -54,8 +54,6 @@ class RunManager:
         # Initialize wandb first if requested
         self.track_wandb = track_wandb
         self.wandb_run_id = None
-
-        print("TRACKING WANDB: ", track_wandb)
         
         if track_wandb:
             print("Initializing wandb")

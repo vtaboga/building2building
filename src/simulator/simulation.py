@@ -1,12 +1,3 @@
-"""It would be nice to be able to use energyplus through some familiar reset &
-step API. However, energyplus was not made for this. This module implements all
-the code glue needed to make the .step function work.
-
-Note, however, that at this point, the concept of a reward doesn't exist yet.
-This module only cares about control.
-
-"""
-
 import pyenergyplus.api
 import threading
 import src.simulator.template as template
@@ -292,30 +283,37 @@ class EnergyPlusSimulation:
             replace_meters_with_handles,
         )
 
-        # Convert any actuator specifications in the observation template
-        def replace_actuators_with_handles(actuator: ActuatorHole) -> ActuatorHandle:
-            handle = api.exchange.get_actuator_handle(
-                state,
-                actuator.component_type,
-                actuator.control_type,
-                actuator.actuator_key,
-            )
-            if handle < 0:
-                raise InvalidActuator(actuator)
-            return ActuatorHandle(handle)
+        self.observation_template_with_handles = obs_with_variable_and_meter_handles
 
-        obs_template_with_all_handles = template.search_replace(
-            obs_with_variable_and_meter_handles,
-            ActuatorHole,
-            replace_actuators_with_handles,
-        )
+        # Convert any actuator specifications in the observation template
+        #def replace_actuators_with_handles(actuator: ActuatorHole) -> ActuatorHandle:
+        #    handle = api.exchange.get_actuator_handle(
+        #        state,
+        #        actuator.component_type,
+        #        actuator.control_type,
+        #        actuator.actuator_key,
+        #    )
+        #    if handle < 0:
+        #        raise InvalidActuator(actuator)
+        #    return ActuatorHandle(handle)
+
+        #obs_template_with_all_handles = template.search_replace(
+        #    obs_with_variable_and_meter_handles,
+        #    ActuatorHole,
+        #    replace_actuators_with_handles,
+        #)
         
-        # Store the processed observation template for use in callbacks
-        self.observation_template_with_handles = obs_template_with_all_handles
         
         # Step 2: Create a separate dictionary for controlling actuators
         # This maps actuator names to their respective handles for direct control
         self.actuator_control_handles = {}
+
+        handle = api.exchange.get_actuator_handle(
+                state, 
+                "Zone Temperature Control", 
+                "Cooling Setpoint", 
+                "Space Type 1 Thermostat 3"
+            )
         
         for actuator_name, actuator_spec in self.actuators.items():
             handle = api.exchange.get_actuator_handle(
@@ -324,6 +322,8 @@ class EnergyPlusSimulation:
                 actuator_spec.control_type, 
                 actuator_spec.actuator_key
             )
+            if handle < 0:
+                raise InvalidActuator(actuator_spec)
             self.actuator_control_handles[actuator_name] = handle
 
     def start(self) -> typing.Tuple[typing.Any, bool]:

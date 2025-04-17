@@ -5,7 +5,8 @@ import logging
 import json
 from typing import List, Dict, Any, Optional
 from src.generator.utils import get_counties_from_coords_batch
-
+from src.simulator.action_spaces import get_controllable_setpoints_rdf
+from src.simulator import query_info
 logger = logging.getLogger('generator')
 
 def process_metadata(state: str):
@@ -739,3 +740,136 @@ def modify_timestep(epjson_path: str, output_path: Optional[str] = None, timeste
     else:
         print("No changes were made to the epJSON file")
         
+def add_setpoint_control_to_epjson(epjson_path: str, output_path: str = None) -> None:
+    """
+    Modifies an epJSON file to add controllable temperature setpoint schedules.
+    
+    Args:
+        epjson_path (str): Path to the input epJSON file
+        output_path (str, optional): Path to save the modified epJSON. If None, overwrites input file.
+    """
+    # Set default output path if not provided
+    if output_path is None:
+        output_path = epjson_path
+        
+    # Load the epJSON file
+    with open(epjson_path, 'r') as f:
+        epjson = json.load(f)
+        
+    # Get thermostat setpoints used in the building
+    thermostat_setpoints = get_temperature_setpoints(epjson_path)
+    
+    # Make sure Schedule:Compact exists in epjson
+    if "Schedule:Compact" not in epjson:
+        epjson["Schedule:Compact"] = {}
+        
+    def create_schedule_compact(temperature: float):
+        """Helper function to create a schedule compact object in the correct format"""
+        return {
+            "data": [
+                {"field": "Through: 12/31"},
+                {"field": "For: AllDays"},
+                {"field": "Until: 24:00"},
+                {"field": temperature}
+            ],
+            "schedule_type_limits_name": "Temperature"
+        }
+        
+    # Process each thermostat
+    for control_type, setpoint_name in thermostat_setpoints:
+        if control_type == "ThermostatSetpoint:DualSetpoint":
+            # Get the original schedule names
+            dual_setpoint = epjson["ThermostatSetpoint:DualSetpoint"][setpoint_name]
+            
+            # Create new schedule names
+            cooling_schedule_name = f"{setpoint_name} Cooling Setpoint"
+            heating_schedule_name = f"{setpoint_name} Heating Setpoint"
+            
+            # Update the thermostat to use new schedules
+            dual_setpoint["cooling_setpoint_temperature_schedule_name"] = cooling_schedule_name
+            dual_setpoint["heating_setpoint_temperature_schedule_name"] = heating_schedule_name
+            
+            # Create cooling setpoint schedule if it doesn't exist
+            if cooling_schedule_name not in epjson["Schedule:Compact"]:
+                epjson["Schedule:Compact"][cooling_schedule_name] = create_schedule_compact(25.0)
+            
+            # Create heating setpoint schedule if it doesn't exist
+            if heating_schedule_name not in epjson["Schedule:Compact"]:
+                epjson["Schedule:Compact"][heating_schedule_name] = create_schedule_compact(20.0)
+            
+        elif control_type == "ThermostatSetpoint:SingleHeating":
+            # Create new schedule name
+            heating_schedule_name = f"{setpoint_name} Heating Setpoint"
+            
+            # Update the thermostat to use new schedule
+            epjson["ThermostatSetpoint:SingleHeating"][setpoint_name]["setpoint_temperature_schedule_name"] = heating_schedule_name
+            
+            # Create heating setpoint schedule if it doesn't exist
+            if heating_schedule_name not in epjson["Schedule:Compact"]:
+                epjson["Schedule:Compact"][heating_schedule_name] = create_schedule_compact(20.0)
+            
+        elif control_type == "ThermostatSetpoint:SingleCooling":
+            # Create new schedule name
+            cooling_schedule_name = f"{setpoint_name} Cooling Setpoint"
+            
+            # Update the thermostat to use new schedule
+            epjson["ThermostatSetpoint:SingleCooling"][setpoint_name]["setpoint_temperature_schedule_name"] = cooling_schedule_name
+            
+            # Create cooling setpoint schedule if it doesn't exist
+            if cooling_schedule_name not in epjson["Schedule:Compact"]:
+                epjson["Schedule:Compact"][cooling_schedule_name] = create_schedule_compact(25.0)
+            
+        elif control_type == "ThermostatSetpoint:SingleHeatingOrCooling":
+            # Create new schedule name for the single setpoint
+            setpoint_schedule_name = f"{setpoint_name} Setpoint"
+            
+            # Update the thermostat to use new schedule
+            epjson["ThermostatSetpoint:SingleHeatingOrCooling"][setpoint_name]["setpoint_temperature_schedule_name"] = setpoint_schedule_name
+            
+            # Create setpoint schedule if it doesn't exist
+            if setpoint_schedule_name not in epjson["Schedule:Compact"]:
+                epjson["Schedule:Compact"][setpoint_schedule_name] = create_schedule_compact(22.5)
+    
+    # Save the modified epJSON
+    with open(output_path, 'w') as f:
+        json.dump(epjson, f, indent=2)
+
+def get_temperature_setpoints(epjson_path: str) -> List[tuple]:
+    """
+    Analyzes an epJSON file to identify thermostat setpoints that are used to control zones.
+    
+    Args:
+        epjson_path (str): Path to the epJSON file
+        
+    Returns:
+        List[tuple]: List of tuples containing (thermostat_type, thermostat_name) for thermostats 
+                     that are used to control at least one zone
+    """
+    # Convert epJSON to RDF for querying
+    rdf_graph = query_info.rdf_from_json(epjson_path)
+    
+    # Query to find thermostats that are used in zone controls
+    thermostat_query = """
+    SELECT DISTINCT ?control_type ?setpoint_name
+    WHERE {
+        # Find zone controls and their types
+        ?control a ns:ZoneControl%3AThermostat .
+        ?control ns:control_1_object_type ?control_type .
+        ?control ns:control_1_name ?setpoint_name .
+        
+        # Make sure the control is used by at least one zone
+        ?control ?zone_prop ?zone_name .
+        FILTER(?zone_prop = ns:zone_or_zonelist_name) .
+    }
+    """
+    
+    # Execute query and process results
+    results = []
+    for row in rdf_graph.query(thermostat_query, initNs={"ns": query_info.ns}):
+        control_type = str(row.control_type)
+        setpoint_name = str(row.setpoint_name)
+        results.append((control_type, setpoint_name))
+    
+    return results
+
+

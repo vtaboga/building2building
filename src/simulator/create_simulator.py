@@ -31,7 +31,7 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
     config.auto_add_temperature(rdf, obs_template)
     config.auto_add_energy(rdf, obs_template)
     config.auto_add_weather(rdf, obs_template)
-    # Get controllable setpoints instead of all actuators
+
     setpoints = get_controllable_setpoints_rdf(rdf)
     actuators = {}
     for zone_setpoints in setpoints.values():
@@ -47,15 +47,12 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
 
 
     def make_energyplus() -> EnergyPlusSimulation:
-        # For a simulation to run, we need a building file,
-        # a weather file, an observation template and the dict
-        # of actuators we want to control.
         return EnergyPlusSimulation(
             path_to_building,
             path_to_weather,
             obs_template,
             actuators,
-            run_manager=run_manager  # Pass the run manager to the simulation
+            run_manager=run_manager 
         )
 
 

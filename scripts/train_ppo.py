@@ -14,12 +14,12 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train PPO algorithm on EnergyPlus environment")
     parser.add_argument('--state', type=str, default="AL", help='State code (e.g., AL)')
     parser.add_argument('--county', type=str, default="Pike", help='County name')
-    parser.add_argument('--building-id', type=str, default="6014003401346", help='Building ID')
+    parser.add_argument('--building-id', type=str, default="6014003401548", help='Building ID')
     parser.add_argument('--seed', type=int, default=1, help='Random seed')
     parser.add_argument('--track', action='store_true', help='Track with wandb')
     parser.add_argument('--wandb-project', type=str, default="building2building", help='W&B project name')
     parser.add_argument('--wandb-entity', type=str, default="pierre-luc-bacon-mila-org", help='W&B entity')
-    parser.add_argument('--total-timesteps', type=int, default=1000, help='Total timesteps for training')
+    parser.add_argument('--total-timesteps', type=int, default=1000000, help='Total timesteps for training')
     
     return parser.parse_args()
 
