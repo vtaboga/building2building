@@ -2,7 +2,7 @@ import argparse
 from datetime import datetime
 import src.simulator.utils
 from src.generator.search_idf import search_idf
-from src.core.logging import setup_logger
+from src.core.run_manager import RunManager
 from src.simulator.create_simulator import create_simulator
 from src.generator.processing import add_hvac_meters_to_epjson, add_outdoor_air_meters_to_epjson, modify_timestep
 import numpy as np
@@ -29,6 +29,14 @@ def parse_arguments():
                        help='Number of buildings to search for')
     parser.add_argument('--episodes', type=int, default=1,
                        help='Number of episodes to run')
+    parser.add_argument('--seed', type=int, default=42,
+                       help='Random seed')
+    parser.add_argument('--track', action='store_true',
+                       help='Track with wandb')
+    parser.add_argument('--wandb-project', type=str, default="building2building",
+                       help='W&B project name')
+    parser.add_argument('--wandb-entity', type=str, default=None,
+                       help='W&B entity')
     
     return parser.parse_args()
 
@@ -36,29 +44,29 @@ if __name__ == "__main__":
     # Parse command line arguments
     args = parse_arguments()
     
-    # Create timestamp for unique folder and log file names
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    # Create a run manager for this experiment
+    run_manager = RunManager(
+        experiment_name="simulation",
+        track_wandb=args.track,
+        wandb_project=args.wandb_project,
+        wandb_entity=args.wandb_entity,
+        seed=args.seed,
+        tags={
+            "state": args.state,
+            "county": args.county,
+            "building_type": args.building_type,
+            "area": args.area,
+            "num_floors": args.num_floors,
+            "height": args.height,
+            "n_buildings": args.n_buildings,
+            "episodes": args.episodes
+        }
+    )
     
-    # Create base directories
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    results_dir = os.path.join(base_dir, 'results', f'simulation_{timestamp}')
-    logs_dir = os.path.join(base_dir, 'logs')
+    # Get logger from run manager
+    logger = run_manager.logger
     
-    # Create all necessary directories
-    os.makedirs(results_dir, exist_ok=True)
-    os.makedirs(logs_dir, exist_ok=True)
-    
-    # Save simulation parameters
-    params = vars(args)
-    with open(os.path.join(results_dir, 'parameters.json'), 'w') as f:
-        json.dump(params, f, indent=4)
-    
-    # Setup loggers with new path
-    log_filename = os.path.join(results_dir, 'simulation.log')
-    root_logger = setup_logger('root', filename=log_filename)
-    generator_logger = setup_logger('generator', filename=log_filename, add_handlers=False)
-    
-    
+    logger.info("Searching for building files...")
     buildings, path_to_weather = search_idf(
         state=args.state,
         county=args.county,
@@ -69,10 +77,10 @@ if __name__ == "__main__":
         n_buildings=args.n_buildings
     )
 
-    root_logger.info("Create simulator...")
+    logger.info("Create simulator...")
 
     # Process first building
-    building = buildings[0]
+    building, characteristics = buildings[0]
     add_hvac_meters_to_epjson(building)
     add_outdoor_air_meters_to_epjson(building)
     modify_timestep(building)
@@ -81,18 +89,20 @@ if __name__ == "__main__":
     import gymnasium as gym
     env_kwargs = {
         'path_to_building': building,
-        'path_to_weather': path_to_weather
+        'path_to_weather': path_to_weather,
+        'building_characteristics': characteristics,
+        'run_manager': run_manager  # Pass the run manager to the environment
     }
     env = gym.make('EnergyPlus-v0', **env_kwargs)
 
-    root_logger.info("Starting simulation episodes...")
+    logger.info("Starting simulation episodes...")
     
     # Create lists to store episode results
     episode_results = []
 
     # Run episodes
     for episode in range(args.episodes):
-        root_logger.info(f"Episode {episode + 1}/{args.episodes}")
+        logger.info(f"Episode {episode + 1}/{args.episodes}")
         
         episode_data = {
             'steps': [],
@@ -125,7 +135,15 @@ if __name__ == "__main__":
             })
             
             if step % 24 == 0:  # Log every 24 steps
-                root_logger.info(f"Step {step}, Reward: {reward:.2f}, Total: {total_reward:.2f}")
+                logger.info(f"Step {step}, Reward: {reward:.2f}, Total: {total_reward:.2f}")
+                
+                # Log metrics to wandb if enabled
+                if args.track:
+                    run_manager.log_metrics({
+                        'reward': float(reward),
+                        'total_reward': float(total_reward)
+                    }, step=step)
+                    
             step += 1
         
         # Store episode summary
@@ -133,22 +151,21 @@ if __name__ == "__main__":
         episode_data['episode_length'] = step
         episode_results.append(episode_data)
         
-        root_logger.info(f"Episode {episode + 1} finished. Total steps: {step}, Total reward: {total_reward:.2f}")
+        logger.info(f"Episode {episode + 1} finished. Total steps: {step}, Total reward: {total_reward:.2f}")
         
-        # Save episode results
-        with open(os.path.join(results_dir, f'episode_{episode+1}_results.json'), 'w') as f:
-            json.dump(episode_data, f, indent=4)
+        # Save episode results using run manager
+        run_manager.save_results(episode_data, f'episode_{episode+1}_results.json')
 
     # Save summary of all episodes
     summary = {
         'total_episodes': args.episodes,
         'average_reward': np.mean([ep['total_reward'] for ep in episode_results]),
         'average_length': np.mean([ep['episode_length'] for ep in episode_results]),
-        'timestamp': timestamp
     }
     
-    with open(os.path.join(results_dir, 'simulation_summary.json'), 'w') as f:
-        json.dump(summary, f, indent=4)
-
-    root_logger.info("Simulation complete. Results saved in: " + results_dir)
+    run_manager.save_results(summary, 'simulation_summary.json')
+    logger.info("Simulation complete. Results saved in: " + run_manager.run_dir)
     env.close()
+    
+    # Finalize the run
+    run_manager.finish()

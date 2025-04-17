@@ -6,5 +6,7 @@ register(
     kwargs={
         'path_to_building': None,  # Will be provided when creating env
         'path_to_weather': None,   # Will be provided when creating env
+        'building_characteristics': None,
+        'run_manager': None,
     }
 )

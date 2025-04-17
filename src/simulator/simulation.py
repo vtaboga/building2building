@@ -163,8 +163,11 @@ class EnergyPlusSimulation:
     """The amount of steps before the simulation exits."""
     max_steps: int = 10_000
 
+    """Whether to print verbose output."""
+    verbose: bool = False
+
     """The directory in which energyplus will write its log files."""
-    log_dir: str = "results/eplus_output"
+    _log_dir: str = "results/eplus_output"
 
     actuator_control_handles: typing.Dict[str, int] = field(default_factory=dict)
 
@@ -172,6 +175,9 @@ class EnergyPlusSimulation:
     act_chan: Channel = field(default_factory=Channel)
 
     state: typing.Union[None, int] = field(default=None, init=False)
+
+    """The run manager instance to use for logging and results"""
+    run_manager: typing.Optional[typing.Any] = None
 
     def callback_timestep(self, state: int) -> None:
         try:
@@ -254,8 +260,6 @@ class EnergyPlusSimulation:
         1. Converting observation template entries to their respective handles
         2. Creating a lookup dictionary for actuator control
         """
-        if self.verbose:
-            print("Preparing observation and actuator handles")
 
         # Step 1: Process the observation template
         # Convert each variable specification into its numeric handle
@@ -425,3 +429,13 @@ class EnergyPlusSimulation:
                 raise RuntimeError("Unreachable")
 
         return out
+
+    @property
+    def log_dir(self) -> str:
+        if self.run_manager:
+            return self.run_manager.get_eplus_output_dir()
+        return self._log_dir
+    
+    @log_dir.setter
+    def log_dir(self, value):
+        self._log_dir = value
