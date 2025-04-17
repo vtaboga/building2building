@@ -3,7 +3,7 @@ import os
 import random
 import time
 from dataclasses import dataclass
-
+from typing import Callable
 import gymnasium as gym
 import numpy as np
 import torch
@@ -12,6 +12,7 @@ import torch.optim as optim
 import tyro
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
+import logging
 
 
 @dataclass
@@ -42,7 +43,7 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "EnergyPlus-v0"
     """the id of the environment"""
-    total_timesteps: int = 1000000
+    total_timesteps: int = 100
     """total timesteps of the experiments"""
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
@@ -92,9 +93,13 @@ class Args:
     """the characteristics of the building"""
 
 
-def make_env(env_id, path_to_building, path_to_weather, building_characteristics):
+def make_env(env_id, path_to_building, path_to_weather, building_characteristics, run_manager=None):
     def thunk():
-        env = gym.make(env_id, path_to_building=path_to_building, path_to_weather=path_to_weather, building_characteristics=building_characteristics)
+        env = gym.make(env_id, 
+                      path_to_building=path_to_building, 
+                      path_to_weather=path_to_weather, 
+                      building_characteristics=building_characteristics,
+                      run_manager=run_manager)
         return env
 
     return thunk
@@ -138,15 +143,26 @@ class Agent(nn.Module):
         return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
 
 
-def main(args: Args):
+def main(args: Args, run_manager=None):
+    """
+    Main function to run PPO algorithm.
+    
+    Args:
+        args: Arguments for the PPO algorithm
+        run_manager: Optional RunManager instance for unified logging
+    """
     # Create directories for logs and outputs
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
-    run_dir = os.path.join(args.results_dir, run_name)
+    run_dir = args.results_dir
     os.makedirs(run_dir, exist_ok=True)
 
-    if args.track:
+    # Setup tracking based on run_manager
+    # Only initialize wandb internally if RunManager isn't handling it
+    use_internal_tracking = run_manager is None and args.track
+    
+    if use_internal_tracking:
+        print("Initializing wandb in ppo!")
         import wandb
-
         wandb.init(
             project=args.wandb_project_name,
             entity=args.wandb_entity,
@@ -156,11 +172,18 @@ def main(args: Args):
             monitor_gym=True,
             save_code=True,
         )
-    writer = SummaryWriter(os.path.join(run_dir, "logs"))
-    writer.add_text(
-        "hyperparameters",
-        "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
-    )
+    
+    # Use RunManager's logger and tensorboard if provided
+    if run_manager:
+        writer = run_manager.get_tensorboard_writer()
+        logger = run_manager.logger
+    else:
+        writer = SummaryWriter(os.path.join(run_dir, "logs"))
+        writer.add_text(
+            "hyperparameters",
+            "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
+        )
+        logger = logging.getLogger("ppo")
 
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
@@ -172,7 +195,8 @@ def main(args: Args):
 
     # env setup
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, args.path_to_building, args.path_to_weather, args.building_characteristics) for _ in range(args.num_envs)]
+        [make_env(args.env_id, args.path_to_building, args.path_to_weather, 
+                 args.building_characteristics, run_manager) for _ in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
@@ -325,19 +349,32 @@ def main(args: Args):
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
     if args.save_model:
-        model_path = os.path.join(run_dir, f"{args.exp_name}.cleanrl_model")
+        # Determine the appropriate path for saving the model
+        if run_manager:
+            # Use RunManager's models directory if available
+            models_dir = os.path.join(run_manager.run_dir, "models")
+            os.makedirs(models_dir, exist_ok=True)
+            model_path = os.path.join(models_dir, f"{args.exp_name}.pt")
+        else:
+            # Default path if RunManager is not available
+            model_path = os.path.join(run_dir, f"{args.exp_name}.cleanrl_model")
+        
+        # Save the model
         torch.save(agent.state_dict(), model_path)
-        print(f"model saved to {model_path}")
-        from cleanrl_utils.evals.ppo_eval import evaluate
+        logger.info(f"Model saved to {model_path}")
 
-        episodic_returns = evaluate(
-            model_path,
-            make_env,
-            args.env_id,
-            eval_episodes=10,
+        episodic_returns = ppo_evaluate(
+            model_path=model_path,
+            make_env=make_env,
+            env_id=args.env_id,
+            path_to_building=args.path_to_building,
+            path_to_weather=args.path_to_weather,
+            building_characteristics=args.building_characteristics,
+            eval_episodes=1,
             run_name=f"{run_name}-eval",
             Model=Agent,
             device=device,
+            run_manager=run_manager,
             gamma=args.gamma,
         )
         for idx, episodic_return in enumerate(episodic_returns):
@@ -352,3 +389,73 @@ def main(args: Args):
 
     envs.close()
     writer.close()
+
+
+def ppo_evaluate(
+    model_path: str,
+    make_env: Callable,
+    env_id: str,
+    path_to_building: str,
+    path_to_weather: str,
+    building_characteristics: dict,
+    eval_episodes: int,
+    run_name: str,
+    Model: torch.nn.Module,
+    device: torch.device = torch.device("cpu"),
+    run_manager=None,
+    gamma: float = 0.99,
+):
+    """
+    Evaluate a trained PPO model.
+    
+    Args:
+        model_path: Path to the saved model
+        make_env: Environment creation function
+        env_id: Environment ID
+        path_to_building: Path to building file
+        path_to_weather: Path to weather file
+        building_characteristics: Building characteristics dict
+        eval_episodes: Number of episodes to evaluate
+        run_name: Name for this evaluation run
+        Model: The model class to use
+        device: Device to run evaluation on
+        run_manager: Optional RunManager instance
+        gamma: Discount factor
+    """
+    # Create environment using the same setup as in training
+    envs = gym.vector.SyncVectorEnv([
+        make_env(env_id, path_to_building, path_to_weather, 
+                building_characteristics, run_manager)
+    ])
+    
+    # Create and load agent
+    agent = Model(envs).to(device)
+    agent.load_state_dict(torch.load(model_path, map_location=device))
+    agent.eval()
+
+    # Run evaluation
+    obs, _ = envs.reset()
+    episodic_returns = []
+    while len(episodic_returns) < eval_episodes:
+        with torch.no_grad():  # Add no_grad for evaluation
+            actions, _, _, _ = agent.get_action_and_value(torch.Tensor(obs).to(device))
+        next_obs, _, _, _, infos = envs.step(actions.cpu().numpy())
+        
+        if "final_info" in infos:
+            for info in infos["final_info"]:
+                if "episode" not in info:
+                    continue
+                # Use run_manager's logger if available
+                if run_manager:
+                    run_manager.logger.info(
+                        f"eval_episode={len(episodic_returns)}, "
+                        f"episodic_return={info['episode']['r']}"
+                    )
+                else:
+                    print(f"eval_episode={len(episodic_returns)}, "
+                          f"episodic_return={info['episode']['r']}")
+                episodic_returns += [info["episode"]["r"]]
+        obs = next_obs
+
+    envs.close()
+    return episodic_returns
