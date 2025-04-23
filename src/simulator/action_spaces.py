@@ -30,10 +30,13 @@ def action_transform(act, actuators):
     
     # Sort to ensure consistent ordering (heating should be first due to alphabetical order)
     schedule_names.sort()
+
+    heating_setpoint = round(act[0], 1)
+    offset = round(act[1], 1)
     
     return {
-        schedule_names[0]: act[0],  # Heating setpoint (first alphabetically)
-        schedule_names[1]: act[1],  # Cooling setpoint (second alphabetically)
+        schedule_names[0]: heating_setpoint + offset,  # Cooling setpoint (first alphabetically)
+        schedule_names[1]: heating_setpoint,  # Heating setpoint (second alphabetically)
     }
 
 def create_action_space(actuators) -> gym.spaces.Box:
@@ -42,10 +45,12 @@ def create_action_space(actuators) -> gym.spaces.Box:
     if len(actuators) != 2:
         raise ValueError(f"Expected 2 actuators (heating and cooling), got {len(actuators)}")
     
-    # Temperature bounds in Celsius
+    # Temperature bounds 
+    # The first valus is the heating setpoint
+    # The second value is the offset from the heating setpoint to the cooling setpoint: T_cooling = T_heating + offset
     return gym.spaces.Box(
-        np.array([12.0, 12.0]),  # Min heating and cooling temps
-        np.array([40.0, 40.0]),  # Max heating and cooling temps
+        np.array([15.0, 1.0]),  
+        np.array([25.0, 15.0])
     )
 
 

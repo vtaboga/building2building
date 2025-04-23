@@ -5,9 +5,9 @@ import json
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run constant baseline policy on EnergyPlus environment")
-    parser.add_argument('--state', type=str, default="AL", help='State code (e.g., AL)')
-    parser.add_argument('--county', type=str, default="Pike", help='County name')
-    parser.add_argument('--building-id', type=str, default="6014003401548", help='Building ID')
+    parser.add_argument('--state', '-s', type=str, help='State code (e.g., AL)')
+    parser.add_argument('--county', '-c', type=str, help='County name')
+    parser.add_argument('--building-id', '-b', type=str, help='Building ID')
     parser.add_argument('--heating-setpoint', type=float, default=21.0, help='Constant heating setpoint (°C)')
     parser.add_argument('--cooling-setpoint', type=float, default=24.0, help='Constant cooling setpoint (°C)')
     parser.add_argument('--seed', type=int, default=1, help='Random seed')

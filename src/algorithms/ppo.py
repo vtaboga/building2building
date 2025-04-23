@@ -13,6 +13,7 @@ import tyro
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 import logging
+from src.algorithms.utils import TrajectoryLogger
 
 
 @dataclass
@@ -93,13 +94,19 @@ class Args:
     """the characteristics of the building"""
 
 
-def make_env(env_id, path_to_building, path_to_weather, building_characteristics, run_manager=None):
+def make_env(env_id, path_to_building, path_to_weather, building_characteristics, gamma, run_manager=None):
     def thunk():
         env = gym.make(env_id, 
                       path_to_building=path_to_building, 
                       path_to_weather=path_to_weather, 
                       building_characteristics=building_characteristics,
                       run_manager=run_manager)
+        env = gym.wrappers.RecordEpisodeStatistics(env)
+        env = gym.wrappers.ClipAction(env)
+        env = gym.wrappers.NormalizeObservation(env)
+        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), observation_space=env.observation_space)
+        env = gym.wrappers.NormalizeReward(env, gamma=gamma)
+        env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -10, 10))
         return env
 
     return thunk
@@ -140,6 +147,7 @@ class Agent(nn.Module):
         probs = Normal(action_mean, action_std)
         if action is None:
             action = probs.sample()
+        
         return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
 
 
@@ -196,7 +204,7 @@ def main(args: Args, run_manager=None):
     # env setup
     envs = gym.vector.SyncVectorEnv(
         [make_env(args.env_id, args.path_to_building, args.path_to_weather, 
-                 args.building_characteristics, run_manager) for _ in range(args.num_envs)]
+                 args.building_characteristics, args.gamma, run_manager) for _ in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
@@ -433,29 +441,42 @@ def ppo_evaluate(
     agent.load_state_dict(torch.load(model_path, map_location=device))
     agent.eval()
 
+    # Initialize trajectory logger with the run manager's logger
+    trajectory_logger = TrajectoryLogger(
+        run_manager.data_dir if run_manager else "trajectories",
+        logger=run_manager.logger if run_manager else logging.getLogger(__name__)
+    )
+
     # Run evaluation
     obs, _ = envs.reset()
     episodic_returns = []
     while len(episodic_returns) < eval_episodes:
-        with torch.no_grad():  # Add no_grad for evaluation
+        with torch.no_grad():
             actions, _, _, _ = agent.get_action_and_value(torch.Tensor(obs).to(device))
-        next_obs, _, _, _, infos = envs.step(actions.cpu().numpy())
+        next_obs, rewards, _, _, infos = envs.step(actions.cpu().numpy())
         
+        # Log the trajectory
+        trajectory_logger.log(obs, actions.cpu().numpy(), rewards)
+
         if "final_info" in infos:
             for info in infos["final_info"]:
                 if "episode" not in info:
                     continue
-                # Use run_manager's logger if available
                 if run_manager:
                     run_manager.logger.info(
                         f"eval_episode={len(episodic_returns)}, "
                         f"episodic_return={info['episode']['r']}"
                     )
                 else:
-                    print(f"eval_episode={len(episodic_returns)}, "
-                          f"episodic_return={info['episode']['r']}")
+                    logging.getLogger(__name__).info(
+                        f"eval_episode={len(episodic_returns)}, "
+                        f"episodic_return={info['episode']['r']}"
+                    )
                 episodic_returns += [info["episode"]["r"]]
         obs = next_obs
+
+    # Save the trajectories
+    trajectory_logger.save()
 
     envs.close()
     return episodic_returns

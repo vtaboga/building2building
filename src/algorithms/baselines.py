@@ -4,12 +4,17 @@ import json
 from pathlib import Path
 from typing import Dict, Any
 from src.core.run_manager import RunManager
+from src.algorithms.utils import TrajectoryLogger
+from src.utils.results_parsing import parse_trajectories
 
 # Make sure to import your environment to register it
 import src.simulator
 
 def constant_policy(obs: np.ndarray, heating_setpoint: float = 21.0, cooling_setpoint: float = 24.0) -> np.ndarray:
-    return np.array([cooling_setpoint, heating_setpoint])
+    # The first value is the cooling setpoint
+    # The second value is the offset from the heating setpoint to the cooling setpoint
+    assert cooling_setpoint > heating_setpoint
+    return np.array([heating_setpoint, cooling_setpoint - heating_setpoint])
 
 def run_constant_baseline(
     env_id: str,
@@ -43,6 +48,12 @@ def run_constant_baseline(
         tags={"policy": "constant"}
     )
     
+    # Initialize trajectory logger
+    trajectory_logger = TrajectoryLogger(
+        run_manager.data_dir if run_manager else "trajectories",
+        logger=run_manager.logger
+    )
+    
     # Create and wrap the environment
     env = gym.make(
         env_id,
@@ -74,6 +85,9 @@ def run_constant_baseline(
         # Take step in environment
         obs, reward, done, truncated, info = env.step(action)
         
+        # Log the trajectory
+        trajectory_logger.log(obs, action, reward)
+        
         # Track metrics
         episode_reward += reward
         rewards.append(reward)
@@ -99,12 +113,20 @@ def run_constant_baseline(
     with open(results_path, "w") as f:
         json.dump(results, f, indent=4)
     
+    # Save the trajectories
+    trajectory_logger.save()
+    
     # Log final results
     run_manager.logger.info("Constant baseline evaluation completed")
     run_manager.logger.info(f"Total reward: {results['total_reward']:.2f}")
     run_manager.logger.info(f"Mean reward per step: {results['mean_reward']:.2f}")
     
     env.close()
+
+    # Parse the trajectories
+    parse_trajectories(trajectory_logger.trajectories_path)
+    run_manager.logger.info("Results parsed")
+
     run_manager.finish()
     
     return results

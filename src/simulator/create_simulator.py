@@ -45,14 +45,14 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
     observation_space = create_observation_space(obs_template)
     action_space = create_action_space(actuators)
 
-
     def make_energyplus() -> EnergyPlusSimulation:
         return EnergyPlusSimulation(
             path_to_building,
             path_to_weather,
             obs_template,
             actuators,
-            run_manager=run_manager 
+            run_manager=run_manager,
+            verbose=True
         )
 
 

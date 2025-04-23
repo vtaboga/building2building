@@ -179,10 +179,7 @@ class EnergyPlusSimulation:
             if api.exchange.warmup_flag(state):
                 return
 
-            # The energyplus simulator has 5 warmup phases. If we start
-            # evaluating setpoints and sending observations before all the
-            # warmup phases are all done, the policy will see the date jump
-            # around, which is bad.
+            # The energyplus simulator has 5 warmup phases.
             if self.number_of_warmup_phases_completed < 5:
                 return
 

@@ -225,11 +225,15 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
         
         # Convert the final IDF to epJSON
         epjson_path = convert_to_epjson(final_output_path)
+        logger.info(f"Converted to epJSON: {epjson_path}")
+        add_setpoint_control_to_epjson(epjson_path)
+        logger.info(f"Added setpoint control to {epjson_path}")
         if epjson_path:
             return epjson_path
         else:
             logger.error("Failed to convert to epJSON format")
             return final_output_path  # Return IDF path as fallback
+        
         
     finally:
         # Clean up temporary directory and additional files
