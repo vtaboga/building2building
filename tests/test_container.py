@@ -34,7 +34,7 @@ def get_singularity_cmd():
 def test_energyplus_simulation(output_dir):
     """Test that EnergyPlus can run a simulation successfully in the container."""
     project_root = get_project_root()
-    idf_path = project_root / "tests" / "fixtures" / "small_office.idf"
+    epjson_path = project_root / "tests" / "fixtures" / "small_office.epJSON"
     weather_path = project_root / "tests" / "fixtures" / "weather_small_office.epw"
     container_path = project_root / "container" / "container.sif"
     
@@ -45,7 +45,7 @@ def test_energyplus_simulation(output_dir):
     singularity_cmd = get_singularity_cmd()
     cmd = [
         singularity_cmd, "exec",
-        "-B", f"{idf_path.parent}:/input",
+        "-B", f"{epjson_path.parent}:/input",
         "-B", f"{output_dir}:/output",
         "--pwd", "/input",
         str(container_path),
@@ -53,7 +53,7 @@ def test_energyplus_simulation(output_dir):
         "-w", "/input/weather_small_office.epw",
         "-d", "/output",
         "-r",
-        "small_office.idf"
+        "small_office.epJSON"
     ]
     
     try:
