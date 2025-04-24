@@ -82,16 +82,16 @@ if path:
     if [ ! -z "$EPLUS_ENV" ]; then
         EPLUS_PATH=$(echo "$EPLUS_ENV" | cut -d'=' -f2)
         
-        # Add both EnergyPlus paths to PYTHONPATH
+        # Only add project path to PYTHONPATH, not EnergyPlus
         cat > .env << EOF
 # Environment Variables
-PYTHONPATH=${PWD}:${EPLUS_PATH}
+PYTHONPATH=${PWD}
 VIRTUAL_ENV=${PWD}/.venv
 PATH=${PWD}/.venv/bin:${PATH}
 ${EPLUS_ENV}
 EOF
         
-        echo "✨ Added EnergyPlus paths to .env"
+        echo "✨ Added EnergyPlus environment variable to .env"
     else
         echo "⚠️ EnergyPlus installation not found locally. You can rely on the container version or specify the path with --energyplus_path."
     fi

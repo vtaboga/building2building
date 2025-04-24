@@ -6,14 +6,19 @@ import shutil
 import gymnasium as gym
 import sys
 import src.simulator  
-
+import json
 
 def test_gym_wrapper():
     # Create environment using gym registration - note the exact ID match
+    with open("tests/fixtures/building.json", "r") as f:
+        building_characteristics = json.load(f)
+
+
     env = gym.make(
         'EnergyPlus-v0',  
-        path_to_building="tests/fixtures/small_office.epJSON",
-        path_to_weather="tests/fixtures/alaska.epw"
+        path_to_building="tests/fixtures/building.epJSON",
+        path_to_weather="tests/fixtures/alaska.epw",
+        building_characteristics=building_characteristics
     )
     
     # Reset environment and get initial observation
