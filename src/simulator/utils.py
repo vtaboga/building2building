@@ -40,14 +40,16 @@ class TrajectoryLogger:
             for name in self.observation_names
         ]
 
-        state_dict = {name: value for name, value in zip(names, state)}
+        # Convert NumPy types to native Python types for JSON serialization
+        state_dict = {name: float(value) if hasattr(value, 'item') else value 
+                     for name, value in zip(names, state)}
 
         self.total_reward += reward
 
         self.trajectories.append({
             "state": state_dict,
             "action": action.tolist() if hasattr(action, 'tolist') else action,
-            "reward": reward
+            "reward": float(reward) if hasattr(reward, 'item') else reward
         })
 
     @staticmethod
@@ -68,8 +70,21 @@ class TrajectoryLogger:
             filename (str): The name of the file to save the trajectories.
         """
         file_path = os.path.join(self.save_dir, filename)
+        
+        # Create a custom encoder to handle NumPy types
+        class NumpyEncoder(json.JSONEncoder):
+            def default(self, obj):
+                import numpy as np
+                if isinstance(obj, np.integer):
+                    return int(obj)
+                if isinstance(obj, np.floating):
+                    return float(obj)
+                if isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                return super(NumpyEncoder, self).default(obj)
+        
         with open(file_path, 'w') as f:
-            json.dump(self.trajectories, f, indent=4)
+            json.dump(self.trajectories, f, indent=4, cls=NumpyEncoder)
         self.logger.info(f"Trajectories saved to {file_path}")
 
 
