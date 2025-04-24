@@ -12,7 +12,6 @@ import gymnasium
 import os
 import sys
 
-
 ObsType = typing.TypeVar("ObsType")
 ActType = typing.TypeVar("ActType")
 
@@ -81,16 +80,25 @@ class EnergyPlusEnvironment(gymnasium.Env, typing.Generic[ObsType, ActType]):
         observation_transform: typing.Callable[[typing.Any], ObsType],
         action_space: gymnasium.Space[ActType],
         action_transform: typing.Callable[[ActType], typing.Any],
+        building_characteristics: typing.Dict[str, typing.Any],
+        controlled_zones: typing.List[str],
+        observation_names: typing.List[str],
     ):
         super(EnergyPlusEnvironment, self).__init__()
         self.make_energyplus = make_energyplus
         self.reward_fn = reward_fn
         self.observation_space = observation_space
         self.observation_transform = observation_transform
-
         self.action_space = action_space
         self.action_transform = action_transform
 
+        self.all_zones = building_characteristics.get("zone_lists", [])
+        print("all zones")
+        print(self.all_zones)
+        self.controlled_zones = controlled_zones
+        self.uncontrolled_zones = [zone for zone in self.all_zones if zone not in self.controlled_zones]
+        self.observation_names = observation_names
+        
     def reset(
         self,
         *,

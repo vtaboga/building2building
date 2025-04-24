@@ -127,7 +127,6 @@ def get_controllable_setpoints_rdf(rdf_graph: rdflib.Graph) -> Dict[str, List[Di
         
         zone_list_results = rdf_graph.query(zone_list_query, initNs={"ns": ns})
         zones_in_list = [str(row.zone) for row in zone_list_results]
-        
         # If no zones found in list, it's a direct zone reference
         if not zones_in_list:
             zones_in_list = [zone_name]

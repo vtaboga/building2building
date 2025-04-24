@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any
 from src.core.run_manager import RunManager
-from src.algorithms.utils import TrajectoryLogger
+from src.simulator.utils import TrajectoryLogger
 from src.utils.results_parsing import parse_trajectories
 
 # Make sure to import your environment to register it
@@ -48,12 +48,6 @@ def run_constant_baseline(
         tags={"policy": "constant"}
     )
     
-    # Initialize trajectory logger
-    trajectory_logger = TrajectoryLogger(
-        run_manager.data_dir if run_manager else "trajectories",
-        logger=run_manager.logger
-    )
-    
     # Create and wrap the environment
     env = gym.make(
         env_id,
@@ -61,6 +55,17 @@ def run_constant_baseline(
         path_to_weather=path_to_weather,
         building_characteristics=building_characteristics,
         run_manager=run_manager
+    )
+
+    uncontrolled_zones = env.unwrapped.uncontrolled_zones
+    controlled_zones = env.unwrapped.controlled_zones
+    observation_names = env.unwrapped.observation_names
+
+    # Initialize trajectory logger
+    trajectory_logger = TrajectoryLogger(
+        run_manager.data_dir if run_manager else "trajectories",
+        observation_names,
+        logger=run_manager.logger
     )
     
     # Set random seed
@@ -77,6 +82,8 @@ def run_constant_baseline(
     truncated = False
     
     run_manager.logger.info(f"Starting constant baseline evaluation with heating={heating_setpoint}°C, cooling={cooling_setpoint}°C")
+    run_manager.logger.info(f"Controlled zones: {controlled_zones}")
+    run_manager.logger.info(f"Uncontrolled zones: {uncontrolled_zones}")
     
     while not (done or truncated):
         # Get action from constant policy
@@ -86,7 +93,7 @@ def run_constant_baseline(
         obs, reward, done, truncated, info = env.step(action)
         
         # Log the trajectory
-        trajectory_logger.log(obs, action, reward)
+        trajectory_logger.log(obs, action, reward, controlled_zones, uncontrolled_zones)
         
         # Track metrics
         episode_reward += reward

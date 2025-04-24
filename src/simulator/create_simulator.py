@@ -34,6 +34,7 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
 
     setpoints = get_controllable_setpoints_rdf(rdf)
     actuators = {}
+    controlled_zones = list(setpoints.keys())
     for zone_setpoints in setpoints.values():
         for setpoint in zone_setpoints:
             actuators[setpoint['schedule_name']] = ActuatorHole(
@@ -42,7 +43,7 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
                 setpoint['schedule_name']
             )
 
-    observation_space = create_observation_space(obs_template)
+    observation_space, observation_names = create_observation_space(obs_template)
     action_space = create_action_space(actuators)
 
     def make_energyplus() -> EnergyPlusSimulation:
@@ -66,6 +67,9 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
         observation_transform,
         action_space,
         lambda act: action_transform(act, actuators),
+        building_characteristics,
+        controlled_zones,
+        observation_names
     )
 
     return gymenv

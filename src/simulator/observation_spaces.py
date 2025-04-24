@@ -18,33 +18,39 @@ def extract_ordered_observations(obs):
     # Get sorted list of zones to ensure consistent order - zones are already decoded
     zones = sorted(obs["temperature"].keys())
     
-    return (
-        # Zone temperatures (in sorted order)
+    # Create a list of names for the observations
+    names = (
+        [f"Zone Temperature {zone}" for zone in zones] +
+        ["Outdoor Air Temperature", "Outdoor Air Relative Humidity", "Current Time of Day", "Day of Year", 
+         "HVAC Electricity Consumption", "HVAC Natural Gas Consumption"]
+    )
+    
+    # Extract the values in the same order
+    values = (
         [obs["temperature"][zone] for zone in zones] +
-        # Weather variables
         [
             obs["weather"]["drybulb_temp"],
             obs["weather"]["relative_humidity"]
         ] +
-        # Time variables
         [
             obs["time"]["current_time"],
             obs["time"]["day_of_year"]
         ] +
-        # Energy variables 
         [
             obs["energy"]["HVAC_electricity"],
             obs["energy"]["HVAC_natural_gas"]
         ]
     )
+    
+    return names, values
 
 
 def observation_transform(obs):
     """Transform raw observations into a numpy array by extracting and ordering
     relevant values.
     """
-    obs = np.array(extract_ordered_observations(obs))
-    return obs
+    _, values = extract_ordered_observations(obs)
+    return np.array(values)
 
 
 def create_observation_space(obs_template: typing.Dict[str, typing.Any]) -> gym.spaces.Box:
@@ -65,7 +71,7 @@ def create_observation_space(obs_template: typing.Dict[str, typing.Any]) -> gym.
     Returns:
         gym.spaces.Box: The observation space with appropriate bounds
     """
-    observation_mock = extract_ordered_observations(obs_template)
+    names, observation_mock = extract_ordered_observations(obs_template)
     num_obs = len(observation_mock)
     
     # Create appropriate bounds for each observation type
@@ -104,5 +110,5 @@ def create_observation_space(obs_template: typing.Dict[str, typing.Any]) -> gym.
     
     # Energy bounds (already set to [0, inf])
     
-    return gym.spaces.Box(low_bounds, high_bounds)
+    return gym.spaces.Box(low_bounds, high_bounds), names
 
