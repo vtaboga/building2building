@@ -297,6 +297,9 @@ def process_idf(building_files: List[tuple], state: str, county: str):
 
             # Save the building characteristics as a JSON file
             characteristics_path = os.path.join(processed_dir, f"{idf_id}.json")
+            # Add zone lists to characteristics
+            zone_lists = get_zone_lists(processed_path)
+            characteristics["zone_lists"] = zone_lists
             with open(characteristics_path, 'w') as json_file:
                 json.dump(characteristics, json_file, indent=4)
             logger.info(f"Saved characteristics to {characteristics_path}")
@@ -876,4 +879,28 @@ def get_temperature_setpoints(epjson_path: str) -> List[tuple]:
     
     return results
 
+
+def get_zone_lists(epjson_path: str) -> List:
+    """
+    Analyzes an epJSON file to identify zone lists
+    
+    Args:
+        epjson_path (str): Path to the epJSON file
+    """
+
+    with open(epjson_path, 'r') as f:
+        epjson = json.load(f)
+
+    data = epjson["ZoneList"]
+    zone_names = []
+    # Iterate through each space type in the dictionary
+    for space_type, space_info in data.items():
+        # Check if 'zones' key exists in the current space type
+        if 'zones' in space_info:
+            # Extract zone names from each zone dictionary
+            for zone in space_info['zones']:
+                if 'zone_name' in zone:
+                    zone_names.append(zone['zone_name'])
+    
+    return zone_names  
 
