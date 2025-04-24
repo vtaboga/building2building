@@ -61,8 +61,8 @@ class RunManager:
             
         # Now create the run ID and directory structure, using wandb run ID if available
         if self.track_wandb and hasattr(self, 'wandb') and self.wandb_run_id:
-            # Use wandb run ID in our directory name
-            self.run_id = f"{experiment_name}_{self.wandb_run_id}"
+            # Use wandb run ID in our directory name but keep the timestamp
+            self.run_id = f"{experiment_name}_{self.timestamp}_{self.wandb_run_id}"
         else:
             # Create our own ID if not using wandb
             if seed is not None:
