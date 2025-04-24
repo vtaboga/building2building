@@ -67,17 +67,14 @@ def run_constant_baseline(
         observation_names,
         logger=run_manager.logger
     )
-    
-    # Set random seed
-    env.reset(seed=seed)
-    
+
     # Initialize metrics
     episode_reward = 0
     rewards = []
     timesteps = 0
     
     # Run the simulation
-    obs, _ = env.reset()
+    obs, _ = env.reset(seed=seed)
     done = False
     truncated = False
     

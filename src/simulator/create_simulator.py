@@ -1,7 +1,7 @@
 import gymnasium as gym
 import typing
 
-from src.simulator.utils import setup_energyplus_path
+from src.simulator.config_manager import setup_energyplus_path
 from src.simulator.simulation import EnergyPlusSimulation, ActuatorHole
 from src.simulator.environment import EnergyPlusEnvironment
 from src.simulator.rewards import base_reward_function

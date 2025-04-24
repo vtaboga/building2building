@@ -5,6 +5,23 @@ set -e
 
 echo "🚀 Starting setup process..."
 
+# Parse command line arguments
+ENERGYPLUS_PATH=""
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        --energyplus_path=*)
+        ENERGYPLUS_PATH="${key#*=}"
+        shift
+        ;;
+        *)
+        echo "Unknown option: $key"
+        echo "Usage: ./setup.sh [--energyplus_path=/path/to/energyplus]"
+        exit 1
+        ;;
+    esac
+done
+
 # Check if Python 3.10 is installed
 if ! command -v python3.10 &> /dev/null; then
     echo "❌ Python 3.10 is not installed. Please install Python 3.10 first."
@@ -47,24 +64,20 @@ VIRTUAL_ENV=${PWD}/.venv
 PATH=${PWD}/.venv/bin:${PATH}
 EOF
 
-    # Now try to add EnergyPlus path
+    # Now try to add EnergyPlus path using the new config_manager
     echo "🔍 Looking for EnergyPlus installation..."
-    EPLUS_ENV=$(python3 -c '
-import os
-from pathlib import Path
+    EPLUS_ENV=$(python3 -c "
+import sys
+sys.path.append('${PWD}')
+from src.simulator.config_manager import find_energyplus_path, update_energyplus_path
 
-def find_energyplus_path():
-    if "ENERGYPLUS_PATH" in os.environ:
-        return os.environ["ENERGYPLUS_PATH"]
-    path = "/usr/local/EnergyPlus-24-1-0"
-    if os.path.exists(path):
-        return path
-    return None
-
-result = find_energyplus_path()
-if result:
-    print(f"ENERGYPLUS_PATH={result}")
-')
+# Use manually specified path if provided
+path = find_energyplus_path('$ENERGYPLUS_PATH')
+if path:
+    # Save to config file for future use
+    update_energyplus_path(path)
+    print(f'ENERGYPLUS_PATH={path}')
+")
     
     if [ ! -z "$EPLUS_ENV" ]; then
         EPLUS_PATH=$(echo "$EPLUS_ENV" | cut -d'=' -f2)
@@ -80,7 +93,7 @@ EOF
         
         echo "✨ Added EnergyPlus paths to .env"
     else
-        echo "⚠️  EnergyPlus installation not found. Will be installed later in container."
+        echo "⚠️ EnergyPlus installation not found locally. You can rely on the container version or specify the path with --energyplus_path."
     fi
     
     echo "✨ Created .env file"

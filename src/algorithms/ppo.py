@@ -13,7 +13,7 @@ import tyro
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 import logging
-from src.algorithms.utils import TrajectoryLogger
+from src.simulator.utils import TrajectoryLogger
 
 
 @dataclass
