@@ -21,6 +21,7 @@ class TrajectoryLogger:
         self.trajectories = []
         self.logger = logger or logging.getLogger(__name__)
         self.observation_names = observation_names
+        self.total_reward = 0
 
     def log(self, state, action, reward, controlled_zones, uncontrolled_zones):
         """
@@ -40,6 +41,8 @@ class TrajectoryLogger:
         ]
 
         state_dict = {name: value for name, value in zip(names, state)}
+
+        self.total_reward += reward
 
         self.trajectories.append({
             "state": state_dict,

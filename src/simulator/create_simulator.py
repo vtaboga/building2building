@@ -53,7 +53,7 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
             obs_template,
             actuators,
             run_manager=run_manager,
-            verbose=True
+            verbose=False
         )
 
 

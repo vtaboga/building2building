@@ -44,13 +44,13 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "EnergyPlus-v0"
     """the id of the environment"""
-    total_timesteps: int = 100
+    total_timesteps: int = 1000000
     """total timesteps of the experiments"""
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
     num_envs: int = 1
     """the number of parallel game environments"""
-    num_steps: int = 2048
+    num_steps: int = 96
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
@@ -76,6 +76,8 @@ class Args:
     """the maximum norm for the gradient clipping"""
     target_kl: float = None
     """the target KL divergence threshold"""
+    eval_frequency: int = 100000
+    """how often (in steps) to evaluate the policy during training"""
 
     # to be filled in runtime
     batch_size: int = 0
@@ -229,6 +231,10 @@ def main(args: Args, run_manager=None):
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
+    
+    # Use the evaluation frequency from args
+    eval_frequency = args.eval_frequency
+    next_eval_step = eval_frequency
 
     for iteration in range(1, args.num_iterations + 1):
         # Annealing the rate if instructed to do so.
@@ -261,6 +267,42 @@ def main(args: Args, run_manager=None):
                         print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
                         writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                         writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+            
+            # Check if it's time to evaluate the current policy
+            if global_step >= next_eval_step:
+                logger.info(f"Evaluating policy at step {global_step}")
+                
+                # Save current model to a temporary file
+                temp_model_path = os.path.join(run_dir, f"temp_model_{global_step}.pt")
+                torch.save(agent.state_dict(), temp_model_path)
+                
+                # Evaluate the current policy
+                eval_returns = ppo_evaluate(
+                    model_path=temp_model_path,
+                    make_env=make_env,
+                    env_id=args.env_id,
+                    path_to_building=args.path_to_building,
+                    path_to_weather=args.path_to_weather,
+                    building_characteristics=args.building_characteristics,
+                    eval_episodes=1,  # Just one episode for quick validation
+                    run_name=f"{run_name}-validation-{global_step}",
+                    Model=Agent,
+                    device=device,
+                    run_manager=run_manager,
+                    gamma=args.gamma,
+                    save_trajectories=False,  # Don't save trajectories during validation
+                )
+                
+                # Log the validation return
+                mean_return = np.mean(eval_returns)
+                writer.add_scalar("validation/episodic_return", mean_return, global_step)
+                
+                # Remove the temporary model file
+                if os.path.exists(temp_model_path):
+                    os.remove(temp_model_path)
+                
+                # Set the next evaluation step
+                next_eval_step = global_step + eval_frequency
 
         # bootstrap value if not done
         with torch.no_grad():
@@ -353,7 +395,6 @@ def main(args: Args, run_manager=None):
         writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
         writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
-        print("SPS:", int(global_step / (time.time() - start_time)))
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
     if args.save_model:
@@ -384,6 +425,7 @@ def main(args: Args, run_manager=None):
             device=device,
             run_manager=run_manager,
             gamma=args.gamma,
+            save_trajectories=True,  # Save trajectories for final evaluation
         )
         for idx, episodic_return in enumerate(episodic_returns):
             writer.add_scalar("eval/episodic_return", episodic_return, idx)
@@ -412,6 +454,7 @@ def ppo_evaluate(
     device: torch.device = torch.device("cpu"),
     run_manager=None,
     gamma: float = 0.99,
+    save_trajectories: bool = False,
 ):
     """
     Evaluate a trained PPO model.
@@ -429,11 +472,12 @@ def ppo_evaluate(
         device: Device to run evaluation on
         run_manager: Optional RunManager instance
         gamma: Discount factor
+        save_trajectories: Whether to save trajectories
     """
     # Create environment using the same setup as in training
     envs = gym.vector.SyncVectorEnv([
         make_env(env_id, path_to_building, path_to_weather, 
-                building_characteristics, run_manager)
+                building_characteristics, gamma, run_manager)
     ])
     
     # Create and load agent
@@ -441,42 +485,58 @@ def ppo_evaluate(
     agent.load_state_dict(torch.load(model_path, map_location=device))
     agent.eval()
 
-    # Initialize trajectory logger with the run manager's logger
-    trajectory_logger = TrajectoryLogger(
-        run_manager.data_dir if run_manager else "trajectories",
-        logger=run_manager.logger if run_manager else logging.getLogger(__name__)
-    )
+    # Get the base environment to access its properties
+    base_env = envs.envs[0].unwrapped
+    observation_names = base_env.observation_names if hasattr(base_env, 'observation_names') else None
+    controlled_zones = base_env.controlled_zones if hasattr(base_env, 'controlled_zones') else None
+    uncontrolled_zones = base_env.uncontrolled_zones if hasattr(base_env, 'uncontrolled_zones') else None
 
-    # Run evaluation
-    obs, _ = envs.reset()
+    logger = run_manager.logger if run_manager else logging.getLogger(__name__)
     episodic_returns = []
-    while len(episodic_returns) < eval_episodes:
-        with torch.no_grad():
-            actions, _, _, _ = agent.get_action_and_value(torch.Tensor(obs).to(device))
-        next_obs, rewards, _, _, infos = envs.step(actions.cpu().numpy())
+    
+    # Run evaluation for the specified number of episodes
+    for episode in range(eval_episodes):
+        # Initialize trajectory logger for this episode
+        trajectory_logger = TrajectoryLogger(
+            os.path.join(run_manager.data_dir if run_manager else "trajectories", f"episode_{episode}"),
+            observation_names,
+            logger=logger
+        )
         
-        # Log the trajectory
-        trajectory_logger.log(obs, actions.cpu().numpy(), rewards)
+        # Reset environment
+        obs, _ = envs.reset()
+        done = False
+        
+        logger.info(f"Starting evaluation episode {episode+1}/{eval_episodes}")
+        
+        # Run episode until done
+        while not done:
+            with torch.no_grad():
+                actions, _, _, _ = agent.get_action_and_value(torch.Tensor(obs).to(device))
+            actions_np = actions.cpu().numpy()
+            next_obs, rewards, terminations, truncations, _ = envs.step(actions_np)
+            
+            # Log the trajectory
+            trajectory_logger.log(obs[0], actions_np[0], rewards[0], controlled_zones, uncontrolled_zones)
+            
+            # Check if episode is done
+            done = terminations[0] or truncations[0]
+            obs = next_obs
+        
+        # Episode is done, get the total reward from the trajectory logger
+        episode_return = trajectory_logger.total_reward
+        episodic_returns.append(episode_return)
+        
+        logger.info(f"Evaluation episode {episode+1} completed: return={episode_return:.2f}")
+        
+        # Save the trajectory if requested
+        if save_trajectories:
+            trajectory_logger.save()
+            logger.info(f"Saved trajectory for episode {episode+1}")
 
-        if "final_info" in infos:
-            for info in infos["final_info"]:
-                if "episode" not in info:
-                    continue
-                if run_manager:
-                    run_manager.logger.info(
-                        f"eval_episode={len(episodic_returns)}, "
-                        f"episodic_return={info['episode']['r']}"
-                    )
-                else:
-                    logging.getLogger(__name__).info(
-                        f"eval_episode={len(episodic_returns)}, "
-                        f"episodic_return={info['episode']['r']}"
-                    )
-                episodic_returns += [info["episode"]["r"]]
-        obs = next_obs
-
-    # Save the trajectories
-    trajectory_logger.save()
-
+    # Calculate and log average return
+    mean_return = sum(episodic_returns) / len(episodic_returns)
+    logger.info(f"Evaluation completed. Mean return: {mean_return:.2f}")
+    
     envs.close()
     return episodic_returns

@@ -93,8 +93,6 @@ class EnergyPlusEnvironment(gymnasium.Env, typing.Generic[ObsType, ActType]):
         self.action_transform = action_transform
 
         self.all_zones = building_characteristics.get("zone_lists", [])
-        print("all zones")
-        print(self.all_zones)
         self.controlled_zones = controlled_zones
         self.uncontrolled_zones = [zone for zone in self.all_zones if zone not in self.controlled_zones]
         self.observation_names = observation_names
