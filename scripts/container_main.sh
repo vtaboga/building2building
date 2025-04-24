@@ -18,7 +18,6 @@ fi
 
 # Create required directories if they don't exist
 mkdir -p "$REPO_ROOT/data"
-mkdir -p "$REPO_ROOT/logs"
 mkdir -p "$REPO_ROOT/results"
 
 # Determine which command to use
@@ -32,15 +31,33 @@ if ! command -v singularity &> /dev/null; then
     fi
 fi
 
+# Check if a script was specified
+if [ $# -lt 1 ] || [[ "$1" != *.py ]]; then
+    echo "❌ Error: You must provide a Python script to run"
+    echo "Usage: $0 <script.py> [args...]"
+    echo "Example: $0 scripts/main.py --config configs/default.json"
+    exit 1
+fi
+
+# Get the script path
+SCRIPT_PATH="$1"
+
+# If it's a relative path, make it absolute
+if [[ "$SCRIPT_PATH" != /* ]]; then
+    SCRIPT_PATH="/opt/repository/$SCRIPT_PATH"
+fi
+
+# Remove the script argument so remaining args can be passed to the script
+shift
+
 # Run the container with appropriate bindings
-echo "🚀 Running main.py in container..."
+echo "🚀 Running $(basename "$SCRIPT_PATH") in container..."
 "$SINGULARITY_CMD" exec \
     --bind "$REPO_ROOT:/opt/repository" \
     --bind "$REPO_ROOT/data:/opt/repository/data" \
-    --bind "$REPO_ROOT/logs:/opt/repository/logs" \
     --bind "$REPO_ROOT/results:/opt/repository/results" \
     --pwd /opt/repository \
     "$CONTAINER" \
-    /opt/repository/.venv/bin/python /opt/repository/scripts/main.py "$@"
+    /opt/repository/.venv/bin/python "$SCRIPT_PATH" "$@"
 
 echo "✅ Container execution completed" 
