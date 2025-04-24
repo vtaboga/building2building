@@ -1,8 +1,46 @@
 import numpy as np
 
-def base_reward_function(obs) -> float:
-    """Calculate a reward term from a "raw observation"."""
+def base_reward_function(obs, setpoints=None, building_characteristics=None) -> float:
+    """Calculate a reward combining temperature tracking and energy consumption.
     
-    print(f"Obs: {obs}")
-    power_penalty = obs["energy"]["HVAC_electricity"] + obs["energy"]["HVAC_natural_gas"]
-    return -power_penalty
+    Args:
+        obs: Dictionary containing observations
+        setpoints: Dictionary mapping zones to their setpoint configurations
+        building_characteristics: Dictionary containing building characteristics
+        
+    Returns:
+        float: Combined reward (negative values represent penalties)
+    """
+
+    # Energy consumption penalty
+    energy_penalty = obs["energy"]["HVAC_electricity"] + obs["energy"]["HVAC_natural_gas"]
+    energy_penalty /= 3600  # Convert to Wh
+
+    # Divide energy consumption by the building area if available
+    if building_characteristics and 'area' in building_characteristics:
+        energy_penalty /= building_characteristics['area']
+    
+    # If no setpoints provided, return just the power penalty
+    if setpoints is None:
+        return -energy_penalty
+        
+    # Get controlled zones (zones that have setpoints)
+    controlled_zones = list(setpoints.keys())
+    
+    # Calculate temperature tracking error for controlled zones
+    temp_error = 0
+    target_temp = 21.0  # Target temperature in °C
+    
+    for zone in controlled_zones:
+        current_temp = obs["temperature"][zone]
+        temp_error += (current_temp - target_temp) ** 2
+    
+    # Calculate mean squared error
+    if controlled_zones:
+        temp_error = temp_error / len(controlled_zones)
+    
+    # Combine rewards (negative values represent penalties)
+    # Equal weighting between temperature tracking and energy consumption
+    total_reward = -(temp_error + energy_penalty)
+    
+    return total_reward

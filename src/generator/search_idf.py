@@ -41,8 +41,16 @@ def search_metadata(metadata: pd.DataFrame, building_type: str, area: float, num
         by=['Floors_diff', 'Area_diff', 'Height_diff']
     )
 
-    # Get the top n_buildings IDs
-    result = sorted_filtered['ID'].head(n_buildings).tolist()
+    # Get the top n_buildings IDs and their characteristics
+    result = [
+        (row['ID'], {
+            'building_type': row['BuildingType'],
+            'num_floors': row['NumFloors'],
+            'area': row['Area'],
+            'height': row['Height']
+        })
+        for _, row in sorted_filtered.head(n_buildings).iterrows()
+    ]
     logger.debug(f"Found {len(result)} matching buildings")
     return result
 
@@ -67,7 +75,7 @@ def load_metadata(state: str, county: str=None):
         logger.error(f"Error loading metadata: {e}")
         raise
 
-def search_idf(state: str, county:str, building_type: str, area: float, num_floors: int, height: float, n_buildings: int):
+def search_idf(state: str, county: str, building_type: str, area: float, num_floors: int, height: float, n_buildings: int):
     """
     Search and process IDF files matching the specified criteria.
     """
@@ -86,15 +94,15 @@ def search_idf(state: str, county:str, building_type: str, area: float, num_floo
         logger.debug(f"Loaded metadata with shape: {metadata.shape}")
 
         # Search for matching IDF files
-        idf_files = search_metadata(metadata, building_type, area, num_floors, height, n_buildings)
-        if idf_files:
-            logger.info(f"Found {len(idf_files)} matching IDF files: {idf_files}")
+        building_files = search_metadata(metadata, building_type, area, num_floors, height, n_buildings)
+        if building_files:
+            logger.info(f"Found {len(building_files)} matching IDF files: {building_files}")
         else:
             logger.warning("No matching IDF files found")
             return
 
         # Process the found IDF files
-        processed_files = process_idf(idf_files, state, county)
+        processed_files = process_idf(building_files, state, county)
         logger.info(f"Successfully processed {len(processed_files)} IDF files")
 
         # Download associated weather files
@@ -105,7 +113,15 @@ def search_idf(state: str, county:str, building_type: str, area: float, num_floo
         logger.error(f"Error during IDF search and processing: {e}")
         raise
 
-    building_files = [os.path.join("data/processed_idf", f"{state}", f"{county}", f"{idf_file}.epJSON") for idf_file in idf_files]
+    # Create tuples of (path_to_building, dict_of_characteristics)
+
+    base_path = os.path.join("data/processed_buildings", f"{state}", f"{county}")
+    
+    
+    building_files = [
+        (os.path.join(base_path, f"{building[0]}.epJSON"), building[1])
+        for building in building_files
+    ]
 
     return building_files, weather_file
 

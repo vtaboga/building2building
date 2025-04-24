@@ -9,7 +9,8 @@ trouble to any gymnasium consumer.
 import typing
 import src.simulator.simulation as simulation
 import gymnasium
-
+import os
+import sys
 
 ObsType = typing.TypeVar("ObsType")
 ActType = typing.TypeVar("ActType")
@@ -57,6 +58,20 @@ class EnergyPlusEnvironment(gymnasium.Env, typing.Generic[ObsType, ActType]):
         typing.Any,  # Raw action
     ]
 
+    ENERGYPLUS_PATH = '/usr/local/EnergyPlus-24.1.0'
+    
+    @classmethod
+    def setup(cls):
+        # Use container path when in container, otherwise use env variable
+        in_container = os.getenv('SINGULARITY_CONTAINER', '') != ''
+        if in_container:
+            path = '/usr/local/EnergyPlus-24.1.0'
+        else:
+            path = os.getenv('ENERGYPLUS_PATH')
+            
+        if path and os.path.exists(path):
+            sys.path.append(path)
+
     def __init__(
         self,
         make_energyplus: typing.Callable[[], simulation.EnergyPlusSimulation],
@@ -65,16 +80,23 @@ class EnergyPlusEnvironment(gymnasium.Env, typing.Generic[ObsType, ActType]):
         observation_transform: typing.Callable[[typing.Any], ObsType],
         action_space: gymnasium.Space[ActType],
         action_transform: typing.Callable[[ActType], typing.Any],
+        building_characteristics: typing.Dict[str, typing.Any],
+        controlled_zones: typing.List[str],
+        observation_names: typing.List[str],
     ):
         super(EnergyPlusEnvironment, self).__init__()
         self.make_energyplus = make_energyplus
         self.reward_fn = reward_fn
         self.observation_space = observation_space
         self.observation_transform = observation_transform
-
         self.action_space = action_space
         self.action_transform = action_transform
 
+        self.all_zones = building_characteristics.get("zone_lists", [])
+        self.controlled_zones = controlled_zones
+        self.uncontrolled_zones = [zone for zone in self.all_zones if zone not in self.controlled_zones]
+        self.observation_names = observation_names
+        
     def reset(
         self,
         *,
@@ -90,7 +112,6 @@ class EnergyPlusEnvironment(gymnasium.Env, typing.Generic[ObsType, ActType]):
         # Do something about the actions
         a = self.action_transform(action)
         obs, finished = self.ep.step(a)
-        # print(f"{obs}, {finished}")
         if not finished:
             transformed_obs = self.observation_transform(obs)
             self.last_obs = transformed_obs

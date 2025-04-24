@@ -12,3 +12,7 @@ data/
 logs
 container/*.sif
 container/*.sh
+building2building.egg-info/
+results/
+wandb/
+configs/

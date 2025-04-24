@@ -5,6 +5,23 @@ set -e
 
 echo "🚀 Starting setup process..."
 
+# Parse command line arguments
+ENERGYPLUS_PATH=""
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        --energyplus_path=*)
+        ENERGYPLUS_PATH="${key#*=}"
+        shift
+        ;;
+        *)
+        echo "Unknown option: $key"
+        echo "Usage: ./setup.sh [--energyplus_path=/path/to/energyplus]"
+        exit 1
+        ;;
+    esac
+done
+
 # Check if Python 3.10 is installed
 if ! command -v python3.10 &> /dev/null; then
     echo "❌ Python 3.10 is not installed. Please install Python 3.10 first."
@@ -39,13 +56,46 @@ source .venv/bin/activate
 # Create .env file
 echo "📝 Creating .env file..."
 if [ ! -f ".env" ]; then
+    # First create the basic .env file
     cat > .env << EOF
 # Environment Variables
 PYTHONPATH=${PWD}
 VIRTUAL_ENV=${PWD}/.venv
 PATH=${PWD}/.venv/bin:${PATH}
-# Add other environment variables here
 EOF
+
+    # Now try to add EnergyPlus path using the new config_manager
+    echo "🔍 Looking for EnergyPlus installation..."
+    EPLUS_ENV=$(python3 -c "
+import sys
+sys.path.append('${PWD}')
+from src.simulator.config_manager import find_energyplus_path, update_energyplus_path
+
+# Use manually specified path if provided
+path = find_energyplus_path('$ENERGYPLUS_PATH')
+if path:
+    # Save to config file for future use
+    update_energyplus_path(path)
+    print(f'ENERGYPLUS_PATH={path}')
+")
+    
+    if [ ! -z "$EPLUS_ENV" ]; then
+        EPLUS_PATH=$(echo "$EPLUS_ENV" | cut -d'=' -f2)
+        
+        # Only add project path to PYTHONPATH, not EnergyPlus
+        cat > .env << EOF
+# Environment Variables
+PYTHONPATH=${PWD}
+VIRTUAL_ENV=${PWD}/.venv
+PATH=${PWD}/.venv/bin:${PATH}
+${EPLUS_ENV}
+EOF
+        
+        echo "✨ Added EnergyPlus environment variable to .env"
+    else
+        echo "⚠️ EnergyPlus installation not found locally. You can rely on the container version or specify the path with --energyplus_path."
+    fi
+    
     echo "✨ Created .env file"
 else
     echo "ℹ️ .env file already exists, skipping..."
@@ -55,6 +105,10 @@ fi
 echo "📦 Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
+
+# Install the package in development mode
+echo "📦 Installing package in development mode..."
+pip install -e .
 
 echo "🏗️ Building Singularity containers..."
 mkdir -p container
@@ -89,5 +143,6 @@ fi
 
 echo "🧪 Running validation tests..."
 pytest tests/test_container.py -v
+pytest tests/test_gym_wrapper.py -v
 
 echo "✅ Setup completed successfully!" 

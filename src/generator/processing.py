@@ -5,7 +5,8 @@ import logging
 import json
 from typing import List, Dict, Any, Optional
 from src.generator.utils import get_counties_from_coords_batch
-
+from src.simulator.action_spaces import get_controllable_setpoints_rdf
+from src.simulator import query_info
 logger = logging.getLogger('generator')
 
 def process_metadata(state: str):
@@ -92,7 +93,7 @@ def find_transitioned_file(original_file: str, to_ver: str) -> str:
 def transition_idf(idf_path: str, state: str, county: str, target_version: str = "24.1") -> str:
     """
     Transition an IDF file to the target EnergyPlus version using the transition executables.
-    Saves the processed file in data/processed_idf/state/county/ directory.
+    Saves the processed file in data/processed_buildings/state/county/ directory.
 
     Args:
         idf_path (str): Path to the input IDF file
@@ -101,11 +102,11 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
         target_version (str): Target EnergyPlus version (default: "24.1")
 
     Returns:
-        str: Path to the transitioned file in the processed_idf directory
+        str: Path to the transitioned file in the processed_buildigns directory
     """
 
     # Create the output directory structure
-    processed_dir = os.path.join("data", "processed_idf", state, county)
+    processed_dir = os.path.join("data", "processed_buildings", state, county)
     os.makedirs(processed_dir, exist_ok=True)
 
     idf_dir = os.path.dirname(idf_path)
@@ -216,7 +217,7 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
                 if os.path.exists(to_idd_link):
                     os.remove(to_idd_link)
         
-        # Copy the final file to the processed_idf directory instead of original location
+        # Copy the final file to the processed_buildigs directory instead of original location
         with open(working_file, 'r') as src, open(final_output_path, 'w') as dst:
             dst.write(src.read())
         
@@ -224,11 +225,15 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
         
         # Convert the final IDF to epJSON
         epjson_path = convert_to_epjson(final_output_path)
+        logger.info(f"Converted to epJSON: {epjson_path}")
+        add_setpoint_control_to_epjson(epjson_path)
+        logger.info(f"Added setpoint control to {epjson_path}")
         if epjson_path:
             return epjson_path
         else:
             logger.error("Failed to convert to epJSON format")
             return final_output_path  # Return IDF path as fallback
+        
         
     finally:
         # Clean up temporary directory and additional files
@@ -255,7 +260,7 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
     
     return final_output_path
 
-def process_idf(idf_files: List[int], state: str, county: str):
+def process_idf(building_files: List[tuple], state: str, county: str):
     """
     Process IDF files if they haven't been processed already.
     
@@ -267,11 +272,11 @@ def process_idf(idf_files: List[int], state: str, county: str):
     Returns:
         List[str]: List of paths to processed IDF files
     """
-    processed_dir = os.path.join("data", "processed_idf", state, county)
+    processed_dir = os.path.join("data", "processed_buildings", state, county)
     os.makedirs(processed_dir, exist_ok=True)
     
     processed_paths = []
-    for idf_id in idf_files:
+    for idf_id, characteristics in building_files:
         # Check if processed file already exists
         processed_path = os.path.join(processed_dir, f"{idf_id}.epJSON")
         if os.path.exists(processed_path):
@@ -289,6 +294,15 @@ def process_idf(idf_files: List[int], state: str, county: str):
         processed_path = transition_idf(original_path, state, county)
         if processed_path:
             processed_paths.append(processed_path)
+
+            # Save the building characteristics as a JSON file
+            characteristics_path = os.path.join(processed_dir, f"{idf_id}.json")
+            # Add zone lists to characteristics
+            zone_lists = get_zone_lists(processed_path)
+            characteristics["zone_lists"] = zone_lists
+            with open(characteristics_path, 'w') as json_file:
+                json.dump(characteristics, json_file, indent=4)
+            logger.info(f"Saved characteristics to {characteristics_path}")
             
     return processed_paths
 
@@ -733,3 +747,160 @@ def modify_timestep(epjson_path: str, output_path: Optional[str] = None, timeste
     else:
         print("No changes were made to the epJSON file")
         
+def add_setpoint_control_to_epjson(epjson_path: str, output_path: str = None) -> None:
+    """
+    Modifies an epJSON file to add controllable temperature setpoint schedules.
+    
+    Args:
+        epjson_path (str): Path to the input epJSON file
+        output_path (str, optional): Path to save the modified epJSON. If None, overwrites input file.
+    """
+    # Set default output path if not provided
+    if output_path is None:
+        output_path = epjson_path
+        
+    # Load the epJSON file
+    with open(epjson_path, 'r') as f:
+        epjson = json.load(f)
+        
+    # Get thermostat setpoints used in the building
+    thermostat_setpoints = get_temperature_setpoints(epjson_path)
+    
+    # Make sure Schedule:Compact exists in epjson
+    if "Schedule:Compact" not in epjson:
+        epjson["Schedule:Compact"] = {}
+        
+    def create_schedule_compact(temperature: float):
+        """Helper function to create a schedule compact object in the correct format"""
+        return {
+            "data": [
+                {"field": "Through: 12/31"},
+                {"field": "For: AllDays"},
+                {"field": "Until: 24:00"},
+                {"field": temperature}
+            ],
+            "schedule_type_limits_name": "Temperature"
+        }
+        
+    # Process each thermostat
+    for control_type, setpoint_name in thermostat_setpoints:
+        if control_type == "ThermostatSetpoint:DualSetpoint":
+            # Get the original schedule names
+            dual_setpoint = epjson["ThermostatSetpoint:DualSetpoint"][setpoint_name]
+            
+            # Create new schedule names
+            cooling_schedule_name = f"{setpoint_name} Cooling Setpoint"
+            heating_schedule_name = f"{setpoint_name} Heating Setpoint"
+            
+            # Update the thermostat to use new schedules
+            dual_setpoint["cooling_setpoint_temperature_schedule_name"] = cooling_schedule_name
+            dual_setpoint["heating_setpoint_temperature_schedule_name"] = heating_schedule_name
+            
+            # Create cooling setpoint schedule if it doesn't exist
+            if cooling_schedule_name not in epjson["Schedule:Compact"]:
+                epjson["Schedule:Compact"][cooling_schedule_name] = create_schedule_compact(25.0)
+            
+            # Create heating setpoint schedule if it doesn't exist
+            if heating_schedule_name not in epjson["Schedule:Compact"]:
+                epjson["Schedule:Compact"][heating_schedule_name] = create_schedule_compact(20.0)
+            
+        elif control_type == "ThermostatSetpoint:SingleHeating":
+            # Create new schedule name
+            heating_schedule_name = f"{setpoint_name} Heating Setpoint"
+            
+            # Update the thermostat to use new schedule
+            epjson["ThermostatSetpoint:SingleHeating"][setpoint_name]["setpoint_temperature_schedule_name"] = heating_schedule_name
+            
+            # Create heating setpoint schedule if it doesn't exist
+            if heating_schedule_name not in epjson["Schedule:Compact"]:
+                epjson["Schedule:Compact"][heating_schedule_name] = create_schedule_compact(20.0)
+            
+        elif control_type == "ThermostatSetpoint:SingleCooling":
+            # Create new schedule name
+            cooling_schedule_name = f"{setpoint_name} Cooling Setpoint"
+            
+            # Update the thermostat to use new schedule
+            epjson["ThermostatSetpoint:SingleCooling"][setpoint_name]["setpoint_temperature_schedule_name"] = cooling_schedule_name
+            
+            # Create cooling setpoint schedule if it doesn't exist
+            if cooling_schedule_name not in epjson["Schedule:Compact"]:
+                epjson["Schedule:Compact"][cooling_schedule_name] = create_schedule_compact(25.0)
+            
+        elif control_type == "ThermostatSetpoint:SingleHeatingOrCooling":
+            # Create new schedule name for the single setpoint
+            setpoint_schedule_name = f"{setpoint_name} Setpoint"
+            
+            # Update the thermostat to use new schedule
+            epjson["ThermostatSetpoint:SingleHeatingOrCooling"][setpoint_name]["setpoint_temperature_schedule_name"] = setpoint_schedule_name
+            
+            # Create setpoint schedule if it doesn't exist
+            if setpoint_schedule_name not in epjson["Schedule:Compact"]:
+                epjson["Schedule:Compact"][setpoint_schedule_name] = create_schedule_compact(22.5)
+    
+    # Save the modified epJSON
+    with open(output_path, 'w') as f:
+        json.dump(epjson, f, indent=2)
+
+def get_temperature_setpoints(epjson_path: str) -> List[tuple]:
+    """
+    Analyzes an epJSON file to identify thermostat setpoints that are used to control zones.
+    
+    Args:
+        epjson_path (str): Path to the epJSON file
+        
+    Returns:
+        List[tuple]: List of tuples containing (thermostat_type, thermostat_name) for thermostats 
+                     that are used to control at least one zone
+    """
+    # Convert epJSON to RDF for querying
+    rdf_graph = query_info.rdf_from_json(epjson_path)
+    
+    # Query to find thermostats that are used in zone controls
+    thermostat_query = """
+    SELECT DISTINCT ?control_type ?setpoint_name
+    WHERE {
+        # Find zone controls and their types
+        ?control a ns:ZoneControl%3AThermostat .
+        ?control ns:control_1_object_type ?control_type .
+        ?control ns:control_1_name ?setpoint_name .
+        
+        # Make sure the control is used by at least one zone
+        ?control ?zone_prop ?zone_name .
+        FILTER(?zone_prop = ns:zone_or_zonelist_name) .
+    }
+    """
+    
+    # Execute query and process results
+    results = []
+    for row in rdf_graph.query(thermostat_query, initNs={"ns": query_info.ns}):
+        control_type = str(row.control_type)
+        setpoint_name = str(row.setpoint_name)
+        results.append((control_type, setpoint_name))
+    
+    return results
+
+
+def get_zone_lists(epjson_path: str) -> List:
+    """
+    Analyzes an epJSON file to identify zone lists
+    
+    Args:
+        epjson_path (str): Path to the epJSON file
+    """
+
+    with open(epjson_path, 'r') as f:
+        epjson = json.load(f)
+
+    data = epjson["ZoneList"]
+    zone_names = []
+    # Iterate through each space type in the dictionary
+    for space_type, space_info in data.items():
+        # Check if 'zones' key exists in the current space type
+        if 'zones' in space_info:
+            # Extract zone names from each zone dictionary
+            for zone in space_info['zones']:
+                if 'zone_name' in zone:
+                    zone_names.append(zone['zone_name'])
+    
+    return zone_names  
+
