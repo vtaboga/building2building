@@ -13,7 +13,7 @@ import tyro
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 import logging
-from src.simulator.utils import TrajectoryLogger
+from src.simulator.utils import TrajectoryLogger, CustomNormalizeObservation
 
 
 @dataclass
@@ -105,11 +105,8 @@ def make_env(env_id, path_to_building, path_to_weather, building_characteristics
                       run_manager=run_manager)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env = gym.wrappers.ClipAction(env)
-        env = gym.wrappers.NormalizeObservation(env)
-        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), observation_space=env.observation_space)
-        env = gym.wrappers.NormalizeReward(env, gamma=gamma)
-        env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -10, 10))
-        return env
+        norm_env = CustomNormalizeObservation(env)
+        return norm_env
 
     return thunk
 
@@ -404,12 +401,33 @@ def main(args: Args, run_manager=None):
             models_dir = os.path.join(run_manager.run_dir, "models")
             os.makedirs(models_dir, exist_ok=True)
             model_path = os.path.join(models_dir, f"{args.exp_name}.pt")
+            norm_state_path = os.path.join(models_dir, f"{args.exp_name}_norm_state.pkl")
         else:
             # Default path if RunManager is not available
             model_path = os.path.join(run_dir, f"{args.exp_name}.cleanrl_model")
+            norm_state_path = os.path.join(run_dir, f"{args.exp_name}_norm_state.pkl")
         
         # Save the model
         torch.save(agent.state_dict(), model_path)
+        
+        # Save normalization state from the first environment
+        base_env = envs.envs[0]
+        norm_wrapper = None
+        
+        # Find the normalization wrapper
+        while base_env is not None:
+            if isinstance(base_env, CustomNormalizeObservation):
+                norm_wrapper = base_env
+                break
+            if hasattr(base_env, 'env'):
+                base_env = base_env.env
+            else:
+                break
+        
+        if norm_wrapper:
+            norm_wrapper.save_running_state(norm_state_path)
+            logger.info(f"Normalization state saved to {norm_state_path}")
+        
         logger.info(f"Model saved to {model_path}")
 
         episodic_returns = ppo_evaluate(
@@ -474,11 +492,37 @@ def ppo_evaluate(
         gamma: Discount factor
         save_trajectories: Whether to save trajectories
     """
+    # Initialize logger first to avoid reference errors
+    logger = run_manager.logger if run_manager else logging.getLogger(__name__)
+    
     # Create environment using the same setup as in training
+    env = make_env(env_id, path_to_building, path_to_weather, 
+                building_characteristics, gamma, run_manager)()
     envs = gym.vector.SyncVectorEnv([
         make_env(env_id, path_to_building, path_to_weather, 
                 building_characteristics, gamma, run_manager)
     ])
+    
+    # Find the normalization wrapper
+    norm_wrapper = None
+    temp_env = env
+    while temp_env is not None:
+        if isinstance(temp_env, CustomNormalizeObservation):
+            norm_wrapper = temp_env
+            break
+        if hasattr(temp_env, 'env'):
+            temp_env = temp_env.env
+        else:
+            break
+    
+    # Load normalization state if available
+    norm_state_path = model_path.replace('.pt', '_norm_state.pkl')
+    if norm_wrapper and os.path.exists(norm_state_path):
+        try:
+            norm_wrapper.load_running_state(norm_state_path)
+            logger.info(f"Loaded normalization state from {norm_state_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load normalization state: {e}")
     
     # Create and load agent
     agent = Model(envs).to(device)
@@ -491,7 +535,6 @@ def ppo_evaluate(
     controlled_zones = base_env.controlled_zones if hasattr(base_env, 'controlled_zones') else None
     uncontrolled_zones = base_env.uncontrolled_zones if hasattr(base_env, 'uncontrolled_zones') else None
 
-    logger = run_manager.logger if run_manager else logging.getLogger(__name__)
     episodic_returns = []
     
     # Run evaluation for the specified number of episodes
@@ -516,8 +559,14 @@ def ppo_evaluate(
             actions_np = actions.cpu().numpy()
             next_obs, rewards, terminations, truncations, _ = envs.step(actions_np)
             
-            # Log the trajectory
-            trajectory_logger.log(obs[0], actions_np[0], rewards[0], controlled_zones, uncontrolled_zones)
+            # Denormalize observation if we have a normalization wrapper
+            if norm_wrapper:
+                denorm_obs = norm_wrapper.denormalize(obs[0])   
+                # Log the denormalized observation in the trajectory
+                trajectory_logger.log(denorm_obs, actions_np[0], rewards[0], controlled_zones, uncontrolled_zones)
+            else:
+                # If no normalization wrapper, log the observation as is
+                trajectory_logger.log(obs[0], actions_np[0], rewards[0], controlled_zones, uncontrolled_zones)
             
             # Check if episode is done
             done = terminations[0] or truncations[0]
