@@ -106,6 +106,16 @@ class TrajectoryLogger:
         self.logger.info(f"Trajectories saved to {file_path}")
 
 
+class CustomRescaleAction(gym.wrappers.RescaleAction):
+
+    def __init__(self, env, min_action, max_action):
+        super().__init__(env, min_action, max_action)
+
+    def scale_action(self, action):
+        scaled_action = (action + 1.0) / 2.0 * (self.env.action_space.high - self.env.action_space.low) + self.env.action_space.low
+        return scaled_action
+
+
 class CustomNormalizeObservation(gym.Wrapper):
     """Custom normalization wrapper with special handling for cyclical variables,
     state saving and denormalization support.
@@ -218,7 +228,7 @@ class CustomNormalizeObservation(gym.Wrapper):
             observation = np.array(observation)
         
         # Make a copy to avoid modifying the original
-        obs_copy = observation.copy().astype(np.float32)
+        obs_copy = observation.copy().astype(np.float64)
         
         # Extract cyclical and non-cyclical parts
         cyclical_mask = np.zeros(observation.shape[-1], dtype=bool)
