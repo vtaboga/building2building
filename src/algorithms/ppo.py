@@ -13,7 +13,8 @@ import tyro
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 import logging
-from src.simulator.utils import TrajectoryLogger, CustomNormalizeObservation
+from src.simulator.utils import TrajectoryLogger
+from src.simulator.wrappers import NormalizeObservation
 
 
 @dataclass
@@ -105,7 +106,7 @@ def make_env(env_id, path_to_building, path_to_weather, building_characteristics
                       run_manager=run_manager)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env = gym.wrappers.ClipAction(env)
-        norm_env = CustomNormalizeObservation(env)
+        norm_env = NormalizeObservation(env)
         return norm_env
 
     return thunk
@@ -408,26 +409,7 @@ def main(args: Args, run_manager=None):
             norm_state_path = os.path.join(run_dir, f"{args.exp_name}_norm_state.pkl")
         
         # Save the model
-        torch.save(agent.state_dict(), model_path)
-        
-        # Save normalization state from the first environment
-        base_env = envs.envs[0]
-        norm_wrapper = None
-        
-        # Find the normalization wrapper
-        while base_env is not None:
-            if isinstance(base_env, CustomNormalizeObservation):
-                norm_wrapper = base_env
-                break
-            if hasattr(base_env, 'env'):
-                base_env = base_env.env
-            else:
-                break
-        
-        if norm_wrapper:
-            norm_wrapper.save_running_state(norm_state_path)
-            logger.info(f"Normalization state saved to {norm_state_path}")
-        
+        torch.save(agent.state_dict(), model_path)       
         logger.info(f"Model saved to {model_path}")
 
         episodic_returns = ppo_evaluate(
@@ -447,13 +429,6 @@ def main(args: Args, run_manager=None):
         )
         for idx, episodic_return in enumerate(episodic_returns):
             writer.add_scalar("eval/episodic_return", episodic_return, idx)
-
-        if args.upload_model:
-            from cleanrl_utils.huggingface import push_to_hub
-
-            repo_name = f"{args.env_id}-{args.exp_name}-seed{args.seed}"
-            repo_id = f"{args.hf_entity}/{repo_name}" if args.hf_entity else repo_name
-            push_to_hub(args, episodic_returns, repo_id, "PPO", run_dir, f"videos/{run_name}-eval")
 
     envs.close()
     writer.close()
@@ -507,22 +482,13 @@ def ppo_evaluate(
     norm_wrapper = None
     temp_env = env
     while temp_env is not None:
-        if isinstance(temp_env, CustomNormalizeObservation):
+        if isinstance(temp_env, NormalizeObservation):
             norm_wrapper = temp_env
             break
         if hasattr(temp_env, 'env'):
             temp_env = temp_env.env
         else:
             break
-    
-    # Load normalization state if available
-    norm_state_path = model_path.replace('.pt', '_norm_state.pkl')
-    if norm_wrapper and os.path.exists(norm_state_path):
-        try:
-            norm_wrapper.load_running_state(norm_state_path)
-            logger.info(f"Loaded normalization state from {norm_state_path}")
-        except Exception as e:
-            logger.warning(f"Failed to load normalization state: {e}")
     
     # Create and load agent
     agent = Model(envs).to(device)
