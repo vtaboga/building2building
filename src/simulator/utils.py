@@ -106,6 +106,48 @@ class TrajectoryLogger:
         self.logger.info(f"Trajectories saved to {file_path}")
 
 
+class CustomRescaleAction(gym.wrappers.RescaleAction):
+    def __init__(self, env, min_action, max_action):
+        """
+        Initialize the CustomRescaleAction wrapper.
+        
+        Args:
+            env: The environment to wrap
+            min_action: The minimum value of the new action space
+            max_action: The maximum value of the new action space
+        """
+        super().__init__(env, min_action, max_action)
+        self.min_action = min_action
+        self.max_action = max_action
+
+    def scale_action(self, action: np.ndarray) -> np.ndarray:
+        """
+        Scale an action from the normalized space (min_action to max_action) 
+        to the environment's original action space and clip it to stay within bounds.
+        
+        Args:
+            action: Action in the normalized space (min_action to max_action)
+            
+        Returns:
+            Action scaled to the environment's original action space and clipped
+        """
+        # Scale from [min_action, max_action] to [0, 1]
+        norm_action = (action - self.min_action) / (self.max_action - self.min_action)
+        
+        # Scale from [0, 1] to environment's action space
+        scaled_action = norm_action * (self.env.action_space.high - self.env.action_space.low) + self.env.action_space.low
+        
+        # Clip the action to ensure it stays within the environment's action space
+        # This wrapper is usually used in conjunction with a clipping wrapper
+        clipped_action = np.clip(
+            scaled_action,
+            self.env.action_space.low,
+            self.env.action_space.high
+        )
+        
+        return clipped_action
+
+
 class CustomNormalizeObservation(gym.Wrapper):
     """Custom normalization wrapper with special handling for cyclical variables,
     state saving and denormalization support.
@@ -218,7 +260,7 @@ class CustomNormalizeObservation(gym.Wrapper):
             observation = np.array(observation)
         
         # Make a copy to avoid modifying the original
-        obs_copy = observation.copy().astype(np.float32)
+        obs_copy = observation.copy().astype(np.float64)
         
         # Extract cyclical and non-cyclical parts
         cyclical_mask = np.zeros(observation.shape[-1], dtype=bool)

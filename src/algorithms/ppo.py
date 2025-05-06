@@ -13,8 +13,10 @@ import tyro
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 import logging
-from src.simulator.utils import TrajectoryLogger, CustomNormalizeObservation
+from src.simulator.utils import TrajectoryLogger, CustomNormalizeObservation, CustomRescaleAction
 
+# Set default tensor type to float64 for better precision
+torch.set_default_dtype(torch.float64)
 
 @dataclass
 class Args:
@@ -104,6 +106,7 @@ def make_env(env_id, path_to_building, path_to_weather, building_characteristics
                       building_characteristics=building_characteristics,
                       run_manager=run_manager)
         env = gym.wrappers.RecordEpisodeStatistics(env)
+        env = CustomRescaleAction(env, min_action=-1.0, max_action=1.0)
         env = gym.wrappers.ClipAction(env)
         norm_env = CustomNormalizeObservation(env)
         return norm_env
@@ -503,13 +506,17 @@ def ppo_evaluate(
                 building_characteristics, gamma, run_manager)
     ])
     
-    # Find the normalization wrapper
+    # Find both wrappers
     norm_wrapper = None
+    rescale_wrapper = None
     temp_env = env
+
     while temp_env is not None:
         if isinstance(temp_env, CustomNormalizeObservation):
             norm_wrapper = temp_env
-            break
+        if isinstance(temp_env, CustomRescaleAction):
+            rescale_wrapper = temp_env
+        
         if hasattr(temp_env, 'env'):
             temp_env = temp_env.env
         else:
@@ -562,8 +569,15 @@ def ppo_evaluate(
             # Denormalize observation if we have a normalization wrapper
             if norm_wrapper:
                 denorm_obs = norm_wrapper.denormalize(obs[0])   
+                
+                # Use the rescale wrapper if available, otherwise just use the raw actions
+                if rescale_wrapper:
+                    scaled_actions = rescale_wrapper.scale_action(actions_np[0])
+                else:
+                    scaled_actions = actions_np[0]
+                
                 # Log the denormalized observation in the trajectory
-                trajectory_logger.log(denorm_obs, actions_np[0], rewards[0], controlled_zones, uncontrolled_zones)
+                trajectory_logger.log(denorm_obs, scaled_actions, rewards[0], controlled_zones, uncontrolled_zones)
             else:
                 # If no normalization wrapper, log the observation as is
                 trajectory_logger.log(obs[0], actions_np[0], rewards[0], controlled_zones, uncontrolled_zones)

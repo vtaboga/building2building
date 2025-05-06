@@ -7,7 +7,8 @@ set -e
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Define container paths
-CONTAINER="$REPO_ROOT/container/container.sif"
+CONTAINER_PATH="$REPO_ROOT/container"
+CONTAINER="$CONTAINER_PATH/container.sif"
 
 # Check if container exists
 if [ ! -f "$CONTAINER" ]; then
@@ -36,26 +37,26 @@ if [ $# -lt 1 ] || [[ "$1" != *.py ]]; then
     echo "❌ Error: You must provide a Python script to run"
     echo "Usage: $0 <script.py> [args...]"
     echo "Example: $0 scripts/main.py --config configs/default.json"
+    echo ""
+    echo "For remote execution with scratch folder, use container_main_remote.sh instead:"
+    echo "./scripts/container_main_remote.sh --scratch=/scratch/user123 scripts/main.py --config configs/default.json"
     exit 1
 fi
 
 # Get the script path
 SCRIPT_PATH="$1"
+shift
 
 # If it's a relative path, make it absolute
 if [[ "$SCRIPT_PATH" != /* ]]; then
     SCRIPT_PATH="/opt/repository/$SCRIPT_PATH"
 fi
 
-# Remove the script argument so remaining args can be passed to the script
-shift
-
 # Run the container with appropriate bindings
 echo "🚀 Running $(basename "$SCRIPT_PATH") in container..."
+
 "$SINGULARITY_CMD" exec \
     --bind "$REPO_ROOT:/opt/repository" \
-    --bind "$REPO_ROOT/data:/opt/repository/data" \
-    --bind "$REPO_ROOT/results:/opt/repository/results" \
     --pwd /opt/repository \
     "$CONTAINER" \
     /opt/repository/.venv/bin/python "$SCRIPT_PATH" "$@"
