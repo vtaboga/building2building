@@ -28,16 +28,17 @@ if ! command -v python3.10 &> /dev/null; then
     exit 1
 fi
 
-# Check if pip is installed
-if ! command -v pip3 &> /dev/null; then
-    echo "❌ pip3 is not installed. Please install pip3 first."
+# Check if pip or pip3 is installed
+if ! (command -v pip &> /dev/null || command -v pip3 &> /dev/null); then
+    echo "❌ Neither pip nor pip3 is installed. Please install pip first."
     exit 1
 fi
 
 # Check if Singularity/Apptainer is installed
+CONTAINER_AVAILABLE=true
 if ! (command -v singularity &> /dev/null || command -v apptainer &> /dev/null); then
-    echo "❌ Neither Singularity nor Apptainer is installed. Please install one of them first."
-    exit 1
+    echo "⚠️ Neither Singularity nor Apptainer is installed. Will skip container-related steps."
+    CONTAINER_AVAILABLE=false
 fi
 
 # Create and activate virtual environment for local development
@@ -64,9 +65,11 @@ VIRTUAL_ENV=${PWD}/.venv
 PATH=${PWD}/.venv/bin:${PATH}
 EOF
 
-    # Now try to add EnergyPlus path using the new config_manager
-    echo "🔍 Looking for EnergyPlus installation..."
-    EPLUS_ENV=$(python3 -c "
+    # Only try to add EnergyPlus path if container is available
+    if [ "$CONTAINER_AVAILABLE" = true ]; then
+        # Now try to add EnergyPlus path using the new config_manager
+        echo "🔍 Looking for EnergyPlus installation..."
+        EPLUS_ENV=$(python3 -c "
 import sys
 sys.path.append('${PWD}')
 from src.simulator.config_manager import find_energyplus_path, update_energyplus_path
@@ -78,22 +81,25 @@ if path:
     update_energyplus_path(path)
     print(f'ENERGYPLUS_PATH={path}')
 ")
-    
-    if [ ! -z "$EPLUS_ENV" ]; then
-        EPLUS_PATH=$(echo "$EPLUS_ENV" | cut -d'=' -f2)
         
-        # Only add project path to PYTHONPATH, not EnergyPlus
-        cat > .env << EOF
+        if [ ! -z "$EPLUS_ENV" ]; then
+            EPLUS_PATH=$(echo "$EPLUS_ENV" | cut -d'=' -f2)
+            
+            # Only add project path to PYTHONPATH, not EnergyPlus
+            cat > .env << EOF
 # Environment Variables
 PYTHONPATH=${PWD}
 VIRTUAL_ENV=${PWD}/.venv
 PATH=${PWD}/.venv/bin:${PATH}
 ${EPLUS_ENV}
 EOF
-        
-        echo "✨ Added EnergyPlus environment variable to .env"
+            
+            echo "✨ Added EnergyPlus environment variable to .env"
+        else
+            echo "⚠️ EnergyPlus installation not found locally. You can rely on the container version or specify the path with --energyplus_path."
+        fi
     else
-        echo "⚠️ EnergyPlus installation not found locally. You can rely on the container version or specify the path with --energyplus_path."
+        echo "⚠️ Skipping EnergyPlus path configuration as container is not available."
     fi
     
     echo "✨ Created .env file"
@@ -110,39 +116,59 @@ pip install -r requirements.txt
 echo "📦 Installing package in development mode..."
 pip install -e .
 
-echo "🏗️ Building Singularity containers..."
-mkdir -p container
+# Only build containers if Singularity/Apptainer is available
+if [ "$CONTAINER_AVAILABLE" = true ]; then
+    echo "🏗️ Building Singularity containers..."
+    mkdir -p container
 
-# Download EnergyPlus installer if it doesn't exist
-EPLUS_INSTALLER="container/EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu20.04-x86_64.sh"
-if [ ! -f "$EPLUS_INSTALLER" ]; then
-    echo "📥 Downloading EnergyPlus installer..."
-    wget -O "$EPLUS_INSTALLER" https://github.com/NREL/EnergyPlus/releases/download/v24.1.0/EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu20.04-x86_64.sh
-    chmod +x "$EPLUS_INSTALLER"
-fi
+    # Download EnergyPlus installer if it doesn't exist
+    EPLUS_INSTALLER="container/EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu20.04-x86_64.sh"
+    if [ ! -f "$EPLUS_INSTALLER" ]; then
+        echo "📥 Downloading EnergyPlus installer..."
+        wget -O "$EPLUS_INSTALLER" https://github.com/NREL/EnergyPlus/releases/download/v24.1.0/EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu20.04-x86_64.sh
+        chmod +x "$EPLUS_INSTALLER"
+    fi
 
-# Build the containers
-SINGULARITY_CMD="singularity"
-if ! command -v singularity &> /dev/null; then
-    SINGULARITY_CMD="apptainer"
-fi
+    # Build the containers
+    SINGULARITY_CMD="singularity"
+    if ! command -v singularity &> /dev/null; then
+        SINGULARITY_CMD="apptainer"
+    fi
 
-# Check if debootstrap is installed
-if ! command -v debootstrap &> /dev/null; then
-    echo "❌ debootstrap is not installed. Installing..."
-    sudo apt-get update && sudo apt-get install -y debootstrap
-fi
+    # Check if debootstrap is installed
+    if ! command -v debootstrap &> /dev/null; then
+        echo "❌ debootstrap is not installed. Installing..."
+        sudo apt-get update && sudo apt-get install -y debootstrap
+    fi
 
-# Build container
-if [ ! -f "container/container.sif" ]; then
-    echo "🏗️ Building main container..."
-    sudo $SINGULARITY_CMD build container/container.sif container/container.def
+    # Build container
+    if [ ! -f "container/container.sif" ]; then
+        echo "🏗️ Building main container..."
+        sudo $SINGULARITY_CMD build container/container.sif container/container.def
+    else
+        echo "ℹ️ Main container already exists, skipping build..."
+    fi
+
+    # Ask if user wants to run tests
+    read -p "Do you want to run validation tests? (y/n): " RUN_TESTS
+    if [[ $RUN_TESTS =~ ^[Yy]$ ]]; then
+        echo "🧪 Running validation tests..."
+        pytest tests/test_container.py -v
+        pytest tests/test_gym_wrapper.py -v
+    else
+        echo "⏭️ Skipping tests as requested."
+    fi
 else
-    echo "ℹ️ Main container already exists, skipping build..."
+    echo "⚠️ Skipping container build and container-related tests."
+    
+    # Ask if user wants to run non-container tests
+    read -p "Do you want to run non-container tests? (y/n): " RUN_TESTS
+    if [[ $RUN_TESTS =~ ^[Yy]$ ]]; then
+        echo "🧪 Running non-container tests..."
+        pytest tests/test_gym_wrapper.py -v
+    else
+        echo "⏭️ Skipping tests as requested."
+    fi
 fi
-
-echo "🧪 Running validation tests..."
-pytest tests/test_container.py -v
-pytest tests/test_gym_wrapper.py -v
 
 echo "✅ Setup completed successfully!" 
