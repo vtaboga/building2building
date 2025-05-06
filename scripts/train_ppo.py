@@ -16,6 +16,7 @@ def parse_args():
     parser.add_argument('--state', '-s', type=str, help='State code (e.g., AL)')
     parser.add_argument('--county', '-c', type=str, help='County name')
     parser.add_argument('--building-id', '-b', type=str, help='Building ID')
+    parser.add_argument('--weather', '-w', type=str, help='EPW Weather file')
     
     # General training arguments
     parser.add_argument('--seed', type=int, default=1, help='Random seed')
@@ -32,13 +33,15 @@ def parse_args():
     parser.add_argument('--num-steps', type=int, default=2048, help='Steps per environment per rollout')
     parser.add_argument('--anneal-lr', action='store_true', default=True, help='Anneal learning rate')
     parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')
+    parser.add_argument('--reward-type', type=str, default="barrier", help='Reward type')
+    parser.add_argument('--energy-weight', type=float, default=1.0, help='Energy weight for base reward function')
     parser.add_argument('--gae-lambda', type=float, default=0.95, help='GAE lambda parameter')
     parser.add_argument('--num-minibatches', type=int, default=32, help='Number of minibatches')
     parser.add_argument('--update-epochs', type=int, default=10, help='Number of update epochs')
     parser.add_argument('--norm-adv', action='store_true', default=True, help='Normalize advantages')
     parser.add_argument('--clip-coef', type=float, default=0.2, help='PPO clipping coefficient')
     parser.add_argument('--clip-vloss', action='store_true', default=True, help='Clip value loss')
-    parser.add_argument('--ent-coef', type=float, default=0.0, help='Entropy coefficient')
+    parser.add_argument('--ent-coef', type=float, default=0.05, help='Entropy coefficient')
     parser.add_argument('--vf-coef', type=float, default=0.5, help='Value function coefficient')
     parser.add_argument('--max-grad-norm', type=float, default=0.5, help='Maximum gradient norm')
     parser.add_argument('--target-kl', type=float, default=None, help='Target KL divergence')
@@ -46,16 +49,6 @@ def parse_args():
                         help='How often (in steps) to evaluate the policy during training')
     
     return parser.parse_args()
-
-def make_env(env_id, path_to_building, path_to_weather, building_characteristics, run_manager=None):
-    def thunk():
-        env = gym.make(env_id, 
-                      path_to_building=path_to_building, 
-                      path_to_weather=path_to_weather, 
-                      building_characteristics=building_characteristics,
-                      run_manager=run_manager)
-        return env
-    return thunk
 
 if __name__ == "__main__":
     cmd_args = parse_args()
@@ -89,8 +82,9 @@ if __name__ == "__main__":
     args = Args(
         env_id="EnergyPlus-v0",
         path_to_building=building_path,
-        path_to_weather=f"data/weather/USA_{cmd_args.state}_Albertville.Muni.AP.720376_TMYx.2004-2018.epw",
+        path_to_weather=f"data/weather/{cmd_args.weather}",
         building_characteristics=building_characteristics,
+        reward_type=cmd_args.reward_type,
         
         # Transfer command line arguments to PPO Args
         track=cmd_args.track,

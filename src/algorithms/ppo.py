@@ -45,10 +45,14 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "EnergyPlus-v0"
     """the id of the environment"""
-    total_timesteps: int = 1000000
+    total_timesteps: int = 10000000
     """total timesteps of the experiments"""
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
+    reward_type: str = "barrier"
+    """the type of reward function to use"""
+    energy_weight: float = 1.0
+    """the weight of the energy consumption penalty"""
     num_envs: int = 1
     """the number of parallel game environments"""
     num_steps: int = 96
@@ -97,12 +101,14 @@ class Args:
     """the characteristics of the building"""
 
 
-def make_env(env_id, path_to_building, path_to_weather, building_characteristics, gamma, run_manager=None):
+def make_env(env_id, path_to_building, path_to_weather, building_characteristics, reward_type, energy_weight, gamma, run_manager=None):
     def thunk():
         env = gym.make(env_id, 
                       path_to_building=path_to_building, 
                       path_to_weather=path_to_weather, 
                       building_characteristics=building_characteristics,
+                      reward_type=reward_type,
+                      energy_weight=energy_weight,
                       run_manager=run_manager)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env = gym.wrappers.ClipAction(env)
@@ -203,8 +209,8 @@ def main(args: Args, run_manager=None):
 
     # env setup
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, args.path_to_building, args.path_to_weather, 
-                 args.building_characteristics, args.gamma, run_manager) for _ in range(args.num_envs)]
+        [make_env(env_id=args.env_id, path_to_building=args.path_to_building, path_to_weather=args.path_to_weather, 
+                 building_characteristics=args.building_characteristics, reward_type=args.reward_type, energy_weight=args.energy_weight, gamma=args.gamma, run_manager=run_manager) for _ in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
@@ -279,6 +285,8 @@ def main(args: Args, run_manager=None):
                     model_path=temp_model_path,
                     make_env=make_env,
                     env_id=args.env_id,
+                    reward_type=args.reward_type,
+                    energy_weight=args.energy_weight,
                     path_to_building=args.path_to_building,
                     path_to_weather=args.path_to_weather,
                     building_characteristics=args.building_characteristics,
@@ -402,11 +410,9 @@ def main(args: Args, run_manager=None):
             models_dir = os.path.join(run_manager.run_dir, "models")
             os.makedirs(models_dir, exist_ok=True)
             model_path = os.path.join(models_dir, f"{args.exp_name}.pt")
-            norm_state_path = os.path.join(models_dir, f"{args.exp_name}_norm_state.pkl")
         else:
             # Default path if RunManager is not available
             model_path = os.path.join(run_dir, f"{args.exp_name}.cleanrl_model")
-            norm_state_path = os.path.join(run_dir, f"{args.exp_name}_norm_state.pkl")
         
         # Save the model
         torch.save(agent.state_dict(), model_path)       
@@ -415,6 +421,8 @@ def main(args: Args, run_manager=None):
         episodic_returns = ppo_evaluate(
             model_path=model_path,
             make_env=make_env,
+            reward_type=args.reward_type,
+            energy_weight=args.energy_weight,
             env_id=args.env_id,
             path_to_building=args.path_to_building,
             path_to_weather=args.path_to_weather,
@@ -437,6 +445,8 @@ def main(args: Args, run_manager=None):
 def ppo_evaluate(
     model_path: str,
     make_env: Callable,
+    reward_type: str,
+    energy_weight: float,
     env_id: str,
     path_to_building: str,
     path_to_weather: str,
@@ -472,10 +482,10 @@ def ppo_evaluate(
     
     # Create environment using the same setup as in training
     env = make_env(env_id, path_to_building, path_to_weather, 
-                building_characteristics, gamma, run_manager)()
+                building_characteristics, reward_type, gamma, energy_weight, run_manager)()
     envs = gym.vector.SyncVectorEnv([
         make_env(env_id, path_to_building, path_to_weather, 
-                building_characteristics, gamma, run_manager)
+                building_characteristics, reward_type, gamma, energy_weight, run_manager)
     ])
     
     # Find the normalization wrapper
