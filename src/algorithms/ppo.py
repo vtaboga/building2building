@@ -13,7 +13,8 @@ import tyro
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 import logging
-from src.simulator.utils import TrajectoryLogger, CustomNormalizeObservation, CustomRescaleAction
+from src.simulator.utils import TrajectoryLogger
+from src.simulator.wrappers import NormalizeObservation
 
 # Set default tensor type to float64 for better precision
 torch.set_default_dtype(torch.float64)
@@ -46,10 +47,14 @@ class Args:
     # Algorithm specific arguments
     env_id: str = "EnergyPlus-v0"
     """the id of the environment"""
-    total_timesteps: int = 1000000
+    total_timesteps: int = 10000000
     """total timesteps of the experiments"""
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
+    reward_type: str = "barrier"
+    """the type of reward function to use"""
+    energy_weight: float = 1.0
+    """the weight of the energy consumption penalty"""
     num_envs: int = 1
     """the number of parallel game environments"""
     num_steps: int = 96
@@ -98,17 +103,19 @@ class Args:
     """the characteristics of the building"""
 
 
-def make_env(env_id, path_to_building, path_to_weather, building_characteristics, gamma, run_manager=None):
+def make_env(env_id, path_to_building, path_to_weather, building_characteristics, reward_type, energy_weight, gamma, run_manager=None):
     def thunk():
         env = gym.make(env_id, 
                       path_to_building=path_to_building, 
                       path_to_weather=path_to_weather, 
                       building_characteristics=building_characteristics,
+                      reward_type=reward_type,
+                      energy_weight=energy_weight,
                       run_manager=run_manager)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env = CustomRescaleAction(env, min_action=-1.0, max_action=1.0)
         env = gym.wrappers.ClipAction(env)
-        norm_env = CustomNormalizeObservation(env)
+        norm_env = NormalizeObservation(env)
         return norm_env
 
     return thunk
@@ -205,8 +212,8 @@ def main(args: Args, run_manager=None):
 
     # env setup
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, args.path_to_building, args.path_to_weather, 
-                 args.building_characteristics, args.gamma, run_manager) for _ in range(args.num_envs)]
+        [make_env(env_id=args.env_id, path_to_building=args.path_to_building, path_to_weather=args.path_to_weather, 
+                 building_characteristics=args.building_characteristics, reward_type=args.reward_type, energy_weight=args.energy_weight, gamma=args.gamma, run_manager=run_manager) for _ in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
@@ -281,6 +288,8 @@ def main(args: Args, run_manager=None):
                     model_path=temp_model_path,
                     make_env=make_env,
                     env_id=args.env_id,
+                    reward_type=args.reward_type,
+                    energy_weight=args.energy_weight,
                     path_to_building=args.path_to_building,
                     path_to_weather=args.path_to_weather,
                     building_characteristics=args.building_characteristics,
@@ -404,38 +413,19 @@ def main(args: Args, run_manager=None):
             models_dir = os.path.join(run_manager.run_dir, "models")
             os.makedirs(models_dir, exist_ok=True)
             model_path = os.path.join(models_dir, f"{args.exp_name}.pt")
-            norm_state_path = os.path.join(models_dir, f"{args.exp_name}_norm_state.pkl")
         else:
             # Default path if RunManager is not available
             model_path = os.path.join(run_dir, f"{args.exp_name}.cleanrl_model")
-            norm_state_path = os.path.join(run_dir, f"{args.exp_name}_norm_state.pkl")
         
         # Save the model
-        torch.save(agent.state_dict(), model_path)
-        
-        # Save normalization state from the first environment
-        base_env = envs.envs[0]
-        norm_wrapper = None
-        
-        # Find the normalization wrapper
-        while base_env is not None:
-            if isinstance(base_env, CustomNormalizeObservation):
-                norm_wrapper = base_env
-                break
-            if hasattr(base_env, 'env'):
-                base_env = base_env.env
-            else:
-                break
-        
-        if norm_wrapper:
-            norm_wrapper.save_running_state(norm_state_path)
-            logger.info(f"Normalization state saved to {norm_state_path}")
-        
+        torch.save(agent.state_dict(), model_path)       
         logger.info(f"Model saved to {model_path}")
 
         episodic_returns = ppo_evaluate(
             model_path=model_path,
             make_env=make_env,
+            reward_type=args.reward_type,
+            energy_weight=args.energy_weight,
             env_id=args.env_id,
             path_to_building=args.path_to_building,
             path_to_weather=args.path_to_weather,
@@ -451,13 +441,6 @@ def main(args: Args, run_manager=None):
         for idx, episodic_return in enumerate(episodic_returns):
             writer.add_scalar("eval/episodic_return", episodic_return, idx)
 
-        if args.upload_model:
-            from cleanrl_utils.huggingface import push_to_hub
-
-            repo_name = f"{args.env_id}-{args.exp_name}-seed{args.seed}"
-            repo_id = f"{args.hf_entity}/{repo_name}" if args.hf_entity else repo_name
-            push_to_hub(args, episodic_returns, repo_id, "PPO", run_dir, f"videos/{run_name}-eval")
-
     envs.close()
     writer.close()
 
@@ -465,6 +448,8 @@ def main(args: Args, run_manager=None):
 def ppo_evaluate(
     model_path: str,
     make_env: Callable,
+    reward_type: str,
+    energy_weight: float,
     env_id: str,
     path_to_building: str,
     path_to_weather: str,
@@ -500,10 +485,10 @@ def ppo_evaluate(
     
     # Create environment using the same setup as in training
     env = make_env(env_id, path_to_building, path_to_weather, 
-                building_characteristics, gamma, run_manager)()
+                building_characteristics, reward_type, gamma, energy_weight, run_manager)()
     envs = gym.vector.SyncVectorEnv([
         make_env(env_id, path_to_building, path_to_weather, 
-                building_characteristics, gamma, run_manager)
+                building_characteristics, reward_type, gamma, energy_weight, run_manager)
     ])
     
     # Find both wrappers
@@ -512,7 +497,7 @@ def ppo_evaluate(
     temp_env = env
 
     while temp_env is not None:
-        if isinstance(temp_env, CustomNormalizeObservation):
+        if isinstance(temp_env, NormalizeObservation):
             norm_wrapper = temp_env
         if isinstance(temp_env, CustomRescaleAction):
             rescale_wrapper = temp_env
@@ -521,15 +506,6 @@ def ppo_evaluate(
             temp_env = temp_env.env
         else:
             break
-    
-    # Load normalization state if available
-    norm_state_path = model_path.replace('.pt', '_norm_state.pkl')
-    if norm_wrapper and os.path.exists(norm_state_path):
-        try:
-            norm_wrapper.load_running_state(norm_state_path)
-            logger.info(f"Loaded normalization state from {norm_state_path}")
-        except Exception as e:
-            logger.warning(f"Failed to load normalization state: {e}")
     
     # Create and load agent
     agent = Model(envs).to(device)

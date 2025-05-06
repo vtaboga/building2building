@@ -16,6 +16,8 @@ register(
         'path_to_building': None,  # Will be provided when creating env
         'path_to_weather': None,   # Will be provided when creating env
         'building_characteristics': None,
+        'reward_type': None,
+        'energy_weight': None,
         'run_manager': None,
     }
 )
