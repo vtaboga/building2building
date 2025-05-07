@@ -65,12 +65,13 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
             return base_reward_function(obs, setpoints, building_characteristics, energy_weight)
         else:
             raise ValueError(f"Invalid reward type: {reward_type}")
+    
 
     gymenv = EnergyPlusEnvironment[typing.Any, typing.Any](
         make_energyplus,
         reward_function, 
         observation_space,
-        observation_transform,
+        lambda obs: observation_transform(obs, building_characteristics["area"]),
         action_space,
         lambda act: action_transform(act, actuators),
         building_characteristics,

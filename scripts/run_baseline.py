@@ -8,8 +8,11 @@ def parse_args():
     parser.add_argument('--state', '-s', type=str, help='State code (e.g., AL)')
     parser.add_argument('--county', '-c', type=str, help='County name')
     parser.add_argument('--building-id', '-b', type=str, help='Building ID')
+    parser.add_argument('--weather', type=str, help='Weather file')
     parser.add_argument('--heating-setpoint', type=float, default=21.0, help='Constant heating setpoint (°C)')
     parser.add_argument('--cooling-setpoint', type=float, default=24.0, help='Constant cooling setpoint (°C)')
+    parser.add_argument('--reward-type', type=str, default="base", choices=["barrier", "base"], help='Reward type')
+    parser.add_argument('--energy-weight', type=float, default=0.0, help='Energy weight')
     parser.add_argument('--seed', type=int, default=1, help='Random seed')
     
     return parser.parse_args()
@@ -37,6 +40,8 @@ if __name__ == "__main__":
         building_characteristics=building_characteristics,
         heating_setpoint=args.heating_setpoint,
         cooling_setpoint=args.cooling_setpoint,
+        reward_type=args.reward_type,
+        energy_weight=args.energy_weight,
         seed=args.seed
     )
     

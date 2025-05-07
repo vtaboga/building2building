@@ -12,13 +12,9 @@ def base_reward_function(obs, setpoints=None, building_characteristics=None, ene
         float: Combined reward (negative values represent penalties)
     """
 
-    # Energy consumption penalty
+    # Energy consumption penalty (in Wh/floor area)
     energy_penalty = obs["energy"]["HVAC_electricity"] + obs["energy"]["HVAC_natural_gas"]
-    energy_penalty /= 3600  # Convert to Wh
-
-    # Divide energy consumption by the building area if available
-    if building_characteristics and 'area' in building_characteristics:
-        energy_penalty /= building_characteristics['area']
+    energy_penalty = energy_penalty / 3600.0 / building_characteristics["area"]
     
     # If no setpoints provided, return just the power penalty
     if setpoints is None:
@@ -58,13 +54,9 @@ def barrier_reward_function(obs, setpoints=None, building_characteristics=None) 
         float: Combined reward (negative values represent penalties)
     """
 
-    # Energy consumption penalty
+    # Energy consumption penalty (in Wh/floor area)
     energy_penalty = obs["energy"]["HVAC_electricity"] + obs["energy"]["HVAC_natural_gas"]
-    energy_penalty /= 3600  # Convert to Wh
-
-    # Divide energy consumption by the building area if available
-    if building_characteristics and 'area' in building_characteristics:
-        energy_penalty /= building_characteristics['area']
+    energy_penalty = energy_penalty / 3600.0 / building_characteristics["area"]
     
     # If no setpoints provided, return just the power penalty
     if setpoints is None:
@@ -83,10 +75,6 @@ def barrier_reward_function(obs, setpoints=None, building_characteristics=None) 
         current_temp = obs["temperature"][zone]
         if abs(current_temp - target_temp) > delta_temp:
             temp_error += penalty
-    
-    # Calculate mean squared error
-    if controlled_zones:
-        temp_error = temp_error / len(controlled_zones)
     
     # Combine rewards (negative values represent penalties)
     total_reward = -(temp_error + energy_penalty)

@@ -33,7 +33,7 @@ def parse_args():
     parser.add_argument('--num-steps', type=int, default=2048, help='Steps per environment per rollout')
     parser.add_argument('--anneal-lr', action='store_true', default=True, help='Anneal learning rate')
     parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')
-    parser.add_argument('--reward-type', type=str, default="barrier", help='Reward type')
+    parser.add_argument('--reward-type', type=str, default="barrier", choices=["barrier", "base"], help='Reward type')
     parser.add_argument('--energy-weight', type=float, default=1.0, help='Energy weight for base reward function')
     parser.add_argument('--gae-lambda', type=float, default=0.95, help='GAE lambda parameter')
     parser.add_argument('--num-minibatches', type=int, default=32, help='Number of minibatches')

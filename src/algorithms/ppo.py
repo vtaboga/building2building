@@ -14,7 +14,7 @@ from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 import logging
 from src.simulator.utils import TrajectoryLogger
-from src.simulator.wrappers import NormalizeObservation
+from src.simulator.wrappers import NormalizeObservation, CustomRescaleAction
 
 # Set default tensor type to float64 for better precision
 torch.set_default_dtype(torch.float64)
@@ -113,7 +113,7 @@ def make_env(env_id, path_to_building, path_to_weather, building_characteristics
                       energy_weight=energy_weight,
                       run_manager=run_manager)
         env = gym.wrappers.RecordEpisodeStatistics(env)
-        env = CustomRescaleAction(env, min_action=-1.0, max_action=1.0)
+        env = CustomRescaleAction(env)
         env = gym.wrappers.ClipAction(env)
         norm_env = NormalizeObservation(env)
         return norm_env

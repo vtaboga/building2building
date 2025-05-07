@@ -37,20 +37,32 @@ def extract_ordered_observations(obs):
             obs["time"]["day_of_year"]
         ] +
         [
-            obs["energy"]["HVAC_electricity"],
-            obs["energy"]["HVAC_natural_gas"]
+            obs["energy"]["HVAC_electricity"],  
+            obs["energy"]["HVAC_natural_gas"]  
         ]
     )
     
     return names, values
 
 
-def observation_transform(obs):
+def observation_transform(obs, floor_area: float = None):
     """Transform raw observations into a numpy array by extracting and ordering
     relevant values.
+    If floor_area is provided, divide the HVAC energy consumption by the floor area and convert to Wh.
     """
-    _, values = extract_ordered_observations(obs)
-    return np.array(values)
+    names, values = extract_ordered_observations(obs)
+    values = np.array(values)
+    
+    # Get indices of HVAC-related values (should be the last two elements)
+    hvac_indices = [i for i, name in enumerate(names) if "HVAC" in name]
+    
+    # Convert floor area to a valid divisor
+    floor_area = 1.0 if floor_area is None else floor_area
+    
+    # Apply transformation to HVAC values
+    values[hvac_indices] = values[hvac_indices] / floor_area / 3600.0
+    
+    return values
 
 
 def create_observation_space(obs_template: typing.Dict[str, typing.Any]) -> gym.spaces.Box:
@@ -106,9 +118,11 @@ def create_observation_space(obs_template: typing.Dict[str, typing.Any]) -> gym.
     # Day of year bounds
     low_bounds[idx] = 1.0  # Day 1
     high_bounds[idx] = 366.0  # Day 366 (leap year)
-    idx += 1
+    idx += 1    
     
-    # Energy bounds (already set to [0, inf])
+    # HVAC bounds
+    low_bounds[idx:] = 0.0  # Wh/ft2
+    high_bounds[idx:] = 40.0  # Wh/ft2
     
     return gym.spaces.Box(low_bounds, high_bounds), names
 

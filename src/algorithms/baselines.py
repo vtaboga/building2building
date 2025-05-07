@@ -6,15 +6,28 @@ from typing import Dict, Any
 from src.core.run_manager import RunManager
 from src.simulator.utils import TrajectoryLogger
 from src.utils.results_parsing import parse_trajectories
-
+from src.simulator.wrappers import CustomRescaleAction, NormalizeObservation
 # Make sure to import your environment to register it
 import src.simulator
 
-def constant_policy(obs: np.ndarray, heating_setpoint: float = 21.0, cooling_setpoint: float = 24.0) -> np.ndarray:
-    # The first value is the cooling setpoint
+def constant_policy(
+    obs: np.ndarray,
+    heating_setpoint: float = 21.0,
+    cooling_setpoint: float = 24.0,
+    normalize: bool = False,
+    action_space: gym.spaces.Box = None
+) -> np.ndarray:
+    # The first value is the heating setpoint
     # The second value is the offset from the heating setpoint to the cooling setpoint
-    assert cooling_setpoint > heating_setpoint
-    return np.array([heating_setpoint, cooling_setpoint - heating_setpoint])
+    if normalize:
+        assert action_space is not None, "action_space must be provided when normalize=True"
+        action = np.array([heating_setpoint, cooling_setpoint - heating_setpoint])
+        # Normalize each action dimension to [0, 1]
+        action = (action - action_space.low) / (action_space.high - action_space.low)
+    else:
+        assert cooling_setpoint > heating_setpoint
+        action = np.array([heating_setpoint, cooling_setpoint - heating_setpoint])
+    return action
 
 def run_constant_baseline(
     env_id: str,
@@ -23,6 +36,8 @@ def run_constant_baseline(
     building_characteristics: Dict[str, Any],
     heating_setpoint: float = 21.0,
     cooling_setpoint: float = 24.0,
+    reward_type: str = "base",
+    energy_weight: float = 0.0,
     seed: int = 1,
 ) -> Dict[str, Any]:
     """
@@ -35,6 +50,8 @@ def run_constant_baseline(
         building_characteristics: Dictionary containing building characteristics
         heating_setpoint: Constant heating setpoint temperature
         cooling_setpoint: Constant cooling setpoint temperature
+        reward_type: Type of reward function to use
+        energy_weight: Weight of the energy consumption penalty
         seed: Random seed for reproducibility
     
     Returns:
@@ -54,8 +71,14 @@ def run_constant_baseline(
         path_to_building=path_to_building,
         path_to_weather=path_to_weather,
         building_characteristics=building_characteristics,
+        reward_type=reward_type,
+        energy_weight=energy_weight,
         run_manager=run_manager
     )
+    action_space = env.action_space
+    env = CustomRescaleAction(env)
+    env = gym.wrappers.ClipAction(env)
+    env = NormalizeObservation(env)
 
     uncontrolled_zones = env.unwrapped.uncontrolled_zones
     controlled_zones = env.unwrapped.controlled_zones
@@ -84,13 +107,13 @@ def run_constant_baseline(
     
     while not (done or truncated):
         # Get action from constant policy
-        action = constant_policy(obs, heating_setpoint, cooling_setpoint)
+        action = constant_policy(obs, heating_setpoint, cooling_setpoint, normalize=True, action_space=action_space)
         
         # Take step in environment
         obs, reward, done, truncated, info = env.step(action)
         
         # Log the trajectory
-        trajectory_logger.log(obs, action, reward, controlled_zones, uncontrolled_zones)
+        trajectory_logger.log(env.denormalize(obs), env.env.env.scale_action(action), reward, controlled_zones, uncontrolled_zones)
         
         # Track metrics
         episode_reward += reward
