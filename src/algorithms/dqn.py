@@ -99,8 +99,6 @@ def make_env(env_id, path_to_building, path_to_weather, building_characteristics
                       reward_type=reward_type,
                       energy_weight=energy_weight,
                       run_manager=run_manager)
-        env = CustomRescaleAction(env)
-        env = gym.wrappers.ClipAction(env)
         norm_env = NormalizeObservation(env)
         return norm_env
 
@@ -128,7 +126,7 @@ def get_action_binning(action_space, bins_per_dimension=20):
 
 
 class QNetwork(nn.Module):
-    def __init__(self, env, bins_per_dimension=5):
+    def __init__(self, env, bins_per_dimension=20):
         super().__init__()
         # Get observation and action dimensions
         self.observation_dim = np.array(env.single_observation_space.shape).prod()
@@ -239,7 +237,7 @@ def main(args: Args, run_manager=None):
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
     # Set the number of discrete bins per dimension
-    bins_per_dimension = 5
+    bins_per_dimension = 20
     
     # Initialize Q networks
     q_network = QNetwork(envs, bins_per_dimension).to(device)
@@ -545,8 +543,9 @@ def dqn_evaluate(
             with torch.no_grad():
                 obs_tensor = torch.tensor(obs).reshape(1, -1).to(device)
                 action, _ = q_network.get_action(obs_tensor, epsilon=0.0)  # No exploration during evaluation
-            
-            next_obs, rewards, terminations, truncations, _ = envs.step(action)
+            # Wrap the action in a list for SyncVectorEnv
+            action_list = [action]  # Create a list with one action for the single environment
+            next_obs, rewards, terminations, truncations, _ = envs.step(action_list)
             
             # Denormalize observation if we have a normalization wrapper
             if norm_wrapper:
