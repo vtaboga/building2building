@@ -51,7 +51,7 @@ class Args:
     """total timesteps of the experiments"""
     learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
-    reward_type: str = "barrier"
+    reward_type: str = "base"
     """the type of reward function to use"""
     energy_weight: float = 1.0
     """the weight of the energy consumption penalty"""
@@ -112,7 +112,6 @@ def make_env(env_id, path_to_building, path_to_weather, building_characteristics
                       reward_type=reward_type,
                       energy_weight=energy_weight,
                       run_manager=run_manager)
-        env = gym.wrappers.RecordEpisodeStatistics(env)
         env = CustomRescaleAction(env)
         env = gym.wrappers.ClipAction(env)
         norm_env = NormalizeObservation(env)
@@ -143,6 +142,7 @@ class Agent(nn.Module):
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, np.prod(envs.single_action_space.shape)), std=0.01),
+            nn.Sigmoid()
         )
         self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(envs.single_action_space.shape)))
 
