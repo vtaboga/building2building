@@ -42,7 +42,7 @@ def base_reward_function(obs, setpoints=None, building_characteristics=None, ene
     return total_reward
 
 
-def barrier_reward_function(obs, setpoints=None, building_characteristics=None) -> float:
+def barrier_reward_function(obs, setpoints=None, building_characteristics=None, energy_weight=1.0) -> float:
     """Calculate a reward combining temperature tracking and energy consumption.
     
     Args:
@@ -77,6 +77,6 @@ def barrier_reward_function(obs, setpoints=None, building_characteristics=None) 
             temp_error += penalty
     
     # Combine rewards (negative values represent penalties)
-    total_reward = -(temp_error + energy_penalty)
+    total_reward = -(temp_error + energy_weight * energy_penalty)
     
     return total_reward
