@@ -60,7 +60,7 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
 
     def reward_function(obs):
         if reward_type == "barrier":
-            return barrier_reward_function(obs, setpoints, building_characteristics)
+            return barrier_reward_function(obs, setpoints, building_characteristics, energy_weight)
         elif reward_type == "base":
             return base_reward_function(obs, setpoints, building_characteristics, energy_weight)
         else:
