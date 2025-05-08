@@ -16,3 +16,4 @@ building2building.egg-info/
 results/
 wandb/
 configs/
+jobs/
