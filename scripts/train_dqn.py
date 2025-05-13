@@ -17,6 +17,7 @@ def parse_args():
     parser.add_argument('--county', '-c', type=str, help='County name')
     parser.add_argument('--building-id', '-b', type=str, help='Building ID')
     parser.add_argument('--weather', '-w', type=str, help='EPW Weather file')
+    parser.add_argument('--weather_validation', type=str, default=None, help='EPW Weather file for validation (optional)')
     
     # General training arguments
     parser.add_argument('--seed', type=int, default=1, help='Random seed')
@@ -81,6 +82,7 @@ if __name__ == "__main__":
         env_id="EnergyPlus-v0",
         path_to_building=building_path,
         path_to_weather=f"data/weather/{cmd_args.weather}",
+        weather_validation=f"data/weather/{cmd_args.weather_validation}" if cmd_args.weather_validation else None,
         building_characteristics=building_characteristics,
         reward_type=cmd_args.reward_type,
         energy_weight=cmd_args.energy_weight,
