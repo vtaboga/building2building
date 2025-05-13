@@ -9,109 +9,99 @@ import logging
 
 logger = logging.getLogger('generator')
 
-def download_epw(state_code, city_name=None, save_dir="data/weather"):
+def download_epw(state_code, city_name=None, save_dir="data/weather", n_files=2):
     """
-    Download EPW weather file for a specific city and state.
-    If city_name is None, downloads any available weather file from the state.
-    
+    Download up to n_files EPW weather files for a specific city and state.
+    If city_name is None, downloads any available weather files from the state.
+
     Args:
         city_name (str or None): Name of the city, or None for any city in the state
         state_code (str): Two-letter state code
         save_dir (str): Directory to save the EPW file
-    
+        n_files (int): Number of EPW files to download
+
     Returns:
-        str or None: Path to the EPW file if successful, None otherwise
+        list[str] or str or None: List of paths to the EPW files if successful, None otherwise
     """
-    # Ensure save directory exists
     os.makedirs(save_dir, exist_ok=True)
-    
-    # Check existing files in the save directory
     existing_files = os.listdir(save_dir) if os.path.exists(save_dir) else []
-    
-    # Special handling for None city_name - look for any file from the state
+
+    # Check for already existing files
+    found_files = []
     if city_name is None:
         for file in existing_files:
             if file.endswith('.epw') and (f"USA_{state_code.upper()}_" in file or f"_{state_code.upper()}." in file):
-                logger.info(f"Found existing EPW file for state {state_code}: {os.path.join(save_dir, file)}")
-                return os.path.join(save_dir, file)
+                found_files.append(os.path.join(save_dir, file))
+                if len(found_files) >= n_files:
+                    logger.info(f"Found {len(found_files)} existing EPW files for state {state_code}")
+                    return found_files if n_files > 1 else found_files[0]
     else:
         for file in existing_files:
             if file.endswith('.epw') and city_name.lower() in file.lower() and (
                 f"USA_{state_code.upper()}_" in file or f"_{state_code.upper()}." in file):
-                logger.info(f"EPW file already exists: {os.path.join(save_dir, file)}")
-                return os.path.join(save_dir, file)
-    
-    logger.info(f"No existing EPW file found for {'state '+state_code if city_name is None else city_name+', '+state_code}. Downloading...")
-    
+                found_files.append(os.path.join(save_dir, file))
+                if len(found_files) >= n_files:
+                    logger.info(f"Found {len(found_files)} existing EPW files for {city_name}, {state_code}")
+                    return found_files if n_files > 1 else found_files[0]
+
+    logger.info(f"No existing EPW file(s) found for {'state '+state_code if city_name is None else city_name+', '+state_code}. Downloading...")
+
     base_url = "https://climate.onebuilding.org/WMO_Region_4_North_and_Central_America/USA_United_States_of_America/"
-    
-    # Get the webpage content
     response = requests.get(base_url)
     if response.status_code != 200:
         logger.error("Failed to access the webpage.")
         return None
-    
-    # Parse HTML
+
     soup = BeautifulSoup(response.text, "html.parser")
-    
-    # Find the ZIP file that matches the criteria
-    zip_file_link = None
-    
-    # Look for links containing the required information
+
+    # Find up to n_files matching ZIP file links
+    zip_file_links = []
     for link in soup.find_all("a"):
         href = link.get("href")
         file_name = link.get_text()
-        
         if href and file_name.endswith(".zip"):
             if city_name is None:
-                # For None city_name, match any file from the state with exact state code pattern
                 if f"USA_{state_code.upper()}_" in file_name or f"_{state_code.upper()}." in file_name:
-                    zip_file_link = base_url + href
-                    logger.debug(f"Found matching ZIP file for state {state_code}: {file_name}")
-                    break
+                    zip_file_links.append(base_url + href)
             else:
-                # Original behavior for specific city with exact state code pattern
                 if city_name.lower() in file_name.lower() and (
                     f"USA_{state_code.upper()}_" in file_name or f"_{state_code.upper()}." in file_name):
-                    zip_file_link = base_url + href
-                    logger.debug(f"Found matching ZIP file: {file_name}")
-                    break
+                    zip_file_links.append(base_url + href)
+        if len(zip_file_links) >= n_files:
+            break
 
-    if zip_file_link:
-        # Download the ZIP file
+    if not zip_file_links:
+        logger.warning(f"No ZIP file found for city: {city_name}, state: {state_code}")
+        return None
+
+    downloaded_epw_paths = []
+    for zip_file_link in zip_file_links:
         logger.debug(f"Downloading from: {zip_file_link}")
         response = requests.get(zip_file_link)
-        
         if response.status_code == 200:
-            # Extract EPW file from the ZIP
             try:
                 with zipfile.ZipFile(io.BytesIO(response.content)) as zip_ref:
-                    # Find the EPW file in the ZIP
                     epw_files = [f for f in zip_ref.namelist() if f.endswith('.epw')]
-                    
                     if epw_files:
-                        epw_file = epw_files[0]  # Take the first EPW file
-                        
-                        # Extract the EPW file
+                        epw_file = epw_files[0]  # Take the first EPW file in the ZIP
                         epw_content = zip_ref.read(epw_file)
-                        
-                        # Save the EPW file
                         epw_path = os.path.join(save_dir, os.path.basename(epw_file))
                         with open(epw_path, "wb") as f:
                             f.write(epw_content)
-                        
                         logger.info(f"Downloaded and extracted EPW file: {epw_path}")
-                        return epw_path
+                        downloaded_epw_paths.append(epw_path)
+                        if len(downloaded_epw_paths) >= n_files:
+                            break
                     else:
                         logger.warning("No EPW file found in the ZIP archive.")
             except zipfile.BadZipFile:
                 logger.error("Downloaded file is not a valid ZIP file.")
         else:
             logger.error(f"Failed to download ZIP file. Status code: {response.status_code}")
-    else:
-        logger.warning(f"No ZIP file found for city: {city_name}, state: {state_code}")
-    
-    return None  # Explicitly return None when no file is found
+
+    if not downloaded_epw_paths:
+        return None
+    return downloaded_epw_paths if n_files > 1 else downloaded_epw_paths[0]
 
 
 def get_available_counties() -> list[tuple[str, str]]:

@@ -99,6 +99,8 @@ class Args:
     """the path to the EnergyPlus building file"""
     path_to_weather: str = None
     """the path to the EnergyPlus weather file"""
+    weather_validation: str = None
+    """the path to the EnergyPlus weather file for validation (optional)"""
     building_characteristics: dict = None
     """the characteristics of the building"""
 
@@ -283,6 +285,9 @@ def main(args: Args, run_manager=None):
                 temp_model_path = os.path.join(run_dir, f"temp_model_{global_step}.pt")
                 torch.save(agent.state_dict(), temp_model_path)
                 
+                # Use validation weather if provided, else training weather
+                validation_weather = args.weather_validation if args.weather_validation else args.path_to_weather
+
                 # Evaluate the current policy
                 eval_returns = ppo_evaluate(
                     model_path=temp_model_path,
@@ -291,7 +296,7 @@ def main(args: Args, run_manager=None):
                     reward_type=args.reward_type,
                     energy_weight=args.energy_weight,
                     path_to_building=args.path_to_building,
-                    path_to_weather=args.path_to_weather,
+                    path_to_weather=validation_weather,
                     building_characteristics=args.building_characteristics,
                     eval_episodes=1,  # Just one episode for quick validation
                     run_name=f"{run_name}-validation-{global_step}",
@@ -421,6 +426,9 @@ def main(args: Args, run_manager=None):
         torch.save(agent.state_dict(), model_path)       
         logger.info(f"Model saved to {model_path}")
 
+        # Use validation weather if provided, else training weather
+        validation_weather = args.weather_validation if args.weather_validation else args.path_to_weather
+
         episodic_returns = ppo_evaluate(
             model_path=model_path,
             make_env=make_env,
@@ -428,7 +436,7 @@ def main(args: Args, run_manager=None):
             energy_weight=args.energy_weight,
             env_id=args.env_id,
             path_to_building=args.path_to_building,
-            path_to_weather=args.path_to_weather,
+            path_to_weather=validation_weather,
             building_characteristics=args.building_characteristics,
             eval_episodes=1,
             run_name=f"{run_name}-eval",

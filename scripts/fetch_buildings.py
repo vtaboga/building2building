@@ -14,6 +14,7 @@ def parse_arguments():
     parser.add_argument('--num-floors', '-f', type=int, default=1, help='Number of floors')
     parser.add_argument('--height', type=float, default=None, help='Height of the building')
     parser.add_argument('--n-buildings', '-n', type=int, default=1, help='Number of buildings to search for')
+    parser.add_argument('--n-weather-files', '-w', type=int, default=2, help='Number of weather files to download')
 
     
     return parser.parse_args()
@@ -33,6 +34,7 @@ if __name__ == "__main__":
             "num_floors": args.num_floors,
             "height": args.height,
             "n_buildings": args.n_buildings,
+            "n_weather_files": args.n_weather_files,
         }
     )
     
@@ -47,7 +49,8 @@ if __name__ == "__main__":
         area=args.area,
         num_floors=args.num_floors,
         height=args.height,
-        n_buildings=args.n_buildings
+        n_buildings=args.n_buildings,
+        n_weather_files=args.n_weather_files
     )
     logger.info(f"Found {len(buildings)} buildings")
     logger.info(f"Weather file path: {path_to_weather}")
