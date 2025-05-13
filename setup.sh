@@ -102,6 +102,20 @@ EOF
         echo "⚠️ Skipping EnergyPlus path configuration as container is not available."
     fi
     
+    # --- Add Building2Building path configuration ---
+    echo "# Path configuration for Building2Building" >> .env
+    REPO_ROOT="$PWD"
+    # Try to use $SCRATCH if set, otherwise $HOME/scratch
+    if [ -n "$SCRATCH" ]; then
+        SCRATCH_ROOT="$SCRATCH/Building2Building"
+    else
+        SCRATCH_ROOT="$HOME/scratch/Building2Building"
+    fi
+    echo "CONTAINER_PATH=${REPO_ROOT}/container/container.sif" >> .env
+    echo "RESULTS_DIR=${REPO_ROOT}/results" >> .env
+    echo "WANDB_DIR=${SCRATCH_ROOT}/wandb" >> .env
+    echo "DATA_ROOT=${SCRATCH_ROOT}/data" >> .env
+
     echo "✨ Created .env file"
 else
     echo "ℹ️ .env file already exists, skipping..."
