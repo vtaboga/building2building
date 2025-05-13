@@ -2,7 +2,7 @@
 #SBATCH --job-name=train_ppo
 #SBATCH --output=logs/slurm-%j.out
 #SBATCH --error=logs/slurm-%j.err
-#SBATCH --time=01:00:00
+#SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 
