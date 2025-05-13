@@ -110,6 +110,18 @@ Don't forget to change the .sh permission the first time:
 chmod +x /scripts/container_main.sh
 ```
 
+## Slurm scripts
+
+Slurm scripts are stored in `jobs/`. When a job is launched, a temporary directory is allocated and relevant data as well as the container are copied to this temporary directory.
+The paths to the different folders are written in `.env` when `setup.sh` is executed. These paths are specific to the Mila cluster. 
+The scripts execute `container_main.sh` with the specified python script and arguments. If multiple seeds are specified, runs are executed sequentially for each seed. 
+
+An example of command is:
+
+```bash
+sbatch jobs/train_dqn.sh -s "AL" -c "Pike" -b 6014003413384 --seed 1,2,3,4,5 --weather "USA_AL_Albertville.Muni.AP.720376_TMYx.2004-2018.epw" --total-timesteps 250000 --eval-frequency 25000 --reward-type "barrier" --energy-weight 1.0 --track
+```
+
 ## Minergym
 
 The gym wrapper of energyplus is based on the minergym repository https://github.com/Terramorpha/minergym
