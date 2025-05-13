@@ -75,7 +75,7 @@ def load_metadata(state: str, county: str=None):
         logger.error(f"Error loading metadata: {e}")
         raise
 
-def search_idf(state: str, county: str, building_type: str, area: float, num_floors: int, height: float, n_buildings: int):
+def search_idf(state: str, county: str, building_type: str, area: float, num_floors: int, height: float, n_buildings: int, n_weather_files: int):
     """
     Search and process IDF files matching the specified criteria.
     """
@@ -106,7 +106,7 @@ def search_idf(state: str, county: str, building_type: str, area: float, num_flo
         logger.info(f"Successfully processed {len(processed_files)} IDF files")
 
         # Download associated weather files
-        weather_file = download_epw(state_code=state)
+        weather_files = download_epw(state_code=state, n_files=n_weather_files)
         logger.info(f"Successfully downloaded weather files")
         
     except Exception as e:
@@ -123,6 +123,6 @@ def search_idf(state: str, county: str, building_type: str, area: float, num_flo
         for building in building_files
     ]
 
-    return building_files, weather_file
+    return building_files, weather_files
 
     
