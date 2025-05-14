@@ -93,7 +93,7 @@ To create a gym environment, one needs to specify the epJSON and weather files. 
 
 **TODO:** There is an issue with the IDF files, only one floor (i.e., one zone) seems to be conditioned per building. In any case, only the controlled zone is consider to compute the reward.
 
-## Singularity container
+### Singularity container
 
 To run experiments on the cluster, we need a container to execute EnergyPlus.
 
@@ -110,7 +110,7 @@ Don't forget to change the .sh permission the first time:
 chmod +x /scripts/container_main.sh
 ```
 
-## Slurm scripts
+### Slurm scripts
 
 Slurm scripts are stored in `jobs/`. When a job is launched, a temporary directory is allocated and relevant data as well as the container are copied to this temporary directory.
 The paths to the different folders are written in `.env` when `setup.sh` is executed. These paths are specific to the Mila cluster. 
@@ -121,6 +121,25 @@ An example of command is:
 ```bash
 sbatch jobs/train_dqn.sh -s "AL" -c "Pike" -b 6014003413384 --seed 1,2,3,4,5 --weather "USA_AL_Albertville.Muni.AP.720376_TMYx.2004-2018.epw" --total-timesteps 250000 --eval-frequency 25000 --reward-type "barrier" --energy-weight 1.0 --track
 ```
+
+## Contributing
+
+This project follows a structured branching strategy to maintain code quality:
+
+### Branch Structure
+- **`main`**: Stable version of the code. Protected and only updated through reviewed pull requests from `dev`.
+- **`dev`**: Default branch for development. All feature work branches from here.
+
+### Workflow for Contributors
+1. Always create feature branches from `dev`, not `main`
+2. Name your branch with a descriptive name and use a prefix: `feature/new_cool_feature` or `fix/issue_i_am_fixing`
+3. Create unitests in `tests/` for new features and make sure other tests pass.
+4. Submit pull requests to the `dev` branch when your work is complete
+5. For convenience there is no automated tests on Github yet, it is on you to review the code you are merging on `dev`. 
+
+### Release Process
+- Periodically, `dev` is merged into `main` after thorough testing
+- Critical hotfixes may be branched directly from `main`, but must be merged to both `main` and `dev`
 
 ## Minergym
 
