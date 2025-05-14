@@ -75,12 +75,14 @@ STATE=""
 COUNTY=""
 BUILDING_ID=""
 WEATHER=""
+WEATHER_VALIDATION=""
 for ((i=0; i<${#PY_ARGS[@]}; i++)); do
     case "${PY_ARGS[$i]}" in
         -s|--state) STATE="${PY_ARGS[$((i+1))]}";;
         -c|--county) COUNTY="${PY_ARGS[$((i+1))]}";;
         -b|--building-id) BUILDING_ID="${PY_ARGS[$((i+1))]}";;
         --weather) WEATHER="${PY_ARGS[$((i+1))]}";;
+        --weather_validation) WEATHER_VALIDATION="${PY_ARGS[$((i+1))]}";;
     esac
 done
 
@@ -103,6 +105,15 @@ cp "$DATA_ROOT/processed_buildings/$STATE/$COUNTY/$BUILDING_ID.json" "$SCRATCH_D
 cp "$DATA_ROOT/processed_buildings/$STATE/$COUNTY/$BUILDING_ID.epJSON" "$SCRATCH_DIR/data/processed_buildings/$STATE/$COUNTY/"
 mkdir -p "$SCRATCH_DIR/data/weather"
 cp "$DATA_ROOT/weather/$WEATHER" "$SCRATCH_DIR/data/weather/"
+
+# Copy validation weather file if specified
+if [ -n "$WEATHER_VALIDATION" ]; then
+    if [ -f "$DATA_ROOT/weather/$WEATHER_VALIDATION" ]; then
+        cp "$DATA_ROOT/weather/$WEATHER_VALIDATION" "$SCRATCH_DIR/data/weather/"
+    else
+        echo "Warning: Validation weather file $DATA_ROOT/weather/$WEATHER_VALIDATION not found, skipping copy."
+    fi
+fi
 
 mkdir -p "$RESULTS_DIR" "$WANDB_DIR"
 

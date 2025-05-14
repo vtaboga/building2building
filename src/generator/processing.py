@@ -159,10 +159,9 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
                 logger.error(f"Error: Target IDD file not found at {to_idd}")
                 return None
                 
-            # Create symbolic links to IDD files in the working directory
-            current_dir = os.getcwd()
-            from_idd_link = os.path.join(current_dir, os.path.basename(from_idd))
-            to_idd_link = os.path.join(current_dir, os.path.basename(to_idd))
+            # Create symbolic links to IDD files in the temp directory (not in /opt/repository)
+            from_idd_link = os.path.join(temp_dir, os.path.basename(from_idd))
+            to_idd_link = os.path.join(temp_dir, os.path.basename(to_idd))
             
             try:
                 if os.path.exists(from_idd_link):
@@ -177,13 +176,15 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
                 logger.debug(f"Using: {transition_exe}")
                 logger.debug(f"Input: {working_file}")
                 
+                # Run the transition executable from the temp_dir
                 result = subprocess.run(
                     [transition_exe, working_file],
                     check=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    env={"DISPLAY": ""}
+                    env={"DISPLAY": ""},
+                    cwd=temp_dir
                 )
                 
                 if result.stdout:
