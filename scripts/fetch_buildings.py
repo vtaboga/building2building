@@ -1,7 +1,7 @@
 import argparse
 from datetime import datetime
-from src.generator.search_idf import search_idf
-from src.core.run_manager import RunManager
+from building2building.generator.search_idf import search_idf
+from building2building.core.run_manager import RunManager
 
 
 def parse_arguments():

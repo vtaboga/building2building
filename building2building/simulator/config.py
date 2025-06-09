@@ -13,14 +13,14 @@ This module collects functions useful to creates those 4-tuples.
 
 """
 
-import src.simulator.query_info as query_info
+import building2building.simulator.query_info as query_info
 import rdflib
 import typing
-import src.simulator.simulation as simulation
+import building2building.simulator.simulation as simulation
 from typing import Dict, List
 import urllib.parse
 import logging
-from src.core.logging import setup_logger
+from building2building.core.logging import setup_logger
 import os
 
 

@@ -6,8 +6,8 @@ import logging
 import gymnasium as gym
 import numpy as np
 import pickle
-from src.simulator.observation_spaces import extract_ordered_observations
-from src.simulator.config_manager import setup_energyplus_path, find_energyplus_path
+from building2building.simulator.observation_spaces import extract_ordered_observations
+from building2building.simulator.config_manager import setup_energyplus_path, find_energyplus_path
 
 
 def get_energyplus_env():

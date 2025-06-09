@@ -1,8 +1,8 @@
 import pandas as pd
 import os
 import logging
-from src.generator.downloader import download_and_extract_county_idf, download_metadata, download_epw
-from src.generator.processing import process_idf, process_metadata
+from building2building.generator.downloader import download_and_extract_county_idf, download_metadata, download_epw
+from building2building.generator.processing import process_idf, process_metadata
 
 logger = logging.getLogger('generator')
 

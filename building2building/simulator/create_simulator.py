@@ -1,14 +1,14 @@
 import gymnasium as gym
 import typing
 
-from src.simulator.config_manager import setup_energyplus_path
-from src.simulator.simulation import EnergyPlusSimulation, ActuatorHole
-from src.simulator.environment import EnergyPlusEnvironment
-from src.simulator.rewards import base_reward_function, barrier_reward_function
-from src.simulator import query_info, config
-from src.simulator.observation_spaces import observation_transform, create_observation_space
-from src.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints_rdf
-from src.core.run_manager import RunManager
+from building2building.simulator.config_manager import setup_energyplus_path
+from building2building.simulator.simulation import EnergyPlusSimulation, ActuatorHole
+from building2building.simulator.environment import EnergyPlusEnvironment
+from building2building.simulator.rewards import base_reward_function, barrier_reward_function
+from building2building.simulator import query_info, config
+from building2building.simulator.observation_spaces import observation_transform, create_observation_space
+from building2building.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints_rdf
+from building2building.core.run_manager import RunManager
 
 def create_simulator(path_to_building: str, path_to_weather: str, building_characteristics: dict, reward_type: str, energy_weight: float = 1.0, run_manager: RunManager = None) -> gym.Env:
     """

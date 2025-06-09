@@ -4,9 +4,9 @@ import subprocess
 import logging
 import json
 from typing import List, Dict, Any, Optional
-from src.generator.utils import get_counties_from_coords_batch
-from src.simulator.action_spaces import get_controllable_setpoints_rdf
-from src.simulator import query_info
+from building2building.generator.utils import get_counties_from_coords_batch
+from building2building.simulator.action_spaces import get_controllable_setpoints_rdf
+from building2building.simulator import query_info
 logger = logging.getLogger('generator')
 
 def process_metadata(state: str):

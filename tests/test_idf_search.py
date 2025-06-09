@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 import os
-from src.generator.search_idf import search_metadata
+from building2building.generator.search_idf import search_metadata
 
 class TestSearchMetadata(unittest.TestCase):
     @classmethod

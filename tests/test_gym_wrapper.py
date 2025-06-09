@@ -5,7 +5,7 @@ import glob
 import shutil
 import gymnasium as gym
 import sys
-import src.simulator  
+import building2building.simulator  
 import json
 
 def test_gym_wrapper():

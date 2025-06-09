@@ -3,10 +3,10 @@ import gymnasium as gym
 import json
 from pathlib import Path
 from typing import Dict, Any
-from src.core.run_manager import RunManager
-from src.simulator.utils import TrajectoryLogger
-from src.utils.results_parsing import parse_trajectories
-from src.simulator.wrappers import CustomRescaleAction, NormalizeObservation
+from building2building.core.run_manager import RunManager
+from building2building.simulator.utils import TrajectoryLogger
+from building2building.utils.results_parsing import parse_trajectories
+from building2building.simulator.wrappers import CustomRescaleAction, NormalizeObservation
 # Make sure to import your environment to register it
 import src.simulator
 

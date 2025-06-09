@@ -1,9 +1,9 @@
 import argparse
 from datetime import datetime
 import src.simulator.utils
-from src.generator.search_idf import search_idf
-from src.core.run_manager import RunManager
-from src.generator.processing import add_hvac_meters_to_epjson, add_outdoor_air_meters_to_epjson, modify_timestep, add_setpoint_control_to_epjson
+from building2building.generator.search_idf import search_idf
+from building2building.core.run_manager import RunManager
+from building2building.generator.processing import add_hvac_meters_to_epjson, add_outdoor_air_meters_to_epjson, modify_timestep, add_setpoint_control_to_epjson
 import numpy as np
 import os
 import json
