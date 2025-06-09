@@ -1,130 +1,130 @@
+import geopandas as gpd
+import pandas as pd
+from shapely.geometry import Point
 import requests
 import logging
 import asyncio
 import aiohttp
 from typing import List, Tuple
+import os
+import zipfile
 
 logger = logging.getLogger('generator')
 
-def get_county_from_coords(lat, lon):
+def download_county_boundaries():
     """
-    Returns the US county name for given latitude and longitude using FCC API.
-    Formats to fit dataset format: removes the last word and replaces spaces/hyphens with underscores.
+    Download US county boundaries from Census Bureau
+    """
 
-    Args:
-        lat (float): Latitude
-        lon (float): Longitude
+    zip_file_name = os.path.join("data", "metadata", "counties.zip")
+
+    # Option 1: Cartographic boundaries (smaller, simplified)
+    url = "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_county_500k.zip"
+
+    # Option 2: Full TIGER/Line boundaries (more detailed, larger)
+    # url = "https://www2.census.gov/geo/tiger/TIGER2024/COUNTY/tl_2024_us_county.zip"
+
+
+    if not os.path.exists(zip_file_name):
+        logger.info("Downloading county boundaries...")
+        response = requests.get(url, verify=False)
+        with open(zip_file_name, 'wb') as f:
+            f.write(response.content)
+
+    boundaries_dir = os.path.join("data", "metadata", "counties")
+
+    if not os.path.exists(boundaries_dir):
+        logger.info("Extracting county boundaries...")
+
+        # Extract the shapefile
+        with zipfile.ZipFile(zip_file_name, 'r') as zip_ref:
+            zip_ref.extractall(boundaries_dir)
+
+    return boundaries_dir
+
+def load_county_boundaries(data_dir):
+    """
+    Load county boundaries into a GeoDataFrame
+    """
+    # Find the .shp file in the extracted directory
+    shp_files = [f for f in os.listdir(data_dir) if f.endswith('.shp')]
+    if not shp_files:
+        raise FileNotFoundError("No shapefile found in the extracted data")
+
+    shp_path = os.path.join(data_dir, shp_files[0])
+
+    logger.info(f"Loading {shp_path}...")
+    counties = gpd.read_file(shp_path)
+
+    # Ensure we're using WGS84 (EPSG:4326) for lat/lon coordinates
+    if counties.crs != 'EPSG:4326':
+        counties = counties.to_crs('EPSG:4326')
+
+    logger.info(f"Loaded {len(counties)} counties")
+    logger.info(f"Columns available: {list(counties.columns)}")
+    return counties
+
+def fast_county_lookup(lat_lon_pairs, counties_gdf):
+    coords_df = pd.DataFrame(lat_lon_pairs, columns=["latitude", "longitude"])
+    geometry = [Point(lon, lat) for lat, lon in lat_lon_pairs]
+    points_gdf = gpd.GeoDataFrame(coords_df, geometry=geometry, crs="EPSG:4326")
+    logger.info("computing expensive sjoin...")
+    result = gpd.sjoin(points_gdf, counties_gdf, how="left", predicate="within")
+    return result.drop(["geometry"], axis=1)
+
+def batch_county_lookup(lat_lon_pairs, counties_gdf):
+    """
+    Perform batch county lookup for thousands of coordinate pairs
+
+    Parameters:
+    - lat_lon_pairs: List of tuples [(lat1, lon1), (lat2, lon2), ...]
+    - counties_gdf: GeoDataFrame with county boundaries
 
     Returns:
-        str: Formatted county name if found, else None
+    - List of county information for each coordinate pair
     """
-    url = "https://geo.fcc.gov/api/census/block/find"
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "format": "json"
-    }
+    results = []
 
-    try:
-        logger.debug(f"Querying FCC API for coordinates: ({lat}, {lon})")
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
-        county_name = data.get('County', {}).get('name')
-        
-        if county_name:
-            # Remove the last word (usually 'County') and split remaining words
-            words = county_name.split()[:-1]
-            if words:
-                # Join remaining words and replace spaces/hyphens with underscore
-                formatted_name = '_'.join(''.join(words).replace('-', '_').split())
-                logger.debug(f"Found county: {county_name} -> formatted as: {formatted_name}")
-                return formatted_name
-            
-        logger.warning(f"No county name found for coordinates ({lat}, {lon})")
-        return None
-        
-    except requests.RequestException as e:
-        logger.error(f"Request error for coordinates ({lat}, {lon}): {e}")
-    except Exception as e:
-        logger.error(f"Unexpected error while getting county for coordinates ({lat}, {lon}): {e}")
-    
-    return None
+    logger.info(f"Processing {len(lat_lon_pairs)} coordinate pairs...")
 
-async def get_county_async(session: aiohttp.ClientSession, lat: float, lon: float) -> str:
-    """
-    Asynchronously get county name for a single coordinate pair.
-    """
-    try:
-        async with session.get(
-            "https://geo.fcc.gov/api/census/block/find",
-            params={
-                "latitude": lat,
-                "longitude": lon,
-                "format": "json"
-            }
-        ) as response:
-            if response.status == 200:
-                data = await response.json()
-                county_name = data.get('County', {}).get('name')
-                if county_name:
-                    # Remove the last word (usually 'County') and split remaining words
-                    words = county_name.split()[:-1]
-                    if words:
-                        # Join remaining words and replace spaces/hyphens with underscore
-                        return '_'.join(''.join(words).replace('-', '_').split())
-            return None
-    except Exception as e:
-        logger.error(f"Error getting county for coordinates ({lat}, {lon}): {e}")
-        return None
+    for i, (lat, lon) in enumerate(lat_lon_pairs):
+        if i % 1000 == 0:
+            logger.info(f"Processed {i/(len(lat_lon_pairs)-1)} of all coordinates")
 
-async def get_counties_batch_async(coords_list: List[Tuple[float, float]], max_concurrent: int = 50) -> List[str]:
-    """
-    Asynchronously get county names for all coordinate pairs using a connection pool.
-    
-    Args:
-        coords_list: List of (latitude, longitude) tuples
-        max_concurrent: Maximum number of concurrent connections
-    
-    Returns:
-        List of county names corresponding to the coordinates
-    """
-    async with aiohttp.ClientSession(
-        connector=aiohttp.TCPConnector(limit=max_concurrent),
-        timeout=aiohttp.ClientTimeout(total=300)  # 5 minutes total timeout
-    ) as session:
-        tasks = []
-        for lat, lon in coords_list:
-            tasks.append(get_county_async(session, lat, lon))
-        
-        # Process in chunks to avoid memory issues
-        chunk_size = 1000
-        counties = []
-        for i in range(0, len(tasks), chunk_size):
-            chunk = tasks[i:i + chunk_size]
-            logger.debug(f"Processing chunk {i//chunk_size + 1}/{(len(tasks) + chunk_size - 1)//chunk_size}")
-            chunk_results = await asyncio.gather(*chunk, return_exceptions=True)
-            counties.extend([
-                result if not isinstance(result, Exception) else None 
-                for result in chunk_results
-            ])
-            
-        return counties
+        # Create point geometry
+        point = Point(lon, lat)  # Note: Point(lon, lat) not (lat, lon)
+
+        # Find which county contains this point
+        containing_counties = counties_gdf[counties_gdf.geometry.contains(point)]
+
+        if len(containing_counties) > 0:
+            county_info = containing_counties.iloc[0]
+            results.append({
+                'latitude': lat,
+                'longitude': lon,
+                'county_fips': county_info.get('GEOID', ''),
+                'county_name': county_info.get('NAME', ''),
+                'state_fips': county_info.get('STATEFP', ''),
+                'state_name': county_info.get('STATE_NAME', '')  # May not be available in all datasets
+            })
+        else:
+            # Point not found in any county (e.g., water, outside US)
+            results.append({
+                'latitude': lat,
+                'longitude': lon,
+                'county_fips': None,
+                'county_name': None,
+                'state_fips': None,
+                'state_name': None
+            })
+
+    print("Batch lookup complete!")
+    return results
+
 
 def get_counties_from_coords_batch(coords_list: List[Tuple[float, float]]) -> List[str]:
-    """
-    Get county names for all coordinate pairs.
-    
-    Args:
-        coords_list: List of (latitude, longitude) tuples
-    
-    Returns:
-        List of county names corresponding to the coordinates
-    """
-    try:
-        # Create new event loop for async operation
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop.run_until_complete(get_counties_batch_async(coords_list))
-    finally:
-        loop.close()
+    data_dir = download_county_boundaries()
+    counties = load_county_boundaries(data_dir)
+    counties.sindex # create an index to accelerate inclusion calculations
+    results = fast_county_lookup(coords_list, counties)
+    return list(results["NAME"])
