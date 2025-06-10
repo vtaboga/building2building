@@ -1,7 +1,7 @@
 import gymnasium as gym
 import typing
 
-from building2building.simulator.config_manager import setup_energyplus_path
+from building2building.env import setup_energyplus_path
 from building2building.simulator.simulation import EnergyPlusSimulation, ActuatorHole
 from building2building.simulator.environment import EnergyPlusEnvironment
 from building2building.simulator.rewards import base_reward_function, barrier_reward_function
