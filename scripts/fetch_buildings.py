@@ -2,7 +2,7 @@ import argparse
 from datetime import datetime
 from building2building.generator.search_idf import search_idf
 from building2building.core.run_manager import RunManager
-
+import logging
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Generate IDF files based on specified parameters')
@@ -15,7 +15,7 @@ def parse_arguments():
     parser.add_argument('--height', type=float, default=None, help='Height of the building')
     parser.add_argument('--n-buildings', '-n', type=int, default=1, help='Number of buildings to search for')
     parser.add_argument('--n-weather-files', '-w', type=int, default=2, help='Number of weather files to download')
-
+    parser.add_argument('--log-level', type=str, default="WARNING", help="the lowest level of logs which will be displayed")
     
     return parser.parse_args()
 
@@ -40,6 +40,8 @@ if __name__ == "__main__":
     
     # Get logger from run manager
     logger = run_manager.logger
+
+    logging.basicConfig(level=getattr(logging, args.log_level))
     
     logger.info("Searching for building files...")
     buildings, path_to_weather = search_idf(
