@@ -14,8 +14,8 @@ import tyro
 from torch.utils.tensorboard import SummaryWriter
 import logging
 import src.simulator
-from src.simulator.utils import TrajectoryLogger
-from src.simulator.wrappers import NormalizeObservation, CustomRescaleAction
+from building2building.simulator.utils import TrajectoryLogger
+from building2building.simulator.wrappers import NormalizeObservation, CustomRescaleAction
 
 # Set default tensor type to float64 for better precision
 torch.set_default_dtype(torch.float64)

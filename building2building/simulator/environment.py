@@ -7,7 +7,7 @@ trouble to any gymnasium consumer.
 
 
 import typing
-import src.simulator.simulation as simulation
+import building2building.simulator.simulation as simulation
 import gymnasium
 import os
 import sys

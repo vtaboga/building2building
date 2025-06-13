@@ -2,17 +2,36 @@
 Centralized configuration management for EnergyPlus paths and other settings.
 This module is used by both setup scripts and runtime code.
 """
+
+
 import os
 import sys
 import platform
 from pathlib import Path
 import json
 import logging
+import contextlib
+import importlib
+import contextvars
+import typing
+
+ENERGYPLUS_PATH = contextvars.ContextVar("ENERGYPLUS_PATH")
+
+T = typing.TypeVar("T")
+
+@contextlib.contextmanager
+def ctxvar_set(var: contextvars.ContextVar[T], val: T):
+    try:
+        token = var.set(val)
+        yield token
+    finally:
+        var.reset(token)
 
 logger = logging.getLogger(__name__)
 
 # Get the project root directory
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+PROJECT_ROOT = os.path.dirname(importlib.util.find_spec("building2building").origin)
+# os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
 # Configuration file path in the configs directory
 CONFIG_DIR = os.path.join(PROJECT_ROOT, "configs")
@@ -143,13 +162,18 @@ def setup_energyplus_path(manual_path=None):
     Returns:
         str: Path to EnergyPlus if found, None otherwise
     """
-    energyplus_path = find_energyplus_path(manual_path)
-    
-    if energyplus_path:
-        if energyplus_path not in sys.path:
-            sys.path.append(energyplus_path)
-            logger.info(f"Added EnergyPlus path: {energyplus_path}")
-        return energyplus_path
+
+    if ENERGYPLUS_PATH.get(None) is not None:
+        return
+
+    maybe_energyplus_path = find_energyplus_path(manual_path)
+
+    if maybe_energyplus_path:
+        if maybe_energyplus_path not in sys.path:
+            ENERGYPLUS_PATH.set(maybe_energyplus_path)
+
+            sys.path.append(maybe_energyplus_path)
+            logger.info(f"Added EnergyPlus path: {maybe_energyplus_path}")
     else:
         logger.warning(
             "EnergyPlus installation not found. If you're not running in a container, "

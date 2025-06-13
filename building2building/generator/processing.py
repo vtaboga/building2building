@@ -3,10 +3,14 @@ import pandas as pd
 import subprocess
 import logging
 import json
+import shutil
 from typing import List, Dict, Any, Optional
-from src.generator.utils import get_counties_from_coords_batch
-from src.simulator.action_spaces import get_controllable_setpoints_rdf
-from src.simulator import query_info
+from pathlib import Path
+from building2building.generator.utils import get_counties_from_coords_batch
+from building2building.simulator.action_spaces import get_controllable_setpoints_rdf
+from building2building.simulator import query_info
+import building2building.env as env
+from building2building.utils import cd
 logger = logging.getLogger('generator')
 
 def process_metadata(state: str):
@@ -74,8 +78,6 @@ def find_transitioned_file(original_file: str, to_ver: str) -> str:
         os.path.join(idf_dir, f"{base_name}.{to_ver}.idf"),
         # Pattern 6: original_name.new
         os.path.join(idf_dir, f"{base_name}.new"),
-        # Pattern 7: The original file might have been modified in place
-        original_file,
     ]
     
     for pattern in possible_patterns:
@@ -105,125 +107,120 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
         str: Path to the transitioned file in the processed_buildigns directory
     """
 
+    idf_path = str(Path(idf_path).resolve())
+
     # Create the output directory structure
     processed_dir = os.path.join("data", "processed_buildings", state, county)
     os.makedirs(processed_dir, exist_ok=True)
 
     idf_dir = os.path.dirname(idf_path)
     idf_name = os.path.basename(idf_path)
-    
+
     # Define the final output path
-    final_output_path = os.path.join(processed_dir, idf_name)
-    
+    final_output_path = str(Path(os.path.join(processed_dir, idf_name)).resolve())
+
     # Create a temporary directory for transition files
     temp_dir = os.path.join(idf_dir, "temp_transition")
     os.makedirs(temp_dir, exist_ok=True)
-    
+
+    # Define the transition sequence from 9.4 to 24.1
+    transitions = [
+        "9.4.0-to-9.5.0",
+        "9.5.0-to-9.6.0",
+        "9.6.0-to-22.1.0",
+        "22.1.0-to-22.2.0",
+        "22.2.0-to-23.1.0",
+        "23.1.0-to-23.2.0",
+        "23.2.0-to-24.1.0"
+    ]
+
     # Copy the original file to temp directory to work with
-    working_file = os.path.join(temp_dir, idf_name)
-    with open(idf_path, 'r') as src, open(working_file, 'w') as dst:
-        dst.write(src.read())
-    
-    try:
-        # Define the transition sequence from 9.4 to 24.1
-        transitions = [
-            "9.4.0-to-9.5.0",
-            "9.5.0-to-9.6.0",
-            "9.6.0-to-22.1.0",
-            "22.1.0-to-22.2.0",
-            "22.2.0-to-23.1.0",
-            "23.1.0-to-23.2.0",
-            "23.2.0-to-24.1.0"
-        ]
-        
-        # Path to the transition executables directory
-        energyplus_dir = "/usr/local/EnergyPlus-24-1-0"
-        transition_dir = os.path.join(energyplus_dir, "PreProcess", "IDFVersionUpdater")
-        
+
+
+    energyplus_dir = env.ENERGYPLUS_PATH.get()
+    transition_dir = os.path.join(energyplus_dir, "PreProcess", "IDFVersionUpdater")
+    def transition_exe(from_ver, to_ver):
+        p = os.path.join(transition_dir, f"Transition-V{from_ver.replace('.', '-')}-to-V{to_ver.replace('.', '-')}")
+        if not os.path.exists(p):
+            e = f"Error: Transition executable not found at {transition_exe}"
+            logger.error(e)
+            raise Exception(e)
+        return p
+
+    with cd(temp_dir):
+        working_file = idf_name
+        shutil.copy(idf_path, working_file)
+
         for transition in transitions:
             from_ver, to_ver = transition.split("-to-")
-            
+
             # Get paths for the transition executable and IDD files
-            transition_exe = os.path.join(transition_dir, f"Transition-V{from_ver.replace('.', '-')}-to-V{to_ver.replace('.', '-')}")
             from_idd = os.path.join(transition_dir, f"V{from_ver.replace('.', '-')}-Energy+.idd")
             to_idd = os.path.join(transition_dir, f"V{to_ver.replace('.', '-')}-Energy+.idd")
-            
+
             # Check if required files exist
-            if not os.path.exists(transition_exe):
-                logger.error(f"Error: Transition executable not found at {transition_exe}")
-                return None
             if not os.path.exists(from_idd):
-                logger.error(f"Error: Source IDD file not found at {from_idd}")
-                return None
+                e = f"Error: Source IDD file not found at {from_idd}"
+                logger.error(e)
+                raise Exception(e)
             if not os.path.exists(to_idd):
-                logger.error(f"Error: Target IDD file not found at {to_idd}")
-                return None
-                
+                e = f"Error: Target IDD file not found at {to_idd}"
+                logger.error(e)
+                raise Exception(e)
+
             # Create symbolic links to IDD files in the temp directory (not in /opt/repository)
-            from_idd_link = os.path.join(temp_dir, os.path.basename(from_idd))
-            to_idd_link = os.path.join(temp_dir, os.path.basename(to_idd))
-            
-            try:
-                if os.path.exists(from_idd_link):
-                    os.remove(from_idd_link)
-                if os.path.exists(to_idd_link):
-                    os.remove(to_idd_link)
-                    
+            from_idd_link = os.path.basename(from_idd)
+            to_idd_link = os.path.basename(to_idd)
+            if not os.path.exists(from_idd_link):
                 os.symlink(from_idd, from_idd_link)
+            if not os.path.exists(to_idd_link):
                 os.symlink(to_idd, to_idd_link)
-                
-                logger.info(f"\nRunning transition from {from_ver} to {to_ver}")
-                logger.debug(f"Using: {transition_exe}")
-                logger.debug(f"Input: {working_file}")
-                
-                # Run the transition executable from the temp_dir
-                result = subprocess.run(
-                    [transition_exe, working_file],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    env={"DISPLAY": ""},
-                    cwd=temp_dir
-                )
-                
-                if result.stdout:
-                    logger.debug("Transition output:", result.stdout)
-                if result.stderr:
-                    logger.warning("Transition errors:", result.stderr)
-                
-                # Clean up any .idfold files that might have been created
-                old_file = working_file + "old"
-                if os.path.exists(old_file):
-                    os.remove(old_file)
-                
-                # Look for the transitioned file
-                transitioned_file = find_transitioned_file(working_file, to_ver)
-                if transitioned_file:
-                    logger.debug(f"Found transitioned file at: {transitioned_file}")
-                    if transitioned_file != working_file:
-                        # Replace working file with transitioned file
-                        with open(transitioned_file, 'r') as src, open(working_file, 'w') as dst:
-                            dst.write(src.read())
-                        # Remove the transitioned file after copying
-                        os.remove(transitioned_file)
-                else:
-                    logger.error(f"Error: Could not find transitioned file for {working_file}")
-                    return None
-                    
-            finally:
-                # Clean up symbolic links
-                if os.path.exists(from_idd_link):
-                    os.remove(from_idd_link)
-                if os.path.exists(to_idd_link):
-                    os.remove(to_idd_link)
-        
+
+            logger.info(f"\nRunning transition from {from_ver} to {to_ver}")
+
+            cwd = os.getcwd()
+            # Run the transition executable from the temp_dir
+            cmdline = [transition_exe(from_ver, to_ver), os.path.basename(working_file)]
+            logging.debug(f"With CWD: {cwd}")
+            logging.debug(f"Using cmd: {cmdline}")
+            result = subprocess.run(
+                cmdline,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env={"DISPLAY": ""},
+                cwd=os.getcwd()
+            )
+
+            print(f"return code trnasition {from_ver} {to_ver} is {result.returncode}")
+
+            if result.stdout:
+                logger.debug(f"Transition output: {result.stdout}")
+            if result.stderr:
+                logger.warning(f"Transition errors: {result.stderr}")
+
+            # Clean up any .idfold files that might have been created
+            old_file = working_file + "old"
+            if os.path.exists(old_file):
+                os.remove(old_file)
+
+            # Look for the transitioned file
+            transitioned_file = find_transitioned_file(working_file, to_ver)
+            if transitioned_file:
+                logger.debug(f"Found transitioned file at: {transitioned_file}")
+                if transitioned_file != working_file:
+                    # Replace working file with transitioned file
+                    os.rename(transitioned_file, working_file)
+            else:
+                e = f"Error: Could not find transitioned file for {working_file}"
+                logger.error(e)
+                raise Exception(e)
         # Copy the final file to the processed_buildigs directory instead of original location
-        with open(working_file, 'r') as src, open(final_output_path, 'w') as dst:
-            dst.write(src.read())
-        
+        shutil.copy(working_file, final_output_path)
+
         logger.info(f"\nFinal transitioned file saved to: {final_output_path}")
-        
+
         # Convert the final IDF to epJSON
         epjson_path = convert_to_epjson(final_output_path)
         logger.info(f"Converted to epJSON: {epjson_path}")
@@ -234,31 +231,11 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
         else:
             logger.error("Failed to convert to epJSON format")
             return final_output_path  # Return IDF path as fallback
-        
-        
-    finally:
-        # Clean up temporary directory and additional files
+
         if os.path.exists(temp_dir):
-            for file in os.listdir(temp_dir):
-                try:
-                    os.remove(os.path.join(temp_dir, file))
-                except Exception as e:
-                    logger.warning(f"Failed to remove temporary file {file}: {e}")
-            try:
-                os.rmdir(temp_dir)
-            except Exception as e:
-                logger.warning(f"Failed to remove temporary directory: {e}")
-        
-        # Clean up Energy+.ini and Transition.audit files
-        cleanup_files = ['Energy+.ini', 'Transition.audit']
-        for file in cleanup_files:
-            try:
-                if os.path.exists(file):
-                    os.remove(file)
-                    logger.debug(f"Removed {file}")
-            except Exception as e:
-                logger.warning(f"Failed to remove {file}: {e}")
-    
+            shutil.rmtree(temp_dir)
+
+
     return final_output_path
 
 def process_idf(building_files: List[tuple], state: str, county: str):
@@ -320,10 +297,10 @@ def convert_to_epjson(idf_path: str) -> str:
     """
     try:
         # Define the output path
-        epjson_path = os.path.splitext(idf_path)[0] + '.epJSON'
+        epjson_path = os.path.splitext(Path(idf_path).resolve())[0] + '.epJSON'
         
         # Path to the EnergyPlus executable
-        energyplus_dir = "/usr/local/EnergyPlus-24-1-0"
+        energyplus_dir = env.ENERGYPLUS_PATH.get()
         converter = os.path.join(energyplus_dir, "ConvertInputFormat")
         
         logger.info(f"Converting {idf_path} to epJSON format")
@@ -336,10 +313,12 @@ def convert_to_epjson(idf_path: str) -> str:
             stderr=subprocess.PIPE,
             text=True
         )
-        
+
         if result.stderr:
             logger.warning(f"Conversion warnings: {result.stderr}")
-            
+        if result.stdout:
+            logger.warning(f"Conversion warnings: {result.stdout}")            
+
         # Check if the epJSON file was created
         if os.path.exists(epjson_path):
             logger.info(f"Successfully converted to: {epjson_path}")
@@ -349,14 +328,14 @@ def convert_to_epjson(idf_path: str) -> str:
             return epjson_path
         else:
             logger.error(f"epJSON file not created at expected path: {epjson_path}")
-            return None
-            
+            raise Exception(f"epJSON file not created at expected path: {epjson_path}")
+
     except subprocess.CalledProcessError as e:
         logger.error(f"Conversion failed: {e.stderr}")
-        return None
+        raise
     except Exception as e:
         logger.error(f"Error during conversion: {e}")
-        return None
+        raise
     
 
 def add_hvac_meters_to_epjson(epjson_path: str, output_path: str = None) -> None:
@@ -857,14 +836,14 @@ def get_temperature_setpoints(epjson_path: str) -> List[tuple]:
     rdf_graph = query_info.rdf_from_json(epjson_path)
     
     # Query to find thermostats that are used in zone controls
-    thermostat_query = """
+    thermostat_query = """# -*- mode: sparql -*-
     SELECT DISTINCT ?control_type ?setpoint_name
     WHERE {
         # Find zone controls and their types
         ?control a ns:ZoneControl%3AThermostat .
         ?control ns:control_1_object_type ?control_type .
         ?control ns:control_1_name ?setpoint_name .
-        
+
         # Make sure the control is used by at least one zone
         ?control ?zone_prop ?zone_name .
         FILTER(?zone_prop = ns:zone_or_zonelist_name) .

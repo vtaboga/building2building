@@ -1,6 +1,6 @@
 import pyenergyplus.api
 import threading
-import src.simulator.template as template
+import building2building.simulator.template as template
 import collections
 from dataclasses import dataclass, field
 import typing

@@ -72,7 +72,7 @@ EOF
         EPLUS_ENV=$(python3 -c "
 import sys
 sys.path.append('${PWD}')
-from src.simulator.config_manager import find_energyplus_path, update_energyplus_path
+from building2building.simulator.config_manager import find_energyplus_path, update_energyplus_path
 
 # Use manually specified path if provided
 path = find_energyplus_path('$ENERGYPLUS_PATH')

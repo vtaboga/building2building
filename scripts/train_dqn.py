@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 import json
 import argparse
-from src.algorithms.dqn import main, Args
-from src.core.run_manager import RunManager
+from building2building.algorithms.dqn import main, Args
+from building2building.core.run_manager import RunManager
 
 # Make sure to import your environment to register it
 import src.simulator
