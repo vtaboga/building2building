@@ -4,7 +4,7 @@ MirrorURL: https://us.archive.ubuntu.com/ubuntu/
 
 %files
     # Copy only essential repository files
-    src/ /opt/repository/src
+    building2building/ /opt/repository/building2building
     scripts/ /opt/repository/scripts
     tests/ /opt/repository/tests
     requirements.txt /opt/repository/requirements.txt
