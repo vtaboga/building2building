@@ -1,3 +1,4 @@
+from pathlib import Path
 import os
 import pandas as pd
 import subprocess
@@ -11,9 +12,10 @@ from building2building.simulator.action_spaces import get_controllable_setpoints
 from building2building.simulator import query_info
 import building2building.env as env
 from building2building.utils import cd
-logger = logging.getLogger('generator')
 
-def process_metadata(state: str):
+logger = logging.getLogger(__name__)
+
+def process_metadata(state: str) -> Path:
     """
     Process all metadata CSV files in the metadata directory to get the county name for each row.
     For each file:
@@ -21,78 +23,70 @@ def process_metadata(state: str):
     2. If County column exists, skip the file as it's already processed
     3. Parses the Centroid column to extract latitude and longitude
     4. Creates a new County column with the county name for each coordinate pair
-    Uses async requests to optimize county lookups
+
+    Returns the path of the processed file.
     """
-    csv_file = os.path.join("data", "metadata", f"{state}.csv")
-    
-    try:
-        # Read the CSV file
-        df = pd.read_csv(csv_file)
-        
-        # Skip if County column already exists
-        if 'County' in df.columns:
-            logger.info(f"Skipping {csv_file} - already processed")
-            return
-        
-        logger.info(f"Processing metadata for state: {state}")
-        
-        # Split the Centroid column into latitude and longitude
-        df[['Latitude', 'Longitude']] = df['Centroid'].str.split('/', expand=True)
-        
-        # Convert to float
-        df['Latitude'] = df['Latitude'].astype(float)
-        df['Longitude'] = df['Longitude'].astype(float)
-        
-        # Process all coordinates at once
-        logger.debug("Getting county names for all coordinates...")
-        coords_list = list(zip(df['Latitude'], df['Longitude']))
-        counties = get_counties_from_coords_batch(coords_list)
-        
-        # Add counties to dataframe
-        df['County'] = counties
-        
-        # Save the updated CSV file
-        df.to_csv(csv_file, index=False)
-        logger.info(f"Successfully processed and updated {csv_file}")
-            
-    except Exception as e:
-        logger.error(f"Error processing {csv_file}: {e}")
-        raise
+    path_in = Path("data", "metadata", f"{state}.csv")
+    path_out = Path("data", "metadata", f"{state}_processed.parquet")
 
-def find_transitioned_file(original_file: str, to_ver: str) -> str:
+    if path_out.exists():
+        return path_out
+
+    # Read the CSV file
+    df = pd.read_csv(path_in)
+
+    logger.info(f"Processing metadata for state: {state}")
+
+    # Split the Centroid column into latitude and longitude
+    df[['Latitude', 'Longitude']] = df['Centroid'].str.split('/', expand=True)
+
+    # Convert to float
+    df['Latitude'] = df['Latitude'].astype(float)
+    df['Longitude'] = df['Longitude'].astype(float)
+
+    # Process all coordinates at once
+    logger.debug("Getting county names for all coordinates...")
+    coords_list = list(zip(df['Latitude'], df['Longitude']))
+    counties = get_counties_from_coords_batch(coords_list)
+
+    # Add counties to dataframe
+    df['County'] = counties
+
+    # Save the updated CSV file
+    df.to_parquet(path_out)
+    logger.info(f"Successfully processed and wrote to {path_out}")
+
+    return path_out
+
+def find_transitioned_file(original_file: Path, to_ver: str) -> Path:
     """Helper function to find the transitioned file which might have different naming patterns"""
-    idf_dir = os.path.dirname(original_file)
-    base_name = os.path.splitext(os.path.basename(original_file))[0]
-    
-    # Different possible patterns for the output file
-    possible_patterns = [
-        # Pattern 1: original_name.idfnew (actual pattern we're seeing)
-        os.path.join(idf_dir, f"{base_name}.idfnew"),
-        # Pattern 2: original_name-V{version}.idf
-        os.path.join(idf_dir, f"{base_name}-V{to_ver.replace('.', '-')}.idf"),
-        # Pattern 3: original_name.V{version}.idf
-        os.path.join(idf_dir, f"{base_name}.V{to_ver.replace('.', '-')}.idf"),
-        # Pattern 4: original_name-{version}.idf
-        os.path.join(idf_dir, f"{base_name}-{to_ver.replace('.', '-')}.idf"),
-        # Pattern 5: original_name.{version}.idf
-        os.path.join(idf_dir, f"{base_name}.{to_ver}.idf"),
-        # Pattern 6: original_name.new
-        os.path.join(idf_dir, f"{base_name}.new"),
-    ]
-    
-    for pattern in possible_patterns:
-        if os.path.exists(pattern):
-            logger.debug(f"Found matching file: {pattern}")
-            return pattern
-            
-    # If no pattern matches, log all files in directory for debugging
-    logger.warning(f"No matching transitioned file found. Available files in {idf_dir}:")
-    for file in os.listdir(idf_dir):
-        logger.debug(f"  {file}")
-            
-    return None
+    idf_dir = original_file.parent
+    base_name = original_file.with_suffix("").name
 
-def transition_idf(idf_path: str, state: str, county: str, target_version: str = "24.1") -> str:
+    new_path = (idf_dir / base_name).with_suffix(".idfnew")
+
+    # # Different possible patterns for the output file
+    # possible_patterns = [
+    #     # Pattern 1: original_name.idfnew (actual pattern we're seeing)
+    #     os.path.join(idf_dir, f"{base_name}.idfnew"),
+    #     # Pattern 2: original_name-V{version}.idf
+    #     os.path.join(idf_dir, f"{base_name}-V{to_ver.replace('.', '-')}.idf"),
+    #     # Pattern 3: original_name.V{version}.idf
+    #     os.path.join(idf_dir, f"{base_name}.V{to_ver.replace('.', '-')}.idf"),
+    #     # Pattern 4: original_name-{version}.idf
+    #     os.path.join(idf_dir, f"{base_name}-{to_ver.replace('.', '-')}.idf"),
+    #     # Pattern 5: original_name.{version}.idf
+    #     os.path.join(idf_dir, f"{base_name}.{to_ver}.idf"),
+    #     # Pattern 6: original_name.new
+    #     os.path.join(idf_dir, f"{base_name}.new"),
+    # ]
+
+    if not new_path.exists():
+        raise Exception(f"can't find transitioned file at {new_path}")
+
+    return new_path
+
+def transition_idf(idf_path: Path, state: str, county: str, target_version: str = "24.1") -> Path:
     """
     Transition an IDF file to the target EnergyPlus version using the transition executables.
     Saves the processed file in data/processed_buildings/state/county/ directory.
@@ -107,21 +101,21 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
         str: Path to the transitioned file in the processed_buildigns directory
     """
 
-    idf_path = str(Path(idf_path).resolve())
+    idf_path = idf_path.resolve()
 
     # Create the output directory structure
-    processed_dir = os.path.join("data", "processed_buildings", state, county)
-    os.makedirs(processed_dir, exist_ok=True)
+    processed_dir = Path("data", "processed_buildings", state, county).resolve()
+    processed_dir.mkdir(parents=True, exist_ok=True)
 
-    idf_dir = os.path.dirname(idf_path)
-    idf_name = os.path.basename(idf_path)
+    idf_dir = idf_path.parent
+    idf_name = Path(idf_path.name)
 
     # Define the final output path
-    final_output_path = str(Path(os.path.join(processed_dir, idf_name)).resolve())
+    final_output_path = processed_dir / idf_name
 
     # Create a temporary directory for transition files
-    temp_dir = os.path.join(idf_dir, "temp_transition")
-    os.makedirs(temp_dir, exist_ok=True)
+    temp_dir = idf_dir / "temp_transition"
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
     # Define the transition sequence from 9.4 to 24.1
     transitions = [
@@ -136,15 +130,13 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
 
     # Copy the original file to temp directory to work with
 
-
     energyplus_dir = env.ENERGYPLUS_PATH.get()
-    transition_dir = os.path.join(energyplus_dir, "PreProcess", "IDFVersionUpdater")
+    transition_dir = energyplus_dir / "PreProcess" / "IDFVersionUpdater"
+
     def transition_exe(from_ver, to_ver):
-        p = os.path.join(transition_dir, f"Transition-V{from_ver.replace('.', '-')}-to-V{to_ver.replace('.', '-')}")
-        if not os.path.exists(p):
-            e = f"Error: Transition executable not found at {transition_exe}"
-            logger.error(e)
-            raise Exception(e)
+        p = transition_dir / f"Transition-V{from_ver.replace('.', '-')}-to-V{to_ver.replace('.', '-')}"
+        if not p.exists():
+            raise Exception(f"Error: Transition executable not found at {transition_exe}")
         return p
 
     with cd(temp_dir):
@@ -201,9 +193,9 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
                 logger.warning(f"Transition errors: {result.stderr}")
 
             # Clean up any .idfold files that might have been created
-            old_file = working_file + "old"
-            if os.path.exists(old_file):
-                os.remove(old_file)
+            old_file = Path(str(working_file) + "old")
+            if old_file.exists():
+                old_file.unlink()
 
             # Look for the transitioned file
             transitioned_file = find_transitioned_file(working_file, to_ver)
@@ -241,33 +233,33 @@ def transition_idf(idf_path: str, state: str, county: str, target_version: str =
 def process_idf(building_files: List[tuple], state: str, county: str):
     """
     Process IDF files if they haven't been processed already.
-    
+
     Args:
         idf_files (List[int]): List of IDF file IDs
         state (str): Two-letter state code
         county (str): County name
-    
+
     Returns:
         List[str]: List of paths to processed IDF files
     """
     processed_dir = os.path.join("data", "processed_buildings", state, county)
     os.makedirs(processed_dir, exist_ok=True)
-    
+
     processed_paths = []
     for idf_id, characteristics in building_files:
         # Check if processed file already exists
-        processed_path = os.path.join(processed_dir, f"{idf_id}.epJSON")
-        if os.path.exists(processed_path):
+        processed_path = Path(processed_dir, f"{idf_id}.epJSON")
+        if processed_path.exists():
             logger.info(f"Skipping {idf_id}.epJSON - already processed")
             processed_paths.append(processed_path)
             continue
-            
+
         # Get path to original file
-        original_path = os.path.join("data", "idf", f"{state}_{county}_IDF", f"{idf_id}.idf")
-        if not os.path.exists(original_path):
+        original_path = Path("data", "idf", f"{state}_{county}_IDF", f"{idf_id}.idf")
+        if not original_path.exists():
             logger.warning(f"Warning: Original file not found at {original_path}")
             continue
-            
+
         # Process the file
         processed_path = transition_idf(original_path, state, county)
         if processed_path:

@@ -6,17 +6,19 @@ import logging
 import asyncio
 import aiohttp
 from typing import List, Tuple
-import os
+from pathlib import Path
 import zipfile
+from building2building.generator.downloader import download_file_progress, extract_zip_progress
 
-logger = logging.getLogger('generator')
+
+logger = logging.getLogger(__name__)
 
 def download_county_boundaries():
     """
     Download US county boundaries from Census Bureau
     """
 
-    zip_file_name = os.path.join("data", "metadata", "counties.zip")
+    zip_file_name = Path("data", "metadata", "counties.zip")
 
     # Option 1: Cartographic boundaries (smaller, simplified)
     url = "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_county_500k.zip"
@@ -25,43 +27,39 @@ def download_county_boundaries():
     # url = "https://www2.census.gov/geo/tiger/TIGER2024/COUNTY/tl_2024_us_county.zip"
 
 
-    if not os.path.exists(zip_file_name):
+    if not zip_file_name.exists():
         logger.info("Downloading county boundaries...")
-        response = requests.get(url, verify=False)
-        with open(zip_file_name, 'wb') as f:
-            f.write(response.content)
+        download_file_progress(url, zip_file_name, description="Downloading county boundaries")
 
-    boundaries_dir = os.path.join("data", "metadata", "counties")
+    boundaries_dir = Path("data", "metadata", "counties")
 
-    if not os.path.exists(boundaries_dir):
+    if not boundaries_dir.exists():
         logger.info("Extracting county boundaries...")
 
-        # Extract the shapefile
-        with zipfile.ZipFile(zip_file_name, 'r') as zip_ref:
-            zip_ref.extractall(boundaries_dir)
+        extract_zip_progress(zip_file_name, boundaries_dir, description="Extracting county boundaries")
 
     return boundaries_dir
 
-def load_county_boundaries(data_dir):
+def load_county_boundaries(data_dir: Path):
     """
     Load county boundaries into a GeoDataFrame
     """
     # Find the .shp file in the extracted directory
-    shp_files = [f for f in os.listdir(data_dir) if f.endswith('.shp')]
+    shp_files = [f for f in data_dir.iterdir() if f.suffix == '.shp']
     if not shp_files:
         raise FileNotFoundError("No shapefile found in the extracted data")
 
-    shp_path = os.path.join(data_dir, shp_files[0])
+    shp_path = shp_files[0]
 
-    logger.info(f"Loading {shp_path}...")
+    logger.debug(f"Loading {shp_path}...")
     counties = gpd.read_file(shp_path)
 
     # Ensure we're using WGS84 (EPSG:4326) for lat/lon coordinates
     if counties.crs != 'EPSG:4326':
         counties = counties.to_crs('EPSG:4326')
 
-    logger.info(f"Loaded {len(counties)} counties")
-    logger.info(f"Columns available: {list(counties.columns)}")
+    logger.debug(f"Loaded {len(counties)} counties")
+    logger.debug(f"Columns available: {list(counties.columns)}")
     return counties
 
 def fast_county_lookup(lat_lon_pairs, counties_gdf):
