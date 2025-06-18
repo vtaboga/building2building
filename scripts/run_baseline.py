@@ -1,4 +1,4 @@
-from building2building.algorithms.baselines import run_constant_baseline
+from building2building.algorithms.online.baselines import run_constant_baseline
 import argparse
 import json
 

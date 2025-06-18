@@ -137,21 +137,6 @@ echo "📦 Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Install OfflineRL-Kit manually 
-echo "📦 Installing OfflineRL-Kit manually..."
-
-echo "📥 Cloning OfflineRL-Kit repository..."
-if git clone https://github.com/yihaosun1124/OfflineRL-Kit.git; then
-    cd OfflineRL-Kit
-    echo "🔧 Installing OfflineRL-Kit (without dependencies)..."
-    # Install without trying to resolve dependencies to avoid SSL issues
-    pip install -e . --no-deps
-    echo "✅ OfflineRL-Kit installed successfully!"
-else
-    echo "❌ Failed to install OfflineRL-Kit."
-    exit 1
-fi
-
 # Install the package in development mode
 echo "📦 Installing package in development mode..."
 pip install -e .

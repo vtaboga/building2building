@@ -3,7 +3,7 @@ import os
 
 import numpy as np
 import torch
-import gym
+import gymnasium as gym
 
 from typing import Optional, Dict, List
 from tqdm import tqdm
@@ -87,26 +87,27 @@ class MFPolicyTrainer:
 
     def _evaluate(self) -> Dict[str, List[float]]:
         self.policy.eval()
-        obs = self.eval_env.reset()
+        obs, info = self.eval_env.reset()
         eval_ep_info_buffer = []
         num_episodes = 0
         episode_reward, episode_length = 0, 0
 
         while num_episodes < self._eval_episodes:
             action = self.policy.select_action(obs.reshape(1,-1), deterministic=True)
-            next_obs, reward, terminal, _ = self.eval_env.step(action.flatten())
+            next_obs, reward, terminated, truncated, _ = self.eval_env.step(action.flatten())
+            done = terminated or truncated
             episode_reward += reward
             episode_length += 1
 
             obs = next_obs
 
-            if terminal:
+            if done:
                 eval_ep_info_buffer.append(
                     {"episode_reward": episode_reward, "episode_length": episode_length}
                 )
                 num_episodes +=1
                 episode_reward, episode_length = 0, 0
-                obs = self.eval_env.reset()
+                obs, info = self.eval_env.reset()
         
         return {
             "eval/episode_reward": [ep_info["episode_reward"] for ep_info in eval_ep_info_buffer],

@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import gym
+import gymnasium as gym
 
 from copy import deepcopy
 from typing import Dict, Union, Tuple

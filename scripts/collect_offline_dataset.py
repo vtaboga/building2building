@@ -14,9 +14,9 @@ from typing import Dict, List, Any, Optional, Union
 import logging
 
 # Building2Building imports
-from building2building.algorithms.dqn import QNetwork, dqn_evaluate
-from building2building.algorithms.ppo import Agent as PPOAgent, ppo_evaluate
-from building2building.algorithms.baselines import constant_policy
+from building2building.algorithms.online.dqn import QNetwork, dqn_evaluate
+from building2building.algorithms.online.ppo import Agent as PPOAgent, ppo_evaluate
+from building2building.algorithms.online.baselines import constant_policy
 from building2building.core.run_manager import RunManager
 from building2building.simulator.wrappers import NormalizeObservation, CustomRescaleAction
 import building2building.simulator

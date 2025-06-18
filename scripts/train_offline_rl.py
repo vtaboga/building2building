@@ -6,11 +6,11 @@ Supports CQL, IQL, and TD3+BC from OfflineRL-Kit.
 import os
 import json
 import argparse
-from building2building.algorithms.offline_rl import main, OfflineRLArgs
+from building2building.algorithms.offline.policy_trainer.mf_policy_trainer import main, OfflineRLArgs
 from building2building.core.run_manager import RunManager
 
 # Make sure to import your environment to register it
-import src.simulator
+import building2building.simulator
 
 
 def parse_args():

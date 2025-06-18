@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import gym
+import gymnasium as gym
 
 from torch.nn import functional as F
 from typing import Dict, Union, Tuple

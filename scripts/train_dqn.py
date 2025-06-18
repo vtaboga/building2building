@@ -4,11 +4,11 @@ import torch
 import torch.nn as nn
 import json
 import argparse
-from building2building.algorithms.dqn import main, Args
+from building2building.algorithms.online.dqn import main, Args
 from building2building.core.run_manager import RunManager
 
 # Make sure to import your environment to register it
-import src.simulator
+import building2building.simulator
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train DQN algorithm on EnergyPlus environment")
