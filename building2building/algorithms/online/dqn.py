@@ -13,7 +13,7 @@ import torch.optim as optim
 import tyro
 from torch.utils.tensorboard import SummaryWriter
 import logging
-import src.simulator
+import building2building.simulator
 from building2building.simulator.utils import TrajectoryLogger
 from building2building.simulator.wrappers import NormalizeObservation, CustomRescaleAction
 

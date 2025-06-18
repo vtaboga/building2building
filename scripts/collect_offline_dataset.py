@@ -19,7 +19,7 @@ from building2building.algorithms.ppo import Agent as PPOAgent, ppo_evaluate
 from building2building.algorithms.baselines import constant_policy
 from building2building.core.run_manager import RunManager
 from building2building.simulator.wrappers import NormalizeObservation, CustomRescaleAction
-import src.simulator
+import building2building.simulator
 
 
 def parse_args():
@@ -70,46 +70,40 @@ def parse_args():
 
 def collect_baseline_data(env: gym.Env, num_episodes: int, heating_setpoint: float,
                          cooling_setpoint: float, logger: logging.Logger) -> Dict[str, List]:
-    """Collect data using constant baseline policy."""
+    """Collect data using constant baseline policy in D4RL format."""
     
     data = {
         'observations': [],
+        'next_observations': [],  
         'actions': [],
         'rewards': [],
         'terminals': [],
         'timeouts': []
     }
     
-    logger.info(f"Collecting {num_episodes} episodes with constant baseline policy")
-    logger.info(f"Heating setpoint: {heating_setpoint}°C, Cooling setpoint: {cooling_setpoint}°C")
-    
     for episode in range(num_episodes):
         obs, _ = env.reset()
         done = False
         truncated = False
-        episode_reward = 0
         
         while not (done or truncated):
-            # Get action from constant policy
             action = constant_policy(obs, heating_setpoint, cooling_setpoint, 
                                    normalize=True, action_space=env.env.env.action_space)
             
-            # Store transition
+            # Store current observation and action
             data['observations'].append(obs.copy())
             data['actions'].append(action.copy())
             
             # Take step
             next_obs, reward, done, truncated, info = env.step(action)
             
+            # Store next observation and outcomes
+            data['next_observations'].append(next_obs.copy())  
             data['rewards'].append(reward)
             data['terminals'].append(done)
-            data['timeouts'].append(truncated)
+            data['timeouts'].append(truncated)  # D4RL treats this as timeout flag
             
             obs = next_obs
-            episode_reward += reward
-        
-        if (episode + 1) % 10 == 0:
-            logger.info(f"Episode {episode + 1}/{num_episodes}, Reward: {episode_reward:.2f}")
     
     return data
 
