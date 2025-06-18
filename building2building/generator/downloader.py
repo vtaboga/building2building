@@ -1,3 +1,5 @@
+from tqdm import tqdm
+import shutil
 import requests
 from bs4 import BeautifulSoup
 import os
@@ -6,10 +8,51 @@ import zipfile
 import io
 from pathlib import Path
 import logging
+from typing import *
 
-logger = logging.getLogger('generator')
+logger = logging.getLogger(__name__)
 
-def download_epw(state_code, city_name=None, save_dir="data/weather", n_files=2):
+def download_file_progress(url: str, dest: Path, description:str|None = None):
+    logger.info(f"Downloading {dest}...")
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+
+    # Get total file size from headers
+    total_size = int(response.headers.get('content-length', 0))
+
+    block_size = 1<<16
+
+    if description is None:
+        desc="Downloading"
+    else:
+        desc = description
+
+    with tqdm(total=total_size, unit="B", unit_scale=True, desc=desc) as progress_bar:
+        with open(dest, "wb") as file:
+            for data in response.iter_content(block_size):
+                progress_bar.update(len(data))
+                file.write(data)
+
+
+def extract_zip_progress(zip_path: Path, dst_dir: Path, description:str | None = None):
+    if description is None:
+        desc = "Extracting"
+    else:
+        desc = description
+
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        file_list = zip_ref.infolist()
+
+        # Calculate total uncompressed size
+        total_size = sum(file_info.file_size for file_info in file_list)
+
+        with tqdm(total=total_size, unit="B", unit_scale=True, desc=desc) as progress_bar:
+            for file_info in file_list:
+                zip_ref.extract(file_info, dst_dir)
+                progress_bar.update(file_info.file_size)
+
+
+def download_epw(state_code, city_name=None, save_dir=Path("data/weather"), n_files=2) -> list[Path] | None:
     """
     Download up to n_files EPW weather files for a specific city and state.
     If city_name is None, downloads any available weather files from the state.
@@ -23,39 +66,37 @@ def download_epw(state_code, city_name=None, save_dir="data/weather", n_files=2)
     Returns:
         list[str] or str or None: List of paths to the EPW files if successful, None otherwise
     """
-    os.makedirs(save_dir, exist_ok=True)
-    existing_files = os.listdir(save_dir) if os.path.exists(save_dir) else []
+    save_dir.mkdir(exist_ok=True)
+    existing_files: list[Path] = list(save_dir.iterdir()) if save_dir.exists() else []
 
     # Check for already existing files
     found_files = []
     if city_name is None:
         for file in existing_files:
-            if file.endswith('.epw') and (f"USA_{state_code.upper()}_" in file or f"_{state_code.upper()}." in file):
-                found_files.append(os.path.join(save_dir, file))
-                if len(found_files) >= n_files:
-                    logger.info(f"Found {len(found_files)} existing EPW files for state {state_code}")
-                    return found_files if n_files > 1 else found_files[0]
+            filename = str(file)
+            if file.suffix == '.epw' and (f"USA_{state_code.upper()}_" in filename or f"_{state_code.upper()}." in filename):
+                found_files.append(file)
     else:
         for file in existing_files:
             if file.endswith('.epw') and city_name.lower() in file.lower() and (
                 f"USA_{state_code.upper()}_" in file or f"_{state_code.upper()}." in file):
-                found_files.append(os.path.join(save_dir, file))
-                if len(found_files) >= n_files:
-                    logger.info(f"Found {len(found_files)} existing EPW files for {city_name}, {state_code}")
-                    return found_files if n_files > 1 else found_files[0]
+                found_files.append(file)
+
+    if len(found_files) >= n_files:
+        logger.info(f"Found {len(found_files)} existing EPW files for state {state_code}")
+        return found_files
+
 
     logger.info(f"No existing EPW file(s) found for {'state '+state_code if city_name is None else city_name+', '+state_code}. Downloading...")
 
     base_url = "https://climate.onebuilding.org/WMO_Region_4_North_and_Central_America/USA_United_States_of_America/"
     response = requests.get(base_url)
-    if response.status_code != 200:
-        logger.error("Failed to access the webpage.")
-        return None
+    response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
 
     # Find up to n_files matching ZIP file links
-    zip_file_links = []
+    zip_file_links: list[str] = []
     for link in soup.find_all("a"):
         href = link.get("href")
         file_name = link.get_text()
@@ -71,78 +112,73 @@ def download_epw(state_code, city_name=None, save_dir="data/weather", n_files=2)
             break
 
     if not zip_file_links:
-        logger.warning(f"No ZIP file found for city: {city_name}, state: {state_code}")
-        return None
+        raise Exception(f"No ZIP file found for city: {city_name}, state: {state_code}")
 
-    downloaded_epw_paths = []
+    def download_and_extract_epw(zip_url) -> Path | None:
+        response = requests.get(zip_url)
+        response.raise_for_status()
+        with zipfile.ZipFile(io.BytesIO(response.content)) as zip_ref:
+            epw_files = [f for f in zip_ref.namelist() if f.endswith('.epw')]
+            if epw_files:
+                epw_file = epw_files[0]  # Take the first EPW file in the ZIP
+                epw_content = zip_ref.read(epw_file)
+                epw_path = Path(save_dir, os.path.basename(epw_file))
+                with open(epw_path, "wb") as f:
+                    f.write(epw_content)
+                logger.info(f"Downloaded and extracted EPW file: {epw_path}")
+                return epw_path
+            else:
+                return None
+
+    downloaded_epw_paths: list[str] = []
+
     for zip_file_link in zip_file_links:
-        logger.debug(f"Downloading from: {zip_file_link}")
-        response = requests.get(zip_file_link)
-        if response.status_code == 200:
-            try:
-                with zipfile.ZipFile(io.BytesIO(response.content)) as zip_ref:
-                    epw_files = [f for f in zip_ref.namelist() if f.endswith('.epw')]
-                    if epw_files:
-                        epw_file = epw_files[0]  # Take the first EPW file in the ZIP
-                        epw_content = zip_ref.read(epw_file)
-                        epw_path = os.path.join(save_dir, os.path.basename(epw_file))
-                        with open(epw_path, "wb") as f:
-                            f.write(epw_content)
-                        logger.info(f"Downloaded and extracted EPW file: {epw_path}")
-                        downloaded_epw_paths.append(epw_path)
-                        if len(downloaded_epw_paths) >= n_files:
-                            break
-                    else:
-                        logger.warning("No EPW file found in the ZIP archive.")
-            except zipfile.BadZipFile:
-                logger.error("Downloaded file is not a valid ZIP file.")
-        else:
-            logger.error(f"Failed to download ZIP file. Status code: {response.status_code}")
+        if len(downloaded_epw_paths) >= n_files:
+            break
 
-    if not downloaded_epw_paths:
-        return None
-    return downloaded_epw_paths if n_files > 1 else downloaded_epw_paths[0]
+        logger.debug(f"Downloading from: {zip_file_link}")
+        try:
+            maybe_path = download_and_extract_epw(zip_file_link)
+            if maybe_path is not None:
+                downloaded_epw_paths.append(maybe_path)
+        except zipfile.BadZipFile:
+            logger.error("Downloaded file is not a valid ZIP file.")
+    if len(downloaded_epw_paths) < n_files:
+        raise Exception(f"Did not find enough files. wanted {n_files} got {len(downloaded_epw_paths)}")
+    return downloaded_epw_paths
 
 
 def get_available_counties() -> list[tuple[str, str]]:
     """
     Scrapes the ESS-DIVE website to get a list of all available county IDF files.
-    
+
     Returns:
         list[tuple[str, str]]: List of tuples containing (state_code, county_name)
     """
     base_url = "https://tier2.ess-dive.lbl.gov/doi-10-15485-2283980/data/Counties_IDF/"
-    
-    try:
-        # Get the webpage content
-        response = requests.get(base_url)
-        response.raise_for_status()
-        
-        # Parse HTML
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Find all links that end with _IDF.zip
-        zip_links = soup.find_all('a', href=re.compile(r'.*_IDF\.zip$'))
-        
-        counties = []
-        for link in zip_links:
-            filename = link['href']
-            # Extract state and county from filename (e.g., "AK_Anchorage_IDF.zip")
-            match = re.match(r'([A-Z]{2})_(.+)_IDF\.zip', filename)
-            if match:
-                state_code = match.group(1)
-                county_name = match.group(2)
-                counties.append((state_code, county_name))
-        
-        logger.debug(f"Found {len(counties)} available counties")
-        return sorted(counties)  # Sort by state code and county name
-        
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error accessing website: {e}")
-        return []
-    except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
-        return []
+
+    # Get the webpage content
+    response = requests.get(base_url)
+    response.raise_for_status()
+
+    # Parse HTML
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    # Find all links that end with _IDF.zip
+    zip_links = soup.find_all('a', href=re.compile(r'.*_IDF\.zip$'))
+
+    counties: list[tuple[str, str]] = []
+    for link in zip_links:
+        filename = link['href']
+        # Extract state and county from filename (e.g., "AK_Anchorage_IDF.zip")
+        match = re.match(r'([A-Z]{2})_(.+)_IDF\.zip', filename)
+        if match:
+            state_code = match.group(1)
+            county_name = match.group(2)
+            counties.append((state_code, county_name))
+
+    logger.debug(f"Found {len(counties)} available counties")
+    return sorted(counties)  # Sort by state code and county name
 
 def download_and_extract_county_idf(state_code: str, county_name: str) -> str:
     """
@@ -182,37 +218,18 @@ def download_and_extract_county_idf(state_code: str, county_name: str) -> str:
     
     # Full path for the zip file
     zip_path = output_dir / filename
-    
-    try:
-        # Download the file
-        logger.info(f"Downloading {filename}...")
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
-        
-        # Save the zip file
-        with open(zip_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-        
-        # Extract the zip file to the county-specific folder
-        logger.debug(f"Extracting {filename} to {folder_name}/...")
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(county_dir)
-        
-        # Remove the zip file after extraction
-        os.remove(zip_path)
-        logger.info(f"Successfully downloaded and extracted {filename}")
-        
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error downloading file: {e}")
-    except zipfile.BadZipFile:
-        logger.error(f"Error: {filename} is not a valid zip file")
-        if zip_path.exists():
-            os.remove(zip_path)
-    except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
-        if zip_path.exists():
-            os.remove(zip_path)
+
+    # if not zip_path.exists():
+    # Download the file
+    download_file_progress(url, zip_path, description=f"Downloading IDFs for county {county_name}")
+
+    # Extract the zip file to the county-specific folder
+
+    extract_zip_progress(zip_path, county_dir, description="Extracting IDFs")
+
+    # Remove the zip file after extraction
+    os.remove(zip_path)
+    logger.info(f"Successfully downloaded and extracted {filename}")
 
     return county_dir
 
@@ -233,28 +250,13 @@ def download_metadata(state: str):
     os.makedirs(output_dir, exist_ok=True)
 
     # Check if file already exists
-    file_path = os.path.join(output_dir, target_file)
+    file_url = metadata_url + target_file
+    file_path = Path(output_dir, target_file)
     if os.path.exists(file_path):
         logger.info(f"Skipping {target_file} - already exists")
         return
 
-    try:
-        # Download the file
-        file_url = metadata_url + target_file
-        response = requests.get(file_url)
-        response.raise_for_status()
-
-        # Save the file
-        with open(file_path, 'wb') as f:
-            f.write(response.content)
-        logger.info(f"Downloaded: {target_file}")
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error downloading metadata for {state}: {str(e)}")
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        raise
+    download_file_progress(file_url, file_path, description=f"Downloading {target_file}")
 
 def scrap_full_dataset() -> list[Path]:
     """

@@ -1,12 +1,15 @@
 import pandas as pd
+import duckdb
 import os
 import logging
 from building2building.generator.downloader import download_and_extract_county_idf, download_metadata, download_epw
 from building2building.generator.processing import process_idf, process_metadata
+from typing import Tuple
+import pathlib
 
-logger = logging.getLogger('generator')
+logger = logging.getLogger(__name__)
 
-def search_metadata(metadata: pd.DataFrame, building_type: str, area: float, num_floors: int, height: float=None, n_buildings: int=1):
+def search_metadata(metadata: pd.DataFrame, building_type: str, area: float|None, num_floors: int|None, height: float|None=None, n_buildings: int=1):
     """
     Search metadata for buildings matching the given criteria in order:
     1. Building type (required)
@@ -54,28 +57,24 @@ def search_metadata(metadata: pd.DataFrame, building_type: str, area: float, num
     logger.debug(f"Found {len(result)} matching buildings")
     return result
 
-def load_metadata(state: str, county: str=None):
+def load_metadata(metadata_path: pathlib.Path, county: str|None=None) -> pd.DataFrame:
     """
     Load and filter metadata for the specified state and county.
     """
-    try:
-        metadata_path = os.path.join("data", "metadata", f"{state}.csv")
-        metadata = pd.read_csv(metadata_path)
-        logger.debug(f"Loaded metadata for state {state}")
-        
-        if county is not None:
-            metadata = metadata[metadata['County'] == county]
-            logger.debug(f"Filtered metadata for county {county}: {len(metadata)} entries")
-        return metadata
-        
-    except FileNotFoundError:
-        logger.error(f"Metadata file not found for state: {state}")
-        raise
-    except Exception as e:
-        logger.error(f"Error loading metadata: {e}")
-        raise
+    if county is None:
+        query = f"SELECT * FROM '{metadata_path}'"
+    else:
+        logger.debug(f"Will filtered metadata for county {county}")
+        query = f"SELECT * FROM '{metadata_path}' WHERE County = '{county}'"
 
-def search_idf(state: str, county: str, building_type: str, area: float, num_floors: int, height: float, n_buildings: int, n_weather_files: int):
+
+    logger.debug(f"Executing query `{query}`")
+    df = duckdb.query(query).to_df()
+    logger.debug(f"Loaded metadata.")
+
+    return df
+
+def search_idf(state: str, county: str, building_type: str, area: float, num_floors: int, height: float|None, n_buildings: int, n_weather_files: int) -> Tuple[list[Tuple[str, dict]], list[str]]:
     """
     Search and process IDF files matching the specified criteria.
     """
@@ -89,8 +88,9 @@ def search_idf(state: str, county: str, building_type: str, area: float, num_flo
     # Load metadata
     try:
         download_metadata(state=state)
-        process_metadata(state=state)
-        metadata = load_metadata(state, county=county)
+
+        metadata_path = process_metadata(state=state)
+        metadata = load_metadata(metadata_path, county=county)
         logger.debug(f"Loaded metadata with shape: {metadata.shape}")
 
         # Search for matching IDF files
@@ -98,17 +98,14 @@ def search_idf(state: str, county: str, building_type: str, area: float, num_flo
         if building_files:
             logger.info(f"Found {len(building_files)} matching IDF files: {building_files}")
         else:
-            logger.warning("No matching IDF files found")
-            return
+            raise Exception("No matching IDF files found")
 
         # Process the found IDF files
         processed_files = process_idf(building_files, state, county)
-        logger.info(f"Successfully processed {len(processed_files)} IDF files")
 
         # Download associated weather files
         weather_files = download_epw(state_code=state, n_files=n_weather_files)
-        logger.info(f"Successfully downloaded weather files")
-        
+
     except Exception as e:
         logger.error(f"Error during IDF search and processing: {e}")
         raise

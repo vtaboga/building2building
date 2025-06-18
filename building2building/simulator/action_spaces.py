@@ -9,10 +9,7 @@ from building2building.core.logging import setup_logger
 from typing import Dict, List
 from building2building.simulator.query_info import ns
 
-# Setup config logger as a child of root
-logger = setup_logger('config', add_handlers=False)
-
-
+logger = logging.getLogger(__name__)
 
 def action_transform(act, actuators):
     """Transform raw actions into heating and cooling setpoints.
