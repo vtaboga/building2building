@@ -18,7 +18,10 @@ def test_gym_wrapper():
         'EnergyPlus-v0',  
         path_to_building="tests/fixtures/building.epJSON",
         path_to_weather="tests/fixtures/alaska.epw",
-        building_characteristics=building_characteristics
+        building_characteristics=building_characteristics,
+        reward_type="base",
+        energy_weight=1.0,
+        run_manager=None
     )
     
     # Reset environment and get initial observation
