@@ -7,8 +7,8 @@ from torch.nn import functional as F
 from typing import Dict, Union, Tuple
 from copy import deepcopy
 from collections import defaultdict
-from offlinerlkit.policy import BasePolicy
-from offlinerlkit.dynamics import BaseDynamics
+from building2building.algorithms.offline.policy import BasePolicy
+from building2building.algorithms.offline.dynamics import BaseDynamics
 
 
 class MOBILEPolicy(BasePolicy):

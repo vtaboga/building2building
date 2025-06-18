@@ -4,9 +4,9 @@ import torch.nn as nn
 
 from torch.nn import functional as F
 from typing import Dict, Union, Tuple, Callable
-from offlinerlkit.policy import TD3Policy
-from offlinerlkit.utils.noise import GaussianNoise
-from offlinerlkit.utils.scaler import StandardScaler
+from building2building.algorithms.offline.policy import TD3Policy
+from building2building.algorithms.offline.utils.noise import GaussianNoise
+from building2building.algorithms.offline.utils.scaler import StandardScaler
 
 
 class TD3BCPolicy(TD3Policy):

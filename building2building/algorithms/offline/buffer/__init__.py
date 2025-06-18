@@ -1,4 +1,4 @@
-from building2building.algorithms.offline_rl.buffer.buffer import ReplayBuffer
+from building2building.algorithms.offline.buffer.buffer import ReplayBuffer
 
 
 __all__ = [

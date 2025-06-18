@@ -8,9 +8,9 @@ from torch.nn import functional as F
 from typing import Dict, Union, Tuple
 from collections import defaultdict
 from operator import itemgetter
-from offlinerlkit.utils.scaler import StandardScaler
-from offlinerlkit.policy import MOPOPolicy
-from offlinerlkit.dynamics import BaseDynamics
+from building2building.algorithms.offline.utils.scaler import StandardScaler
+from building2building.algorithms.offline.policy import MOPOPolicy
+from building2building.algorithms.offline.dynamics import BaseDynamics
 
 
 class RAMBOPolicy(MOPOPolicy):

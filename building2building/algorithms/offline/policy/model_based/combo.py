@@ -6,8 +6,8 @@ import gymnasium as gym
 from torch.nn import functional as F
 from typing import Dict, Union, Tuple
 from collections import defaultdict
-from offlinerlkit.policy import CQLPolicy
-from offlinerlkit.dynamics import BaseDynamics
+from building2building.algorithms.offline.policy import CQLPolicy
+from building2building.algorithms.offline.dynamics import BaseDynamics
 
 
 class COMBOPolicy(CQLPolicy):

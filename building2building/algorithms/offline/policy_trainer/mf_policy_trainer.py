@@ -8,9 +8,9 @@ import gymnasium as gym
 from typing import Optional, Dict, List
 from tqdm import tqdm
 from collections import deque
-from offlinerlkit.buffer import ReplayBuffer
-from offlinerlkit.utils.logger import Logger
-from offlinerlkit.policy import BasePolicy
+from building2building.algorithms.offline.buffer import ReplayBuffer
+from building2building.algorithms.offline.utils.logger import Logger
+from building2building.algorithms.offline.policy import BasePolicy
 
 
 # model-free policy trainer

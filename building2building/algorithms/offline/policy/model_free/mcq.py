@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from torch.nn import functional as F
 from typing import Dict, Union, Tuple
-from offlinerlkit.policy import SACPolicy
+from building2building.algorithms.offline.policy import SACPolicy
 
 
 class MCQPolicy(SACPolicy):

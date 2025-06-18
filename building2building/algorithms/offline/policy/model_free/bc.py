@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from torch.nn import functional as F
 from typing import Dict, Union, Tuple, Callable
-from offlinerlkit.policy import BasePolicy
+from building2building.algorithms.offline.policy import BasePolicy
 
 
 class BCPolicy(BasePolicy):

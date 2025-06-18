@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from copy import deepcopy
 from typing import Dict, Union, Tuple
-from offlinerlkit.policy import BasePolicy
+from building2building.algorithms.offline.policy import BasePolicy
 
 
 class SACPolicy(BasePolicy):
