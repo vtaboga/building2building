@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 import collections
+import json
+import os
 
 
 def qlearning_dataset(env, dataset=None, terminate_on_end=False, **kwargs):
@@ -162,3 +164,43 @@ class SequenceDataset(torch.utils.data.Dataset):
         masks = torch.from_numpy(masks).to(dtype=torch.float32, device=self.device)
 
         return inputs, targets, masks
+
+
+def load_dataset(dataset_path: str) -> dict:
+    """
+    Load dataset from JSON or NPZ file.
+    
+    Args:
+        dataset_path: Path to the dataset file
+        
+    Returns:
+        Dictionary containing the dataset with keys:
+        - observations: numpy array of observations
+        - actions: numpy array of actions  
+        - next_observations: numpy array of next observations
+        - rewards: numpy array of rewards
+        - terminals: numpy array of terminal flags
+    """
+    if not os.path.exists(dataset_path):
+        raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
+    
+    if dataset_path.endswith('.json'):
+        with open(dataset_path, 'r') as f:
+            dataset = json.load(f)
+        # Convert lists to numpy arrays
+        for key in dataset:
+            dataset[key] = np.array(dataset[key])
+    elif dataset_path.endswith('.npz'):
+        dataset = np.load(dataset_path)
+        # Convert to dictionary
+        dataset = {key: dataset[key] for key in dataset.keys()}
+    else:
+        raise ValueError(f"Unsupported dataset format. Use .json or .npz files.")
+    
+    # Ensure all required keys are present
+    required_keys = ['observations', 'actions', 'next_observations', 'rewards', 'terminals']
+    for key in required_keys:
+        if key not in dataset:
+            raise KeyError(f"Missing required key '{key}' in dataset")
+    
+    return dataset
