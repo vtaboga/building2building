@@ -1,19 +1,22 @@
 import gymnasium as gym
-from typing import *
 
 from pathlib import Path
+
+from typing import Any
 
 from building2building.env import setup_energyplus_path
 from building2building.simulator.simulation import EnergyPlusSimulation, ActuatorHole
 from building2building.simulator.environment import EnergyPlusEnvironment
 from building2building.simulator.rewards import base_reward_function, barrier_reward_function
-from building2building.simulator import query_info, config
+from building2building.simulator import config
 from building2building.simulator.observation_spaces import observation_transform, create_observation_space
-from building2building.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints_rdf
-from typing import Optional
+from building2building.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints
+from building2building.core.run_manager import RunManager
+from building2building.ontology import Ontology
 
+import logging
 
-def create_simulator(path_to_building: Path, path_to_weather: Path, building_characteristics: dict, reward_type: str, energy_weight: float = 1.0, eplus_output_dir: Optional[str] = None) -> gym.Env:
+logger = logging.getLogger(__name__)
 
     """
     Create a simulator for a given building and weather file.
@@ -31,14 +34,16 @@ def create_simulator(path_to_building: Path, path_to_weather: Path, building_cha
     """
 
     obs_template = {}
-    rdf = query_info.rdf_from_json(path_to_building)
+    ont = Ontology.from_json(path_to_building)
     # Add observations
-    config.auto_add_time(rdf, obs_template)
-    config.auto_add_temperature(rdf, obs_template)
-    config.auto_add_energy(rdf, obs_template)
-    config.auto_add_weather(rdf, obs_template)
+    config.auto_add_time(ont, obs_template)
+    config.auto_add_temperature(ont, obs_template)
+    config.auto_add_energy(ont, obs_template)
+    config.auto_add_weather(ont, obs_template)
 
-    setpoints = get_controllable_setpoints_rdf(rdf)
+    setpoints = get_controllable_setpoints(ont)
+    # breakpoint()
+
     actuators = {}
     controlled_zones = list(setpoints.keys())
     for zone_setpoints in setpoints.values():
@@ -60,10 +65,10 @@ def create_simulator(path_to_building: Path, path_to_weather: Path, building_cha
             actuators,
             verbose=False
         )
-        # Set the log directory if provided
-        if eplus_output_dir:
-            sim.log_dir = eplus_output_dir
+
+        logger.debug(f"created simulator {sim}")
         return sim
+
 
     def reward_function(obs):
         if reward_type == "barrier":
