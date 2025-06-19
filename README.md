@@ -145,3 +145,7 @@ This project follows a structured branching strategy to maintain code quality:
 
 The gym wrapper of energyplus is based on the minergym repository https://github.com/Terramorpha/minergym
 
+## OfflineRL-Kit
+
+The implementation of the off line RL algorithms is taken from https://github.com/yihaosun1124/OfflineRL-Kit/tree/main
+
