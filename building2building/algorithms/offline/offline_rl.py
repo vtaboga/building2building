@@ -17,9 +17,15 @@ from building2building.algorithms.offline.utils import Logger, load_dataset
 from building2building.algorithms.offline.policy.model_free.cql import CQLPolicy
 from building2building.algorithms.offline.policy.model_free.iql import IQLPolicy
 from building2building.algorithms.offline.policy.model_free.td3bc import TD3BCPolicy
+from building2building.algorithms.offline.policy.model_based.mopo import MOPOPolicy
+from building2building.algorithms.offline.policy.model_based.combo import COMBOPolicy
+from building2building.algorithms.offline.policy.model_based.mobile import MOBILEPolicy
+from building2building.algorithms.offline.policy.model_based.rambo import RAMBOPolicy
+from building2building.algorithms.offline.dynamics import EnsembleDynamics, RNNDynamics
 from building2building.algorithms.offline.modules import Actor, Critic
 from building2building.algorithms.offline.nets import MLP
 from building2building.core.run_manager import RunManager
+from building2building.simulator.wrappers import CustomRescaleAction, NormalizeObservation
 
 import building2building.simulator
 
@@ -65,15 +71,31 @@ class OfflineRLArgs:
     noise_clip: float = 0.5
     policy_freq: int = 2
     alpha: float = 2.5
+    # Model-based specific
+    rollout_freq: int = 1000
+    rollout_batch_size: int = 50000
+    rollout_length: int = 5
+    real_ratio: float = 0.05
+    dynamics_lr: float = 1e-3
+    dynamics_hidden_dims: tuple = (200, 200, 200, 200)
+    dynamics_update_freq: int = 0
+    n_ensemble: int = 7
+    n_elites: int = 5
 
 
 def create_policy(algorithm: str, obs_dim: int, action_dim: int, action_space, device: str, args: OfflineRLArgs):
     """Create policy based on algorithm."""
-    actor = Actor(obs_dim, action_dim, device=device)
     
     if algorithm == "cql":
-        critic1 = Critic(obs_dim, action_dim, device=device)
-        critic2 = Critic(obs_dim, action_dim, device=device)
+        # Create MLP backbone for actor (processes observations)
+        actor_backbone = MLP(obs_dim, [256, 256]).to(device)
+        actor = Actor(actor_backbone, action_dim, device=device)
+        
+        # Create MLP backbones for critics (process obs+action)
+        critic1_backbone = MLP(obs_dim + action_dim, [256, 256]).to(device)
+        critic2_backbone = MLP(obs_dim + action_dim, [256, 256]).to(device)
+        critic1 = Critic(critic1_backbone, device=device)
+        critic2 = Critic(critic2_backbone, device=device)
         
         actor_optim = torch.optim.Adam(actor.parameters(), lr=args.lr)
         critic1_optim = torch.optim.Adam(critic1.parameters(), lr=args.lr)
@@ -97,9 +119,16 @@ def create_policy(algorithm: str, obs_dim: int, action_dim: int, action_space, d
         )
     
     elif algorithm == "iql":
-        critic_q1 = Critic(obs_dim, action_dim, device=device)
-        critic_q2 = Critic(obs_dim, action_dim, device=device)
-        critic_v = MLP([obs_dim, 256, 256, 1], device=device)
+        # Create MLP backbone for actor (processes observations)
+        actor_backbone = MLP(obs_dim, [256, 256]).to(device)
+        actor = Actor(actor_backbone, action_dim, device=device)
+        
+        # Create MLP backbones for critics
+        critic_q1_backbone = MLP(obs_dim + action_dim, [256, 256]).to(device)
+        critic_q2_backbone = MLP(obs_dim + action_dim, [256, 256]).to(device)
+        critic_q1 = Critic(critic_q1_backbone, device=device)
+        critic_q2 = Critic(critic_q2_backbone, device=device)
+        critic_v = MLP(obs_dim, [256, 256], 1).to(device)
         
         actor_optim = torch.optim.Adam(actor.parameters(), lr=args.lr)
         critic_q1_optim = torch.optim.Adam(critic_q1.parameters(), lr=args.lr)
@@ -123,8 +152,15 @@ def create_policy(algorithm: str, obs_dim: int, action_dim: int, action_space, d
         )
     
     elif algorithm == "td3bc":
-        critic1 = Critic(obs_dim, action_dim, device=device)
-        critic2 = Critic(obs_dim, action_dim, device=device)
+        # Create MLP backbone for actor (processes observations)
+        actor_backbone = MLP(obs_dim, [256, 256]).to(device)
+        actor = Actor(actor_backbone, action_dim, device=device)
+        
+        # Create MLP backbones for critics
+        critic1_backbone = MLP(obs_dim + action_dim, [256, 256]).to(device)
+        critic2_backbone = MLP(obs_dim + action_dim, [256, 256]).to(device)
+        critic1 = Critic(critic1_backbone, device=device)
+        critic2 = Critic(critic2_backbone, device=device)
         
         actor_optim = torch.optim.Adam(actor.parameters(), lr=args.lr)
         critic1_optim = torch.optim.Adam(critic1.parameters(), lr=args.lr)
@@ -143,6 +179,135 @@ def create_policy(algorithm: str, obs_dim: int, action_dim: int, action_space, d
             noise_clip=args.noise_clip,
             update_actor_freq=args.policy_freq,
             alpha=args.alpha
+        )
+    
+    elif algorithm == "mopo":
+        # Create ensemble model for dynamics
+        from building2building.algorithms.offline.nets import EnsembleNetwork
+        from building2building.algorithms.offline.utils.scaler import StandardScaler
+        from building2building.algorithms.offline.modules import ActorProb, TanhDiagGaussian
+        
+        # Simple terminal function that always returns False (no early termination)
+        def terminal_fn(obs, action, next_obs):
+            return np.zeros((obs.shape[0], 1), dtype=bool)
+        
+        # Create ensemble model
+        ensemble_model = EnsembleNetwork(
+            input_dim=obs_dim + action_dim,
+            output_dim=obs_dim + 1,  # next_obs + reward
+            hidden_dims=args.dynamics_hidden_dims,
+            num_ensemble=args.n_ensemble,
+            num_elites=args.n_elites,
+            device=device
+        )
+        
+        # Create dynamics optimizer and scaler
+        dynamics_optim = torch.optim.Adam(ensemble_model.parameters(), lr=args.dynamics_lr)
+        scaler = StandardScaler()
+        
+        # Create dynamics model
+        dynamics = EnsembleDynamics(
+            model=ensemble_model,
+            optim=dynamics_optim,
+            scaler=scaler,
+            terminal_fn=terminal_fn
+        )
+        
+        # Create probabilistic actor for SAC-based MOPO
+        actor_backbone = MLP(obs_dim, [256, 256]).to(device)
+        dist_net = TanhDiagGaussian(
+            latent_dim=actor_backbone.output_dim,
+            output_dim=action_dim,
+            unbounded=True,
+            conditioned_sigma=True
+        ).to(device)
+        actor = ActorProb(actor_backbone, dist_net, device=device)
+        
+        # Create MLP backbones for critics (process obs+action)
+        critic1_backbone = MLP(obs_dim + action_dim, [256, 256]).to(device)
+        critic2_backbone = MLP(obs_dim + action_dim, [256, 256]).to(device)
+        critic1 = Critic(critic1_backbone, device=device)
+        critic2 = Critic(critic2_backbone, device=device)
+        
+        actor_optim = torch.optim.Adam(actor.parameters(), lr=args.lr)
+        critic1_optim = torch.optim.Adam(critic1.parameters(), lr=args.lr)
+        critic2_optim = torch.optim.Adam(critic2.parameters(), lr=args.lr)
+        
+        policy = MOPOPolicy(
+            dynamics=dynamics,
+            actor=actor,
+            critic1=critic1,
+            critic2=critic2,
+            actor_optim=actor_optim,
+            critic1_optim=critic1_optim,
+            critic2_optim=critic2_optim,
+            tau=args.tau,
+            gamma=args.gamma,
+            alpha=0.2
+        )
+    
+    elif algorithm in ["combo", "mobile", "rambo"]:
+        # For now, redirect these to MOPO until properly implemented
+        import warnings
+        warnings.warn(f"{algorithm} not fully implemented, using MOPO instead")
+        # Create the same setup as MOPO...
+        from building2building.algorithms.offline.nets import EnsembleNetwork
+        from building2building.algorithms.offline.utils.scaler import StandardScaler
+        from building2building.algorithms.offline.modules import ActorProb, TanhDiagGaussian
+        
+        def terminal_fn(obs, action, next_obs):
+            return np.zeros((obs.shape[0], 1), dtype=bool)
+        
+        ensemble_model = EnsembleNetwork(
+            input_dim=obs_dim + action_dim,
+            output_dim=obs_dim + 1,
+            hidden_dims=args.dynamics_hidden_dims,
+            num_ensemble=args.n_ensemble,
+            num_elites=args.n_elites,
+            device=device
+        )
+        
+        dynamics_optim = torch.optim.Adam(ensemble_model.parameters(), lr=args.dynamics_lr)
+        scaler = StandardScaler()
+        
+        dynamics = EnsembleDynamics(
+            model=ensemble_model,
+            optim=dynamics_optim,
+            scaler=scaler,
+            terminal_fn=terminal_fn
+        )
+        
+        # Create probabilistic actor for SAC-based policies
+        actor_backbone = MLP(obs_dim, [256, 256]).to(device)
+        dist_net = TanhDiagGaussian(
+            latent_dim=actor_backbone.output_dim,
+            output_dim=action_dim,
+            unbounded=True,
+            conditioned_sigma=True
+        ).to(device)
+        actor = ActorProb(actor_backbone, dist_net, device=device)
+        
+        # Create MLP backbones for critics
+        critic1_backbone = MLP(obs_dim + action_dim, [256, 256]).to(device)
+        critic2_backbone = MLP(obs_dim + action_dim, [256, 256]).to(device)
+        critic1 = Critic(critic1_backbone, device=device)
+        critic2 = Critic(critic2_backbone, device=device)
+        
+        actor_optim = torch.optim.Adam(actor.parameters(), lr=args.lr)
+        critic1_optim = torch.optim.Adam(critic1.parameters(), lr=args.lr)
+        critic2_optim = torch.optim.Adam(critic2.parameters(), lr=args.lr)
+        
+        policy = MOPOPolicy(
+            dynamics=dynamics,
+            actor=actor,
+            critic1=critic1,
+            critic2=critic2,
+            actor_optim=actor_optim,
+            critic1_optim=critic1_optim,
+            critic2_optim=critic2_optim,
+            tau=args.tau,
+            gamma=args.gamma,
+            alpha=0.2
         )
     
     else:
@@ -168,49 +333,90 @@ def main(args: OfflineRLArgs, run_manager: RunManager):
     }
     
     env = gym.make(args.env_id, **env_kwargs)
+    # Apply the same wrappers as in dataset collection
+    env = CustomRescaleAction(env)
+    env = gym.wrappers.ClipAction(env)
+    env = NormalizeObservation(env)
     
     # Load dataset
     dataset = load_dataset(args.dataset_path)
+    device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
     buffer = ReplayBuffer(
         buffer_size=len(dataset['observations']),
         obs_shape=dataset['observations'].shape[1:],
-        obs_dtype=np.float32,
+        obs_dtype=dataset['observations'].dtype,
         action_dim=dataset['actions'].shape[1],
-        action_dtype=np.float32,
-        device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        action_dtype=dataset['actions'].dtype,
+        device=device_str
     )
     
     # Add data to buffer
     buffer.add_batch(
-        observations=dataset['observations'],
+        obss=dataset['observations'],
+        next_obss=dataset['next_observations'],
         actions=dataset['actions'],
         rewards=dataset['rewards'],
-        next_observations=dataset['next_observations'],
         terminals=dataset['terminals']
     )
     
-    # Create policy
-    obs_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.shape[0]
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Create policy - get dimensions from dataset instead of environment
+    obs_dim = dataset['observations'].shape[1]
+    action_dim = dataset['actions'].shape[1]
     
-    policy = create_policy(args.algorithm, obs_dim, action_dim, env.action_space, device, args)
+    policy = create_policy(args.algorithm, obs_dim, action_dim, env.action_space, device_str, args)
     
-    # Create logger
+    # Initialize dynamics model for model-based algorithms
+    if args.algorithm in ["mopo", "combo", "mobile", "rambo"]:
+        print("Initializing dynamics model...")
+        dynamics_info = policy.update_dynamics(buffer)
+        print(f"Dynamics initialization completed. Loss: {dynamics_info.get('dynamics_loss', 'N/A')}")
+    
+    # Create logger with TensorBoard output
     output_config = {"stdout": "stdout", "tensorboard": "tensorboard"}
     logger = Logger(args.results_dir, output_config)
     
-    # Create trainer
-    trainer = MFPolicyTrainer(
-        policy=policy,
-        eval_env=env,
-        buffer=buffer,
-        logger=logger,
-        epoch=args.epoch,
-        step_per_epoch=args.step_per_epoch,
-        batch_size=args.batch_size,
-        eval_episodes=args.eval_episodes
-    )
+    # Determine if this is a model-based algorithm
+    model_based_algorithms = ["mopo", "combo", "mobile", "rambo"]
+    is_model_based = args.algorithm in model_based_algorithms
+    
+    if is_model_based:
+        # Create fake buffer for model-based training
+        fake_buffer = ReplayBuffer(
+            buffer_size=args.rollout_batch_size * args.rollout_length,
+            obs_shape=dataset['observations'].shape[1:],
+            obs_dtype=dataset['observations'].dtype,
+            action_dim=dataset['actions'].shape[1],
+            action_dtype=dataset['actions'].dtype,
+            device=device_str
+        )
+        
+        # Use MBPolicyTrainer for model-based algorithms
+        trainer = MBPolicyTrainer(
+            policy=policy,
+            eval_env=env,
+            real_buffer=buffer,
+            fake_buffer=fake_buffer,
+            logger=logger,
+            rollout_setting=(args.rollout_freq, args.rollout_batch_size, args.rollout_length),
+            epoch=args.epoch,
+            step_per_epoch=args.step_per_epoch,
+            batch_size=args.batch_size,
+            real_ratio=args.real_ratio,
+            eval_episodes=args.eval_episodes,
+            dynamics_update_freq=args.dynamics_update_freq
+        )
+    else:
+        # Use MFPolicyTrainer for model-free algorithms
+        trainer = MFPolicyTrainer(
+            policy=policy,
+            eval_env=env,
+            buffer=buffer,
+            logger=logger,
+            epoch=args.epoch,
+            step_per_epoch=args.step_per_epoch,
+            batch_size=args.batch_size,
+            eval_episodes=args.eval_episodes
+        )
     
     # Train
     run_manager.logger.info(f"Starting {args.algorithm.upper()} training...")

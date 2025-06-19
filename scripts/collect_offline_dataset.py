@@ -88,7 +88,7 @@ def collect_baseline_data(env: gym.Env, num_episodes: int, heating_setpoint: flo
         
         while not (done or truncated):
             action = constant_policy(obs, heating_setpoint, cooling_setpoint, 
-                                   normalize=True, action_space=env.env.env.action_space)
+                                   normalize=True, action_space=env.action_space)
             
             # Store current observation and action
             data['observations'].append(obs.copy())
@@ -114,7 +114,12 @@ def save_dataset(data: Dict[str, List], output_path: str, logger: logging.Logger
     # Convert lists to numpy arrays
     dataset = {}
     for key, values in data.items():
-        dataset[key] = np.array(values)
+        if key in ['rewards', 'terminals', 'timeouts']:
+            # Reshape rewards, terminals, and timeouts to column vectors (n_samples, 1)
+            # This matches the expected format for offline RL buffers
+            dataset[key] = np.array(values).reshape(-1, 1)
+        else:
+            dataset[key] = np.array(values)
     
     # Log dataset statistics
     n_transitions = len(dataset['observations'])
@@ -127,6 +132,8 @@ def save_dataset(data: Dict[str, List], output_path: str, logger: logging.Logger
     logger.info(f"  Mean reward per step: {mean_reward:.4f}")
     logger.info(f"  Observation shape: {dataset['observations'].shape}")
     logger.info(f"  Action shape: {dataset['actions'].shape}")
+    logger.info(f"  Rewards shape: {dataset['rewards'].shape}")
+    logger.info(f"  Terminals shape: {dataset['terminals'].shape}")
     
     # Save based on file extension
     if output_path.endswith('.json'):

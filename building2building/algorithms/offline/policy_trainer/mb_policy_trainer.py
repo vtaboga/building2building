@@ -97,8 +97,23 @@ class MBPolicyTrainer:
             eval_info = self._evaluate()
             ep_reward_mean, ep_reward_std = np.mean(eval_info["eval/episode_reward"]), np.std(eval_info["eval/episode_reward"])
             ep_length_mean, ep_length_std = np.mean(eval_info["eval/episode_length"]), np.std(eval_info["eval/episode_length"])
-            norm_ep_rew_mean = self.eval_env.get_normalized_score(ep_reward_mean) * 100
-            norm_ep_rew_std = self.eval_env.get_normalized_score(ep_reward_std) * 100
+            
+            # Handle normalized score calculation by accessing the unwrapped environment
+            try:
+                # Try to access get_normalized_score through the wrapper chain
+                if hasattr(self.eval_env, 'get_normalized_score'):
+                    norm_ep_rew_mean = self.eval_env.get_normalized_score(ep_reward_mean) * 100
+                    norm_ep_rew_std = self.eval_env.get_normalized_score(ep_reward_std) * 100
+                else:
+                    # Access the method through the unwrapped environment
+                    unwrapped_env = self.eval_env.unwrapped
+                    norm_ep_rew_mean = unwrapped_env.get_normalized_score(ep_reward_mean) * 100
+                    norm_ep_rew_std = unwrapped_env.get_normalized_score(ep_reward_std) * 100
+            except (AttributeError, TypeError):
+                # Fallback if get_normalized_score is not available at all
+                norm_ep_rew_mean = ep_reward_mean
+                norm_ep_rew_std = ep_reward_std
+            
             last_10_performance.append(norm_ep_rew_mean)
             self.logger.logkv("eval/normalized_episode_reward", norm_ep_rew_mean)
             self.logger.logkv("eval/normalized_episode_reward_std", norm_ep_rew_std)

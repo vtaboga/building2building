@@ -37,7 +37,8 @@ def parse_args():
     
     # Algorithm arguments
     parser.add_argument('--algorithm', type=str, default="cql", 
-                        choices=["cql", "iql", "td3bc"], help='Offline RL algorithm to use')
+                        choices=["cql", "iql", "td3bc", "mopo", "combo", "mobile", "rambo"], 
+                        help='Offline RL algorithm to use')
     
     # Training configuration
     parser.add_argument('--epoch', type=int, default=1000, help='Number of training epochs')
@@ -74,6 +75,16 @@ def parse_args():
     parser.add_argument('--noise-clip', type=float, default=0.5, help='Noise clip for TD3+BC')
     parser.add_argument('--policy-freq', type=int, default=2, help='Policy update frequency for TD3+BC')
     parser.add_argument('--alpha', type=float, default=2.5, help='Behavioral cloning weight for TD3+BC')
+    
+    # Model-based arguments
+    parser.add_argument('--rollout-freq', type=int, default=1000, help='Rollout frequency for model-based methods')
+    parser.add_argument('--rollout-batch-size', type=int, default=50000, help='Rollout batch size for model-based methods')
+    parser.add_argument('--rollout-length', type=int, default=5, help='Rollout length for model-based methods')
+    parser.add_argument('--real-ratio', type=float, default=0.05, help='Real data ratio for model-based methods')
+    parser.add_argument('--dynamics-lr', type=float, default=1e-3, help='Learning rate for dynamics model')
+    parser.add_argument('--dynamics-update-freq', type=int, default=0, help='Dynamics update frequency')
+    parser.add_argument('--n-ensemble', type=int, default=7, help='Number of ensemble models')
+    parser.add_argument('--n-elites', type=int, default=5, help='Number of elite models')
     
     return parser.parse_args()
 
@@ -164,6 +175,16 @@ if __name__ == "__main__":
         noise_clip=cmd_args.noise_clip,
         policy_freq=cmd_args.policy_freq,
         alpha=cmd_args.alpha,
+        
+        # Model-based parameters
+        rollout_freq=cmd_args.rollout_freq,
+        rollout_batch_size=cmd_args.rollout_batch_size,
+        rollout_length=cmd_args.rollout_length,
+        real_ratio=cmd_args.real_ratio,
+        dynamics_lr=cmd_args.dynamics_lr,
+        dynamics_update_freq=cmd_args.dynamics_update_freq,
+        n_ensemble=cmd_args.n_ensemble,
+        n_elites=cmd_args.n_elites,
     )
     
     # Log the configuration

@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 
 from typing import Callable, List, Tuple, Dict, Optional
-from building2building.algorithms.offline_rl.dynamics.base_dynamics import BaseDynamics
-from building2building.algorithms.offline_rl.utils.scaler import StandardScaler
-from building2building.algorithms.offline_rl.utils.logger import Logger
+from building2building.algorithms.offline.dynamics.base_dynamics import BaseDynamics
+from building2building.algorithms.offline.utils.scaler import StandardScaler
+from building2building.algorithms.offline.utils.logger import Logger
 
 
 class EnsembleDynamics(BaseDynamics):
