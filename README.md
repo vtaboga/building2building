@@ -1,6 +1,6 @@
 # Building2Building
 
-![Building2Building](images/building2building.png)
+<img src="images/building2building.png" alt="Building2Building" width="50%">
 
 Benchmarking transfer learning in Reinforcement Learning on millions of buildings.
 
