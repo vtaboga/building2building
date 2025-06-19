@@ -1,8 +1,9 @@
-# Building2Building
+<div align="center">
+  <h1>Building2Building</h1>
+  <img src="images/building2building.png" alt="Building2Building" width="50%">
+  <p><strong>Benchmarking transfer learning in Reinforcement Learning on millions of buildings.</strong></p>
+</div>
 
-<img src="images/building2building.png" alt="Building2Building" width="50%">
-
-Benchmarking transfer learning in Reinforcement Learning on millions of buildings.
 
 ## Prerequisites
 
