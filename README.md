@@ -1,5 +1,7 @@
 # Building2Building
 
+![Building2Building](images/building2building.png)
+
 Benchmarking transfer learning in Reinforcement Learning on millions of buildings.
 
 ## Prerequisites
