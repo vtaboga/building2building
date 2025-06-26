@@ -6,8 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 import json
 
-from typeguard import typechecked
-
 T = TypeVar("T")
 Point: TypeAlias = tuple[float, float, float]
 ZoneSurfacePointHierarchy: TypeAlias = dict[Node, dict[Node, List[Point]]]
@@ -168,28 +166,33 @@ class Ontology:
 
 
     def zone_adjacency(self) -> UndirectedGraph[Node]:
-        eq_class = self.pointset_to_surfaceset()
+        """Compute a graph of adjacent zones using `BuildingSurface:Detailed`
+        objects and the `outside_boundary_condition_object` property."""
+
+        q = """# -*- mode: sparql -*-
+SELECT ?zoneA ?zoneB
+WHERE {
+  ?surfaceA a "BuildingSurface:Detailed" .
+  ?surfaceA idf:zone_name ?zoneA .
+
+  ?surfaceB a "BuildingSurface:Detailed" .
+  ?surfaceB idf:zone_name ?zoneB .
+
+  # One is the other side of the other
+  ?surfaceA idf:outside_boundary_condition "Surface" .
+  ?surfaceA idf:outside_boundary_condition_object ?surfaceB .
+
+  # And vice versa
+  ?surfaceB idf:outside_boundary_condition "Surface" .
+  ?surfaceB idf:outside_boundary_condition_object ?surfaceA .
+}
+"""
 
         out = {}
 
-        @typechecked
-        def zone_name(surface: Node) -> Node:
-            q = """# -*- mode: sparql -*-
-SELECT ?zoneName
-WHERE {
-  ?surface idf:zone_name ?zoneName
-}"""
-            for r in self.rdf.query(q, initBindings={"surface":surface}):
-                return r.zoneName
-            raise Exception(f"counldn't find zone of {surface}")
-
-        for _, similar_surfaces in eq_class.items():
-            # A group of "similar" surface connect the zones to which they
-            # belong.
-            their_zones = set(zone_name(surface) for surface in similar_surfaces)
-            for zone in their_zones:
-                neighbors = out.setdefault(zone, set())
-                neighbors |= their_zones
+        for r in self.rdf.query(q):
+            out.setdefault(r.zoneA, set()).add(r.zoneB)
+            out.setdefault(r.zoneB, set()).add(r.zoneB)
 
         return out
 

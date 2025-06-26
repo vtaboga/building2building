@@ -5,15 +5,28 @@ import subprocess
 import logging
 import json
 import shutil
-from typing import List, Dict, Optional, Literal, Union, TypeAlias, reveal_type
+from typing import List, Dict, Optional, Literal, Union, TypeAlias, reveal_type, Callable
 from pathlib import Path
 from building2building.generator.utils import get_counties_from_coords_batch
 from building2building.ontology import Ontology
 import building2building.env as env
 from building2building.utils import cd
 import tempfile
+from contextlib import contextmanager
+import time
+from functools import partial
 
 logger = logging.getLogger(__name__)
+
+@contextmanager
+def timer(name="Code block"):
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        end = time.perf_counter()
+        logger.info(f"{name} took {end - start:.4f} seconds")
+
 
 def process_metadata(state: str) -> Path:
     """
@@ -132,6 +145,11 @@ def upgrade_idf(idf_in: Path, idf_out: Path, transition: Transition):
 
         shutil.copy(temp_idf_out, idf_out)
 
+def specialized_upgrade_idf(t):
+    x = partial(upgrade_idf, transition=t)
+    x.__qualname__ = upgrade_idf.__qualname__ + "-" + t
+    return x
+
 def convert_idf(idf_path: Path, epjson_path: Path):
     # Path to the EnergyPlus executable
     converter = env.ENERGYPLUS_PATH.get() / "ConvertInputFormat"
@@ -163,66 +181,6 @@ def convert_idf(idf_path: Path, epjson_path: Path):
             logger.warning(f"Conversion warnings: {result.stdout}")
 
         shutil.copy(temp_epjson_path, epjson_path)
-
-
-def process_idf(building_files: List[tuple], state: str, county: str):
-    """
-    Process IDF files if they haven't been processed already.
-
-    Args:
-        idf_files (List[int]): List of IDF file IDs
-        state (str): Two-letter state code
-        county (str): County name
-
-    Returns:
-        List[str]: List of paths to processed IDF files
-    """
-    processed_dir = Path("data", "processed_buildings", state, county)
-    os.makedirs(processed_dir, exist_ok=True)
-
-    processed_paths = []
-    for idf_id, characteristics in building_files:
-        # Check if processed file already exists
-        processed_path = Path(processed_dir, f"{idf_id}.epJSON")
-        if processed_path.exists():
-            logger.info(f"Skipping {idf_id}.epJSON - already processed")
-            processed_paths.append(processed_path)
-            continue
-
-        # Get path to original file
-        original_path = Path("data", "idf", f"{state}_{county}_IDF", f"{idf_id}.idf")
-        if not original_path.exists():
-            raise Exception(f"Warning: Original file not found at {original_path}")
-
-        # Process the file
-        with tempfile.TemporaryDirectory() as p:
-            working_file = Path(p) / original_path.name
-            working_file_epjson = working_file.with_suffix(".epJSON")
-
-            shutil.copy(original_path, working_file)
-            for t in transitions:
-                upgrade_idf(working_file, working_file, t)
-
-            convert_idf(working_file, working_file_epjson)
-
-            add_setpoint_control_to_epjson(working_file_epjson, working_file_epjson)
-            shutil.copy(working_file_epjson, processed_path)
-
-        processed_paths.append(processed_path)
-
-        # Save the building characteristics as a JSON file
-        characteristics_path = processed_dir / f"{idf_id}.json"
-
-        ont = Ontology.from_json(processed_path)
-        # Add zone lists to characteristics
-        zone_list = [n.toPyton() for n in ont.zones()]
-        characteristics["zone_lists"] = zone_list
-        with open(characteristics_path, 'w') as json_file:
-            json.dump(characteristics, json_file, indent=4)
-            logger.info(f"Saved characteristics to {characteristics_path}")
-
-    return processed_paths
-
 
 def add_hvac_meters_to_epjson(epjson_path: str, output_path: str = None) -> None:
     """
@@ -297,7 +255,7 @@ def add_hvac_meters_to_epjson(epjson_path: str, output_path: str = None) -> None
     # Save the modified epJSON if changes were made
     if modified:
         with open(output_path, 'w') as f:
-            json.dump(epjson, f, indent=2)
+            json.dump(epjson, f, indent=4)
         print(f"Modified epJSON saved to {output_path}")
     else:
         print("No changes needed. All required meters already exist.")
@@ -425,7 +383,7 @@ def add_outdoor_air_meters_to_epjson(epjson_path: str, output_path: str = None) 
     # Save the modified epJSON if changes were made
     if modified:
         with open(output_path, 'w') as f:
-            json.dump(epjson, f, indent=2)
+            json.dump(epjson, f, indent=4)
         print(f"Modified epJSON saved to {output_path}")
     else:
         print("No changes needed. All required outdoor air variables already exist.")
@@ -536,7 +494,7 @@ def add_outdoor_air_nodes_if_missing(epjson_path: str, output_path: str = None) 
     # Save the modified epJSON if changes were made
     if modified:
         with open(output_path, 'w') as f:
-            json.dump(epjson, f, indent=2)
+            json.dump(epjson, f, indent=4)
         print(f"Modified epJSON saved to {output_path}")
     else:
         print("No changes needed to outdoor air nodes configuration.")
@@ -606,7 +564,7 @@ def modify_timestep(epjson_path: str, output_path: Optional[str] = None, timeste
     if timestep_modified:
         try:
             with open(output_path, 'w') as f:
-                json.dump(epjson, f, indent=2)
+                json.dump(epjson, f, indent=4)
             print(f"Modified epJSON saved to {output_path}")
         except Exception as e:
             print(f"Error saving modified file: {e}")
@@ -702,7 +660,7 @@ def add_setpoint_control_to_epjson(epjson_path: Path, output_path: Path):
     
     # Save the modified epJSON
     with open(output_path, 'w') as f:
-        json.dump(epjson, f, indent=2)
+        json.dump(epjson, f, indent=4)
 
 def get_temperature_setpoints(epjson_path: Path) -> List[tuple]:
     """Analyzes an epJSON file to identify thermostat setpoints that are used to
@@ -741,3 +699,52 @@ WHERE {
         results.append((control_type, setpoint_name))
 
     return results
+
+def glue_surfaces(epjson_in: Path, epjson_out:Path):
+    """Look at all the surfaces, and glue together those that have the same
+    coordinates."""
+
+    ont = Ontology.from_json(epjson_in)
+
+
+    with open(epjson_in, "rb") as f:
+        json_obj = json.load(f)
+
+    surfaces = json_obj["BuildingSurface:Detailed"]
+
+    mapping = ont.pointset_to_surfaceset()
+
+    for surfaceset in mapping.values():
+        if len(surfaceset) == 1:
+            continue
+        if len(surfaceset) != 2:
+            raise Exception(f"wrong number of overlapping surfaces: {surfaceset}")
+
+        surface_list = list(surfaceset)
+
+        left_name = surface_list[0].toPython()
+        right_name = surface_list[1].toPython()
+
+        left = surfaces[left_name]
+        right = surfaces[right_name]
+
+        print(left_name, right_name)
+
+
+        # Step 1: set outside_boundary_condition
+        #         "outside_boundary_condition": "Surface",
+        # "outside_boundary_condition_object": "ceiling_unit1_BackRow_BottomFloor",
+
+        left["outside_boundary_condition"] = "Surface"
+        right["outside_boundary_condition"] = "Surface"
+
+        # Step 2: attach the correct surface
+
+        left["outside_boundary_condition_object"] = right_name
+        right["outside_boundary_condition_object"] = left_name
+
+        with open(epjson_out, "w") as f:
+            json.dump(json_obj, f, indent=4)
+
+
+
