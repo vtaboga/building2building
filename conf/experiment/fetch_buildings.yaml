@@ -1,16 +1,13 @@
 # @package _global_
 name: fetch_buildings
 
-# Building configuration parameters (all included to avoid struct mode)
+# Building search criteria - only parameters used by search_idf()
 building:
   state: "AL"
   county: "Pike" 
   building_type: "SmallHotel"
-  building_id: "example_building"
-  area: 500
-  num_floors: 1
-  height: null
-  n_buildings: 1
-  n_weather_files: 2
-  weather: "example_weather.epw"
-  weather_validation: null 
+  area: 400                    
+  num_floors: 3               
+  height: 35.0                
+  n_buildings: 1               
+  n_weather_files: 2           

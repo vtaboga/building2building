@@ -1,6 +1,7 @@
 # Main configuration file for Building2Building project
 defaults:
   - experiment: simulation
+  - building: default
   - fetch_building: default
   - training: default
   - simulation: default
@@ -8,12 +9,9 @@ defaults:
   - wandb: default
   - _self_
 
-# Default experiment name will be set by experiment configs
-# name: simulation  # Removed - should come from experiment configs
-
 # Basic configuration
 seed: 42
-track: false
+track: true
 
 # Directories  
 base_dir: results

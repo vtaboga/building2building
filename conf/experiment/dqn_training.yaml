@@ -1,6 +1,31 @@
 # @package _global_
-defaults:
-  - override /training: dqn
-
 name: dqn_training
-track: true 
+track: true
+
+# Building configuration for training
+building:
+  state: "AL"
+  county: "Pike"
+  building_id: "6014003402037"
+  weather: "USA_AL_Mobile.Rgnl.AP-Bates.Field.722230_US.Normals.2006-2020.epw"
+  weather_validation: "USA_AL_Fairhope-Callahan.AP.720592_TMYx.epw"
+
+# DQN Training configuration
+training:
+  total_timesteps: 1000000
+  save_model: true
+
+dqn:
+  learning_rate: 0.0001
+  num_envs: 1
+  buffer_size: 1000000
+  gamma: 0.99
+  tau: 1.0
+  target_network_frequency: 500
+  batch_size: 128
+  start_e: 1.0
+  end_e: 0.05
+  exploration_fraction: 0.1
+  learning_starts: 50000
+  train_frequency: 10
+  eval_frequency: 10000 
