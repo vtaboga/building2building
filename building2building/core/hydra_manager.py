@@ -5,76 +5,60 @@ import time
 from datetime import datetime
 from typing import Dict, Any, Optional
 import uuid
+from omegaconf import DictConfig, OmegaConf
+from hydra.core.hydra_config import HydraConfig
 
-class RunManager:
+
+class HydraManager:
     """
-    Unified manager for experiment runs that handles:
-    - Directory creation with consistent naming
+    Hydra-compatible manager for experiment runs that handles:
+    - Directory creation with consistent naming (leveraging Hydra's output dir)
     - Logging configuration (file and console)
     - Result storage
     - Integration with wandb and TensorBoard
+    - Works seamlessly with Hydra configurations
     """
     
-    def __init__(
-        self,
-        experiment_name: str,
-        base_dir: str = "results",
-        track_wandb: bool = False,
-        wandb_project: str = None,
-        wandb_entity: str = None,
-        tags: Optional[Dict[str, Any]] = None,
-        seed: int = None,
-    ):
+    def __init__(self, cfg: DictConfig):
         """
-        Initialize a new experiment run.
+        Initialize a new experiment run using Hydra configuration.
         
         Args:
-            experiment_name: Name of the experiment
-            base_dir: Base directory for all results
-            track_wandb: Whether to use Weights & Biases
-            wandb_project: W&B project name
-            wandb_entity: W&B entity (team or username)
-            tags: Additional tags/metadata for the run
-            seed: Random seed used for the experiment
+            cfg: Hydra configuration object
         """
-        self.experiment_name = experiment_name
+        self.cfg = cfg
+        self.experiment_name = cfg.get('name', 'experiment')
         self.timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.config = {
-            "experiment_name": experiment_name,
-            "timestamp": self.timestamp,
-            "seed": seed,
-        }
         
-        if tags:
-            self.config.update(tags)
+        # Get Hydra's output directory
+        try:
+            hydra_cfg = HydraConfig.get()
+            self.run_dir = hydra_cfg.runtime.output_dir
+        except:
+            # Fallback if not running under Hydra
+            self.run_dir = f"results/{self.experiment_name}_{self.timestamp}"
+            os.makedirs(self.run_dir, exist_ok=True)
         
         # Set up temporary logger for initialization
         self.logger = self._setup_temp_logger()
         
-        # Initialize wandb first if requested
-        self.track_wandb = track_wandb
+        # Initialize wandb if requested
+        self.track_wandb = cfg.get('track', False)
         self.wandb_run_id = None
         
-        if track_wandb:
+        if self.track_wandb:
             print("Initializing wandb")
-            self._init_wandb(wandb_project, wandb_entity)
+            self._init_wandb()
             
-        # Now create the run ID and directory structure, using wandb run ID if available
+        # Create run ID
         if self.track_wandb and hasattr(self, 'wandb') and self.wandb_run_id:
-            # Use wandb run ID in our directory name but keep the timestamp
-            self.run_id = f"{experiment_name}_{self.timestamp}_{self.wandb_run_id}"
+            self.run_id = f"{self.experiment_name}_{self.timestamp}_{self.wandb_run_id}"
         else:
-            # Create our own ID if not using wandb
+            seed = cfg.get('seed', None)
             if seed is not None:
-                self.run_id = f"{experiment_name}_{self.timestamp}_seed{seed}_{uuid.uuid4().hex[:6]}"
+                self.run_id = f"{self.experiment_name}_{self.timestamp}_seed{seed}_{uuid.uuid4().hex[:6]}"
             else:
-                self.run_id = f"{experiment_name}_{self.timestamp}_{uuid.uuid4().hex[:6]}"
-        
-        self.base_dir = base_dir
-        self.run_dir = os.path.join(base_dir, self.run_id)
-        
-        # Create main run directory
-        os.makedirs(self.run_dir, exist_ok=True)
+                self.run_id = f"{self.experiment_name}_{self.timestamp}_{uuid.uuid4().hex[:6]}"
         
         # Define directory paths
         self.logs_dir = os.path.join(self.run_dir, "logs")
@@ -83,10 +67,7 @@ class RunManager:
         self.tensorboard_dir = os.path.join(self.run_dir, "tensorboard")
         self.data_dir = os.path.join(self.run_dir, "data")
         
-        # Update the config with run ID
-        self.config["run_id"] = self.run_id
-        
-        # Setup permanent logging - this will create logs_dir
+        # Setup permanent logging
         self.logger = self._setup_logging()
         
         # Save initial config
@@ -148,16 +129,24 @@ class RunManager:
         
         return logger
     
-    def _init_wandb(self, project_name, entity):
+    def _init_wandb(self):
         """Initialize Weights & Biases tracking."""
         try:
             import wandb
             
-            # Initialize wandb with default settings
+            # Get wandb config from Hydra config
+            wandb_config = self.cfg.get('wandb', {})
+            project_name = wandb_config.get('project', 'building2building')
+            entity = wandb_config.get('entity', None)
+            
+            # Convert OmegaConf to regular dict for wandb
+            config_dict = OmegaConf.to_container(self.cfg, resolve=True)
+            
+            # Initialize wandb
             run = wandb.init(
                 project=project_name,
                 entity=entity,
-                config=self.config,
+                config=config_dict,
                 sync_tensorboard=True,
                 save_code=True,
                 tags=[self.experiment_name]
@@ -166,10 +155,6 @@ class RunManager:
             # Store the wandb object and run ID
             self.wandb = wandb
             self.wandb_run_id = run.id
-            
-            # Update config with wandb info
-            self.config["wandb_url"] = run.url
-            self.config["wandb_id"] = run.id
             
             self.logger.info(f"Weights & Biases initialized: {run.url}")
             self.logger.info(f"WandB Run ID: {run.id}")
@@ -189,25 +174,30 @@ class RunManager:
             
             from torch.utils.tensorboard import SummaryWriter
             writer = SummaryWriter(self.tensorboard_dir)
-            writer.add_text(
-                "config",
-                "\n".join([f"**{k}:** {v}" for k, v in self.config.items()])
-            )
+            
+            # Convert config to string for tensorboard
+            config_str = OmegaConf.to_yaml(self.cfg)
+            writer.add_text("config", config_str.replace('\n', '  \n'))
             return writer
         except ImportError:
             self.logger.warning("torch.utils.tensorboard not found. Continuing without TensorBoard.")
             return None
     
     def save_config(self, additional_config=None):
-        """Save the run configuration to a JSON file."""
-        config = self.config.copy()
-        if additional_config:
-            config.update(additional_config)
-            self.config.update(additional_config)  # Update internal config too
+        """Save the run configuration to files."""
+        # Save Hydra config as YAML
+        config_yaml_path = os.path.join(self.run_dir, "config.yaml")
+        with open(config_yaml_path, "w") as f:
+            OmegaConf.save(self.cfg, f)
         
-        config_path = os.path.join(self.run_dir, "config.json")
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=4)
+        # Also save as JSON for backward compatibility
+        config_dict = OmegaConf.to_container(self.cfg, resolve=True)
+        if additional_config:
+            config_dict.update(additional_config)
+        
+        config_json_path = os.path.join(self.run_dir, "config.json")
+        with open(config_json_path, "w") as f:
+            json.dump(config_dict, f, indent=4)
     
     def log_metrics(self, metrics, step=None):
         """Log metrics to both TensorBoard and W&B if enabled."""
@@ -230,6 +220,12 @@ class RunManager:
         # Ensure EnergyPlus output directory exists
         self._ensure_dir(self.eplus_dir)
         return self.eplus_dir
+    
+    def get_config(self, key: str = None, default=None):
+        """Get configuration value using dot notation."""
+        if key is None:
+            return self.cfg
+        return OmegaConf.select(self.cfg, key, default=default)
     
     def finish(self):
         """Finalize the run, close all loggers and trackers."""
@@ -261,4 +257,10 @@ class RunManager:
                 self.logger.info("Finalizing WandB logging...")
                 self.wandb.finish()
             except Exception as e:
-                self.logger.warning(f"Error when finishing wandb: {e}") 
+                self.logger.warning(f"Error when finishing wandb: {e}")
+
+
+# Backward compatibility function
+def create_hydra_manager(cfg: DictConfig) -> HydraManager:
+    """Create a HydraManager from Hydra configuration."""
+    return HydraManager(cfg) 

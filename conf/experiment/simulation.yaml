@@ -1,0 +1,6 @@
+# @package _global_
+name: simulation
+
+# Simulation specific settings
+simulation:
+  episodes: 1 

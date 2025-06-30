@@ -1,0 +1,7 @@
+# @package _global_
+name: fetch_buildings
+
+# Override building defaults for fetch_buildings
+building:
+  n_buildings: 1
+  n_weather_files: 2 

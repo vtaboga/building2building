@@ -1,0 +1,28 @@
+# @package _global_
+name: dqn_training
+
+# DQN Training specific settings  
+training:
+  algorithm: dqn
+  total_timesteps: 1000000
+  save_model: true
+
+dqn:
+  learning_rate: 1e-4
+  num_envs: 1
+  buffer_size: 10000
+  gamma: 0.99 
+  tau: 1.0
+  target_network_frequency: 500
+  batch_size: 128
+  start_e: 1.0
+  end_e: 0.05
+  exploration_fraction: 0.5
+  learning_starts: 10000
+  train_frequency: 10
+  eval_frequency: 100000
+
+# Environment settings
+env:
+  reward_type: "base" 
+  energy_weight: 1.0 

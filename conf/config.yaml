@@ -1,0 +1,39 @@
+defaults:
+  - experiment: simulation
+  - hydra/launcher: basic
+
+# Basic configuration
+seed: 42
+track: false
+
+# Directories  
+base_dir: results
+
+# W&B settings
+wandb:
+  project: "building2building"
+  entity: null
+
+# Building and environment settings
+building:
+  state: "AL"
+  county: "Pike"
+  building_type: "SmallHotel"
+  building_id: "example_building"
+  area: 1140
+  num_floors: 6
+  height: null
+  n_buildings: 1
+  weather: "example_weather.epw"
+  weather_validation: null
+
+# Simulation settings
+simulation:
+  episodes: 1
+
+# Hydra settings
+hydra:
+  run:
+    dir: ${base_dir}/${experiment.name}_${now:%Y%m%d_%H%M%S}
+  job:
+    chdir: false 
