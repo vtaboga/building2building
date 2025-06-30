@@ -6,7 +6,6 @@ from building2building.core.hydra_manager import HydraManager
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-    """Fetch buildings using Hydra configuration."""
     
     # Create a Hydra-compatible run manager
     run_manager = HydraManager(cfg)
