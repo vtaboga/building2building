@@ -187,7 +187,7 @@ def main(args: Args, run_manager=None):
     
     Args:
         args: Arguments for the DQN algorithm
-        run_manager: Optional HydraManager instance for unified logging
+        run_manager: Optional run manager for unified logging (deprecated)
     """
     # Create directories for logs and outputs
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
@@ -195,7 +195,7 @@ def main(args: Args, run_manager=None):
     os.makedirs(run_dir, exist_ok=True)
 
     # Setup tracking based on run_manager
-    # Only initialize wandb internally if HydraManager isn't handling it
+    # Only initialize wandb internally if run_manager isn't handling it
     use_internal_tracking = run_manager is None and args.track
     
     if use_internal_tracking:
@@ -211,7 +211,7 @@ def main(args: Args, run_manager=None):
             save_code=True,
         )
     
-    # Use HydraManager's logger and tensorboard if provided
+    # Use run_manager's logger and tensorboard if provided
     if run_manager:
         writer = run_manager.get_tensorboard_writer()
         logger = run_manager.logger
@@ -412,12 +412,12 @@ def main(args: Args, run_manager=None):
     if args.save_model:
         # Determine the appropriate path for saving the model
         if run_manager:
-            # Use HydraManager's models directory if available
+            # Use run_manager's models directory if available
             models_dir = os.path.join(run_manager.run_dir, "models")
             os.makedirs(models_dir, exist_ok=True)
             model_path = os.path.join(models_dir, f"{args.exp_name}.pt")
         else:
-            # Default path if HydraManager is not available
+            # Default path if run_manager is not available
             model_path = os.path.join(run_dir, f"{args.exp_name}.cleanrl_model")
         
         # Save the model

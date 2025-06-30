@@ -5,12 +5,11 @@ import logging
 import urllib.parse
 import rdflib
 from rdflib import namespace
-from building2building.core.logging import setup_logger
 from typing import Dict, List
 from building2building.simulator.query_info import ns
 
-# Setup config logger as a child of root
-logger = setup_logger('config', add_handlers=False)
+# Setup logger using standard Python logging
+logger = logging.getLogger(__name__)
 
 
 

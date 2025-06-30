@@ -1,18 +1,19 @@
 import hydra
-from omegaconf import DictConfig
-import os
-import gymnasium as gym
-import torch
-import torch.nn as nn
+import wandb
+import logging
+from pathlib import Path
+from omegaconf import DictConfig, OmegaConf
+from hydra.core.hydra_config import HydraConfig
+from typing import Dict, Any, cast
 import json
+
 from building2building.algorithms.online.ppo import main, Args
-from building2building.core.hydra_manager import HydraManager
 
 # Make sure to import your environment to register it
 import building2building.simulator
 
 
-def create_ppo_args_from_config(cfg: DictConfig, run_manager: HydraManager) -> Args:
+def create_ppo_args_from_config(cfg: DictConfig, output_dir: Path) -> Args:
     """Convert Hydra configuration to PPO Args object."""
     
     # Load building characteristics
@@ -23,8 +24,11 @@ def create_ppo_args_from_config(cfg: DictConfig, run_manager: HydraManager) -> A
         with open(characteristics_path, 'r') as f:
             building_characteristics = json.load(f)
     except FileNotFoundError:
-        run_manager.logger.error(f"Building characteristics file not found: {characteristics_path}")
+        logging.error(f"Building characteristics file not found: {characteristics_path}")
         raise
+    
+    # Handle weather_validation parameter (Args class expects str, not Optional[str])
+    weather_validation = f"data/weather/{cfg.building.weather_validation}" if cfg.building.get('weather_validation') else cfg.building.weather
     
     # Create PPO arguments from Hydra config
     args = Args(
@@ -32,7 +36,7 @@ def create_ppo_args_from_config(cfg: DictConfig, run_manager: HydraManager) -> A
         env_id="EnergyPlus-v0",
         path_to_building=building_path,
         path_to_weather=f"data/weather/{cfg.building.weather}",
-        weather_validation=f"data/weather/{cfg.building.weather_validation}" if cfg.building.get('weather_validation') else None,
+        weather_validation=weather_validation,
         building_characteristics=building_characteristics,
         reward_type=cfg.env.reward_type,
         energy_weight=cfg.env.energy_weight,
@@ -41,7 +45,7 @@ def create_ppo_args_from_config(cfg: DictConfig, run_manager: HydraManager) -> A
         track=cfg.track,
         wandb_project_name=cfg.wandb.project,
         wandb_entity=cfg.wandb.entity,
-        results_dir=run_manager.run_dir,
+        results_dir=str(output_dir),
         
         # General training settings
         seed=cfg.seed,
@@ -78,26 +82,44 @@ def main_hydra(cfg: DictConfig) -> None:
     if cfg.name != "ppo_training":
         raise ValueError(f"This script expects ppo_training experiment, got {cfg.name}")
     
-    # Create a Hydra-compatible run manager
-    run_manager = HydraManager(cfg)
+    # Get Hydra's output directory and setup logging
+    output_dir = Path(HydraConfig.get().runtime.output_dir)
+    logger = logging.getLogger(__name__)
+    
+    # Create subdirectories
+    (output_dir / 'models').mkdir(exist_ok=True)
+    (output_dir / 'data').mkdir(exist_ok=True)
+    (output_dir / 'eplus_output').mkdir(exist_ok=True)
+    
+    # Initialize W&B following best practices
+    wandb_run = None
+    if cfg.get('track', False):
+        # Convert config to proper dict for wandb
+        config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+        wandb_run = wandb.init(
+            entity=cfg.wandb.entity,
+            project=cfg.wandb.project,
+            config=cast(Dict[str, Any], config_dict) if isinstance(config_dict, dict) else {},
+            name=cfg.get('name', 'ppo_training'),
+            tags=cfg.wandb.get('tags', [])
+        )
+        logger.info(f"W&B initialized: {wandb_run.url}")
     
     # Convert Hydra config to PPO Args
-    args = create_ppo_args_from_config(cfg, run_manager)
-    
-    # Log the configuration
-    run_manager.save_config()
+    args = create_ppo_args_from_config(cfg, output_dir)
     
     # Run PPO training
-    run_manager.logger.info("Starting PPO training...")
+    logger.info("Starting PPO training...")
     try:
-        main(args, run_manager)
-        run_manager.logger.info("PPO training completed successfully")
+        # Pass None as run_manager since we're using Hydra directly
+        main(args, run_manager=None)
+        logger.info("PPO training completed successfully")
     except Exception as e:
-        run_manager.logger.error(f"Error during PPO training: {e}")
+        logger.error(f"Error during PPO training: {e}")
         raise
-    finally:
-        # Ensure we finalize the run even if there's an error
-        run_manager.finish()
+    
+    # Hydra automatically saves config to .hydra/config.yaml
+    logger.info(f"Config automatically saved to: {output_dir}/.hydra/config.yaml")
 
 
 if __name__ == "__main__":

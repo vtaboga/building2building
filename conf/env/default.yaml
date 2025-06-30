@@ -1,0 +1,3 @@
+# Environment configuration
+reward_type: "base"
+energy_weight: 1.0 

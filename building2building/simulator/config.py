@@ -20,7 +20,6 @@ import building2building.simulator.simulation as simulation
 from typing import Dict, List
 import urllib.parse
 import logging
-from building2building.core.logging import setup_logger
 import os
 
 
