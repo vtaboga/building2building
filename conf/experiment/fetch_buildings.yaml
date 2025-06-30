@@ -1,0 +1,13 @@
+# @package _global_
+name: fetch_buildings
+
+# Building search criteria - only parameters used by search_idf()
+building:
+  state: "AL"
+  county: "Pike" 
+  building_type: "SmallHotel"
+  area: 400                    
+  num_floors: 3               
+  height: 35.0                
+  n_buildings: 1               
+  n_weather_files: 2           

@@ -1,0 +1,53 @@
+# @package _global_
+name: train_offline_rl
+track: true
+
+# Building configuration for offline RL training
+building:
+  state: "AL"
+  county: "Pike"
+  building_id: "6014003402037"
+  weather: "USA_AL_Mobile.Rgnl.AP-Bates.Field.722230_US.Normals.2006-2020.epw"
+  weather_validation: "USA_AL_Fairhope-Callahan.AP.720592_TMYx.epw"
+
+# Offline RL training configuration
+offline_rl:
+  algorithm: "cql"  # cql, iql, td3bc, mopo, combo, mobile, rambo
+  dataset_path: "results/collect_dataset_*/6014003402037_dataset.npz"  # Path to dataset
+  
+  # Training parameters
+  epoch: 1000
+  step_per_epoch: 1000
+  eval_episodes: 10
+  batch_size: 256
+  lr: 0.0003
+  gamma: 0.99
+  tau: 0.005
+  
+  # CQL specific parameters
+  cql_weight: 1.0
+  temperature: 1.0
+  with_lagrange: true
+  lagrange_threshold: 10.0
+  cql_alpha_lr: 0.0003
+  
+  # IQL specific parameters
+  beta: 3.0
+  iql_tau: 0.7
+  max_target_backup: false
+  
+  # TD3+BC specific parameters
+  policy_noise: 0.2
+  noise_clip: 0.5
+  policy_freq: 2
+  alpha: 2.5
+  
+  # Model-based parameters
+  rollout_freq: 1000
+  rollout_batch_size: 50000
+  rollout_length: 5
+  real_ratio: 0.05
+  dynamics_lr: 0.001
+  dynamics_update_freq: 0
+  n_ensemble: 7
+  n_elites: 5 

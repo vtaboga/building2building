@@ -1,71 +1,30 @@
 """
-Script to collect offline datasets for offline RL training.
-Can collect data from trained policies, baselines, or mixed datasets.
+Script to collect offline datasets for offline RL training using Hydra configuration.
 """
 
 import os
 import json
-import argparse
 import numpy as np
 import gymnasium as gym
 import torch
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Union
+import hydra
 import logging
+from pathlib import Path
+from omegaconf import DictConfig
+from hydra.core.hydra_config import HydraConfig
+from typing import Dict, List
 
-# Building2Building imports
-from building2building.algorithms.online.dqn import QNetwork, dqn_evaluate
-from building2building.algorithms.online.ppo import Agent as PPOAgent, ppo_evaluate
-from building2building.algorithms.online.baselines import constant_policy
-from building2building.core.run_manager import RunManager
 from building2building.simulator.wrappers import NormalizeObservation, CustomRescaleAction
 import building2building.simulator
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Collect offline datasets for offline RL training")
-    
-    # Building and environment arguments
-    parser.add_argument('--state', '-s', type=str, help='State code (e.g., AL)')
-    parser.add_argument('--county', '-c', type=str, help='County name')
-    parser.add_argument('--building-id', '-b', type=str, help='Building ID')
-    parser.add_argument('--weather', '-w', type=str, help='EPW Weather file')
-    
-    # Data collection arguments
-    parser.add_argument('--output-path', '-o', type=str, required=True,
-                        help='Output path for the dataset (JSON or NPZ format)')
-    parser.add_argument('--data-source', type=str, default="mixed",
-                        choices=["baseline", "trained_policy", "mixed", "random"],
-                        help='Source of data to collect')
-    parser.add_argument('--num-episodes', type=int, default=100,
-                        help='Number of episodes to collect')
-    parser.add_argument('--seed', type=int, default=1, help='Random seed')
-    
-    # Environment configuration
-    parser.add_argument('--reward-type', type=str, default="base",
-                        choices=["barrier", "base"], help='Reward type')
-    parser.add_argument('--energy-weight', type=float, default=1.0,
-                        help='Energy weight for base reward function')
-    
-    # Policy-specific arguments
-    parser.add_argument('--model-path', type=str, default=None,
-                        help='Path to trained model (required for trained_policy)')
-    parser.add_argument('--policy-type', type=str, default="ppo",
-                        choices=["dqn", "ppo"], help='Type of trained policy')
-    
-    # Baseline policy arguments  
-    parser.add_argument('--heating-setpoint', type=float, default=21.0,
-                        help='Heating setpoint for baseline policy')
-    parser.add_argument('--cooling-setpoint', type=float, default=24.0,
-                        help='Cooling setpoint for baseline policy')
-    
-    # Mixed dataset arguments
-    parser.add_argument('--baseline-ratio', type=float, default=0.5,
-                        help='Ratio of baseline episodes in mixed dataset')
-    parser.add_argument('--noise-level', type=float, default=0.1,
-                        help='Noise level for action perturbation in mixed dataset')
-    
-    return parser.parse_args()
+def constant_policy(obs: np.ndarray, heating_setpoint: float, cooling_setpoint: float, 
+                   action_space) -> np.ndarray:
+    """Simple constant policy for baseline data collection."""
+    action = np.array([heating_setpoint, cooling_setpoint - heating_setpoint])
+    # Normalize to [0, 1] range
+    action = (action - action_space.low) / (action_space.high - action_space.low)
+    return action
 
 
 def collect_baseline_data(env: gym.Env, num_episodes: int, heating_setpoint: float,
@@ -87,8 +46,7 @@ def collect_baseline_data(env: gym.Env, num_episodes: int, heating_setpoint: flo
         truncated = False
         
         while not (done or truncated):
-            action = constant_policy(obs, heating_setpoint, cooling_setpoint, 
-                                   normalize=True, action_space=env.action_space)
+            action = constant_policy(obs, heating_setpoint, cooling_setpoint, env.action_space)
             
             # Store current observation and action
             data['observations'].append(obs.copy())
@@ -101,9 +59,11 @@ def collect_baseline_data(env: gym.Env, num_episodes: int, heating_setpoint: flo
             data['next_observations'].append(next_obs.copy())  
             data['rewards'].append(reward)
             data['terminals'].append(done)
-            data['timeouts'].append(truncated)  # D4RL treats this as timeout flag
+            data['timeouts'].append(truncated)
             
             obs = next_obs
+    
+        logger.info(f"Completed episode {episode + 1}/{num_episodes}")
     
     return data
 
@@ -115,8 +75,6 @@ def save_dataset(data: Dict[str, List], output_path: str, logger: logging.Logger
     dataset = {}
     for key, values in data.items():
         if key in ['rewards', 'terminals', 'timeouts']:
-            # Reshape rewards, terminals, and timeouts to column vectors (n_samples, 1)
-            # This matches the expected format for offline RL buffers
             dataset[key] = np.array(values).reshape(-1, 1)
         else:
             dataset[key] = np.array(values)
@@ -126,95 +84,77 @@ def save_dataset(data: Dict[str, List], output_path: str, logger: logging.Logger
     total_reward = np.sum(dataset['rewards'])
     mean_reward = np.mean(dataset['rewards'])
     
-    logger.info(f"\nDataset Statistics:")
+    logger.info(f"Dataset Statistics:")
     logger.info(f"  Total transitions: {n_transitions}")
     logger.info(f"  Total reward: {total_reward:.2f}")
     logger.info(f"  Mean reward per step: {mean_reward:.4f}")
-    logger.info(f"  Observation shape: {dataset['observations'].shape}")
-    logger.info(f"  Action shape: {dataset['actions'].shape}")
-    logger.info(f"  Rewards shape: {dataset['rewards'].shape}")
-    logger.info(f"  Terminals shape: {dataset['terminals'].shape}")
     
-    # Save based on file extension
-    if output_path.endswith('.json'):
-        # Convert numpy arrays to lists for JSON serialization
-        json_data = {}
-        for key, values in dataset.items():
-            json_data[key] = values.tolist()
-        
-        with open(output_path, 'w') as f:
-            json.dump(json_data, f)
-            
-    elif output_path.endswith('.npz'):
-        np.savez_compressed(output_path, **dataset)
-        
-    else:
-        raise ValueError(f"Unsupported output format: {output_path}")
+    # Create output directory if needed
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
+    # Save as NPZ format
+    np.savez_compressed(output_path, **dataset)
     logger.info(f"Dataset saved to: {output_path}")
 
 
-def main():
-    args = parse_args()
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig) -> None:
+    """Main function for dataset collection with Hydra configuration."""
     
-    # Create run manager for logging
-    run_manager = RunManager(
-        experiment_name="dataset_collection",
-        track_wandb=False,
-        seed=args.seed,
-        tags={
-            "data_source": args.data_source,
-            "num_episodes": args.num_episodes,
-            "state": args.state,
-            "county": args.county,
-            "building_id": args.building_id
-        }
-    )
+    # Ensure we're using the dataset collection experiment
+    if cfg.name != "collect_dataset":
+        raise ValueError(f"This script expects collect_dataset experiment, got {cfg.name}")
+    
+    # Get Hydra's output directory and setup logging
+    output_dir = Path(HydraConfig.get().runtime.output_dir)
+    logger = logging.getLogger(__name__)
     
     # Load building characteristics
-    building_path = f"data/processed_buildings/{args.state}/{args.county}/{args.building_id}.epJSON"
-    characteristics_path = f"data/processed_buildings/{args.state}/{args.county}/{args.building_id}.json"
+    building_path = f"data/processed_buildings/{cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}.epJSON"
+    characteristics_path = f"data/processed_buildings/{cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}.json"
     
     try:
         with open(characteristics_path, 'r') as f:
             building_characteristics = json.load(f)
     except FileNotFoundError:
-        run_manager.logger.error(f"Building characteristics file not found: {characteristics_path}")
-        exit(1)
+        logger.error(f"Building characteristics file not found: {characteristics_path}")
+        raise
     
     # Create environment
     env = gym.make(
         "EnergyPlus-v0",
         path_to_building=building_path,
-        path_to_weather=f"data/weather/{args.weather}",
+        path_to_weather=f"data/weather/{cfg.building.weather}",
         building_characteristics=building_characteristics,
-        reward_type=args.reward_type,
-        energy_weight=args.energy_weight,
-        run_manager=run_manager
+        reward_type=cfg.env.reward_type,
+        energy_weight=cfg.env.energy_weight,
     )
     env = CustomRescaleAction(env)
     env = gym.wrappers.ClipAction(env)
     env = NormalizeObservation(env)
     
     # Set seed
-    env.reset(seed=args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    env.reset(seed=cfg.seed)
+    np.random.seed(cfg.seed)
+    torch.manual_seed(cfg.seed)
     
-    # For now, implement baseline collection - can be extended later
-    run_manager.logger.info(f"Starting data collection: {args.data_source}")
+    # Collect data
+    logger.info(f"Starting baseline data collection for {cfg.dataset.num_episodes} episodes")
     
-    data = collect_baseline_data(env, args.num_episodes, args.heating_setpoint,
-                               args.cooling_setpoint, run_manager.logger)
-    
-    # Create output directory if needed
-    os.makedirs(os.path.dirname(args.output_path), exist_ok=True)
+    data = collect_baseline_data(
+        env, 
+        cfg.dataset.num_episodes,
+        cfg.dataset.heating_setpoint,
+        cfg.dataset.cooling_setpoint,
+        logger
+    )
     
     # Save dataset
-    save_dataset(data, args.output_path, run_manager.logger)
+    output_path = output_dir / f"{cfg.building.building_id}_dataset.npz"
+    save_dataset(data, str(output_path), logger)
     
     env.close()
-    run_manager.finish()
+    logger.info("Dataset collection completed!")
 
 
 if __name__ == "__main__":

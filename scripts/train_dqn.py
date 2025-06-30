@@ -1,128 +1,123 @@
-import os
-import gymnasium as gym
-import torch
-import torch.nn as nn
+import hydra
+import wandb
+import logging
+from pathlib import Path
+from omegaconf import DictConfig, OmegaConf
+from hydra.core.hydra_config import HydraConfig
+from typing import Dict, Any, cast
 import json
-import argparse
+
 from building2building.algorithms.online.dqn import main, Args
-from building2building.core.run_manager import RunManager
 
 # Make sure to import your environment to register it
 import building2building.simulator
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Train DQN algorithm on EnergyPlus environment")
-    # Building and environment arguments
-    parser.add_argument('--state', '-s', type=str, help='State code (e.g., AL)')
-    parser.add_argument('--county', '-c', type=str, help='County name')
-    parser.add_argument('--building-id', '-b', type=str, help='Building ID')
-    parser.add_argument('--weather', '-w', type=str, help='EPW Weather file')
-    parser.add_argument('--weather_validation', type=str, default=None, help='EPW Weather file for validation (optional)')
-    
-    # General training arguments
-    parser.add_argument('--seed', type=int, default=1, help='Random seed')
-    parser.add_argument('--track', action='store_true', help='Track with wandb')
-    parser.add_argument('--wandb-project', type=str, default="building2building", help='W&B project name')
-    parser.add_argument('--wandb-entity', type=str, default="pierre-luc-bacon-mila-org", help='W&B entity')
-    parser.add_argument('--total-timesteps', type=int, default=1000000, help='Total timesteps for training')
-    parser.add_argument('--save-model', action='store_true', default=True, help='Save the trained model')
-    parser.add_argument('--results-dir', type=str, default=None, help='Base directory for storing results')
-    
-    # DQN specific arguments
-    parser.add_argument('--learning-rate', type=float, default=1e-4, help='Learning rate')
-    parser.add_argument('--num-envs', type=int, default=1, help='Number of parallel environments')
-    parser.add_argument('--buffer-size', type=int, default=10000, help='Replay buffer size')
-    parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')
-    parser.add_argument('--reward-type', type=str, default="base", choices=["barrier", "base"], help='Reward type')
-    parser.add_argument('--energy-weight', type=float, default=1.0, help='Energy weight for base reward function')
-    parser.add_argument('--tau', type=float, default=1.0, help='Target network update rate')
-    parser.add_argument('--target-network-frequency', type=int, default=500, help='Target network update frequency')
-    parser.add_argument('--batch-size', type=int, default=128, help='Batch size for training')
-    parser.add_argument('--start-e', type=float, default=1.0, help='Starting epsilon for exploration')
-    parser.add_argument('--end-e', type=float, default=0.05, help='Final epsilon for exploration')
-    parser.add_argument('--exploration-fraction', type=float, default=0.5, 
-                        help='Fraction of total timesteps for epsilon decay')
-    parser.add_argument('--learning-starts', type=int, default=10000, help='Timesteps before learning starts')
-    parser.add_argument('--train-frequency', type=int, default=10, help='Training frequency')
-    parser.add_argument('--eval-frequency', type=int, default=100000, 
-                        help='How often (in steps) to evaluate the policy during training')
-    
-    return parser.parse_args()
 
-if __name__ == "__main__":
-    cmd_args = parse_args()
-    
-    # Create a run manager to handle all logging and result saving
-    run_manager = RunManager(
-        experiment_name="dqn_training",
-        track_wandb=cmd_args.track,
-        wandb_project=cmd_args.wandb_project,
-        wandb_entity=cmd_args.wandb_entity,
-        seed=cmd_args.seed,
-        tags={
-            "state": cmd_args.state,
-            "county": cmd_args.county,
-            "building_id": cmd_args.building_id
-        }
-    )
+def create_dqn_args_from_config(cfg: DictConfig, output_dir: Path) -> Args:
+    """Convert Hydra configuration to DQN Args object."""
     
     # Load building characteristics
-    building_path = f"data/processed_buildings/{cmd_args.state}/{cmd_args.county}/{cmd_args.building_id}.epJSON"
-    characteristics_path = f"data/processed_buildings/{cmd_args.state}/{cmd_args.county}/{cmd_args.building_id}.json"
+    building_path = f"data/processed_buildings/{cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}.epJSON"
+    characteristics_path = f"data/processed_buildings/{cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}.json"
     
     try:
         with open(characteristics_path, 'r') as f:
             building_characteristics = json.load(f)
     except FileNotFoundError:
-        run_manager.logger.error(f"Building characteristics file not found: {characteristics_path}")
-        exit(1)
+        logging.error(f"Building characteristics file not found: {characteristics_path}")
+        raise
     
-    # Create DQN arguments
+    # Handle weather_validation parameter (Args class expects str, not Optional[str])
+    weather_validation = f"data/weather/{cfg.building.weather_validation}" if cfg.building.get('weather_validation') else cfg.building.weather
+    
+    # Create DQN arguments from Hydra config
     args = Args(
+        # Environment settings
         env_id="EnergyPlus-v0",
         path_to_building=building_path,
-        path_to_weather=f"data/weather/{cmd_args.weather}",
-        weather_validation=f"data/weather/{cmd_args.weather_validation}" if cmd_args.weather_validation else None,
+        path_to_weather=f"data/weather/{cfg.building.weather}",
+        weather_validation=weather_validation,
         building_characteristics=building_characteristics,
-        reward_type=cmd_args.reward_type,
-        energy_weight=cmd_args.energy_weight,
+        reward_type=cfg.env.reward_type,
+        energy_weight=cfg.env.energy_weight,
         
-        # Transfer command line arguments to DQN Args
-        track=cmd_args.track,
-        wandb_project_name=cmd_args.wandb_project,
-        wandb_entity=cmd_args.wandb_entity,
-        results_dir=cmd_args.results_dir or run_manager.run_dir,
-        seed=cmd_args.seed,
-        total_timesteps=cmd_args.total_timesteps,
-        save_model=cmd_args.save_model,
+        # Tracking settings
+        track=cfg.track,
+        wandb_project_name=cfg.wandb.project,
+        wandb_entity=cfg.wandb.entity,
+        results_dir=str(output_dir),
+        
+        # General training settings
+        seed=cfg.seed,
+        total_timesteps=cfg.training.total_timesteps,
+        save_model=cfg.training.save_model,
         
         # DQN specific parameters
-        learning_rate=cmd_args.learning_rate,
-        num_envs=cmd_args.num_envs,
-        buffer_size=cmd_args.buffer_size,
-        gamma=cmd_args.gamma,
-        tau=cmd_args.tau,
-        target_network_frequency=cmd_args.target_network_frequency,
-        batch_size=cmd_args.batch_size,
-        start_e=cmd_args.start_e,
-        end_e=cmd_args.end_e,
-        exploration_fraction=cmd_args.exploration_fraction,
-        learning_starts=cmd_args.learning_starts,
-        train_frequency=cmd_args.train_frequency,
-        eval_frequency=cmd_args.eval_frequency,
+        learning_rate=cfg.dqn.learning_rate,
+        num_envs=cfg.dqn.num_envs,
+        buffer_size=cfg.dqn.buffer_size,
+        gamma=cfg.dqn.gamma,
+        tau=cfg.dqn.tau,
+        target_network_frequency=cfg.dqn.target_network_frequency,
+        batch_size=cfg.dqn.batch_size,
+        start_e=cfg.dqn.start_e,
+        end_e=cfg.dqn.end_e,
+        exploration_fraction=cfg.dqn.exploration_fraction,
+        learning_starts=cfg.dqn.learning_starts,
+        train_frequency=cfg.dqn.train_frequency,
+        eval_frequency=cfg.dqn.eval_frequency,
     )
     
-    # Log the configuration
-    run_manager.save_config(vars(args))
+    return args
+
+
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main_hydra(cfg: DictConfig) -> None:
+    """Main function for DQN training with Hydra configuration."""
+    
+    # Ensure we're using the DQN training experiment
+    if cfg.name != "dqn_training":
+        raise ValueError(f"This script expects dqn_training experiment, got {cfg.name}")
+    
+    # Get Hydra's output directory and setup logging
+    output_dir = Path(HydraConfig.get().runtime.output_dir)
+    logger = logging.getLogger(__name__)
+    
+    # Create subdirectories
+    (output_dir / 'models').mkdir(exist_ok=True)
+    (output_dir / 'data').mkdir(exist_ok=True)
+    (output_dir / 'eplus_output').mkdir(exist_ok=True)
+    
+    # Initialize W&B following best practices
+    wandb_run = None
+    if cfg.get('track', False):
+        # Convert config to proper dict for wandb
+        config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+        wandb_run = wandb.init(
+            entity=cfg.wandb.entity,
+            project=cfg.wandb.project,
+            config=cast(Dict[str, Any], config_dict) if isinstance(config_dict, dict) else {},
+            name=cfg.get('name', 'dqn_training'),
+            tags=cfg.wandb.get('tags', [])
+        )
+        logger.info(f"W&B initialized: {wandb_run.url}")
+    
+    # Convert Hydra config to DQN Args
+    args = create_dqn_args_from_config(cfg, output_dir)
     
     # Run DQN training
-    run_manager.logger.info("Starting DQN training...")
+    logger.info("Starting DQN training...")
     try:
-        main(args, run_manager)
-        run_manager.logger.info("DQN training completed successfully")
+        # Pass None as run_manager since we're using Hydra directly
+        main(args, run_manager=None)
+        logger.info("DQN training completed successfully")
     except Exception as e:
-        run_manager.logger.error(f"Error during DQN training: {e}")
+        logger.error(f"Error during DQN training: {e}")
         raise
-    finally:
-        # Ensure we finalize the run even if there's an error
-        run_manager.finish() 
+    
+    # Hydra automatically saves config to .hydra/config.yaml
+    logger.info(f"Config automatically saved to: {output_dir}/.hydra/config.yaml")
+
+
+if __name__ == "__main__":
+    main_hydra()

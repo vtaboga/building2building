@@ -1,0 +1,16 @@
+# @package _global_
+name: collect_dataset
+track: false
+
+# Building configuration for dataset collection
+building:
+  state: "AL"
+  county: "Pike"
+  building_id: "6014003402037"
+  weather: "USA_AL_Mobile.Rgnl.AP-Bates.Field.722230_US.Normals.2006-2020.epw"
+
+# Dataset collection configuration
+dataset:
+  num_episodes: 100
+  heating_setpoint: 21.0
+  cooling_setpoint: 24.0 

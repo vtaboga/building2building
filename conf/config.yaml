@@ -1,0 +1,24 @@
+# Main configuration file for Building2Building project
+defaults:
+  - experiment: simulation
+  - building: default
+  - fetch_building: default
+  - training: default
+  - simulation: default
+  - env: default
+  - wandb: default
+  - _self_
+
+# Basic configuration
+seed: 42
+track: true
+
+# Directories  
+base_dir: results
+
+# Hydra settings
+hydra:
+  run:
+    dir: ${base_dir}/${name}_${now:%Y-%m-%d}_${now:%H-%M-%S}
+  job:
+    chdir: false 
