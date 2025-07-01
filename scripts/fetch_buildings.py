@@ -4,7 +4,7 @@ from omegaconf import DictConfig
 from building2building.generator.search_idf import search_idf
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../configs", config_name="default_config")
 def main(cfg: DictConfig) -> None:
     """Main function for searching building files with Hydra configuration."""
     

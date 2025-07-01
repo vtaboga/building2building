@@ -1,0 +1,3 @@
+# @package _global_
+heating_setpoint: 21.0
+cooling_setpoint: 24.0

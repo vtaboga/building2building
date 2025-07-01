@@ -1,6 +1,8 @@
 # Main configuration file for Building2Building project
 defaults:
-  - fetch_building: office_vermont
+  - fetch_buildings: office_vermont
+  - environment: default
+  - policies: constant
 
 # Basic configuration
 seed: 42
