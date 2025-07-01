@@ -21,7 +21,6 @@ def test_gym_wrapper():
         building_characteristics=building_characteristics,
         reward_type="base",
         energy_weight=1.0,
-        run_manager=None
     )
     
     # Reset environment and get initial observation
@@ -37,7 +36,6 @@ def test_gym_wrapper():
     # Run a few simulation steps with random actions
     for _ in range(5):
         action = action_space.sample()  # Use random actions from action space
-        print(action)
         
         # Take a step
         obs, reward, terminated, truncated, info = env.step(action)

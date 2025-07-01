@@ -167,9 +167,6 @@ class EnergyPlusSimulation:
 
     state: typing.Union[None, int] = field(default=None, init=False)
 
-    """The run manager instance to use for logging and results"""
-    run_manager: typing.Optional[typing.Any] = None
-
     def callback_timestep(self, state: int) -> None:
         try:
 
@@ -426,11 +423,9 @@ class EnergyPlusSimulation:
                 raise RuntimeError("Unreachable")
 
         return out
-
+    
     @property
-    def log_dir(self) -> str:
-        if self.run_manager:
-            return self.run_manager.get_eplus_output_dir()
+    def log_dir(self):
         return self._log_dir
     
     @log_dir.setter

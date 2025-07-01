@@ -8,7 +8,6 @@ from rdflib import namespace
 from typing import Dict, List
 from building2building.simulator.query_info import ns
 
-# Setup logger using standard Python logging
 logger = logging.getLogger(__name__)
 
 
