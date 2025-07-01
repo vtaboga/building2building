@@ -1,7 +1,7 @@
 # Configuration for baseline evaluation using composition
 defaults:
   - policies: constant
-  - environment: default
+  - environment: vt_small_office
   - _self_
 
 # General parameters
@@ -12,5 +12,5 @@ hydra:
   run:
     dir: results/baseline_${building_id}_${now:%Y-%m-%d_%H-%M-%S}
   sweep:
-    dir: results/multirun/baseline_${now:%Y-%m-%d_%H-%M-%S}
+    dir: results/baseline_${now:%Y-%m-%d_%H-%M-%S}
     subdir: building_${building_id}

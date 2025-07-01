@@ -1,7 +1,7 @@
 # Main configuration file for Building2Building project
 defaults:
   - fetch_buildings: office_vermont
-  - environment: default
+  - environment: vt_small_office
   - policies: constant
 
 # Basic configuration

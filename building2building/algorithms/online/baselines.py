@@ -42,6 +42,7 @@ def run_constant_baseline(
     energy_weight: float = 0.0,
     seed: int = 1,
     results_dir: str = "baseline_results",
+    eplus_output_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Run a full year simulation using the constant policy baseline.
@@ -57,6 +58,7 @@ def run_constant_baseline(
         energy_weight: Weight of the energy consumption penalty
         seed: Random seed for reproducibility
         results_dir: Directory to save results
+        eplus_output_dir: Directory for EnergyPlus output files
     
     Returns:
         Dictionary containing the evaluation results
@@ -65,6 +67,10 @@ def run_constant_baseline(
     os.makedirs(results_dir, exist_ok=True)
     logger = logging.getLogger("baseline")
     
+    # Create EnergyPlus output directory if specified
+    if eplus_output_dir:
+        os.makedirs(eplus_output_dir, exist_ok=True)
+    
     # Create and wrap the environment
     env = gym.make(
         env_id,
@@ -72,7 +78,8 @@ def run_constant_baseline(
         path_to_weather=path_to_weather,
         building_characteristics=building_characteristics,
         reward_type=reward_type,
-        energy_weight=energy_weight
+        energy_weight=energy_weight,
+        eplus_output_dir=eplus_output_dir
     )
     
     # Get action space before wrapping and ensure it's a Box space

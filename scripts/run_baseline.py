@@ -16,6 +16,9 @@ def main(cfg: DictConfig) -> None:
     # Get Hydra's output directory (automatically managed)
     output_dir = Path(HydraConfig.get().runtime.output_dir)
     
+    # Create EnergyPlus output directory within the run directory
+    eplus_output_dir = output_dir / "eplus_output"
+    
     # Setup paths
     building_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.epJSON"
     characteristics_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.json"
@@ -39,7 +42,8 @@ def main(cfg: DictConfig) -> None:
         reward_type=cfg.reward_type,
         energy_weight=cfg.energy_weight,
         seed=cfg.seed,
-        results_dir=str(output_dir)
+        results_dir=str(output_dir),
+        eplus_output_dir=str(eplus_output_dir)
     )
     
     logger.info("Baseline Evaluation Results:")
@@ -47,6 +51,7 @@ def main(cfg: DictConfig) -> None:
     logger.info(f"Mean reward per step: {results['mean_reward']:.2f}")
     logger.info(f"Total timesteps: {results['total_timesteps']}")
     logger.info(f"Results saved to: {output_dir / 'baseline_results.json'}")
+    logger.info(f"EnergyPlus output saved to: {eplus_output_dir}")
     logger.info(f"Output directory: {output_dir}")
 
 if __name__ == "__main__":
