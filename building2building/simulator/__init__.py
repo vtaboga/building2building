@@ -19,5 +19,6 @@ register(
         'reward_type': None,
         'energy_weight': None,
         'run_manager': None,
+        'eplus_output_dir': None,
     }
 )

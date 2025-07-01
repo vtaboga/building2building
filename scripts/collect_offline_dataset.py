@@ -13,6 +13,7 @@ from pathlib import Path
 from omegaconf import DictConfig
 from hydra.core.hydra_config import HydraConfig
 from typing import Dict, List
+from torch.distributions import Normal
 
 from building2building.simulator.wrappers import NormalizeObservation, CustomRescaleAction
 import building2building.simulator
@@ -21,15 +22,64 @@ import building2building.simulator
 def constant_policy(obs: np.ndarray, heating_setpoint: float, cooling_setpoint: float, 
                    action_space) -> np.ndarray:
     """Simple constant policy for baseline data collection."""
+    # The first value is the heating setpoint
+    # The second value is the offset from the heating setpoint to the cooling setpoint
     action = np.array([heating_setpoint, cooling_setpoint - heating_setpoint])
-    # Normalize to [0, 1] range
+    # Normalize each action dimension to [0, 1] for the normalized environment
     action = (action - action_space.low) / (action_space.high - action_space.low)
     return action
 
 
-def collect_baseline_data(env: gym.Env, num_episodes: int, heating_setpoint: float,
-                         cooling_setpoint: float, logger: logging.Logger) -> Dict[str, List]:
-    """Collect data using constant baseline policy in D4RL format."""
+def load_dqn_policy(model_path: str, env: gym.Env, device: str = "cpu"):
+    """Load trained DQN policy."""
+    from building2building.algorithms.online.dqn import QNetwork
+    import gymnasium as gym
+    
+    # Create a vectorized environment for the QNetwork initialization
+    envs = gym.vector.SyncVectorEnv([lambda: env])
+    
+    policy = QNetwork(envs, bins_per_dimension=20).to(device)
+    state_dict = torch.load(model_path, map_location=device)
+    policy.load_state_dict(state_dict)
+    policy.eval()
+    
+    def get_action(obs):
+        obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(device)
+        action, _ = policy.get_action(obs_tensor, epsilon=0.0)  # No exploration
+        return action
+    
+    return get_action
+
+
+def load_ppo_policy(model_path: str, env: gym.Env, device: str = "cpu"):
+    """Load trained PPO policy."""
+    from building2building.algorithms.online.ppo import Agent
+    import gymnasium as gym
+    
+    # Create a vectorized environment for the Agent initialization
+    envs = gym.vector.SyncVectorEnv([lambda: env])
+    
+    policy = Agent(envs).to(device)
+    state_dict = torch.load(model_path, map_location=device)
+    policy.load_state_dict(state_dict)
+    policy.eval()
+    
+    def get_action(obs):
+        obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(device)
+        with torch.no_grad():
+            action_mean = policy.actor_mean(obs_tensor)
+            action_logstd = policy.actor_logstd.expand_as(action_mean)
+            action_std = torch.exp(action_logstd)
+            probs = Normal(action_mean, action_std)
+            action = probs.sample()
+        return action.cpu().numpy().flatten()
+    
+    return get_action
+
+
+def collect_data_from_policy(env: gym.Env, policy_fn, num_episodes: int, 
+                           logger: logging.Logger) -> Dict[str, List]:
+    """Collect data using any policy function in D4RL format."""
     
     data = {
         'observations': [],
@@ -46,7 +96,7 @@ def collect_baseline_data(env: gym.Env, num_episodes: int, heating_setpoint: flo
         truncated = False
         
         while not (done or truncated):
-            action = constant_policy(obs, heating_setpoint, cooling_setpoint, env.action_space)
+            action = policy_fn(obs)
             
             # Store current observation and action
             data['observations'].append(obs.copy())
@@ -129,6 +179,12 @@ def main(cfg: DictConfig) -> None:
         reward_type=cfg.env.reward_type,
         energy_weight=cfg.env.energy_weight,
     )
+    
+    # Get action space before wrapping 
+    if not isinstance(env.action_space, gym.spaces.Box):
+        raise ValueError("Environment must have a Box action space")
+    action_space = env.action_space
+    
     env = CustomRescaleAction(env)
     env = gym.wrappers.ClipAction(env)
     env = NormalizeObservation(env)
@@ -138,19 +194,39 @@ def main(cfg: DictConfig) -> None:
     np.random.seed(cfg.seed)
     torch.manual_seed(cfg.seed)
     
+    # Determine policy type and load accordingly
+    policy_type = cfg.dataset.get('policy_type', 'baseline')
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    
+    if policy_type == 'baseline':
+        logger.info(f"Starting baseline data collection for {cfg.dataset.num_episodes} episodes")
+        policy_fn = lambda obs: constant_policy(obs, cfg.dataset.heating_setpoint, 
+                                               cfg.dataset.cooling_setpoint, action_space)
+        policy_name = "baseline"
+        
+    elif policy_type == 'dqn':
+        model_path = cfg.dataset.model_path
+        logger.info(f"Loading DQN policy from {model_path}")
+        policy_fn = load_dqn_policy(model_path, env, device)
+        policy_name = "dqn"
+        
+    elif policy_type == 'ppo':
+        model_path = cfg.dataset.model_path
+        logger.info(f"Loading PPO policy from {model_path}")
+        policy_fn = load_ppo_policy(model_path, env, device)
+        policy_name = "ppo"
+        
+    else:
+        raise ValueError(f"Unknown policy type: {policy_type}. Use 'baseline', 'dqn', or 'ppo'")
+    
     # Collect data
-    logger.info(f"Starting baseline data collection for {cfg.dataset.num_episodes} episodes")
+    logger.info(f"Starting {policy_type} data collection for {cfg.dataset.num_episodes} episodes")
+    data = collect_data_from_policy(env, policy_fn, cfg.dataset.num_episodes, logger)
     
-    data = collect_baseline_data(
-        env, 
-        cfg.dataset.num_episodes,
-        cfg.dataset.heating_setpoint,
-        cfg.dataset.cooling_setpoint,
-        logger
-    )
-    
-    # Save dataset
-    output_path = output_dir / f"{cfg.building.building_id}_dataset.npz"
+    # Save dataset to data/offline_dataset directory
+    dataset_dir = Path("data/offline_dataset")
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    output_path = dataset_dir / f"{cfg.building.building_id}_{policy_name}_dataset.npz"
     save_dataset(data, str(output_path), logger)
     
     env.close()

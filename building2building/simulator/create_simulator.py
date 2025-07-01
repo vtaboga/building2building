@@ -10,7 +10,7 @@ from building2building.simulator.observation_spaces import observation_transform
 from building2building.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints_rdf
 from typing import Optional
 
-def create_simulator(path_to_building: str, path_to_weather: str, building_characteristics: dict, reward_type: str, energy_weight: float = 1.0, run_manager: Optional[object] = None) -> gym.Env:
+def create_simulator(path_to_building: str, path_to_weather: str, building_characteristics: dict, reward_type: str, energy_weight: float = 1.0, run_manager: Optional[object] = None, eplus_output_dir: Optional[str] = None) -> gym.Env:
     """
     Create a simulator for a given building and weather file.
     
@@ -21,6 +21,7 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
         reward_type: Type of reward function to use
         energy_weight: Energy weight for reward calculation
         run_manager: Optional run manager (for backward compatibility)
+        eplus_output_dir: Optional directory for EnergyPlus outputs
     
     Returns:
         gym.Env: EnergyPlus environment
@@ -49,7 +50,7 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
     action_space = create_action_space(actuators)
 
     def make_energyplus() -> EnergyPlusSimulation:
-        return EnergyPlusSimulation(
+        sim = EnergyPlusSimulation(
             path_to_building,
             path_to_weather,
             obs_template,
@@ -57,7 +58,10 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
             run_manager=run_manager,
             verbose=False
         )
-
+        # Set the log directory if provided
+        if eplus_output_dir:
+            sim.log_dir = eplus_output_dir
+        return sim
 
     def reward_function(obs):
         if reward_type == "barrier":

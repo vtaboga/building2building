@@ -2,6 +2,10 @@
 name: train_offline_rl
 track: true
 
+# Environment configuration
+reward_type: "base"
+energy_weight: 1.0
+
 # Building configuration for offline RL training
 building:
   state: "AL"
