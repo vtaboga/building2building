@@ -1,13 +1,6 @@
 # Main configuration file for Building2Building project
 defaults:
-  - experiment: simulation
-  - building: default
-  - fetch_building: default
-  - training: default
-  - simulation: default
-  - env: default
-  - wandb: default
-  - _self_
+  - fetch_building: office_vermont
 
 # Basic configuration
 seed: 42

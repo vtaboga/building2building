@@ -1,8 +1,0 @@
-# Building configuration for training (not for fetching)
-# These parameters specify which building and weather files to use for training
-building:
-  state: "AL"
-  county: "Pike"
-  building_id: "6014003402037"  # Specific building ID for training
-  weather: "USA_AL_Mobile.Rgnl.AP-Bates.Field.722230_US.Normals.2006-2020.epw"
-  weather_validation: "USA_AL_Fairhope-Callahan.AP.720592_TMYx.epw" 
