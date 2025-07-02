@@ -30,7 +30,14 @@ def auto_add_energy(
     energy["HVAC_electricity"] = simulation.MeterHole("Electricity:HVAC")
     energy["HVAC_natural_gas"] = simulation.MeterHole("NaturalGas:HVAC")
 
-def create_simulator(path_to_building: Path, path_to_weather: Path, building_characteristics: dict, reward_type: str, energy_weight: float = 1.0) -> gym.Env:
+def create_simulator(
+        path_to_building: Path,
+        path_to_weather: Path,
+        building_characteristics: dict,
+        reward_type: str,
+        energy_weight: float = 1.0,
+        eplus_output_dir: Path | None = None,
+) -> gym.Env:
     """
     Create a simulator for a given building and weather file.
 
@@ -45,6 +52,9 @@ def create_simulator(path_to_building: Path, path_to_weather: Path, building_cha
     Returns:
         gym.Env: EnergyPlus environment
     """
+
+    if eplus_output_dir is None:
+        eplus_output_dir = Path("eplus_output")
 
     obs_template = {}
     ont = Ontology.from_json(path_to_building)
@@ -71,12 +81,18 @@ def create_simulator(path_to_building: Path, path_to_weather: Path, building_cha
     action_space = create_action_space(actuators)
 
     def make_energyplus() -> EnergyPlusSimulation:
+        if eplus_output_dir is None:
+            log_dir = Path("eplus_output")
+        else:
+            log_dir = eplus_output_dir
+
         sim = EnergyPlusSimulation(
             path_to_building,
             path_to_weather,
             obs_template,
             actuators,
-            verbose=False
+            verbose=False,
+            log_dir=log_dir,
         )
 
         logger.debug(f"created simulator {sim}")
