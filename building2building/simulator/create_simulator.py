@@ -1,20 +1,43 @@
 import gymnasium as gym
-from typing import *
 
 from pathlib import Path
 
+from typing import Any
+
 from building2building.env import setup_energyplus_path
-from building2building.simulator.simulation import EnergyPlusSimulation, ActuatorHole
-from building2building.simulator.environment import EnergyPlusEnvironment
+from minergym.simulation import EnergyPlusSimulation, ActuatorHole
+from minergym.environment import EnergyPlusEnvironment
 from building2building.simulator.rewards import base_reward_function, barrier_reward_function
-from building2building.simulator import query_info, config
+import minergym.config as config
 from building2building.simulator.observation_spaces import observation_transform, create_observation_space
-from building2building.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints_rdf
-from typing import Optional
+from building2building.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints
+from minergym.ontology import Ontology
+import minergym.simulation as simulation
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-def create_simulator(path_to_building: Path, path_to_weather: Path, building_characteristics: dict, reward_type: str, energy_weight: float = 1.0, eplus_output_dir: Optional[str] = None) -> gym.Env:
+def auto_add_energy(
+       ont: Ontology, obs_template: dict[str, Any]
+   ) -> None:
+    """Add HVAC energy consumption meters to the observation template."""
+    if "energy" not in obs_template:
+        obs_template["energy"] = {}
 
+    energy = obs_template["energy"]
+    # Add whole building HVAC energy meters only
+    energy["HVAC_electricity"] = simulation.MeterHole("Electricity:HVAC")
+    energy["HVAC_natural_gas"] = simulation.MeterHole("NaturalGas:HVAC")
+
+def create_simulator(
+        path_to_building: Path,
+        path_to_weather: Path,
+        building_characteristics: dict,
+        reward_type: str,
+        energy_weight: float = 1.0,
+        eplus_output_dir: Path | None = None,
+) -> gym.Env:
     """
     Create a simulator for a given building and weather file.
 
@@ -30,15 +53,20 @@ def create_simulator(path_to_building: Path, path_to_weather: Path, building_cha
         gym.Env: EnergyPlus environment
     """
 
-    obs_template = {}
-    rdf = query_info.rdf_from_json(path_to_building)
-    # Add observations
-    config.auto_add_time(rdf, obs_template)
-    config.auto_add_temperature(rdf, obs_template)
-    config.auto_add_energy(rdf, obs_template)
-    config.auto_add_weather(rdf, obs_template)
+    if eplus_output_dir is None:
+        eplus_output_dir = Path("eplus_output")
 
-    setpoints = get_controllable_setpoints_rdf(rdf)
+    obs_template = {}
+    ont = Ontology.from_json(path_to_building)
+    # Add observations
+    config.auto_add_time(ont, obs_template)
+    config.auto_add_temperature(ont, obs_template)
+    auto_add_energy(ont, obs_template)
+    config.auto_add_weather(ont, obs_template)
+
+    setpoints = get_controllable_setpoints(ont)
+    # breakpoint()
+
     actuators = {}
     controlled_zones = list(setpoints.keys())
     for zone_setpoints in setpoints.values():
@@ -53,17 +81,23 @@ def create_simulator(path_to_building: Path, path_to_weather: Path, building_cha
     action_space = create_action_space(actuators)
 
     def make_energyplus() -> EnergyPlusSimulation:
+        if eplus_output_dir is None:
+            log_dir = Path("eplus_output")
+        else:
+            log_dir = eplus_output_dir
+
         sim = EnergyPlusSimulation(
-            str(path_to_building),
-            str(path_to_weather),
+            path_to_building,
+            path_to_weather,
             obs_template,
             actuators,
-            verbose=False
+            verbose=False,
+            log_dir=log_dir,
         )
-        # Set the log directory if provided
-        if eplus_output_dir:
-            sim.log_dir = eplus_output_dir
+
+        logger.debug(f"created simulator {sim}")
         return sim
+
 
     def reward_function(obs):
         if reward_type == "barrier":
@@ -72,18 +106,15 @@ def create_simulator(path_to_building: Path, path_to_weather: Path, building_cha
             return base_reward_function(obs, setpoints, building_characteristics, energy_weight)
         else:
             raise ValueError(f"Invalid reward type: {reward_type}")
-    
+
 
     gymenv = EnergyPlusEnvironment[Any, Any](
         make_energyplus,
-        reward_function, 
+        reward_function,
         observation_space,
         lambda obs: observation_transform(obs, building_characteristics["area"]),
         action_space,
         lambda act: action_transform(act, actuators),
-        building_characteristics,
-        controlled_zones,
-        observation_names
     )
 
     return gymenv

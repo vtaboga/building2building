@@ -5,15 +5,28 @@ import subprocess
 import logging
 import json
 import shutil
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional, Literal, Union, TypeAlias, reveal_type, Callable
 from pathlib import Path
 from building2building.generator.utils import get_counties_from_coords_batch
-from building2building.simulator.action_spaces import get_controllable_setpoints_rdf
-from building2building.simulator import query_info
+from minergym.ontology import Ontology
 import building2building.env as env
 from building2building.utils import cd
+import tempfile
+from contextlib import contextmanager
+import time
+from functools import partial
 
 logger = logging.getLogger(__name__)
+
+@contextmanager
+def timer(name="Code block"):
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        end = time.perf_counter()
+        logger.info(f"{name} took {end - start:.4f} seconds")
+
 
 def process_metadata(state: str) -> Path:
     """
@@ -58,328 +71,164 @@ def process_metadata(state: str) -> Path:
 
     return path_out
 
-def find_transitioned_file(original_file: Path, to_ver: str) -> Path:
-    """Helper function to find the transitioned file which might have different naming patterns"""
-    idf_dir = original_file.parent
-    base_name = original_file.with_suffix("").name
 
-    new_path = (idf_dir / base_name).with_suffix(".idfnew")
+transitions = [
+    "9.4.0-to-9.5.0",
+    "9.5.0-to-9.6.0",
+    "9.6.0-to-22.1.0",
+    "22.1.0-to-22.2.0",
+    "22.2.0-to-23.1.0",
+    "23.1.0-to-23.2.0",
+    "23.2.0-to-24.1.0"
+]
 
-    # # Different possible patterns for the output file
-    # possible_patterns = [
-    #     # Pattern 1: original_name.idfnew (actual pattern we're seeing)
-    #     os.path.join(idf_dir, f"{base_name}.idfnew"),
-    #     # Pattern 2: original_name-V{version}.idf
-    #     os.path.join(idf_dir, f"{base_name}-V{to_ver.replace('.', '-')}.idf"),
-    #     # Pattern 3: original_name.V{version}.idf
-    #     os.path.join(idf_dir, f"{base_name}.V{to_ver.replace('.', '-')}.idf"),
-    #     # Pattern 4: original_name-{version}.idf
-    #     os.path.join(idf_dir, f"{base_name}-{to_ver.replace('.', '-')}.idf"),
-    #     # Pattern 5: original_name.{version}.idf
-    #     os.path.join(idf_dir, f"{base_name}.{to_ver}.idf"),
-    #     # Pattern 6: original_name.new
-    #     os.path.join(idf_dir, f"{base_name}.new"),
-    # ]
+Transition: TypeAlias = Union[*(Literal[t] for t in transitions)]
 
-    if not new_path.exists():
-        raise Exception(f"can't find transitioned file at {new_path}")
+def upgrade_idf(idf_in: Path, idf_out: Path, transition: Transition):
 
-    return new_path
+    from_version, to_version = transition.split("-to-")
 
-def transition_idf(idf_path: Path, state: str, county: str, target_version: str = "24.1") -> Path:
-    """
-    Transition an IDF file to the target EnergyPlus version using the transition executables.
-    Saves the processed file in data/processed_buildings/state/county/ directory.
+    transition_dir = env.ENERGYPLUS_PATH.get() / "PreProcess" / "IDFVersionUpdater"
 
-    Args:
-        idf_path (str): Path to the input IDF file
-        state (str): Two-letter state code
-        county (str): County name
-        target_version (str): Target EnergyPlus version (default: "24.1")
+    transition_exe = transition_dir / f"Transition-V{from_version.replace('.', '-')}-to-V{to_version.replace('.', '-')}"
+    if not transition_exe.exists():
+        raise Exception(f"{transition_exe} does not exist")
 
-    Returns:
-        str: Path to the transitioned file in the processed_buildigns directory
-    """
+    with tempfile.TemporaryDirectory() as temp:
+        logger.debug(f"executing transition {transition} in {temp}")
+        temp_path = Path(temp).resolve()
 
-    idf_path = idf_path.resolve()
+        temp_idf_in = temp_path / "in.idf"
+        temp_idf_out = temp_path / "in.idfnew"
 
-    # Create the output directory structure
-    processed_dir = Path("data", "processed_buildings", state, county).resolve()
-    processed_dir.mkdir(parents=True, exist_ok=True)
+        from_idd_part = f"V{from_version.replace('.', '-')}-Energy+.idd"
+        to_idd_part = f"V{to_version.replace('.', '-')}-Energy+.idd"
 
-    idf_dir = idf_path.parent
-    idf_name = Path(idf_path.name)
+        from_idd = (transition_dir / Path(from_idd_part)).resolve()
+        to_idd = (transition_dir / Path(to_idd_part)).resolve()
 
-    # Define the final output path
-    final_output_path = processed_dir / idf_name
+        if not from_idd.exists():
+            raise Exception(f"{from_idd} doesn't exist")
+        if not to_idd.exists():
+            raise Exception(f"{to_idd} doesn't exist")
 
-    # Create a temporary directory for transition files
-    temp_dir = idf_dir / "temp_transition"
-    temp_dir.mkdir(parents=True, exist_ok=True)
+        (temp_path / from_idd_part).symlink_to(from_idd)
+        (temp_path / to_idd_part).symlink_to(to_idd)
 
-    # Define the transition sequence from 9.4 to 24.1
-    transitions = [
-        "9.4.0-to-9.5.0",
-        "9.5.0-to-9.6.0",
-        "9.6.0-to-22.1.0",
-        "22.1.0-to-22.2.0",
-        "22.2.0-to-23.1.0",
-        "23.1.0-to-23.2.0",
-        "23.2.0-to-24.1.0"
-    ]
+        shutil.copy(idf_in, temp_idf_in)
 
-    # Copy the original file to temp directory to work with
+        # Run the transition executable from the temp_dir
+        cmdline = [
+            transition_exe,
+            "in.idf",
+        ]
 
-    energyplus_dir = env.ENERGYPLUS_PATH.get()
-    transition_dir = energyplus_dir / "PreProcess" / "IDFVersionUpdater"
+        logging.debug(f"Using cmd: {cmdline}")
 
-    def transition_exe(from_ver, to_ver):
-        p = transition_dir / f"Transition-V{from_ver.replace('.', '-')}-to-V{to_ver.replace('.', '-')}"
-        if not p.exists():
-            raise Exception(f"Error: Transition executable not found at {transition_exe}")
-        return p
-
-    with cd(temp_dir):
-        working_file = idf_name
-        shutil.copy(idf_path, working_file)
-
-        for transition in transitions:
-            from_ver, to_ver = transition.split("-to-")
-
-            # Get paths for the transition executable and IDD files
-            from_idd = os.path.join(transition_dir, f"V{from_ver.replace('.', '-')}-Energy+.idd")
-            to_idd = os.path.join(transition_dir, f"V{to_ver.replace('.', '-')}-Energy+.idd")
-
-            # Check if required files exist
-            if not os.path.exists(from_idd):
-                e = f"Error: Source IDD file not found at {from_idd}"
-                logger.error(e)
-                raise Exception(e)
-            if not os.path.exists(to_idd):
-                e = f"Error: Target IDD file not found at {to_idd}"
-                logger.error(e)
-                raise Exception(e)
-
-            # Create symbolic links to IDD files in the temp directory (not in /opt/repository)
-            from_idd_link = os.path.basename(from_idd)
-            to_idd_link = os.path.basename(to_idd)
-            if not os.path.exists(from_idd_link):
-                os.symlink(from_idd, from_idd_link)
-            if not os.path.exists(to_idd_link):
-                os.symlink(to_idd, to_idd_link)
-
-            logger.info(f"\nRunning transition from {from_ver} to {to_ver}")
-
-            cwd = os.getcwd()
-            # Run the transition executable from the temp_dir
-            cmdline = [transition_exe(from_ver, to_ver), os.path.basename(working_file)]
-            logging.debug(f"With CWD: {cwd}")
-            logging.debug(f"Using cmd: {cmdline}")
-            result = subprocess.run(
-                cmdline,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env={"DISPLAY": ""},
-                cwd=os.getcwd()
-            )
-
-            print(f"return code trnasition {from_ver} {to_ver} is {result.returncode}")
-
-            if result.stdout:
-                logger.debug(f"Transition output: {result.stdout}")
-            if result.stderr:
-                logger.warning(f"Transition errors: {result.stderr}")
-
-            # Clean up any .idfold files that might have been created
-            old_file = Path(str(working_file) + "old")
-            if old_file.exists():
-                old_file.unlink()
-
-            # Look for the transitioned file
-            transitioned_file = find_transitioned_file(working_file, to_ver)
-            if transitioned_file:
-                logger.debug(f"Found transitioned file at: {transitioned_file}")
-                if transitioned_file != working_file:
-                    # Replace working file with transitioned file
-                    os.rename(transitioned_file, working_file)
-            else:
-                e = f"Error: Could not find transitioned file for {working_file}"
-                logger.error(e)
-                raise Exception(e)
-        # Copy the final file to the processed_buildigs directory instead of original location
-        shutil.copy(working_file, final_output_path)
-
-        logger.info(f"\nFinal transitioned file saved to: {final_output_path}")
-
-        # Convert the final IDF to epJSON
-        epjson_path = convert_to_epjson(final_output_path)
-        logger.info(f"Converted to epJSON: {epjson_path}")
-        add_setpoint_control_to_epjson(epjson_path)
-        logger.info(f"Added setpoint control to {epjson_path}")
-        if epjson_path:
-            return epjson_path
-        else:
-            logger.error("Failed to convert to epJSON format")
-            return final_output_path  # Return IDF path as fallback
-
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
-
-
-    return final_output_path
-
-def process_idf(building_files: List[tuple], state: str, county: str):
-    """
-    Process IDF files if they haven't been processed already.
-
-    Args:
-        idf_files (List[int]): List of IDF file IDs
-        state (str): Two-letter state code
-        county (str): County name
-
-    Returns:
-        List[str]: List of paths to processed IDF files
-    """
-    processed_dir = os.path.join("data", "processed_buildings", state, county)
-    os.makedirs(processed_dir, exist_ok=True)
-
-    processed_paths = []
-    for idf_id, characteristics in building_files:
-        # Check if processed file already exists
-        processed_path = Path(processed_dir, f"{idf_id}.epJSON")
-        if processed_path.exists():
-            logger.info(f"Skipping {idf_id}.epJSON - already processed")
-            processed_paths.append(processed_path)
-            continue
-
-        # Get path to original file
-        original_path = Path("data", "idf", f"{state}_{county}_IDF", f"{idf_id}.idf")
-        if not original_path.exists():
-            logger.warning(f"Warning: Original file not found at {original_path}")
-            continue
-
-        # Process the file
-        processed_path = transition_idf(original_path, state, county)
-        if processed_path:
-            processed_paths.append(processed_path)
-
-            # Save the building characteristics as a JSON file
-            characteristics_path = os.path.join(processed_dir, f"{idf_id}.json")
-            # Add zone lists to characteristics
-            zone_lists = get_zone_lists(processed_path)
-            characteristics["zone_lists"] = zone_lists
-            with open(characteristics_path, 'w') as json_file:
-                json.dump(characteristics, json_file, indent=4)
-            logger.info(f"Saved characteristics to {characteristics_path}")
-            
-    return processed_paths
-
-def convert_to_epjson(idf_path: str) -> str:
-    """
-    Convert an IDF file to epJSON format using EnergyPlus converter.
-    Deletes the original IDF file after successful conversion.
-
-    Args:
-        idf_path (str): Path to the input IDF file
-
-    Returns:
-        str: Path to the converted epJSON file, or None if conversion fails
-    """
-    try:
-        # Define the output path
-        epjson_path = os.path.splitext(Path(idf_path).resolve())[0] + '.epJSON'
-        
-        # Path to the EnergyPlus executable
-        energyplus_dir = env.ENERGYPLUS_PATH.get()
-        converter = os.path.join(energyplus_dir, "ConvertInputFormat")
-        
-        logger.info(f"Converting {idf_path} to epJSON format")
-        
-        # Run the conversion
         result = subprocess.run(
-            [converter, idf_path],
+            cmdline,
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            env={"DISPLAY": ""},
+            cwd=temp_path
+        )
+
+        if result.stdout:
+            logger.debug(f"Transition output: {result.stdout}")
+        if result.stderr:
+            logger.warning(f"Transition errors: {result.stderr}")
+
+        if not temp_idf_out.exists():
+            raise Exception(f"{temp_idf_out} does not exist")
+
+        shutil.copy(temp_idf_out, idf_out)
+
+def specialized_upgrade_idf(t):
+    x = partial(upgrade_idf, transition=t)
+    x.__qualname__ = upgrade_idf.__qualname__ + "-" + t
+    return x
+
+def convert_idf(idf_path: Path, epjson_path: Path):
+    # Path to the EnergyPlus executable
+    converter = env.ENERGYPLUS_PATH.get() / "ConvertInputFormat"
+
+    logger.info(f"Converting {idf_path} to epJSON format")
+
+
+    with tempfile.TemporaryDirectory() as temp:
+        temp_path = Path(temp)
+        # Run the conversion
+
+        temp_idf_path = temp_path / "in.idf"
+        temp_epjson_path = temp_idf_path.with_suffix(".epJSON")
+
+        shutil.copy(idf_path, temp_idf_path)
+
+        result = subprocess.run(
+            [converter, temp_idf_path],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=temp,
         )
 
         if result.stderr:
             logger.warning(f"Conversion warnings: {result.stderr}")
         if result.stdout:
-            logger.warning(f"Conversion warnings: {result.stdout}")            
+            logger.warning(f"Conversion warnings: {result.stdout}")
 
-        # Check if the epJSON file was created
-        if os.path.exists(epjson_path):
-            logger.info(f"Successfully converted to: {epjson_path}")
-            # Delete the original IDF file
-            os.remove(idf_path)
-            logger.debug(f"Deleted original IDF file: {idf_path}")
-            return epjson_path
-        else:
-            logger.error(f"epJSON file not created at expected path: {epjson_path}")
-            raise Exception(f"epJSON file not created at expected path: {epjson_path}")
+        shutil.copy(temp_epjson_path, epjson_path)
 
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Conversion failed: {e.stderr}")
-        raise
-    except Exception as e:
-        logger.error(f"Error during conversion: {e}")
-        raise
-    
-
-def add_hvac_meters_to_epjson(epjson_path: str, output_path: str = None) -> None:
+def add_hvac_meters_to_epjson(epjson_path: Path, output_path: Path) -> None:
     """
     Check if HVAC energy consumption meters exist in an epJSON file.
     If not, add the meters and save the modified epJSON.
-    
+
     Args:
         epjson_path: Path to the input epJSON file
         output_path: Path to save the modified epJSON file (if None, will overwrite the input file)
     """
-    # Set default output path if not provided
-    if output_path is None:
-        output_path = epjson_path
-    
+
     # Load the epJSON file
     with open(epjson_path, 'r') as f:
         epjson = json.load(f)
-    
+
     # Check if we already have the necessary meters
     has_elec_hvac_meter = False
     has_gas_hvac_meter = False
-    
+
     # First, check existing Output:Meter objects
     if "Output:Meter" in epjson:
         for meter_key, meter_data in epjson["Output:Meter"].items():
             if meter_data.get("key_name") == "Electricity:HVAC" and meter_data.get("reporting_frequency") == "Timestep":
                 has_elec_hvac_meter = True
                 print("Found existing Electricity:HVAC meter with Timestep reporting.")
-            
+
             if meter_data.get("key_name") == "NaturalGas:HVAC" and meter_data.get("reporting_frequency") == "Timestep":
                 has_gas_hvac_meter = True
                 print("Found existing NaturalGas:HVAC meter with Timestep reporting.")
-    
+
     # Check Output:Meter:MeterFileOnly objects as well
     if "Output:Meter:MeterFileOnly" in epjson:
         for meter_key, meter_data in epjson["Output:Meter:MeterFileOnly"].items():
             if meter_data.get("key_name") == "Electricity:HVAC" and meter_data.get("reporting_frequency") == "Timestep":
                 has_elec_hvac_meter = True
                 print("Found existing Electricity:HVAC meter file only with Timestep reporting.")
-            
+
             if meter_data.get("key_name") == "NaturalGas:HVAC" and meter_data.get("reporting_frequency") == "Timestep":
                 has_gas_hvac_meter = True
                 print("Found existing NaturalGas:HVAC meter file only with Timestep reporting.")
-    
+
     # Add meters if they don't exist
     modified = False
-    
+
     # Make sure the Output:Meter category exists
     if "Output:Meter" not in epjson:
         epjson["Output:Meter"] = {}
-    
+
     # Add electricity HVAC meter if needed
     if not has_elec_hvac_meter:
         new_meter_name = f"Output:Meter:ElectricityHVAC"
@@ -389,7 +238,7 @@ def add_hvac_meters_to_epjson(epjson_path: str, output_path: str = None) -> None
         }
         print(f"Added Electricity:HVAC meter with Timestep reporting.")
         modified = True
-    
+
     # Add natural gas HVAC meter if needed
     if not has_gas_hvac_meter:
         new_meter_name = f"Output:Meter:NaturalGasHVAC"
@@ -399,11 +248,11 @@ def add_hvac_meters_to_epjson(epjson_path: str, output_path: str = None) -> None
         }
         print(f"Added NaturalGas:HVAC meter with Timestep reporting.")
         modified = True
-    
+
     # Save the modified epJSON if changes were made
     if modified:
         with open(output_path, 'w') as f:
-            json.dump(epjson, f, indent=2)
+            json.dump(epjson, f, indent=4)
         print(f"Modified epJSON saved to {output_path}")
     else:
         print("No changes needed. All required meters already exist.")
@@ -463,18 +312,15 @@ def check_meter_availability(epjson_path: str) -> Dict[str, bool]:
 
 
 
-def add_outdoor_air_meters_to_epjson(epjson_path: str, output_path: str = None) -> None:
+def add_outdoor_air_meters_to_epjson(epjson_path: Path, output_path: Path) -> None:
     """
     Check if outdoor air temperature and humidity output variables exist in an epJSON file.
     If not, add them and save the modified epJSON.
     
     Args:
         epjson_path: Path to the input epJSON file
-        output_path: Path to save the modified epJSON file (if None, will overwrite the input file)
+        output_path: Path to save the modified epJSON file
     """
-    # Set default output path if not provided
-    if output_path is None:
-        output_path = epjson_path
     
     # Load the epJSON file
     with open(epjson_path, 'r') as f:
@@ -502,9 +348,6 @@ def add_outdoor_air_meters_to_epjson(epjson_path: str, output_path: str = None) 
                     has_outdoor_vars[outdoor_var] = True
                     print(f"Found existing output variable: {var_name} with Timestep reporting.")
     
-    # Add variables if they don't exist
-    modified = False
-    
     # Make sure the Output:Variable category exists
     if "Output:Variable" not in epjson:
         epjson["Output:Variable"] = {}
@@ -526,15 +369,9 @@ def add_outdoor_air_meters_to_epjson(epjson_path: str, output_path: str = None) 
                 "reporting_frequency": "Timestep"
             }
             print(f"Added output variable: {var_name} with Timestep reporting.")
-            modified = True
-    
-    # Save the modified epJSON if changes were made
-    if modified:
-        with open(output_path, 'w') as f:
-            json.dump(epjson, f, indent=2)
-        print(f"Modified epJSON saved to {output_path}")
-    else:
-        print("No changes needed. All required outdoor air variables already exist.")
+
+    with open(output_path, 'w') as f:
+        json.dump(epjson, f, indent=4)
 
 def check_output_variables_availability(epjson_path: str) -> Dict[str, bool]:
     """
@@ -585,14 +422,14 @@ def check_output_variables_availability(epjson_path: str) -> Dict[str, bool]:
     
     return var_availability
 
-def add_outdoor_air_nodes_if_missing(epjson_path: str, output_path: str = None) -> None:
+def add_outdoor_air_nodes_if_missing(epjson_path: Path, output_path: Path) -> None:
     """
     Check if outdoor air node exists and add it if missing.
     This ensures that outdoor air can be properly monitored.
     
     Args:
         epjson_path: Path to the input epJSON file
-        output_path: Path to save the modified epJSON file (if None, will overwrite the input file)
+        output_path: Path to save the modified epJSON file
     """
     # Set default output path if not provided
     if output_path is None:
@@ -642,7 +479,7 @@ def add_outdoor_air_nodes_if_missing(epjson_path: str, output_path: str = None) 
     # Save the modified epJSON if changes were made
     if modified:
         with open(output_path, 'w') as f:
-            json.dump(epjson, f, indent=2)
+            json.dump(epjson, f, indent=4)
         print(f"Modified epJSON saved to {output_path}")
     else:
         print("No changes needed to outdoor air nodes configuration.")
@@ -712,36 +549,33 @@ def modify_timestep(epjson_path: str, output_path: Optional[str] = None, timeste
     if timestep_modified:
         try:
             with open(output_path, 'w') as f:
-                json.dump(epjson, f, indent=2)
+                json.dump(epjson, f, indent=4)
             print(f"Modified epJSON saved to {output_path}")
         except Exception as e:
             print(f"Error saving modified file: {e}")
     else:
         print("No changes were made to the epJSON file")
-        
-def add_setpoint_control_to_epjson(epjson_path: str, output_path: str = None) -> None:
+
+def add_setpoint_control_to_epjson(epjson_path: Path, output_path: Path):
     """
     Modifies an epJSON file to add controllable temperature setpoint schedules.
-    
+
     Args:
         epjson_path (str): Path to the input epJSON file
         output_path (str, optional): Path to save the modified epJSON. If None, overwrites input file.
     """
-    # Set default output path if not provided
-    if output_path is None:
-        output_path = epjson_path
-        
+
     # Load the epJSON file
     with open(epjson_path, 'r') as f:
         epjson = json.load(f)
-        
+
     # Get thermostat setpoints used in the building
     thermostat_setpoints = get_temperature_setpoints(epjson_path)
-    
+
     # Make sure Schedule:Compact exists in epjson
     if "Schedule:Compact" not in epjson:
         epjson["Schedule:Compact"] = {}
-        
+
     def create_schedule_compact(temperature: float):
         """Helper function to create a schedule compact object in the correct format"""
         return {
@@ -753,33 +587,33 @@ def add_setpoint_control_to_epjson(epjson_path: str, output_path: str = None) ->
             ],
             "schedule_type_limits_name": "Temperature"
         }
-        
+
     # Process each thermostat
     for control_type, setpoint_name in thermostat_setpoints:
         if control_type == "ThermostatSetpoint:DualSetpoint":
             # Get the original schedule names
             dual_setpoint = epjson["ThermostatSetpoint:DualSetpoint"][setpoint_name]
-            
+
             # Create new schedule names
             cooling_schedule_name = f"{setpoint_name} Cooling Setpoint"
             heating_schedule_name = f"{setpoint_name} Heating Setpoint"
-            
+
             # Update the thermostat to use new schedules
             dual_setpoint["cooling_setpoint_temperature_schedule_name"] = cooling_schedule_name
             dual_setpoint["heating_setpoint_temperature_schedule_name"] = heating_schedule_name
-            
+
             # Create cooling setpoint schedule if it doesn't exist
             if cooling_schedule_name not in epjson["Schedule:Compact"]:
                 epjson["Schedule:Compact"][cooling_schedule_name] = create_schedule_compact(25.0)
-            
+
             # Create heating setpoint schedule if it doesn't exist
             if heating_schedule_name not in epjson["Schedule:Compact"]:
                 epjson["Schedule:Compact"][heating_schedule_name] = create_schedule_compact(20.0)
-            
+
         elif control_type == "ThermostatSetpoint:SingleHeating":
             # Create new schedule name
             heating_schedule_name = f"{setpoint_name} Heating Setpoint"
-            
+
             # Update the thermostat to use new schedule
             epjson["ThermostatSetpoint:SingleHeating"][setpoint_name]["setpoint_temperature_schedule_name"] = heating_schedule_name
             
@@ -811,68 +645,91 @@ def add_setpoint_control_to_epjson(epjson_path: str, output_path: str = None) ->
     
     # Save the modified epJSON
     with open(output_path, 'w') as f:
-        json.dump(epjson, f, indent=2)
+        json.dump(epjson, f, indent=4)
 
-def get_temperature_setpoints(epjson_path: str) -> List[tuple]:
-    """
-    Analyzes an epJSON file to identify thermostat setpoints that are used to control zones.
-    
+def get_temperature_setpoints(epjson_path: Path) -> List[tuple]:
+    """Analyzes an epJSON file to identify thermostat setpoints that are used to
+    control zones.
+
     Args:
         epjson_path (str): Path to the epJSON file
-        
+
     Returns:
         List[tuple]: List of tuples containing (thermostat_type, thermostat_name) for thermostats 
                      that are used to control at least one zone
+
     """
     # Convert epJSON to RDF for querying
-    rdf_graph = query_info.rdf_from_json(epjson_path)
-    
+    ont = Ontology.from_json(epjson_path)
+
     # Query to find thermostats that are used in zone controls
     thermostat_query = """# -*- mode: sparql -*-
-    SELECT DISTINCT ?control_type ?setpoint_name
-    WHERE {
-        # Find zone controls and their types
-        ?control a ns:ZoneControl%3AThermostat .
-        ?control ns:control_1_object_type ?control_type .
-        ?control ns:control_1_name ?setpoint_name .
+SELECT DISTINCT ?control_type ?setpoint_name
+WHERE {
+  # Find zone controls and their types
+  ?control a "ZoneControl:Thermostat" .
+  ?control idf:control_1_object_type ?control_type .
+  ?control idf:control_1_name ?setpoint_name .
 
-        # Make sure the control is used by at least one zone
-        ?control ?zone_prop ?zone_name .
-        FILTER(?zone_prop = ns:zone_or_zonelist_name) .
-    }
-    """
-    
+  # Make sure the control is used by at least one zone
+  ?control idf:zone_or_zonelist_name ?zone_name .
+}
+"""
+
     # Execute query and process results
     results = []
-    for row in rdf_graph.query(thermostat_query, initNs={"ns": query_info.ns}):
+    for row in ont.rdf.query(thermostat_query):
         control_type = str(row.control_type)
         setpoint_name = str(row.setpoint_name)
         results.append((control_type, setpoint_name))
-    
+
     return results
 
+def glue_surfaces(epjson_in: Path, epjson_out:Path):
+    """Look at all the surfaces, and glue together those that have the same
+    coordinates."""
 
-def get_zone_lists(epjson_path: str) -> List:
-    """
-    Analyzes an epJSON file to identify zone lists
-    
-    Args:
-        epjson_path (str): Path to the epJSON file
-    """
+    ont = Ontology.from_json(epjson_in)
 
-    with open(epjson_path, 'r') as f:
-        epjson = json.load(f)
 
-    data = epjson["ZoneList"]
-    zone_names = []
-    # Iterate through each space type in the dictionary
-    for space_type, space_info in data.items():
-        # Check if 'zones' key exists in the current space type
-        if 'zones' in space_info:
-            # Extract zone names from each zone dictionary
-            for zone in space_info['zones']:
-                if 'zone_name' in zone:
-                    zone_names.append(zone['zone_name'])
-    
-    return zone_names  
+    with open(epjson_in, "rb") as f:
+        json_obj = json.load(f)
+
+    surfaces = json_obj["BuildingSurface:Detailed"]
+
+    mapping = ont.pointset_to_surfaceset()
+
+    for surfaceset in mapping.values():
+        if len(surfaceset) == 1:
+            continue
+        if len(surfaceset) != 2:
+            raise Exception(f"wrong number of overlapping surfaces: {surfaceset}")
+
+        surface_list = list(surfaceset)
+
+        left_name = surface_list[0].toPython()
+        right_name = surface_list[1].toPython()
+
+        left = surfaces[left_name]
+        right = surfaces[right_name]
+
+        print(left_name, right_name)
+
+
+        # Step 1: set outside_boundary_condition
+        #         "outside_boundary_condition": "Surface",
+        # "outside_boundary_condition_object": "ceiling_unit1_BackRow_BottomFloor",
+
+        left["outside_boundary_condition"] = "Surface"
+        right["outside_boundary_condition"] = "Surface"
+
+        # Step 2: attach the correct surface
+
+        left["outside_boundary_condition_object"] = right_name
+        right["outside_boundary_condition_object"] = left_name
+
+        with open(epjson_out, "w") as f:
+            json.dump(json_obj, f, indent=4)
+
+
 

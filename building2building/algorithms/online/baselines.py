@@ -4,20 +4,23 @@ import json
 import os
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from building2building.simulator.utils import TrajectoryLogger
 from building2building.utils.results_parsing import parse_trajectories
 from building2building.simulator.wrappers import CustomRescaleAction, NormalizeObservation
 
 # Make sure to import your environment to register it
 import building2building.simulator
+import logging
+
+logger = logging.getLogger(__name__)
 
 def constant_policy(
     obs: np.ndarray,
     heating_setpoint: float = 21.0,
     cooling_setpoint: float = 24.0,
     normalize: bool = False,
-    action_space: Optional[gym.spaces.Box] = None
+    action_space: gym.spaces.Box|None = None
 ) -> np.ndarray:
     # The first value is the heating setpoint
     # The second value is the offset from the heating setpoint to the cooling setpoint
@@ -108,7 +111,7 @@ def run_constant_baseline(
     episode_reward = 0.0
     rewards = []
     timesteps = 0
-    
+
     # Run the simulation
     obs, _ = env.reset(seed=seed)
     done = False
@@ -121,7 +124,7 @@ def run_constant_baseline(
     while not (done or truncated):
         # Get action from constant policy
         action = constant_policy(obs, heating_setpoint, cooling_setpoint, normalize=True, action_space=action_space)
-        
+
         # Take step in environment
         obs, reward, done, truncated, info = env.step(action)
         
@@ -154,10 +157,10 @@ def run_constant_baseline(
         episode_reward += float(reward)
         rewards.append(float(reward))
         timesteps += 1
-        
+
         if timesteps % 24 == 0:  # Log every 24 timesteps (daily)
             logger.debug(f"Day {timesteps//24}: Reward = {sum(rewards[-24:]):.2f}")
-    
+
     # Calculate metrics
     results = {
         "total_reward": float(episode_reward),
@@ -169,26 +172,26 @@ def run_constant_baseline(
         "heating_setpoint": heating_setpoint,
         "cooling_setpoint": cooling_setpoint
     }
-    
+
     # Save results
     results_path = Path(results_dir) / "baseline_results.json"
     with open(results_path, "w") as f:
         json.dump(results, f, indent=4)
-    
+
     # Save the trajectories
     trajectory_logger.save()
-    
+
     # Log final results
     logger.info("Constant baseline evaluation completed")
     logger.info(f"Total reward: {results['total_reward']:.2f}")
     logger.info(f"Mean reward per step: {results['mean_reward']:.2f}")
-    
+
     env.close()
 
     # Parse the trajectories
     parse_trajectories(trajectory_logger.trajectories_path)
     logger.info("Results parsed")
-    
+
     return results
 
 

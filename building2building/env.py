@@ -11,9 +11,9 @@ from pathlib import Path
 import json
 import logging
 import contextlib
-import importlib
+from importlib.util import find_spec
 from contextvars import ContextVar
-from typing import *
+from typing import reveal_type, TypeVar
 
 ENERGYPLUS_PATH: ContextVar[Path] = ContextVar("ENERGYPLUS_PATH")
 
@@ -30,12 +30,15 @@ def ctxvar_set(var: ContextVar[T], val: T):
 logger = logging.getLogger(__name__)
 
 # Get the project root directory
-PROJECT_ROOT = os.path.dirname(importlib.util.find_spec("building2building").origin)
-# os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+spec = find_spec("building2building")
+if spec is None or spec.origin is None:
+    raise Exception("building2building can't find itself. Maybe it hasen't been installed properly.")
+
+PROJECT_ROOT: Path = Path(spec.origin).parent
 
 # Configuration file path in the configs directory
-CONFIG_DIR = os.path.join(PROJECT_ROOT, "configs")
-CONFIG_FILE = os.path.join(CONFIG_DIR, "energyplus_simulator.json")
+CONFIG_DIR = PROJECT_ROOT / "configs"
+CONFIG_FILE = CONFIG_DIR / "energyplus_simulator.json"
 
 def get_default_energyplus_paths():
     """
@@ -76,12 +79,12 @@ def find_energyplus_path(manual_path: Path|None = None) -> Path:
 
     # Check configuration file
     config = load_config()
-    if config and 'energyplus_path' in config and os.path.exists(config['energyplus_path']):
+    if config and 'energyplus_path' in config and Path(config['energyplus_path']).exists():
         config_path = config['energyplus_path']
         return Path(config_path)
 
     # Check environment variable
-    if 'ENERGYPLUS_PATH' in os.environ and os.path.exists(os.environ['ENERGYPLUS_PATH']):
+    if 'ENERGYPLUS_PATH' in os.environ and Path(os.environ['ENERGYPLUS_PATH']).exists():
         return Path(os.environ['ENERGYPLUS_PATH'])
 
     # Check default paths
@@ -99,17 +102,17 @@ def find_energyplus_path(manual_path: Path|None = None) -> Path:
 def save_config(config_data):
     """
     Save configuration to the config file.
-    
+
     Args:
         config_data (dict): Configuration data to save
-        
+
     Returns:
         bool: True if successful, False otherwise
     """
     try:
         # Ensure the configs directory exists
         os.makedirs(CONFIG_DIR, exist_ok=True)
-        
+
         with open(CONFIG_FILE, 'w') as f:
             json.dump(config_data, f, indent=4)
         logger.info(f"EnergyPlus configuration saved to {CONFIG_FILE}")
@@ -118,7 +121,7 @@ def save_config(config_data):
         logger.error(f"Failed to save EnergyPlus configuration: {e}")
         return False
 
-def load_config() -> Dict | None:
+def load_config() -> dict | None:
     """
     Load configuration from the config file.
 
