@@ -112,8 +112,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
     if cfg.get('track', False):
         import wandb
         wandb.init(
-            project=cfg.wandb.project,
-            entity=cfg.wandb.entity,
+            project=cfg.project,
+            entity=cfg.entity,
             sync_tensorboard=True,
             config=dict(cfg),
             name=run_name,
@@ -143,8 +143,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
             path_to_building=building_path,
             path_to_weather=weather_path,
             building_characteristics=building_characteristics,
-            reward_type=cfg.env.reward_type,
-            energy_weight=cfg.env.energy_weight,
+            reward_type=cfg.reward_type,
+            energy_weight=cfg.energy_weight,
             gamma=cfg.ppo.gamma,
             eplus_output_dir=eplus_outputs_dir
         ) for _ in range(cfg.ppo.num_envs)
@@ -228,8 +228,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
                     model_path=temp_model_path,
                     make_env=make_env,
                     env_id="EnergyPlus-v0",
-                    reward_type=cfg.env.reward_type,
-                    energy_weight=cfg.env.energy_weight,
+                    reward_type=cfg.reward_type,
+                    energy_weight=cfg.energy_weight,
                     path_to_building=building_path,
                     path_to_weather=validation_weather,
                     building_characteristics=building_characteristics,
@@ -357,8 +357,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
         episodic_returns = ppo_evaluate(
             model_path=model_path,
             make_env=make_env,
-            reward_type=cfg.env.reward_type,
-            energy_weight=cfg.env.energy_weight,
+            reward_type=cfg.reward_type,
+            energy_weight=cfg.energy_weight,
             env_id="EnergyPlus-v0",
             path_to_building=building_path,
             path_to_weather=validation_weather,

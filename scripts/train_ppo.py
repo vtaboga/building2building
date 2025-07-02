@@ -15,13 +15,9 @@ from building2building.algorithms.online.ppo import main
 import building2building.simulator
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../configs", config_name="ppo_training")
 def main_hydra(cfg: DictConfig) -> None:
     """Main function for PPO training with Hydra configuration."""
-    
-    # Ensure we're using the PPO training experiment
-    if cfg.name != "ppo_training":
-        raise ValueError(f"This script expects ppo_training experiment, got {cfg.name}")
     
     # Get Hydra's output directory and setup logging
     output_dir = Path(HydraConfig.get().runtime.output_dir)
@@ -40,19 +36,19 @@ def main_hydra(cfg: DictConfig) -> None:
         # Convert config to proper dict for wandb
         config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
         wandb_run = wandb.init(
-            entity=cfg.wandb.entity,
-            project=cfg.wandb.project,
+            entity=cfg.entity,
+            project=cfg.project,
             config=cast(Dict[str, Any], config_dict) if isinstance(config_dict, dict) else {},
             name=cfg.get('name', 'ppo_training'),
-            tags=cfg.wandb.get('tags', [])
+            tags=cfg.get('tags', [])
         )
         logger.info(f"W&B initialized: {wandb_run.url}")
     
     # Load building characteristics and set up paths
-    building_path = f"data/processed_buildings/{cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}.epJSON"
-    weather_path = f"data/weather/{cfg.building.weather}"
-    weather_validation_path = f"data/weather/{cfg.building.weather_validation}" if cfg.building.get('weather_validation') else None
-    characteristics_path = f"data/processed_buildings/{cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}.json"
+    building_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.epJSON"
+    weather_path = f"data/weather/{cfg.weather}"
+    weather_validation_path = f"data/weather/{cfg.weather_validation}" if cfg.get('weather_validation') else None
+    characteristics_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.json"
     
     try:
         with open(characteristics_path, 'r') as f:

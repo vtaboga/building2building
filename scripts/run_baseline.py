@@ -22,7 +22,7 @@ def main(cfg: DictConfig) -> None:
     # Setup paths
     building_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.epJSON"
     characteristics_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.json"
-    weather_path = f"data/weather/{cfg.weather}"
+    weather_path = f"data/weather/{cfg.weather_validation}"  # No training, apply policy to validation weather
     
     try:
         with open(characteristics_path, 'r') as f:
