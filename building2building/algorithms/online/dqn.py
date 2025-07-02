@@ -127,8 +127,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
     if cfg.get('track', False):
         import wandb
         wandb.init(
-            project=cfg.wandb.project,
-            entity=cfg.wandb.entity,
+            project=cfg.get('project', 'building2building'),
+            entity=cfg.get('entity'),
             sync_tensorboard=True,
             config=dict(cfg),
             name=run_name,
@@ -159,8 +159,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
             path_to_building=building_path,
             path_to_weather=weather_path,
             building_characteristics=building_characteristics,
-            reward_type=cfg.env.reward_type,
-            energy_weight=cfg.env.energy_weight,
+            reward_type=cfg.reward_type,
+            energy_weight=cfg.energy_weight,
             gamma=cfg.dqn.gamma
         ) for _ in range(cfg.dqn.num_envs)
     ])
@@ -309,8 +309,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
                 model_path=temp_model_path,
                 make_env=make_env,
                 env_id="EnergyPlus-v0",
-                reward_type=cfg.env.reward_type,
-                energy_weight=cfg.env.energy_weight,
+                reward_type=cfg.reward_type,
+                energy_weight=cfg.energy_weight,
                 path_to_building=building_path,
                 path_to_weather=validation_weather,
                 building_characteristics=building_characteristics,
@@ -342,24 +342,24 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
         # Use validation weather if provided, else training weather
         validation_weather = weather_validation_path if weather_validation_path else weather_path
 
-        # Run final evaluation with trajectory saving
-        episodic_returns = dqn_evaluate(
+        # Final evaluation with validation weather
+        final_eval_returns = dqn_evaluate(
             model_path=model_path,
             make_env=make_env,
-            reward_type=cfg.env.reward_type,
-            energy_weight=cfg.env.energy_weight,
-            env_id="EnergyPlus-v0",
+            env_id="EnergyPlus-v0", 
+            reward_type=cfg.reward_type,
+            energy_weight=cfg.energy_weight,
             path_to_building=building_path,
             path_to_weather=validation_weather,
             building_characteristics=building_characteristics,
             eval_episodes=1,
-            run_name=f"{run_name}-eval",
+            run_name=f"{run_name}-final-validation",
             device=device,
             gamma=cfg.dqn.gamma,
             save_trajectories=True,
             bins_per_dimension=bins_per_dimension
         )
-        for idx, episodic_return in enumerate(episodic_returns):
+        for idx, episodic_return in enumerate(final_eval_returns):
             writer.add_scalar("eval/episodic_return", episodic_return, idx)
 
     envs.close()

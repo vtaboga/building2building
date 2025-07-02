@@ -1,0 +1,24 @@
+# DQN training configuration with composition and seed sweep
+defaults:
+  - environment: vt_small_office
+  - wandb: default
+  - policies: dqn
+  - _self_
+
+# Seed parameter (will be swept over)
+seed: 1
+
+# W&B tracking
+track: true
+
+# Hydra configuration for organized output directories
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      seed: 1,2,3,4,5
+  run:
+    dir: results/dqn_training_${building_id}_${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: results/dqn_training_multirun_${now:%Y-%m-%d_%H-%M-%S}
+    subdir: seed_${seed} 

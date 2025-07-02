@@ -1,16 +1,6 @@
 # @package _global_
-name: dqn_training
-track: true
-
-# Building configuration for training
-building:
-  state: "AL"
-  county: "Pike"
-  building_id: "6014003402037"
-  weather: "USA_AL_Mobile.Rgnl.AP-Bates.Field.722230_US.Normals.2006-2020.epw"
-  weather_validation: "USA_AL_Fairhope-Callahan.AP.720592_TMYx.epw"
-
 # DQN Training configuration
+
 training:
   total_timesteps: 1000000
   save_model: true
