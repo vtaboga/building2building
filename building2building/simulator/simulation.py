@@ -3,10 +3,11 @@ import threading
 import building2building.simulator.template as template
 import collections
 from dataclasses import dataclass, field
-import typing
+from typing import *
 import queue
 import pathlib
 import traceback
+from ctypes import c_void_p
 
 api = pyenergyplus.api.EnergyPlusAPI()
 
@@ -17,7 +18,7 @@ class SimulationCrashed(Exception):
 
 @dataclass(frozen=True, slots=True)
 class _StepResult:
-    observation: typing.Any
+    observation: Any
     finished: bool
 
 
@@ -32,7 +33,7 @@ class _ExceptionResult:
     exn: Exception
 
 
-_Result = typing.Union[_StepResult, _DoneResult, _ExceptionResult]
+_Result = Union[_StepResult, _DoneResult, _ExceptionResult]
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,13 +83,13 @@ class InvalidMeter(Exception):
 
 @dataclass(frozen=True, slots=True)
 class FunctionHole:
-    function: typing.Callable[[int], typing.Any]
+    function: Callable[[int], Any]
 
 
-T = typing.TypeVar("T")
+T = TypeVar("T")
 
 
-class Channel(typing.Generic[T]):
+class Channel(Generic[T]):
     """Since we are running the Energyplus simulation in a different thread, we
     need a mechanism for the user thread (the one in which the user might
     presumably run their policy and the .step function) to exchange actuator
@@ -140,12 +141,12 @@ class EnergyPlusSimulation:
     weather_path: str
 
     """A PyTree containing `Variable` and `Meter` leaves."""
-    observation_template: typing.Any
+    observation_template: Any
 
-    actuators: typing.Dict[str, ActuatorHole]
+    actuators: Dict[str, ActuatorHole]
 
     """ A PyTree of the same shape, but containing the associated handles."""
-    observation_template_with_handles: typing.Any = None
+    observation_template_with_handles: Any = None
 
     number_of_warmup_phases_completed: int = 0
 
@@ -160,12 +161,12 @@ class EnergyPlusSimulation:
     """The directory in which energyplus will write its log files."""
     _log_dir: str = "results/eplus_output"
 
-    actuator_control_handles: typing.Dict[str, int] = field(default_factory=dict)
+    actuator_control_handles: Dict[str, int] = field(default_factory=dict)
 
     obs_chan: Channel = field(default_factory=Channel)
     act_chan: Channel = field(default_factory=Channel)
 
-    state: typing.Union[None, int] = field(default=None, init=False)
+    state: Union[None, c_void_p] = field(default=None, init=False)
 
     def callback_timestep(self, state: int) -> None:
         try:
@@ -239,7 +240,7 @@ class EnergyPlusSimulation:
             tb_exc = traceback.TracebackException.from_exception(e)
             self.obs_chan.put(_ExceptionResult(tb_exc, e))
 
-    def construct_handles(self, state: int) -> None:
+    def construct_handles(self, state: c_void_p) -> None:
         """
         Prepare the simulation by:
         1. Converting observation template entries to their respective handles
@@ -320,7 +321,7 @@ class EnergyPlusSimulation:
                 raise InvalidActuator(actuator_spec)
             self.actuator_control_handles[actuator_name] = handle
 
-    def start(self) -> typing.Tuple[typing.Any, bool]:
+    def start(self) -> Tuple[Any, bool]:
         state = api.state_manager.new_state()
         self.state = state
 
@@ -328,6 +329,14 @@ class EnergyPlusSimulation:
             """Thread running the energyplus simulation."""
             exit_code = None
             try:
+                args = [
+                    "-d",
+                    self.log_dir,
+                    "-w",
+                    self.weather_path,
+                    self.building_path,
+                ]
+                print(f"args: {args}")
                 exit_code = api.runtime.run_energyplus(
                     state,
                     [
@@ -380,13 +389,13 @@ class EnergyPlusSimulation:
 
         return self._get_obs_and_filter()
 
-    def _filter(self, result: _Result) -> typing.Tuple[typing.Any, bool]:
+    def _filter(self, result: _Result) -> Tuple[Any, bool]:
         if isinstance(result, _StepResult):
             return (result.observation, result.finished)
         elif isinstance(result, _DoneResult):
             if result.exit_code != 0:
                 raise SimulationCrashed(
-                    "energyplus exited with an error. See the eplusout.err file"
+                    f"energyplus exited with code {result.exit_code}. See eplusout.err at {self.log_dir}"
                 )
             else:
                 return ({}, True)
@@ -397,19 +406,19 @@ class EnergyPlusSimulation:
                 "this channel should receive only a `StepResult` or a `DoneResult`."
             )
 
-    def _get_obs_and_filter(self) -> typing.Tuple[typing.Any, bool]:
+    def _get_obs_and_filter(self) -> Tuple[Any, bool]:
         return self._filter(self.obs_chan.get())
 
-    def step(self, action: typing.Dict[str, float]) -> typing.Tuple[typing.Any, bool]:
+    def step(self, action: Dict[str, float]) -> Tuple[Any, bool]:
         self.act_chan.put(action)
         return self._get_obs_and_filter()
 
     def get_api_endpoints(
         self,
-    ) -> typing.List[typing.Union[ActuatorHole, VariableHole, MeterHole]]:
+    ) -> List[Union[ActuatorHole, VariableHole, MeterHole]]:
         exchange_points = api.exchange.get_api_data(self.state)
 
-        out: typing.List[typing.Union[ActuatorHole, VariableHole, MeterHole]] = []
+        out: List[Union[ActuatorHole, VariableHole, MeterHole]] = []
         for v in exchange_points:
             if v.what == "Actuator":
                 out.append(ActuatorHole(v.name, v.type, v.key))

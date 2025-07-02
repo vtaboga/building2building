@@ -1,5 +1,7 @@
 import gymnasium as gym
-import typing
+from typing import *
+
+from pathlib import Path
 
 from building2building.env import setup_energyplus_path
 from building2building.simulator.simulation import EnergyPlusSimulation, ActuatorHole
@@ -10,10 +12,12 @@ from building2building.simulator.observation_spaces import observation_transform
 from building2building.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints_rdf
 from typing import Optional
 
-def create_simulator(path_to_building: str, path_to_weather: str, building_characteristics: dict, reward_type: str, energy_weight: float = 1.0, eplus_output_dir: Optional[str] = None) -> gym.Env:
+
+def create_simulator(path_to_building: Path, path_to_weather: Path, building_characteristics: dict, reward_type: str, energy_weight: float = 1.0, eplus_output_dir: Optional[str] = None) -> gym.Env:
+
     """
     Create a simulator for a given building and weather file.
-    
+
     Args:
         path_to_building: Path to the building file (epJSON)
         path_to_weather: Path to the weather file (epw)
@@ -21,7 +25,7 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
         reward_type: Type of reward function to use
         energy_weight: Energy weight for reward calculation
         eplus_output_dir: Optional directory for EnergyPlus outputs
-    
+
     Returns:
         gym.Env: EnergyPlus environment
     """
@@ -50,8 +54,8 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
 
     def make_energyplus() -> EnergyPlusSimulation:
         sim = EnergyPlusSimulation(
-            path_to_building,
-            path_to_weather,
+            str(path_to_building),
+            str(path_to_weather),
             obs_template,
             actuators,
             verbose=False
@@ -70,7 +74,7 @@ def create_simulator(path_to_building: str, path_to_weather: str, building_chara
             raise ValueError(f"Invalid reward type: {reward_type}")
     
 
-    gymenv = EnergyPlusEnvironment[typing.Any, typing.Any](
+    gymenv = EnergyPlusEnvironment[Any, Any](
         make_energyplus,
         reward_function, 
         observation_space,

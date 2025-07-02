@@ -1,9 +1,9 @@
 import numpy as np
-import typing
+from typing import *
 import gymnasium as gym
 
 
-def extract_ordered_observations(obs):
+def extract_ordered_observations(obs) -> Tuple[List[str], List[float]]:
     """Extract specific values from the raw observation dictionary in a consistent order.
     
     The returned list contains in order:
@@ -45,11 +45,12 @@ def extract_ordered_observations(obs):
     return names, values
 
 
-def observation_transform(obs, floor_area: float = None):
+def observation_transform(obs, floor_area: float|None = None) -> np.ndarray:
     """Transform raw observations into a numpy array by extracting and ordering
     relevant values.
     If floor_area is provided, divide the HVAC energy consumption by the floor area and convert to Wh.
     """
+
     names, values = extract_ordered_observations(obs)
     values = np.array(values)
     
@@ -65,7 +66,7 @@ def observation_transform(obs, floor_area: float = None):
     return values
 
 
-def create_observation_space(obs_template: typing.Dict[str, typing.Any]) -> gym.spaces.Box:
+def create_observation_space(obs_template: Dict[str, Any]) -> Tuple[gym.spaces.Box, Any]:
     """Create the observation space with appropriate bounds for each variable type.
     
     The observation space contains in order:
@@ -123,6 +124,6 @@ def create_observation_space(obs_template: typing.Dict[str, typing.Any]) -> gym.
     # HVAC bounds
     low_bounds[idx:] = 0.0  # Wh/ft2
     high_bounds[idx:] = 40.0  # Wh/ft2
-    
+
     return gym.spaces.Box(low_bounds, high_bounds), names
 

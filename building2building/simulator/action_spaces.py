@@ -11,7 +11,6 @@ from building2building.simulator.query_info import ns
 logger = logging.getLogger(__name__)
 
 
-
 def action_transform(act, actuators):
     """Transform raw actions into heating and cooling setpoints.
     

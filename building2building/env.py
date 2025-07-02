@@ -12,15 +12,15 @@ import json
 import logging
 import contextlib
 import importlib
-import contextvars
-import typing
+from contextvars import ContextVar
+from typing import *
 
-ENERGYPLUS_PATH = contextvars.ContextVar("ENERGYPLUS_PATH")
+ENERGYPLUS_PATH: ContextVar[Path] = ContextVar("ENERGYPLUS_PATH")
 
-T = typing.TypeVar("T")
+T = TypeVar("T")
 
 @contextlib.contextmanager
-def ctxvar_set(var: contextvars.ContextVar[T], val: T):
+def ctxvar_set(var: ContextVar[T], val: T):
     try:
         token = var.set(val)
         yield token
@@ -56,44 +56,45 @@ def get_default_energyplus_paths():
         ]
     return []
 
-def find_energyplus_path(manual_path=None):
+def find_energyplus_path(manual_path: Path|None = None) -> Path:
     """
     Find the EnergyPlus installation path by checking:
     1. Manually specified path
     2. Configuration file
     3. Environment variable
     4. Default system paths
-    
+
     Args:
         manual_path (str, optional): Manually specified path to EnergyPlus
-        
+
     Returns:
         str: Path to EnergyPlus installation or None if not found
     """
     # Check manually specified path first
-    if manual_path and os.path.exists(manual_path):
+    if manual_path and manual_path.exists():
         return manual_path
-        
+
     # Check configuration file
     config = load_config()
     if config and 'energyplus_path' in config and os.path.exists(config['energyplus_path']):
-        return config['energyplus_path']
-    
+        config_path = config['energyplus_path']
+        return Path(config_path)
+
     # Check environment variable
     if 'ENERGYPLUS_PATH' in os.environ and os.path.exists(os.environ['ENERGYPLUS_PATH']):
-        return os.environ['ENERGYPLUS_PATH']
-    
+        return Path(os.environ['ENERGYPLUS_PATH'])
+
     # Check default paths
     for path in get_default_energyplus_paths():
         if os.path.exists(path):
             return path
-            
+
     # Add home directory path as a fallback
-    home_path = str(Path.home() / 'EnergyPlus-24-1-0')
-    if os.path.exists(home_path):
+    home_path = Path.home() / 'EnergyPlus-24-1-0'
+    if home_path.exists():
         return home_path
-            
-    return None
+
+    raise Exception("couldn't find energyplus path")
 
 def save_config(config_data):
     """
@@ -117,24 +118,29 @@ def save_config(config_data):
         logger.error(f"Failed to save EnergyPlus configuration: {e}")
         return False
 
-def load_config():
+def load_config() -> Dict | None:
     """
     Load configuration from the config file.
-    
+
     Returns:
         dict: Configuration data or empty dict if file doesn't exist
     """
     if not os.path.exists(CONFIG_FILE):
         return {}
-        
+
     try:
         with open(CONFIG_FILE, 'r') as f:
-            return json.load(f)
+            o = json.load(f)
+            if not isinstance(o, dict):
+                e = f"Failed to load EnergyPlus configuration: {CONFIG_FILE} is not a dict"
+                logger.error(e)
+                raise Exception(e)
     except Exception as e:
         logger.error(f"Failed to load EnergyPlus configuration: {e}")
-        return {}
+        return None
 
-def update_energyplus_path(path):
+
+def update_energyplus_path(path: Path):
     """
     Update the EnergyPlus path in the configuration file.
     
@@ -148,7 +154,7 @@ def update_energyplus_path(path):
         return False
         
     config = load_config()
-    config['energyplus_path'] = path
+    config['energyplus_path'] = str(path)
     return save_config(config)
 
 def setup_energyplus_path(manual_path=None):
@@ -166,17 +172,17 @@ def setup_energyplus_path(manual_path=None):
     if ENERGYPLUS_PATH.get(None) is not None:
         return
 
-    maybe_energyplus_path = find_energyplus_path(manual_path)
+    try:
+        energyplus_path = find_energyplus_path(manual_path)
+        if energyplus_path not in sys.path:
+            ENERGYPLUS_PATH.set(energyplus_path)
+            sys.path.append(str(energyplus_path))
+            logger.info(f"Added EnergyPlus path: {energyplus_path}")
 
-    if maybe_energyplus_path:
-        if maybe_energyplus_path not in sys.path:
-            ENERGYPLUS_PATH.set(maybe_energyplus_path)
-
-            sys.path.append(maybe_energyplus_path)
-            logger.info(f"Added EnergyPlus path: {maybe_energyplus_path}")
-    else:
+    except Exception as e:
         logger.warning(
             "EnergyPlus installation not found. If you're not running in a container, "
             "please set the path using setup.sh --energyplus_path=<path>"
         )
-        return None 
+        return None
+
