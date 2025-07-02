@@ -6,7 +6,7 @@ from building2building.generator.downloader import download_and_extract_county_i
 import building2building.generator.processing as processing
 from typing import Tuple, TypeAlias, Callable
 from pathlib import Path
-from building2building.ontology import Ontology
+from minergym.ontology import Ontology
 import json
 import hashlib
 import tempfile

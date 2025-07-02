@@ -2,12 +2,9 @@ import numpy as np
 import gymnasium as gym
 import logging
 import urllib.parse
-import rdflib
-from rdflib import namespace
 from rdflib.term import Node
-from building2building.core.logging import setup_logger
 from typing import reveal_type, Dict, List
-import building2building.ontology as ontology
+import minergym.ontology as ontology
 
 
 logger = logging.getLogger(__name__)
