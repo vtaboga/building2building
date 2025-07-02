@@ -5,8 +5,12 @@ set -e
 
 echo "🚀 Starting setup process..."
 
+# Store the repository root directory
+REPO_ROOT="$PWD"
+
 # Parse command line arguments
 ENERGYPLUS_PATH=""
+SKIP_CONTAINER=false
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
@@ -14,9 +18,13 @@ while [[ $# -gt 0 ]]; do
         ENERGYPLUS_PATH="${key#*=}"
         shift
         ;;
+        --skip-container)
+        SKIP_CONTAINER=true
+        shift
+        ;;
         *)
         echo "Unknown option: $key"
-        echo "Usage: ./setup.sh [--energyplus_path=/path/to/energyplus]"
+        echo "Usage: ./setup.sh [--energyplus_path=/path/to/energyplus] [--skip-container]"
         exit 1
         ;;
     esac
@@ -34,9 +42,12 @@ if ! (command -v pip &> /dev/null || command -v pip3 &> /dev/null); then
     exit 1
 fi
 
-# Check if Singularity/Apptainer is installed
+# Check if Singularity/Apptainer is installed (only if not skipping containers)
 CONTAINER_AVAILABLE=true
-if ! (command -v singularity &> /dev/null || command -v apptainer &> /dev/null); then
+if [ "$SKIP_CONTAINER" = true ]; then
+    echo "⏭️ Skipping container setup as requested."
+    CONTAINER_AVAILABLE=false
+elif ! (command -v singularity &> /dev/null || command -v apptainer &> /dev/null); then
     echo "⚠️ Neither Singularity nor Apptainer is installed. Will skip container-related steps."
     CONTAINER_AVAILABLE=false
 fi
@@ -130,7 +141,7 @@ pip install -r requirements.txt
 echo "📦 Installing package in development mode..."
 pip install -e .
 
-# Only build containers if Singularity/Apptainer is available
+# Only build containers if not skipped and Singularity/Apptainer is available
 if [ "$CONTAINER_AVAILABLE" = true ]; then
     echo "🏗️ Building Singularity containers..."
     mkdir -p container
@@ -185,4 +196,4 @@ else
     fi
 fi
 
-echo "✅ Setup completed successfully!" 
+echo "✅ Setup completed successfully!"

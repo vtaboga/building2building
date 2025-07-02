@@ -1,0 +1,5 @@
+# IQL specific parameters
+iql:
+  beta: 3.0
+  iql_tau: 0.7
+  max_target_backup: false

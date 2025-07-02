@@ -10,9 +10,11 @@ from building2building.simulator.rewards import base_reward_function, barrier_re
 from building2building.simulator import query_info, config
 from building2building.simulator.observation_spaces import observation_transform, create_observation_space
 from building2building.simulator.action_spaces import action_transform, create_action_space, get_controllable_setpoints_rdf
-from building2building.core.run_manager import RunManager
+from typing import Optional
 
-def create_simulator(path_to_building: Path, path_to_weather: Path, building_characteristics: dict, reward_type: str, energy_weight: float = 1.0, run_manager: RunManager|None = None) -> gym.Env:
+
+def create_simulator(path_to_building: Path, path_to_weather: Path, building_characteristics: dict, reward_type: str, energy_weight: float = 1.0, eplus_output_dir: Optional[str] = None) -> gym.Env:
+
     """
     Create a simulator for a given building and weather file.
 
@@ -21,7 +23,8 @@ def create_simulator(path_to_building: Path, path_to_weather: Path, building_cha
         path_to_weather: Path to the weather file (epw)
         building_characteristics: Dictionary with building characteristics
         reward_type: Type of reward function to use
-        run_manager: Optional RunManager to handle logging and output directories
+        energy_weight: Energy weight for reward calculation
+        eplus_output_dir: Optional directory for EnergyPlus outputs
 
     Returns:
         gym.Env: EnergyPlus environment
@@ -50,15 +53,17 @@ def create_simulator(path_to_building: Path, path_to_weather: Path, building_cha
     action_space = create_action_space(actuators)
 
     def make_energyplus() -> EnergyPlusSimulation:
-        return EnergyPlusSimulation(
+        sim = EnergyPlusSimulation(
             str(path_to_building),
             str(path_to_weather),
             obs_template,
             actuators,
-            run_manager=run_manager,
             verbose=False
         )
-
+        # Set the log directory if provided
+        if eplus_output_dir:
+            sim.log_dir = eplus_output_dir
+        return sim
 
     def reward_function(obs):
         if reward_type == "barrier":

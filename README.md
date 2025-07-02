@@ -1,6 +1,9 @@
-# Building2Building
+<div align="center">
+  <h1>Building2Building</h1>
+  <img src="images/building2building.png" alt="Building2Building" width="50%">
+  <p><strong>Benchmarking transfer learning in Reinforcement Learning on millions of buildings.</strong></p>
+</div>
 
-Benchmarking transfer learning in Reinforcement Learning on millions of buildings.
 
 ## Prerequisites
 
@@ -144,4 +147,8 @@ This project follows a structured branching strategy to maintain code quality:
 ## Minergym
 
 The gym wrapper of energyplus is based on the minergym repository https://github.com/Terramorpha/minergym
+
+## OfflineRL-Kit
+
+The implementation of the off line RL algorithms is taken from https://github.com/yihaosun1124/OfflineRL-Kit/tree/main
 

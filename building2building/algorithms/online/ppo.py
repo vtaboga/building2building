@@ -2,14 +2,12 @@
 import os
 import random
 import time
-from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Optional
 import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import tyro
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 import logging
@@ -19,93 +17,8 @@ from building2building.simulator.wrappers import NormalizeObservation, CustomRes
 # Set default tensor type to float64 for better precision
 torch.set_default_dtype(torch.float64)
 
-@dataclass
-class Args:
-    exp_name: str = os.path.basename(__file__)[: -len(".py")]
-    """the name of this experiment"""
-    seed: int = 1
-    """seed of the experiment"""
-    torch_deterministic: bool = True
-    """if toggled, `torch.backends.cudnn.deterministic=False`"""
-    cuda: bool = True
-    """if toggled, cuda will be enabled by default"""
-    track: bool = False
-    """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "cleanRL"
-    """the wandb's project name"""
-    wandb_entity: str = None
-    """the entity (team) of wandb's project"""
-    save_model: bool = False
-    """whether to save model into the `runs/{run_name}` folder"""
-    upload_model: bool = False
-    """whether to upload the saved model to huggingface"""
-    hf_entity: str = ""
-    """the user or org name of the model repository from the Hugging Face Hub"""
-    results_dir: str = "results"
-    """the base directory for storing all results"""
 
-    # Algorithm specific arguments
-    env_id: str = "EnergyPlus-v0"
-    """the id of the environment"""
-    total_timesteps: int = 10000000
-    """total timesteps of the experiments"""
-    learning_rate: float = 3e-4
-    """the learning rate of the optimizer"""
-    reward_type: str = "base"
-    """the type of reward function to use"""
-    energy_weight: float = 1.0
-    """the weight of the energy consumption penalty"""
-    num_envs: int = 1
-    """the number of parallel game environments"""
-    num_steps: int = 96
-    """the number of steps to run in each environment per policy rollout"""
-    anneal_lr: bool = True
-    """Toggle learning rate annealing for policy and value networks"""
-    gamma: float = 0.99
-    """the discount factor gamma"""
-    gae_lambda: float = 0.95
-    """the lambda for the general advantage estimation"""
-    num_minibatches: int = 32
-    """the number of mini-batches"""
-    update_epochs: int = 10
-    """the K epochs to update the policy"""
-    norm_adv: bool = True
-    """Toggles advantages normalization"""
-    clip_coef: float = 0.2
-    """the surrogate clipping coefficient"""
-    clip_vloss: bool = True
-    """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.0
-    """coefficient of the entropy"""
-    vf_coef: float = 0.5
-    """coefficient of the value function"""
-    max_grad_norm: float = 0.5
-    """the maximum norm for the gradient clipping"""
-    target_kl: float = None
-    """the target KL divergence threshold"""
-    eval_frequency: int = 100000
-    """how often (in steps) to evaluate the policy during training"""
-
-    # to be filled in runtime
-    batch_size: int = 0
-    """the batch size (computed in runtime)"""
-    minibatch_size: int = 0
-    """the mini-batch size (computed in runtime)"""
-    num_iterations: int = 0
-    """the number of iterations (computed in runtime)"""
-
-    # EnergyPlus specific arguments
-    path_to_building: str = None
-    """the path to the EnergyPlus building file"""
-    path_to_weather: str = None
-    """the path to the EnergyPlus weather file"""
-    weather_validation: str = None
-    """the path to the EnergyPlus weather file for validation (optional)"""
-    building_characteristics: dict = None
-    """the characteristics of the building"""
-
-
-def make_env(env_id, path_to_building, path_to_weather, building_characteristics, reward_type, energy_weight, gamma, run_manager=None):
+def make_env(env_id, path_to_building, path_to_weather, building_characteristics, reward_type, energy_weight, gamma, eplus_output_dir=None):
     def thunk():
         env = gym.make(env_id, 
                       path_to_building=path_to_building, 
@@ -113,7 +26,7 @@ def make_env(env_id, path_to_building, path_to_weather, building_characteristics
                       building_characteristics=building_characteristics,
                       reward_type=reward_type,
                       energy_weight=energy_weight,
-                      run_manager=run_manager)
+                      eplus_output_dir=eplus_output_dir)
         env = CustomRescaleAction(env)
         env = gym.wrappers.ClipAction(env)
         norm_env = NormalizeObservation(env)
@@ -162,98 +75,120 @@ class Agent(nn.Module):
         return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
 
 
-def main(args: Args, run_manager=None):
+def main(cfg, building_path, weather_path, weather_validation_path, building_characteristics, results_dir):
     """
     Main function to run PPO algorithm.
     
     Args:
-        args: Arguments for the PPO algorithm
-        run_manager: Optional RunManager instance for unified logging
+        cfg: Hydra configuration object
+        building_path: Path to building file
+        weather_path: Path to weather file  
+        weather_validation_path: Path to validation weather file
+        building_characteristics: Building characteristics dict
+        results_dir: Directory to save results (Hydra output directory)
     """
-    # Create directories for logs and outputs
-    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
-    run_dir = args.results_dir
-    os.makedirs(run_dir, exist_ok=True)
-
-    # Setup tracking based on run_manager
-    # Only initialize wandb internally if RunManager isn't handling it
-    use_internal_tracking = run_manager is None and args.track
+    # Use the results_dir directly (Hydra output directory) instead of creating nested folders
+    run_name = f"EnergyPlus-v0__ppo__{cfg.seed}__{int(time.time())}"
+    run_dir = results_dir  # Use Hydra's output directory directly
     
-    if use_internal_tracking:
-        print("Initializing wandb in ppo!")
+    # Create subdirectories for organized results
+    eplus_outputs_dir = os.path.join(run_dir, "eplus_outputs")
+    test_results_dir = os.path.join(run_dir, "test_results")
+    os.makedirs(eplus_outputs_dir, exist_ok=True)
+    os.makedirs(test_results_dir, exist_ok=True)
+
+    # Setup logging to file
+    log_file = os.path.join(run_dir, "train_ppo.log")
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    
+    logger = logging.getLogger("ppo")
+    logger.addHandler(file_handler)
+    logger.setLevel(logging.INFO)
+
+    # Setup wandb tracking
+    if cfg.get('track', False):
         import wandb
         wandb.init(
-            project=args.wandb_project_name,
-            entity=args.wandb_entity,
+            project=cfg.project,
+            entity=cfg.entity,
             sync_tensorboard=True,
-            config=vars(args),
+            config=dict(cfg),
             name=run_name,
             monitor_gym=True,
             save_code=True,
         )
     
-    # Use RunManager's logger and tensorboard if provided
-    if run_manager:
-        writer = run_manager.get_tensorboard_writer()
-        logger = run_manager.logger
-    else:
-        writer = SummaryWriter(os.path.join(run_dir, "logs"))
-        writer.add_text(
-            "hyperparameters",
-            "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
-        )
-        logger = logging.getLogger("ppo")
-
-    # TRY NOT TO MODIFY: seeding
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    torch.backends.cudnn.deterministic = args.torch_deterministic
-
-    device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
-
-    # env setup
-    envs = gym.vector.SyncVectorEnv(
-        [make_env(env_id=args.env_id, path_to_building=args.path_to_building, path_to_weather=args.path_to_weather, 
-                 building_characteristics=args.building_characteristics, reward_type=args.reward_type, energy_weight=args.energy_weight, gamma=args.gamma, run_manager=run_manager) for _ in range(args.num_envs)]
+    # Setup tensorboard - save in run-specific directory
+    writer = SummaryWriter(os.path.join(run_dir, "logs"))
+    writer.add_text(
+        "hyperparameters",
+        "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in dict(cfg).items()])),
     )
+
+    # Seeding
+    random.seed(cfg.seed)
+    np.random.seed(cfg.seed)
+    torch.manual_seed(cfg.seed)
+    torch.backends.cudnn.deterministic = True
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Environment setup with eplus_output_dir
+    envs = gym.vector.SyncVectorEnv([
+        make_env(
+            env_id="EnergyPlus-v0",
+            path_to_building=building_path,
+            path_to_weather=weather_path,
+            building_characteristics=building_characteristics,
+            reward_type=cfg.reward_type,
+            energy_weight=cfg.energy_weight,
+            gamma=cfg.ppo.gamma,
+            eplus_output_dir=eplus_outputs_dir
+        ) for _ in range(cfg.ppo.num_envs)
+    ])
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
     agent = Agent(envs).to(device)
-    optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
+    optimizer = optim.Adam(agent.parameters(), lr=cfg.ppo.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
-    obs = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space.shape).to(device)
-    actions = torch.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape).to(device)
-    logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
-    values = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    obs_shape = envs.single_observation_space.shape or ()
+    action_shape = envs.single_action_space.shape or ()
+    
+    obs = torch.zeros((cfg.ppo.num_steps, cfg.ppo.num_envs) + obs_shape).to(device)
+    actions = torch.zeros((cfg.ppo.num_steps, cfg.ppo.num_envs) + action_shape).to(device)
+    logprobs = torch.zeros((cfg.ppo.num_steps, cfg.ppo.num_envs)).to(device)
+    rewards = torch.zeros((cfg.ppo.num_steps, cfg.ppo.num_envs)).to(device)
+    dones = torch.zeros((cfg.ppo.num_steps, cfg.ppo.num_envs)).to(device)
+    values = torch.zeros((cfg.ppo.num_steps, cfg.ppo.num_envs)).to(device)
 
-    # TRY NOT TO MODIFY: start the game
+    # Start the game
     global_step = 0
     start_time = time.time()
-    next_obs, _ = envs.reset(seed=args.seed)
+    next_obs, _ = envs.reset(seed=cfg.seed)
     next_obs = torch.Tensor(next_obs).to(device)
-    next_done = torch.zeros(args.num_envs).to(device)
+    next_done = torch.zeros(cfg.ppo.num_envs).to(device)
 
-    args.batch_size = int(args.num_envs * args.num_steps)
-    args.minibatch_size = int(args.batch_size // args.num_minibatches)
-    args.num_iterations = args.total_timesteps // args.batch_size
+    batch_size = int(cfg.ppo.num_envs * cfg.ppo.num_steps)
+    minibatch_size = int(batch_size // cfg.ppo.num_minibatches)
+    num_iterations = cfg.training.total_timesteps // batch_size
     
-    # Use the evaluation frequency from args
-    eval_frequency = args.eval_frequency
+    # Use the evaluation frequency from config
+    eval_frequency = cfg.ppo.eval_frequency
     next_eval_step = eval_frequency
 
-    for iteration in range(1, args.num_iterations + 1):
+    for iteration in range(1, num_iterations + 1):
         # Annealing the rate if instructed to do so.
-        if args.anneal_lr:
-            frac = 1.0 - (iteration - 1.0) / args.num_iterations
-            lrnow = frac * args.learning_rate
+        if cfg.ppo.anneal_lr:
+            frac = 1.0 - (iteration - 1.0) / num_iterations
+            lrnow = frac * cfg.ppo.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
 
-        for step in range(0, args.num_steps):
-            global_step += args.num_envs
+        for step in range(0, cfg.ppo.num_steps):
+            global_step += cfg.ppo.num_envs
             obs[step] = next_obs
             dones[step] = next_done
 
@@ -264,7 +199,7 @@ def main(args: Args, run_manager=None):
             actions[step] = action
             logprobs[step] = logprob
 
-            # TRY NOT TO MODIFY: execute the game and log data.
+            # Execute the game and log data.
             next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
             next_done = np.logical_or(terminations, truncations)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
@@ -281,30 +216,30 @@ def main(args: Args, run_manager=None):
             if global_step >= next_eval_step:
                 logger.info(f"Evaluating policy at step {global_step}")
                 
-                # Save current model to a temporary file
+                # Save current model to a temporary file in run directory
                 temp_model_path = os.path.join(run_dir, f"temp_model_{global_step}.pt")
                 torch.save(agent.state_dict(), temp_model_path)
                 
                 # Use validation weather if provided, else training weather
-                validation_weather = args.weather_validation if args.weather_validation else args.path_to_weather
+                validation_weather = weather_validation_path if weather_validation_path else weather_path
 
                 # Evaluate the current policy
                 eval_returns = ppo_evaluate(
                     model_path=temp_model_path,
                     make_env=make_env,
-                    env_id=args.env_id,
-                    reward_type=args.reward_type,
-                    energy_weight=args.energy_weight,
-                    path_to_building=args.path_to_building,
+                    env_id="EnergyPlus-v0",
+                    reward_type=cfg.reward_type,
+                    energy_weight=cfg.energy_weight,
+                    path_to_building=building_path,
                     path_to_weather=validation_weather,
-                    building_characteristics=args.building_characteristics,
-                    eval_episodes=1,  # Just one episode for quick validation
+                    building_characteristics=building_characteristics,
+                    eval_episodes=1,
                     run_name=f"{run_name}-validation-{global_step}",
-                    Model=Agent,
                     device=device,
-                    run_manager=run_manager,
-                    gamma=args.gamma,
-                    save_trajectories=False,  # Don't save trajectories during validation
+                    gamma=cfg.ppo.gamma,
+                    save_trajectories=False,
+                    trajectories_dir=test_results_dir,
+                    eplus_output_dir=eplus_outputs_dir,
                 )
                 
                 # Log the validation return
@@ -323,32 +258,32 @@ def main(args: Args, run_manager=None):
             next_value = agent.get_value(next_obs).reshape(1, -1)
             advantages = torch.zeros_like(rewards).to(device)
             lastgaelam = 0
-            for t in reversed(range(args.num_steps)):
-                if t == args.num_steps - 1:
+            for t in reversed(range(cfg.ppo.num_steps)):
+                if t == cfg.ppo.num_steps - 1:
                     nextnonterminal = 1.0 - next_done
                     nextvalues = next_value
                 else:
                     nextnonterminal = 1.0 - dones[t + 1]
                     nextvalues = values[t + 1]
-                delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
-                advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+                delta = rewards[t] + cfg.ppo.gamma * nextvalues * nextnonterminal - values[t]
+                advantages[t] = lastgaelam = delta + cfg.ppo.gamma * cfg.ppo.gae_lambda * nextnonterminal * lastgaelam
             returns = advantages + values
 
         # flatten the batch
-        b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
+        b_obs = obs.reshape((-1,) + obs_shape)
         b_logprobs = logprobs.reshape(-1)
-        b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
+        b_actions = actions.reshape((-1,) + action_shape)
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
 
         # Optimizing the policy and value network
-        b_inds = np.arange(args.batch_size)
+        b_inds = np.arange(batch_size)
         clipfracs = []
-        for epoch in range(args.update_epochs):
+        for epoch in range(cfg.ppo.update_epochs):
             np.random.shuffle(b_inds)
-            for start in range(0, args.batch_size, args.minibatch_size):
-                end = start + args.minibatch_size
+            for start in range(0, batch_size, minibatch_size):
+                end = start + minibatch_size
                 mb_inds = b_inds[start:end]
 
                 _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], b_actions[mb_inds])
@@ -359,25 +294,25 @@ def main(args: Args, run_manager=None):
                     # calculate approx_kl http://joschu.net/blog/kl-approx.html
                     old_approx_kl = (-logratio).mean()
                     approx_kl = ((ratio - 1) - logratio).mean()
-                    clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
+                    clipfracs += [((ratio - 1.0).abs() > cfg.ppo.clip_coef).float().mean().item()]
 
                 mb_advantages = b_advantages[mb_inds]
-                if args.norm_adv:
+                if cfg.ppo.norm_adv:
                     mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
                 # Policy loss
                 pg_loss1 = -mb_advantages * ratio
-                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
+                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - cfg.ppo.clip_coef, 1 + cfg.ppo.clip_coef)
                 pg_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # Value loss
                 newvalue = newvalue.view(-1)
-                if args.clip_vloss:
+                if cfg.ppo.clip_vloss:
                     v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
                     v_clipped = b_values[mb_inds] + torch.clamp(
                         newvalue - b_values[mb_inds],
-                        -args.clip_coef,
-                        args.clip_coef,
+                        -cfg.ppo.clip_coef,
+                        cfg.ppo.clip_coef,
                     )
                     v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
                     v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
@@ -386,21 +321,21 @@ def main(args: Args, run_manager=None):
                     v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
 
                 entropy_loss = entropy.mean()
-                loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
+                loss = pg_loss - cfg.ppo.ent_coef * entropy_loss + v_loss * cfg.ppo.vf_coef
 
                 optimizer.zero_grad()
                 loss.backward()
-                nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm)
+                nn.utils.clip_grad_norm_(agent.parameters(), cfg.ppo.max_grad_norm)
                 optimizer.step()
 
-            if args.target_kl is not None and approx_kl > args.target_kl:
+            if cfg.ppo.target_kl is not None and approx_kl > cfg.ppo.target_kl:
                 break
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
 
-        # TRY NOT TO MODIFY: record rewards for plotting purposes
+        # Record rewards for plotting purposes
         writer.add_scalar("charts/learning_rate", optimizer.param_groups[0]["lr"], global_step)
         writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
         writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
@@ -411,40 +346,30 @@ def main(args: Args, run_manager=None):
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
-    if args.save_model:
-        # Determine the appropriate path for saving the model
-        if run_manager:
-            # Use RunManager's models directory if available
-            models_dir = os.path.join(run_manager.run_dir, "models")
-            os.makedirs(models_dir, exist_ok=True)
-            model_path = os.path.join(models_dir, f"{args.exp_name}.pt")
-        else:
-            # Default path if RunManager is not available
-            model_path = os.path.join(run_dir, f"{args.exp_name}.cleanrl_model")
-        
-        # Save the model
+    if cfg.training.save_model:
+        model_path = os.path.join(run_dir, "model.pt")
         torch.save(agent.state_dict(), model_path)       
         logger.info(f"Model saved to {model_path}")
 
         # Use validation weather if provided, else training weather
-        validation_weather = args.weather_validation if args.weather_validation else args.path_to_weather
+        validation_weather = weather_validation_path if weather_validation_path else weather_path
 
         episodic_returns = ppo_evaluate(
             model_path=model_path,
             make_env=make_env,
-            reward_type=args.reward_type,
-            energy_weight=args.energy_weight,
-            env_id=args.env_id,
-            path_to_building=args.path_to_building,
+            reward_type=cfg.reward_type,
+            energy_weight=cfg.energy_weight,
+            env_id="EnergyPlus-v0",
+            path_to_building=building_path,
             path_to_weather=validation_weather,
-            building_characteristics=args.building_characteristics,
+            building_characteristics=building_characteristics,
             eval_episodes=1,
             run_name=f"{run_name}-eval",
-            Model=Agent,
             device=device,
-            run_manager=run_manager,
-            gamma=args.gamma,
-            save_trajectories=True,  # Save trajectories for final evaluation
+            gamma=cfg.ppo.gamma,
+            save_trajectories=True,
+            trajectories_dir=test_results_dir,
+            eplus_output_dir=eplus_outputs_dir,
         )
         for idx, episodic_return in enumerate(episodic_returns):
             writer.add_scalar("eval/episodic_return", episodic_return, idx)
@@ -459,16 +384,16 @@ def ppo_evaluate(
     reward_type: str,
     energy_weight: float,
     env_id: str,
-    path_to_building: str,
-    path_to_weather: str,
-    building_characteristics: dict,
+    path_to_building: Optional[str],
+    path_to_weather: Optional[str],
+    building_characteristics: Optional[dict],
     eval_episodes: int,
     run_name: str,
-    Model: torch.nn.Module,
     device: torch.device = torch.device("cpu"),
-    run_manager=None,
     gamma: float = 0.99,
     save_trajectories: bool = False,
+    trajectories_dir: Optional[str] = None,
+    eplus_output_dir: Optional[str] = None,
 ):
     """
     Evaluate a trained PPO model.
@@ -482,21 +407,20 @@ def ppo_evaluate(
         building_characteristics: Building characteristics dict
         eval_episodes: Number of episodes to evaluate
         run_name: Name for this evaluation run
-        Model: The model class to use
         device: Device to run evaluation on
-        run_manager: Optional RunManager instance
         gamma: Discount factor
         save_trajectories: Whether to save trajectories
+        trajectories_dir: Directory to save trajectories (defaults to current directory)
+        eplus_output_dir: Directory for EnergyPlus outputs
     """
-    # Initialize logger first to avoid reference errors
-    logger = run_manager.logger if run_manager else logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
     
     # Create environment using the same setup as in training
     env = make_env(env_id, path_to_building, path_to_weather, 
-                building_characteristics, reward_type, gamma, energy_weight, run_manager)()
+                building_characteristics, reward_type, energy_weight, gamma, eplus_output_dir)()
     envs = gym.vector.SyncVectorEnv([
         make_env(env_id, path_to_building, path_to_weather, 
-                building_characteristics, reward_type, gamma, energy_weight, run_manager)
+                building_characteristics, reward_type, energy_weight, gamma, eplus_output_dir)
     ])
     
     # Find both wrappers
@@ -511,28 +435,34 @@ def ppo_evaluate(
             rescale_wrapper = temp_env
         
         if hasattr(temp_env, 'env'):
-            temp_env = temp_env.env
+            temp_env = getattr(temp_env, 'env')
         else:
             break
     
     # Create and load agent
-    agent = Model(envs).to(device)
+    agent = Agent(envs).to(device)
     agent.load_state_dict(torch.load(model_path, map_location=device))
     agent.eval()
 
     # Get the base environment to access its properties
     base_env = envs.envs[0].unwrapped
-    observation_names = base_env.observation_names if hasattr(base_env, 'observation_names') else None
-    controlled_zones = base_env.controlled_zones if hasattr(base_env, 'controlled_zones') else None
-    uncontrolled_zones = base_env.uncontrolled_zones if hasattr(base_env, 'uncontrolled_zones') else None
+    observation_names = getattr(base_env, 'observation_names', None)
+    controlled_zones = getattr(base_env, 'controlled_zones', None)
+    uncontrolled_zones = getattr(base_env, 'uncontrolled_zones', None)
 
     episodic_returns = []
+    
+    # Set up trajectories directory - use test_results naming
+    if trajectories_dir is None:
+        trajectories_base = "test_results"
+    else:
+        trajectories_base = trajectories_dir
     
     # Run evaluation for the specified number of episodes
     for episode in range(eval_episodes):
         # Initialize trajectory logger for this episode
         trajectory_logger = TrajectoryLogger(
-            os.path.join(run_manager.data_dir if run_manager else "trajectories", f"episode_{episode}"),
+            os.path.join(trajectories_base, f"episode_{episode}"),
             observation_names,
             logger=logger
         )

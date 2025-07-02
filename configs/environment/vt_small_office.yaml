@@ -1,0 +1,9 @@
+# @package _global_
+# Environment parameters
+state: "VT"
+county: "Orleans"
+building_id: "1003000512784"
+weather: "USA_VT_Middlebury.State.AP.721028_TMYx.epw"
+weather_validation: "USA_VT_Bennington-Morse.State.AP.726166_TMYx.2004-2018.epw"
+reward_type: "base"
+energy_weight: 1.0

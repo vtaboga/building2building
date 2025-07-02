@@ -168,10 +168,7 @@ class EnergyPlusSimulation:
 
     state: Union[None, c_void_p] = field(default=None, init=False)
 
-    """The run manager instance to use for logging and results"""
-    run_manager: Optional[Any] = None
-
-    def callback_timestep(self, state: c_void_p) -> None:
+    def callback_timestep(self, state: int) -> None:
         try:
 
             if not api.exchange.api_data_fully_ready(state):
@@ -435,11 +432,9 @@ class EnergyPlusSimulation:
                 raise RuntimeError("Unreachable")
 
         return out
-
+    
     @property
-    def log_dir(self) -> str:
-        if self.run_manager:
-            return self.run_manager.get_eplus_output_dir()
+    def log_dir(self):
         return self._log_dir
     
     @log_dir.setter

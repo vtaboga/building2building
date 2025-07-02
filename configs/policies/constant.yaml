@@ -1,0 +1,4 @@
+# @package _global_
+constant:
+  heating_setpoint: 21.0
+  cooling_setpoint: 24.0
