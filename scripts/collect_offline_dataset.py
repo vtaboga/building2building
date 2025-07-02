@@ -16,18 +16,8 @@ from typing import Dict, List
 from torch.distributions import Normal
 
 from building2building.simulator.wrappers import NormalizeObservation, CustomRescaleAction
+from building2building.algorithms.online.baselines import constant_policy
 import building2building.simulator
-
-
-def constant_policy(obs: np.ndarray, heating_setpoint: float, cooling_setpoint: float, 
-                   action_space) -> np.ndarray:
-    """Simple constant policy for baseline data collection."""
-    # The first value is the heating setpoint
-    # The second value is the offset from the heating setpoint to the cooling setpoint
-    action = np.array([heating_setpoint, cooling_setpoint - heating_setpoint])
-    # Normalize each action dimension to [0, 1] for the normalized environment
-    action = (action - action_space.low) / (action_space.high - action_space.low)
-    return action
 
 
 def load_dqn_policy(model_path: str, env: gym.Env, device: str = "cpu"):
@@ -147,21 +137,17 @@ def save_dataset(data: Dict[str, List], output_path: str, logger: logging.Logger
     logger.info(f"Dataset saved to: {output_path}")
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../configs", config_name="collect_dataset")
 def main(cfg: DictConfig) -> None:
     """Main function for dataset collection with Hydra configuration."""
-    
-    # Ensure we're using the dataset collection experiment
-    if cfg.name != "collect_dataset":
-        raise ValueError(f"This script expects collect_dataset experiment, got {cfg.name}")
     
     # Get Hydra's output directory and setup logging
     output_dir = Path(HydraConfig.get().runtime.output_dir)
     logger = logging.getLogger(__name__)
     
     # Load building characteristics
-    building_path = f"data/processed_buildings/{cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}.epJSON"
-    characteristics_path = f"data/processed_buildings/{cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}.json"
+    building_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.epJSON"
+    characteristics_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.json"
     
     try:
         with open(characteristics_path, 'r') as f:
@@ -174,10 +160,10 @@ def main(cfg: DictConfig) -> None:
     env = gym.make(
         "EnergyPlus-v0",
         path_to_building=building_path,
-        path_to_weather=f"data/weather/{cfg.building.weather}",
+        path_to_weather=f"data/weather/{cfg.weather_validation}",
         building_characteristics=building_characteristics,
-        reward_type=cfg.env.reward_type,
-        energy_weight=cfg.env.energy_weight,
+        reward_type=cfg.reward_type,
+        energy_weight=cfg.energy_weight,
     )
     
     # Get action space before wrapping 
@@ -195,14 +181,15 @@ def main(cfg: DictConfig) -> None:
     torch.manual_seed(cfg.seed)
     
     # Determine policy type and load accordingly
-    policy_type = cfg.dataset.get('policy_type', 'baseline')
+    policy_type = cfg.dataset.get('policy_type', 'constant')
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    if policy_type == 'baseline':
-        logger.info(f"Starting baseline data collection for {cfg.dataset.num_episodes} episodes")
-        policy_fn = lambda obs: constant_policy(obs, cfg.dataset.heating_setpoint, 
-                                               cfg.dataset.cooling_setpoint, action_space)
-        policy_name = "baseline"
+    if policy_type == 'constant':
+        logger.info(f"Starting constant data collection for {cfg.dataset.num_episodes} episodes")
+        policy_fn = lambda obs: constant_policy(obs, cfg.constant.heating_setpoint, 
+                                               cfg.constant.cooling_setpoint, 
+                                               normalize=True, action_space=action_space)
+        policy_name = "constant"
         
     elif policy_type == 'dqn':
         model_path = cfg.dataset.model_path
@@ -217,16 +204,13 @@ def main(cfg: DictConfig) -> None:
         policy_name = "ppo"
         
     else:
-        raise ValueError(f"Unknown policy type: {policy_type}. Use 'baseline', 'dqn', or 'ppo'")
+        raise ValueError(f"Unknown policy type: {policy_type}. Use 'constant', 'dqn', or 'ppo'")
     
     # Collect data
     logger.info(f"Starting {policy_type} data collection for {cfg.dataset.num_episodes} episodes")
     data = collect_data_from_policy(env, policy_fn, cfg.dataset.num_episodes, logger)
     
-    # Save dataset to data/offline_dataset directory
-    dataset_dir = Path("data/offline_dataset")
-    dataset_dir.mkdir(parents=True, exist_ok=True)
-    output_path = dataset_dir / f"{cfg.building.building_id}_{policy_name}_dataset.npz"
+    output_path = output_dir / f"{cfg.building_id}_{policy_name}_dataset.npz"
     save_dataset(data, str(output_path), logger)
     
     env.close()
