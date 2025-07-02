@@ -12,6 +12,8 @@ import gymnasium as gym
 from pathlib import Path
 from omegaconf import DictConfig, OmegaConf
 from hydra.core.hydra_config import HydraConfig
+from typing import Dict, Any, cast
+import shutil
 
 # Import wandb for tracking
 import wandb
@@ -29,8 +31,10 @@ from building2building.simulator.wrappers import CustomRescaleAction, NormalizeO
 import building2building.simulator
 
 
-def create_policy(algorithm: str, obs_dim: int, action_dim: int, action_space, device: str, cfg: DictConfig):
-    """Create policy based on algorithm."""
+def create_policy(cfg: DictConfig, obs_dim: int, action_dim: int, action_space, device: str):
+    """Create policy based on algorithm configuration."""
+    
+    algorithm = cfg.offline_rl.algorithm
     
     if algorithm == "cql":
         # Create MLP backbone for actor (processes observations)
@@ -64,11 +68,11 @@ def create_policy(algorithm: str, obs_dim: int, action_dim: int, action_space, d
             action_space=action_space,
             tau=cfg.offline_rl.tau,
             gamma=cfg.offline_rl.gamma,
-            cql_weight=getattr(cfg.offline_rl, 'cql_weight', 1.0),
-            temperature=getattr(cfg.offline_rl, 'temperature', 1.0),
-            with_lagrange=getattr(cfg.offline_rl, 'with_lagrange', True),
-            lagrange_threshold=getattr(cfg.offline_rl, 'lagrange_threshold', 10.0),
-            cql_alpha_lr=getattr(cfg.offline_rl, 'cql_alpha_lr', 1e-4)
+            cql_weight=cfg.policies.cql.cql_weight,
+            temperature=cfg.policies.cql.temperature,
+            with_lagrange=cfg.policies.cql.with_lagrange,
+            lagrange_threshold=cfg.policies.cql.lagrange_threshold,
+            cql_alpha_lr=cfg.policies.cql.cql_alpha_lr
         )
     
     elif algorithm == "iql":
@@ -107,8 +111,8 @@ def create_policy(algorithm: str, obs_dim: int, action_dim: int, action_space, d
             action_space=action_space,
             tau=cfg.offline_rl.tau,
             gamma=cfg.offline_rl.gamma,
-            expectile=getattr(cfg.offline_rl, 'iql_tau', 0.7),
-            temperature=getattr(cfg.offline_rl, 'beta', 3.0)
+            expectile=cfg.policies.iql.iql_tau,
+            temperature=cfg.policies.iql.beta
         )
     
     elif algorithm == "td3bc":
@@ -136,10 +140,10 @@ def create_policy(algorithm: str, obs_dim: int, action_dim: int, action_space, d
             critic2_optim=critic2_optim,
             tau=cfg.offline_rl.tau,
             gamma=cfg.offline_rl.gamma,
-            policy_noise=getattr(cfg.offline_rl, 'policy_noise', 0.2),
-            noise_clip=getattr(cfg.offline_rl, 'noise_clip', 0.5),
-            update_actor_freq=getattr(cfg.offline_rl, 'policy_freq', 2),
-            alpha=getattr(cfg.offline_rl, 'alpha', 2.5)
+            policy_noise=cfg.policies.td3bc.policy_noise,
+            noise_clip=cfg.policies.td3bc.noise_clip,
+            update_actor_freq=cfg.policies.td3bc.policy_freq,
+            alpha=cfg.policies.td3bc.alpha
         )
     
     else:
@@ -148,7 +152,7 @@ def create_policy(algorithm: str, obs_dim: int, action_dim: int, action_space, d
     return policy
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../configs", config_name="train_offline_rl")
 def main_hydra(cfg: DictConfig) -> None:
     """Main function for offline RL training with Hydra configuration."""
     
@@ -156,14 +160,24 @@ def main_hydra(cfg: DictConfig) -> None:
     output_dir = Path(HydraConfig.get().runtime.output_dir)
     logger = logging.getLogger(__name__)
     
-    # Initialize wandb if tracking is enabled
-    wandb_run = None
+    # Remove unused subdirectories that Hydra might create
+    unused_dirs = ['models', 'data', 'eplus_output']
+    for unused_dir in unused_dirs:
+        unused_path = output_dir / unused_dir
+        if unused_path.exists():
+            shutil.rmtree(unused_path)
+            logger.info(f"Removed unused directory: {unused_path}")
+    
+    # Initialize W&B following best practices
     if cfg.get('track', False):
+        # Convert config to proper dict for wandb
+        config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
         wandb_run = wandb.init(
-            entity=cfg.wandb.entity,
-            project=cfg.wandb.project,
-            name=f"{cfg.offline_rl.algorithm}_{cfg.building.building_id}",
-            tags=cfg.wandb.get('tags', [])
+            entity=cfg.entity,
+            project=cfg.project,
+            config=cast(Dict[str, Any], config_dict) if isinstance(config_dict, dict) else {},
+            name=f"offline_rl_{cfg.offline_rl.algorithm}_{cfg.building_id}",
+            tags=cfg.get('tags', [])
         )
         logger.info(f"W&B initialized: {wandb_run.url}")
     
@@ -171,9 +185,9 @@ def main_hydra(cfg: DictConfig) -> None:
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     
-    # Load building characteristics
-    building_path = f"data/processed_buildings/{cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}.epJSON"
-    characteristics_path = f"data/processed_buildings/{cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}.json"
+    # Load building characteristics and set up paths
+    building_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.epJSON"
+    characteristics_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.json"
     
     try:
         with open(characteristics_path, 'r') as f:
@@ -191,7 +205,7 @@ def main_hydra(cfg: DictConfig) -> None:
     # Create environment (without run_manager dependency)
     env_kwargs = {
         'path_to_building': building_path,
-        'path_to_weather': f"data/weather/{cfg.building.weather}",
+        'path_to_weather': f"data/weather/{cfg.weather}",
         'building_characteristics': building_characteristics,
         'reward_type': cfg.reward_type,
         'energy_weight': cfg.energy_weight,
@@ -240,7 +254,7 @@ def main_hydra(cfg: DictConfig) -> None:
     logger.info(f"Observation dim: {obs_dim}, Action dim: {action_dim}")
     
     # Use original action space for policy (before wrappers)
-    policy = create_policy(cfg.offline_rl.algorithm, obs_dim, action_dim, original_action_space, device_str, cfg)
+    policy = create_policy(cfg, obs_dim, action_dim, original_action_space, device_str)
     
     # Create logger for training
     output_config = {"stdout": "stdout", "tensorboard": "tensorboard"}
@@ -261,7 +275,7 @@ def main_hydra(cfg: DictConfig) -> None:
     # Log the training start
     logger.info(f"Starting {cfg.offline_rl.algorithm.upper()} offline RL training...")
     logger.info(f"Dataset: {dataset_path}")
-    logger.info(f"Building: {cfg.building.state}/{cfg.building.county}/{cfg.building.building_id}")
+    logger.info(f"Building: {cfg.state}/{cfg.county}/{cfg.building_id}")
     logger.info(f"Output directory: {output_dir}")
     logger.info(f"Algorithm: {cfg.offline_rl.algorithm}")
     logger.info(f"Epochs: {cfg.offline_rl.epoch}")
@@ -275,7 +289,7 @@ def main_hydra(cfg: DictConfig) -> None:
         logger.info(f"Final performance: {results}")
         
         # Log final results to wandb if tracking
-        if wandb_run:
+        if cfg.get('track', False):
             wandb.log({"final_performance": results})
         
         # Save model
@@ -283,13 +297,19 @@ def main_hydra(cfg: DictConfig) -> None:
         torch.save(policy.state_dict(), model_path)
         logger.info(f"Model saved to {model_path}")
         
+        # Log final results structure
+        logger.info(f"Final results structure:")
+        logger.info(f"  - Model: {output_dir}/{cfg.offline_rl.algorithm}_model.pth")
+        logger.info(f"  - TensorBoard logs: {output_dir}/tensorboard/")
+        logger.info(f"  - Config: {output_dir}/.hydra/config.yaml")
+        
     except Exception as e:
         logger.error(f"Error during {cfg.offline_rl.algorithm.upper()} training: {e}")
         raise
     finally:
         env.close()
         # Finish wandb run
-        if wandb_run:
+        if cfg.get('track', False):
             wandb.finish()
 
 

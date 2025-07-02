@@ -1,0 +1,42 @@
+# @package _global_
+name: train_offline_rl
+track: true
+
+# Offline RL training configuration with composition
+defaults:
+  - environment: vt_small_office
+  - wandb: default
+  - policies: cql  # cql, iql, td3bc, mopo, combo, mobile, rambo
+  - _self_
+
+# Seed parameter
+seed: 1
+
+# Offline RL training parameters
+offline_rl:
+  algorithm: "cql"  
+  dataset_path: "data/offline_dataset/6014003413384_baseline_dataset.npz"  # Path to dataset
+  
+  # Training parameters
+  epoch: 1000
+  step_per_epoch: 1000
+  eval_episodes: 10
+  batch_size: 256
+  lr: 0.0003
+  gamma: 0.99
+  tau: 0.005
+  
+  # Model-based parameters (for future use)
+  rollout_freq: 1000
+  rollout_batch_size: 50000
+  rollout_length: 5
+  real_ratio: 0.05
+  dynamics_lr: 0.001
+  dynamics_update_freq: 0
+  n_ensemble: 7
+  n_elites: 5
+
+# Hydra configuration for organized output directories
+hydra:
+  run:
+    dir: results/offline_rl_${offline_rl.algorithm}_${building_id}_${now:%Y-%m-%d_%H-%M-%S} 
