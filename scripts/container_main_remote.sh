@@ -4,7 +4,7 @@
 set -e
 
 module load singularity
-module load python/3.10
+module load python/3.11
 
 # Get the repository root directory
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
