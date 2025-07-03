@@ -13,7 +13,7 @@ import logging
 import contextlib
 from importlib.util import find_spec
 from contextvars import ContextVar
-from typing import reveal_type, TypeVar
+from typing import TypeVar
 
 ENERGYPLUS_PATH: ContextVar[Path] = ContextVar("ENERGYPLUS_PATH")
 

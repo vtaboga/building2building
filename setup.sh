@@ -30,9 +30,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check if Python 3.10 is installed
-if ! command -v python3.10 &> /dev/null; then
-    echo "❌ Python 3.10 is not installed. Please install Python 3.10 first."
+# Check if Python 3.11 is installed
+if ! command -v python3.11 &> /dev/null; then
+    echo "❌ Python 3.11 is not installed. Please install Python 3.11 first."
     exit 1
 fi
 
@@ -55,7 +55,7 @@ fi
 # Create and activate virtual environment for local development
 echo "📦 Creating virtual environment..."
 if [ ! -d ".venv" ]; then
-    python3.10 -m venv .venv
+    python3.11 -m venv .venv
     echo "✨ Virtual environment created"
 else
     echo "ℹ️ Virtual environment already exists"
@@ -135,7 +135,7 @@ fi
 # Install dependencies in virtual environment
 echo "📦 Installing Python dependencies..."
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -e .
 
 # Install the package in development mode
 echo "📦 Installing package in development mode..."
