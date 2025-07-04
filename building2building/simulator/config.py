@@ -13,43 +13,45 @@ This module collects functions useful to creates those 4-tuples.
 
 """
 
-import building2building.ontology as ontology
+import building2building.simulator.query_info as query_info
 import rdflib
+import typing
 import building2building.simulator.simulation as simulation
-from typing import Dict, List, reveal_type, Any
+from typing import Dict, List
 import urllib.parse
 import logging
 import os
 
 
+
 def auto_get_actuators(
-    ont: ontology.Ontology,
-) -> dict[str, simulation.ActuatorHole]:
+    rdf: rdflib.Graph,
+) -> typing.Dict[str, simulation.ActuatorHole]:
     """Add all actuators listed in the graph. This is probably not what you
     want, since actuators that are not heating/cooling setpoints will be added
     too."""
     act = {}
-    for sch in ont.schedules():
+    for name in query_info.rdf_schedules(rdf):
         # for name in zones_with_cooling
-        act[str(sch)] = simulation.ActuatorHole("Schedule:Compact", "Schedule Value", str(sch))
+        act[name] = simulation.ActuatorHole("Schedule:Compact", "Schedule Value", name)
     return act
 
 
 def auto_add_setpoint_variables(
-    ont: ontology.Ontology, obs_template: dict[str, Any]
+    rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
 ) -> None:
-    setpoints: Any = {}
+    setpoints: typing.Any = {}
     obs_template["setpoints"] = setpoints
 
-    heating: Any = {}
+    heating: typing.Any = {}
     setpoints["heating"] = heating
 
-    cooling: Any = {}
+    cooling: typing.Any = {}
     setpoints["cooling"] = cooling
 
-    for z in ont.zones():
+    for z in query_info.rdf_zones(rdf):
         # URL-decode the zone name and use it as the key
-        decoded_zone = str(z)
+        decoded_zone = urllib.parse.unquote(z)
         heating[decoded_zone] = simulation.VariableHole(
             "Zone Thermostat Heating Setpoint Temperature", decoded_zone
         )
@@ -59,20 +61,21 @@ def auto_add_setpoint_variables(
 
 
 def auto_add_temperature(
-        ont: ontology.Ontology, obs_template: dict[str, Any]
+    rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
 ) -> None:
     """Add zone air temperatures to the observation template."""
     if "temperature" not in obs_template:
         obs_template["temperature"] = {}
 
     temps = obs_template["temperature"]
-    for z in ont.zones():
+    for z in query_info.rdf_zones(rdf):
         # URL-decode the zone name and use it as the key
-        decoded_zone = str(z)
+        decoded_zone = urllib.parse.unquote(z)
         temps[decoded_zone] = simulation.VariableHole("ZONE AIR TEMPERATURE", decoded_zone)
+        
 
 def auto_add_energy(
-    ont: ontology.Ontology, obs_template: dict[str, Any]
+    rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
 ) -> None:
     """Add HVAC energy consumption meters to the observation template."""
     if "energy" not in obs_template:
@@ -85,7 +88,7 @@ def auto_add_energy(
 
 
 def auto_add_time(
-    ont: ontology.Ontology, obs_template: dict[str, Any]
+    rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
 ) -> None:
     """Add time variables to the observation template."""
     if "time" not in obs_template:
@@ -104,7 +107,7 @@ def auto_add_time(
 
 
 def auto_add_weather(
-    ont: ontology.Ontology, obs_template: dict[str, Any]
+    rdf: rdflib.Graph, obs_template: typing.Dict[str, typing.Any]
 ) -> None:
     """Add outdoor air measurements to the observation template."""
     if "weather" not in obs_template:
