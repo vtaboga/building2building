@@ -19,14 +19,15 @@ from building2building.simulator.wrappers import NormalizeObservation, CustomRes
 torch.set_default_dtype(torch.float64)
 
 
-def make_env(env_id, path_to_building, path_to_weather, building_characteristics, reward_type, energy_weight, gamma):
+def make_env(env_id, path_to_building, path_to_weather, building_characteristics, reward_type, energy_weight, gamma, eplus_output_dir=None):
     def thunk():
         env = gym.make(env_id, 
                       path_to_building=path_to_building, 
                       path_to_weather=path_to_weather, 
                       building_characteristics=building_characteristics,
                       reward_type=reward_type,
-                      energy_weight=energy_weight)
+                      energy_weight=energy_weight,
+                      eplus_output_dir=eplus_output_dir)
         norm_env = NormalizeObservation(env)
         return norm_env
 
@@ -121,7 +122,24 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
     """
     # Create directories for logs and outputs
     run_name = f"EnergyPlus-v0__dqn__{cfg.seed}__{int(time.time())}"
-    os.makedirs(results_dir, exist_ok=True)
+    run_dir = results_dir  # Use Hydra's output directory directly
+    
+    # Create subdirectories for organized results
+    eplus_outputs_dir = os.path.join(run_dir, "eplus_outputs")
+    test_results_dir = os.path.join(run_dir, "test_results")
+    os.makedirs(eplus_outputs_dir, exist_ok=True)
+    os.makedirs(test_results_dir, exist_ok=True)
+
+    # Setup logging to file
+    log_file = os.path.join(run_dir, "train_dqn.log")
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    
+    logger = logging.getLogger("dqn")
+    logger.addHandler(file_handler)
+    logger.setLevel(logging.INFO)
 
     # Setup wandb tracking
     if cfg.get('track', False):
@@ -137,12 +155,11 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
         )
     
     # Setup logging and tensorboard
-    writer = SummaryWriter(os.path.join(results_dir, "logs"))
+    writer = SummaryWriter(os.path.join(run_dir, "logs"))
     writer.add_text(
         "hyperparameters",
         "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in dict(cfg).items()])),
     )
-    logger = logging.getLogger("dqn")
 
     # Seeding
     random.seed(cfg.seed)
@@ -152,7 +169,7 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Environment setup
+    # Environment setup with eplus_output_dir
     envs = gym.vector.SyncVectorEnv([
         make_env(
             env_id="EnergyPlus-v0",
@@ -161,7 +178,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
             building_characteristics=building_characteristics,
             reward_type=cfg.reward_type,
             energy_weight=cfg.energy_weight,
-            gamma=cfg.dqn.gamma
+            gamma=cfg.dqn.gamma,
+            eplus_output_dir=eplus_outputs_dir
         ) for _ in range(cfg.dqn.num_envs)
     ])
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
@@ -298,7 +316,7 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
             logger.info(f"Evaluating policy at step {global_step}")
             
             # Save current model to a temporary file
-            temp_model_path = os.path.join(results_dir, f"temp_model_{global_step}.pt")
+            temp_model_path = os.path.join(run_dir, f"temp_model_{global_step}.pt")
             torch.save(q_network.state_dict(), temp_model_path)
             
             # Use validation weather if provided, else training weather
@@ -319,6 +337,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
                 device=device,
                 gamma=cfg.dqn.gamma,
                 save_trajectories=False,
+                trajectories_dir=test_results_dir,
+                eplus_output_dir=eplus_outputs_dir,
                 bins_per_dimension=bins_per_dimension
             )
             
@@ -335,7 +355,7 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
     
     # Save the final model if requested
     if cfg.training.save_model:
-        model_path = os.path.join(results_dir, "dqn_model.pt")
+        model_path = os.path.join(run_dir, "dqn_model.pt")
         torch.save(q_network.state_dict(), model_path)       
         logger.info(f"Model saved to {model_path}")
 
@@ -357,6 +377,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
             device=device,
             gamma=cfg.dqn.gamma,
             save_trajectories=True,
+            trajectories_dir=test_results_dir,
+            eplus_output_dir=eplus_outputs_dir,
             bins_per_dimension=bins_per_dimension
         )
         for idx, episodic_return in enumerate(final_eval_returns):
@@ -380,7 +402,9 @@ def dqn_evaluate(
     device: torch.device = torch.device("cpu"),
     gamma: float = 0.99,
     save_trajectories: bool = False,
-    bins_per_dimension: int = 5
+    trajectories_dir: Optional[str] = None,
+    eplus_output_dir: Optional[str] = None,
+    bins_per_dimension: int = 20,
 ):
     """
     Evaluate a trained DQN model.
@@ -397,16 +421,17 @@ def dqn_evaluate(
         device: Device to run evaluation on
         gamma: Discount factor
         save_trajectories: Whether to save trajectories
-        bins_per_dimension: Number of discrete bins per action dimension
+        trajectories_dir: Directory to save trajectories (defaults to current directory)
+        eplus_output_dir: Directory for EnergyPlus outputs
     """
     logger = logging.getLogger(__name__)
     
     # Create environment using the same setup as in training
     env = make_env(env_id, path_to_building, path_to_weather, 
-                building_characteristics, reward_type, energy_weight, gamma)()
+                building_characteristics, reward_type, energy_weight, gamma, eplus_output_dir)()
     envs = gym.vector.SyncVectorEnv([
         make_env(env_id, path_to_building, path_to_weather, 
-                building_characteristics, reward_type, energy_weight, gamma)
+                building_characteristics, reward_type, energy_weight, gamma, eplus_output_dir)
     ])
     
     # Find both wrappers
@@ -433,16 +458,22 @@ def dqn_evaluate(
     # Get the base environment to access its properties
     base_env = envs.envs[0].unwrapped
     observation_names = getattr(base_env, 'observation_names', None)
-    controlled_zones = getattr(base_env, 'controlled_zones', None)
-    uncontrolled_zones = getattr(base_env, 'uncontrolled_zones', None)
+    controlled_zones = getattr(base_env, 'controlled_zones', [])  # Default to empty list
+    uncontrolled_zones = getattr(base_env, 'uncontrolled_zones', [])  # Default to empty list
 
     episodic_returns = []
+    
+    # Set up trajectories directory - use test_results naming
+    if trajectories_dir is None:
+        trajectories_base = "test_results"
+    else:
+        trajectories_base = trajectories_dir
     
     # Run evaluation for the specified number of episodes
     for episode in range(eval_episodes):
         # Initialize trajectory logger for this episode
         trajectory_logger = TrajectoryLogger(
-            os.path.join("trajectories", f"episode_{episode}"),
+            os.path.join(trajectories_base, f"episode_{episode}"),
             observation_names,
             logger=logger
         )
@@ -473,10 +504,12 @@ def dqn_evaluate(
                     scaled_actions = action
                 
                 # Log the denormalized observation in the trajectory
-                trajectory_logger.log(denorm_obs, scaled_actions, rewards[0], controlled_zones, uncontrolled_zones)
+                trajectory_logger.log(denorm_obs, scaled_actions, rewards[0], 
+                                   controlled_zones or [], uncontrolled_zones or [])  # Use empty list if None
             else:
                 # If no normalization wrapper, log the observation as is
-                trajectory_logger.log(obs[0], action, rewards[0], controlled_zones, uncontrolled_zones)
+                trajectory_logger.log(obs[0], action, rewards[0], 
+                                   controlled_zones or [], uncontrolled_zones or [])  # Use empty list if None
             
             # Check if episode is done
             done = terminations[0] or truncations[0]

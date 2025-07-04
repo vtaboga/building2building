@@ -73,6 +73,12 @@ def main_hydra(cfg: DictConfig) -> None:
     
     # Hydra automatically saves config to .hydra/config.yaml
     logger.info(f"Config automatically saved to: {output_dir}/.hydra/config.yaml")
+    logger.info(f"Final results structure:")
+    logger.info(f"  - EnergyPlus outputs: {output_dir}/eplus_outputs/")
+    logger.info(f"  - Test results: {output_dir}/test_results/")
+    logger.info(f"  - Model: {output_dir}/model.pt")
+    logger.info(f"  - Training log: {output_dir}/train_dqn.log")
+    logger.info(f"  - TensorBoard logs: {output_dir}/logs/")
 
 
 if __name__ == "__main__":
