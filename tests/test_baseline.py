@@ -50,7 +50,7 @@ def test_run_baseline():
         # Test 4: Verify trajectories were created
         trajectories_dir = os.path.join(test_results_dir, "trajectories")
         assert os.path.exists(trajectories_dir)
-        assert any(f.endswith('.csv') for f in os.listdir(trajectories_dir))
+        assert any(f.endswith('.json') for f in os.listdir(trajectories_dir))
         
         # Test 5: Verify setpoints match input
         assert results["heating_setpoint"] == 21.0
