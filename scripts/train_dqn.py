@@ -6,7 +6,7 @@ from omegaconf import DictConfig, OmegaConf
 from hydra.core.hydra_config import HydraConfig
 from typing import Dict, Any, cast
 import json
-
+import shutil   
 from building2building.algorithms.online.dqn import main
 
 # Make sure to import your environment to register it
@@ -21,10 +21,13 @@ def main_hydra(cfg: DictConfig) -> None:
     output_dir = Path(HydraConfig.get().runtime.output_dir)
     logger = logging.getLogger(__name__)
     
-    # Create subdirectories
-    (output_dir / 'models').mkdir(exist_ok=True)
-    (output_dir / 'data').mkdir(exist_ok=True)
-    (output_dir / 'eplus_output').mkdir(exist_ok=True)
+    # Remove unused subdirectories that Hydra might create
+    unused_dirs = ['models', 'data', 'eplus_output']
+    for unused_dir in unused_dirs:
+        unused_path = output_dir / unused_dir
+        if unused_path.exists():
+            shutil.rmtree(unused_path)
+            logger.info(f"Removed unused directory: {unused_path}")
     
     # Initialize W&B following best practices
     if cfg.get('track', False):
