@@ -20,10 +20,11 @@ def main(cfg: DictConfig) -> None:
     eplus_output_dir = output_dir / "eplus_output"
     
     # Setup paths
-    building_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.epJSON"
-    characteristics_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.json"
-    weather_path = f"data/weather/{cfg.weather_validation}"  # No training, apply policy to validation weather
-    
+
+    building_path: Path = Path("data/processed_buildings") / cfg.state / cfg.county / f"{cfg.building_id}.epJSON"
+    characteristics_path: Path = Path("data/processed_buildings") / cfg.state / cfg.county / f"{cfg.building_id}.json"
+    weather_path: Path = Path("data/weather") / cfg.weather_validation # No training, apply policy to validation weather
+
     try:
         with open(characteristics_path, 'r') as f:
             building_characteristics = json.load(f)
@@ -42,8 +43,8 @@ def main(cfg: DictConfig) -> None:
         reward_type=cfg.reward_type,
         energy_weight=cfg.energy_weight,
         seed=cfg.seed,
-        results_dir=str(output_dir),
-        eplus_output_dir=str(eplus_output_dir)
+        results_dir=output_dir,
+        eplus_output_dir=eplus_output_dir,
     )
     
     logger.info("Baseline Evaluation Results:")

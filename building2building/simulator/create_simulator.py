@@ -14,6 +14,8 @@ from building2building.simulator.action_spaces import action_transform, create_a
 from minergym.ontology import Ontology
 import minergym.simulation as simulation
 import logging
+import numpy as np
+
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +67,12 @@ def create_simulator(
     config.auto_add_weather(ont, obs_template)
 
     setpoints = get_controllable_setpoints(ont)
-    # breakpoint()
 
     actuators = {}
     controlled_zones = list(setpoints.keys())
+    all_zones = building_characteristics.get("zone_lists", [])
+    uncontrolled_zones = [zone for zone in all_zones if zone not in controlled_zones]
+
     for zone_setpoints in setpoints.values():
         for setpoint in zone_setpoints:
             actuators[setpoint['schedule_name']] = ActuatorHole(
@@ -107,8 +111,7 @@ def create_simulator(
         else:
             raise ValueError(f"Invalid reward type: {reward_type}")
 
-
-    gymenv = EnergyPlusEnvironment[Any, Any](
+    gymenv = EnergyPlusEnvironment[np.ndarray, np.ndarray](
         make_energyplus,
         reward_function,
         observation_space,
@@ -116,6 +119,12 @@ def create_simulator(
         action_space,
         lambda act: action_transform(act, actuators),
     )
+
+    gymenv.metadata = {
+        "controlled_zones": controlled_zones,
+        "uncontrolled_zones": uncontrolled_zones,
+        "observation_names": observation_names,
+    }
 
     return gymenv
 

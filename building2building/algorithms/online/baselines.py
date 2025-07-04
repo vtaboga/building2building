@@ -36,16 +36,16 @@ def constant_policy(
 
 def run_constant_baseline(
     env_id: str,
-    path_to_building: str,
-    path_to_weather: str,
+    path_to_building: Path,
+    path_to_weather: Path,
     building_characteristics: Dict[str, Any],
     heating_setpoint: float = 21.0,
     cooling_setpoint: float = 24.0,
     reward_type: str = "base",
     energy_weight: float = 0.0,
     seed: int = 1,
-    results_dir: str = "baseline_results",
-    eplus_output_dir: Optional[str] = None,
+    results_dir: Path = Path("baseline_results"),
+    eplus_output_dir: Path|None = None,
 ) -> Dict[str, Any]:
     """
     Run a full year simulation using the constant policy baseline.
@@ -68,7 +68,6 @@ def run_constant_baseline(
     """
     # Setup logging and results directory
     os.makedirs(results_dir, exist_ok=True)
-    logger = logging.getLogger("baseline")
     
     # Create EnergyPlus output directory if specified
     if eplus_output_dir:
@@ -96,13 +95,16 @@ def run_constant_baseline(
 
     # Get environment properties safely
     base_env = env.unwrapped
-    uncontrolled_zones = getattr(base_env, 'uncontrolled_zones', None)
-    controlled_zones = getattr(base_env, 'controlled_zones', None)
-    observation_names = getattr(base_env, 'observation_names', None)
+    uncontrolled_zones = env.metadata["uncontrolled_zones"]
+    assert isinstance(uncontrolled_zones, list)
+    controlled_zones = env.metadata["controlled_zones"]
+    assert isinstance(controlled_zones, list)
+    observation_names = env.metadata["observation_names"]
+    assert isinstance(observation_names, list)
 
     # Initialize trajectory logger
     trajectory_logger = TrajectoryLogger(
-        os.path.join(results_dir, "trajectories"),
+        results_dir / "trajectories",
         observation_names,
         logger=logger
     )
