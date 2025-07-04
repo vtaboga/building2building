@@ -12,9 +12,9 @@ from typing import *
 
 logger = logging.getLogger(__name__)
 
-def download_file_progress(url: str, dest: Path, description:str|None = None):
+def download_file_progress(url: str, dest: Path, description:str|None = None, verify:bool=False):
     logger.info(f"Downloading {dest}...")
-    response = requests.get(url, stream=True)
+    response = requests.get(url, stream=True, verify=verify)
     response.raise_for_status()
 
     # Get total file size from headers
