@@ -9,6 +9,8 @@ import pickle
 from building2building.simulator.observation_spaces import extract_ordered_observations
 from building2building.env import setup_energyplus_path, find_energyplus_path
 
+from typing import Any
+
 
 def get_energyplus_env():
     """
@@ -26,7 +28,13 @@ setup_energyplus_path()
 
 
 class TrajectoryLogger:
-    def __init__(self, save_dir, observation_names, logger=None):
+    save_dir: Path
+    trajectories: Any
+    logger: logging.Logger
+    observation_names: list[str]
+    total_reward: float
+
+    def __init__(self, save_dir: Path, observation_names: list[str], logger: logging.Logger|None = None):
         """
         Initialize the TrajectoryLogger.
 
