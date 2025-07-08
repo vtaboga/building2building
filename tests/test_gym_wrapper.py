@@ -10,14 +10,14 @@ import json
 
 def test_gym_wrapper():
     # Create environment using gym registration - note the exact ID match
-    with open("tests/fixtures/building.json", "r") as f:
+    with open("tests/fixtures/processed_buildings/1003000523385.json", "r") as f:
         building_characteristics = json.load(f)
 
 
     env = gym.make(
         'EnergyPlus-v0',  
-        path_to_building="tests/fixtures/building.epJSON",
-        path_to_weather="tests/fixtures/alaska.epw",
+        path_to_building="tests/fixtures/processed_buildings/1003000523385.epJSON",
+        path_to_weather="tests/fixtures/weather/weather_vt_1.epw",
         building_characteristics=building_characteristics,
         reward_type="base",
         energy_weight=1.0,
