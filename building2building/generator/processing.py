@@ -102,7 +102,6 @@ def transition_idf(idf_path: Path, state: str, county: str, target_version: str 
     Returns:
         Path: Path to the transitioned file
     """
-
     idf_path = idf_path.resolve()
 
     # Create the output directory structure
@@ -110,15 +109,13 @@ def transition_idf(idf_path: Path, state: str, county: str, target_version: str 
         output_dir = Path("data", "processed_buildings", state, county).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    idf_dir = idf_path.parent
-    idf_name = Path(idf_path.name)
-
-    # Define the final output path
-    final_output_path = output_dir / idf_name
-
     # Create a temporary directory for transition files
-    temp_dir = idf_dir / "temp_transition"
+    temp_dir = Path("data/temp_transition").resolve()
     temp_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy original file to temp directory
+    working_file = temp_dir / idf_path.name
+    shutil.copy2(idf_path, working_file)
 
     # Define the transition sequence from 9.4 to 24.1
     transitions = [
@@ -131,8 +128,6 @@ def transition_idf(idf_path: Path, state: str, county: str, target_version: str 
         "23.2.0-to-24.1.0"
     ]
 
-    # Copy the original file to temp directory to work with
-
     energyplus_dir = Path(env.ENERGYPLUS_PATH.get())
     transition_dir = energyplus_dir / "PreProcess" / "IDFVersionUpdater"
 
@@ -143,9 +138,6 @@ def transition_idf(idf_path: Path, state: str, county: str, target_version: str 
         return p
 
     with cd(temp_dir):
-        working_file = idf_name
-        shutil.copy(idf_path, working_file)
-
         for transition in transitions:
             from_ver, to_ver = transition.split("-to-")
 
@@ -155,15 +147,11 @@ def transition_idf(idf_path: Path, state: str, county: str, target_version: str 
 
             # Check if required files exist
             if not os.path.exists(from_idd):
-                e = f"Error: Source IDD file not found at {from_idd}"
-                logger.error(e)
-                raise Exception(e)
+                raise Exception(f"Error: Source IDD file not found at {from_idd}")
             if not os.path.exists(to_idd):
-                e = f"Error: Target IDD file not found at {to_idd}"
-                logger.error(e)
-                raise Exception(e)
+                raise Exception(f"Error: Target IDD file not found at {to_idd}")
 
-            # Create symbolic links to IDD files in the temp directory (not in /opt/repository)
+            # Create symbolic links to IDD files in the temp directory
             from_idd_link = os.path.basename(from_idd)
             to_idd_link = os.path.basename(to_idd)
             if not os.path.exists(from_idd_link):
@@ -173,65 +161,37 @@ def transition_idf(idf_path: Path, state: str, county: str, target_version: str 
 
             logger.info(f"\nRunning transition from {from_ver} to {to_ver}")
 
-            cwd = os.getcwd()
-            # Run the transition executable from the temp_dir
-            cmdline = [transition_exe(from_ver, to_ver), os.path.basename(working_file)]
-            logging.debug(f"With CWD: {cwd}")
-            logging.debug(f"Using cmd: {cmdline}")
+            # Run the transition executable
             result = subprocess.run(
-                cmdline,
+                [transition_exe(from_ver, to_ver), working_file.name],
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                env={"DISPLAY": ""},
-                cwd=os.getcwd()
+                env={"DISPLAY": ""}
             )
 
-            print(f"return code trnasition {from_ver} {to_ver} is {result.returncode}")
+            print(f"return code transition {from_ver} {to_ver} is {result.returncode}")
 
-            if result.stdout:
-                logger.debug(f"Transition output: {result.stdout}")
-            if result.stderr:
-                logger.warning(f"Transition errors: {result.stderr}")
-
-            # Clean up any .idfold files that might have been created
-            old_file = Path(str(working_file) + "old")
-            if old_file.exists():
-                old_file.unlink()
-
-            # Look for the transitioned file
+            # Look for the transitioned file and replace working file
             transitioned_file = find_transitioned_file(working_file, to_ver)
-            if transitioned_file:
-                logger.debug(f"Found transitioned file at: {transitioned_file}")
-                if transitioned_file != working_file:
-                    # Replace working file with transitioned file
-                    os.rename(transitioned_file, working_file)
-            else:
-                e = f"Error: Could not find transitioned file for {working_file}"
-                logger.error(e)
-                raise Exception(e)
-        # Copy the final file to the processed_buildigs directory instead of original location
-        shutil.copy(working_file, final_output_path)
+            if transitioned_file and transitioned_file != working_file:
+                os.rename(transitioned_file, working_file)
 
-        logger.info(f"\nFinal transitioned file saved to: {final_output_path}")
+        # Convert to epJSON
+        epjson_path = convert_to_epjson(str(working_file), keep_original=True)
+        final_epjson_path = output_dir / Path(epjson_path).name
+        
+        # Ensure output directory exists and copy file
+        final_epjson_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(epjson_path, final_epjson_path)
 
-        # Convert the final IDF to epJSON
-        epjson_path = convert_to_epjson(str(final_output_path), keep_original=keep_original)
-        logger.info(f"Converted to epJSON: {epjson_path}")
-        add_setpoint_control_to_epjson(epjson_path)
-        logger.info(f"Added setpoint control to {epjson_path}")
-        if epjson_path:
-            return Path(epjson_path)
-        else:
-            logger.error("Failed to convert to epJSON format")
-            return final_output_path  # Return IDF path as fallback
+        # Clean up
+        if not keep_original:
+            idf_path.unlink()
+        shutil.rmtree(temp_dir)
 
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
-
-
-    return final_output_path
+        return final_epjson_path
 
 def process_idf(building_files: List[tuple], state: str, county: str, keep_original: bool = False, output_dir: Optional[Path] = None, input_dir: Optional[Path] = None) -> List[Path]:
     """
@@ -249,7 +209,7 @@ def process_idf(building_files: List[tuple], state: str, county: str, keep_origi
         List[Path]: List of paths to processed IDF files
     """
     if output_dir is None:
-        output_dir = Path("data", "processed_buildings", state, county)
+        output_dir = Path("data", "processed_buildings", state, county).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     processed_paths = []
@@ -263,7 +223,7 @@ def process_idf(building_files: List[tuple], state: str, county: str, keep_origi
 
         # Get path to original file
         if input_dir is None:
-            original_path = Path("data", "idf", f"{state}/{county}", f"{idf_id}.idf")
+            original_path = Path("data", "idf", state, county, f"{idf_id}.idf").resolve()
         else:
             original_path = input_dir / f"{idf_id}.idf"
 
@@ -279,7 +239,7 @@ def process_idf(building_files: List[tuple], state: str, county: str, keep_origi
             # Save the building characteristics as a JSON file
             characteristics_path = output_dir / f"{idf_id}.json"
             # Add zone lists to characteristics
-            zone_lists = get_zone_lists(str(processed_path))
+            zone_lists = get_zone_lists(str(processed_path.resolve()))  # Use the absolute path
             characteristics["zone_lists"] = zone_lists
             with open(characteristics_path, 'w') as json_file:
                 json.dump(characteristics, json_file, indent=4)

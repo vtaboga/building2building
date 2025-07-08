@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 def download_file_progress(url: str, dest: Path, description:str|None = None):
     logger.info(f"Downloading {dest}...")
-    response = requests.get(url, stream=True)
+    
+    # Disable SSL verification only for census.gov URLs
+    verify_ssl = not url.startswith("https://www2.census.gov")
+    response = requests.get(url, stream=True, verify=verify_ssl)
     response.raise_for_status()
 
     # Get total file size from headers
@@ -191,15 +194,15 @@ def download_and_extract_county_idf(state_code: str, county_name: str) -> str:
     Returns:
         str: Path to the county directory containing IDF files
     """
-    # Format the folder name
+    # Format the folder name for download
     folder_name = f"{state_code}_{county_name}_IDF"
     
     # Create output directory if it doesn't exist
     output_dir = Path("data/idf")
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Create specific folder for this county
-    county_dir = output_dir / folder_name
+    # Create specific folder for this county using the expected structure
+    county_dir = output_dir / state_code / county_name
     
     # Check if directory exists and contains files
     if county_dir.exists() and any(county_dir.iterdir()):
@@ -207,9 +210,9 @@ def download_and_extract_county_idf(state_code: str, county_name: str) -> str:
         return county_dir
     
     # If files don't exist, proceed with download
-    county_dir.mkdir(exist_ok=True)
+    county_dir.mkdir(parents=True, exist_ok=True)
     
-    # Format the filename
+    # Format the filename for download
     filename = f"{folder_name}.zip"
     
     # Create the URL
@@ -219,12 +222,10 @@ def download_and_extract_county_idf(state_code: str, county_name: str) -> str:
     # Full path for the zip file
     zip_path = output_dir / filename
 
-    # if not zip_path.exists():
     # Download the file
     download_file_progress(url, zip_path, description=f"Downloading IDFs for county {county_name}")
 
     # Extract the zip file to the county-specific folder
-
     extract_zip_progress(zip_path, county_dir, description="Extracting IDFs")
 
     # Remove the zip file after extraction

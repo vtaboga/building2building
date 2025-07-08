@@ -112,7 +112,7 @@ class TestSearchMetadata(unittest.TestCase):
             self.assertLess(abs(characteristics['height'] - 10.0), 5)   # Within 5 ft
 
         # Get the IDs in sorted order
-        found_ids = sorted(building_id for building_id, _ in results)
+        found_ids = sorted([int(building_id) for building_id, _ in results])  # Convert to int for proper comparison
         # These should be the IDs of single zone files in fixtures
         expected_ids = [1002000365954, 1003000523385]  # IDs from fixtures
         self.assertEqual(found_ids, expected_ids)
@@ -171,13 +171,13 @@ class TestMetadataLoading(unittest.TestCase):
 class TestSearchIDF(unittest.TestCase):
     def setUp(self):
         self.fixtures_dir = pathlib.Path('tests/fixtures')
-        self.metadata_path = self.fixtures_dir / 'test_metadata.csv'
+        self.metadata_path = self.fixtures_dir / 'metadata' / 'test_metadata.csv'
         # Define fixture paths for test files
-        self.fixture_idf_1z = self.fixtures_dir / 'idf' / 'building_1z.idf'
-        self.fixture_epjson_1z = self.fixtures_dir / 'processed_buildings' / 'building_1z.epJSON'
-        self.fixture_idf_5z = self.fixtures_dir / 'idf' / 'building_5z.idf'
-        self.fixture_epjson_5z = self.fixtures_dir / 'processed_buildings' / 'building_5z.epJSON'
-        self.fixture_weather = self.fixtures_dir / 'weather_vt.epw'
+        self.fixture_idf_1z = self.fixtures_dir / 'idf' / '1003000523385.idf'
+        self.fixture_epjson_1z = self.fixtures_dir / 'processed_buildings' / '1003000523385.epJSON'
+        self.fixture_idf_5z = self.fixtures_dir / 'idf' / '1003000523385.idf'
+        self.fixture_epjson_5z = self.fixtures_dir / 'processed_buildings' / '1003000523385.epJSON'
+        self.fixture_weather = self.fixtures_dir / 'weather' / 'weather_vt.epw'
 
     @patch('building2building.generator.search_idf.download_and_extract_county_idf')
     @patch('building2building.generator.search_idf.download_metadata')
@@ -353,31 +353,26 @@ class TestProcessIDF(unittest.TestCase):
         """Test processing a single IDF file"""
         # Test data
         building_id = 1003000523385
-        test_characteristics = {
-            "building_type": "SmallOffice",
-            "num_floors": 1,
-            "area": 1000.0,
-            "height": 10.0
-        }
+        
+        # Load the actual characteristics from the reference JSON file
+        ref_characteristics_path = self.fixtures_dir / 'processed_buildings' / f"{building_id}.json"
+        with open(ref_characteristics_path) as f:
+            test_characteristics = json.load(f)
         
         # Verify input file exists
         input_dir = self.fixtures_dir / 'idf'
         input_file = input_dir / f"{building_id}.idf"
-        print(f"\nDebug - Input file path: {input_file}")
-        print(f"Debug - Input file exists: {input_file.exists()}")
-        print(f"Debug - Current working dir: {os.getcwd()}")
-        
+
         # Process the IDF file
         with cd(self.temp_dir):  # Change to temp directory for processing
             processed_paths = process_idf(
                 [(building_id, test_characteristics)],
                 state="VT",
                 county="TestCounty",
-                keep_original=False,
+                keep_original=True,
                 output_dir=self.test_output_dir,
                 input_dir=input_dir
             )
-            print(f"Debug - Working dir during processing: {os.getcwd()}")
         
         # Check that we got a result
         self.assertEqual(len(processed_paths), 1)
