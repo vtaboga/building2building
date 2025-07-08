@@ -1,0 +1,666 @@
+  Version,22.2;
+
+  Timestep,1;
+
+  LifeCycleCost:Parameters,
+    Life Cycle Cost Parameters,  !- Name
+    EndOfYear,               !- Discounting Convention
+    ConstantDollar,          !- Inflation Approach
+    0.03,                    !- Real Discount Rate
+    ,                        !- Nominal Discount Rate
+    ,                        !- Inflation
+    ,                        !- Base Date Month
+    2011,                    !- Base Date Year
+    ,                        !- Service Date Month
+    2011,                    !- Service Date Year
+    25,                      !- Length of Study Period in Years
+    ,                        !- Tax rate
+    None;                    !- Depreciation Method
+
+  LifeCycleCost:UsePriceEscalation,
+    U.S. Avg  Commercial-Electricity,  !- LCC Price Escalation Name
+    Electricity,             !- Resource
+    2011,                    !- Escalation Start Year
+    January,                 !- Escalation Start Month
+    0.9838,                  !- Year 1 Escalation
+    0.9730,                  !- Year 2 Escalation
+    0.9632,                  !- Year 3 Escalation
+    0.9611,                  !- Year 4 Escalation
+    0.9571,                  !- Year 5 Escalation
+    0.9553,                  !- Year 6 Escalation
+    0.9539,                  !- Year 7 Escalation
+    0.9521,                  !- Year 8 Escalation
+    0.9546,                  !- Year 9 Escalation
+    0.9550,                  !- <none>
+    0.9553,                  !- <none>
+    0.9564,                  !- <none>
+    0.9575,                  !- <none>
+    0.9596,                  !- <none>
+    0.9618,                  !- <none>
+    0.9614,                  !- <none>
+    0.9618,                  !- <none>
+    0.9618,                  !- <none>
+    0.9593,                  !- <none>
+    0.9589,                  !- <none>
+    0.9607,                  !- <none>
+    0.9625,                  !- <none>
+    0.9650,                  !- <none>
+    0.9708,                  !- <none>
+    0.9751,                  !- <none>
+    0.9762,                  !- <none>
+    0.9766,                  !- <none>
+    0.9766,                  !- <none>
+    0.9769,                  !- <none>
+    0.9773;                  !- <none>
+
+  LifeCycleCost:UsePriceEscalation,
+    U.S. Avg  Commercial-Distillate Oil,  !- LCC Price Escalation Name
+    FuelOilNo1,              !- Resource
+    2011,                    !- Escalation Start Year
+    January,                 !- Escalation Start Month
+    0.9714,                  !- Year 1 Escalation
+    0.9730,                  !- Year 2 Escalation
+    0.9942,                  !- Year 3 Escalation
+    1.0164,                  !- Year 4 Escalation
+    1.0541,                  !- Year 5 Escalation
+    1.0928,                  !- Year 6 Escalation
+    1.1267,                  !- Year 7 Escalation
+    1.1580,                  !- Year 8 Escalation
+    1.1792,                  !- Year 9 Escalation
+    1.1967,                  !- <none>
+    1.2200,                  !- <none>
+    1.2333,                  !- <none>
+    1.2566,                  !- <none>
+    1.2709,                  !- <none>
+    1.2826,                  !- <none>
+    1.2985,                  !- <none>
+    1.3102,                  !- <none>
+    1.3250,                  !- <none>
+    1.3261,                  !- <none>
+    1.3282,                  !- <none>
+    1.3324,                  !- <none>
+    1.3356,                  !- <none>
+    1.3431,                  !- <none>
+    1.3510,                  !- <none>
+    1.3568,                  !- <none>
+    1.3606,                  !- <none>
+    1.3637,                  !- <none>
+    1.3674,                  !- <none>
+    1.3706,                  !- <none>
+    1.3743;                  !- <none>
+
+  LifeCycleCost:UsePriceEscalation,
+    U.S. Avg  Commercial-Residual Oil,  !- LCC Price Escalation Name
+    FuelOilNo2,              !- Resource
+    2011,                    !- Escalation Start Year
+    January,                 !- Escalation Start Month
+    0.8469,                  !- Year 1 Escalation
+    0.8257,                  !- Year 2 Escalation
+    0.8681,                  !- Year 3 Escalation
+    0.8988,                  !- Year 4 Escalation
+    0.9289,                  !- Year 5 Escalation
+    0.9604,                  !- Year 6 Escalation
+    0.9897,                  !- Year 7 Escalation
+    1.0075,                  !- Year 8 Escalation
+    1.0314,                  !- Year 9 Escalation
+    1.0554,                  !- <none>
+    1.0861,                  !- <none>
+    1.1278,                  !- <none>
+    1.1497,                  !- <none>
+    1.1620,                  !- <none>
+    1.1743,                  !- <none>
+    1.1852,                  !- <none>
+    1.1948,                  !- <none>
+    1.2037,                  !- <none>
+    1.2071,                  !- <none>
+    1.2119,                  !- <none>
+    1.2139,                  !- <none>
+    1.2194,                  !- <none>
+    1.2276,                  !- <none>
+    1.2365,                  !- <none>
+    1.2420,                  !- <none>
+    1.2461,                  !- <none>
+    1.2509,                  !- <none>
+    1.2550,                  !- <none>
+    1.2591,                  !- <none>
+    1.2638;                  !- <none>
+
+  LifeCycleCost:UsePriceEscalation,
+    U.S. Avg  Commercial-Natural gas,  !- LCC Price Escalation Name
+    NaturalGas,              !- Resource
+    2011,                    !- Escalation Start Year
+    January,                 !- Escalation Start Month
+    0.9823,                  !- Year 1 Escalation
+    0.9557,                  !- Year 2 Escalation
+    0.9279,                  !- Year 3 Escalation
+    0.9257,                  !- Year 4 Escalation
+    0.9346,                  !- Year 5 Escalation
+    0.9412,                  !- Year 6 Escalation
+    0.9512,                  !- Year 7 Escalation
+    0.9645,                  !- Year 8 Escalation
+    0.9856,                  !- Year 9 Escalation
+    1.0067,                  !- <none>
+    1.0222,                  !- <none>
+    1.0410,                  !- <none>
+    1.0610,                  !- <none>
+    1.0787,                  !- <none>
+    1.0942,                  !- <none>
+    1.1098,                  !- <none>
+    1.1220,                  !- <none>
+    1.1308,                  !- <none>
+    1.1386,                  !- <none>
+    1.1486,                  !- <none>
+    1.1619,                  !- <none>
+    1.1763,                  !- <none>
+    1.1918,                  !- <none>
+    1.2118,                  !- <none>
+    1.2284,                  !- <none>
+    1.2439,                  !- <none>
+    1.2605,                  !- <none>
+    1.2772,                  !- <none>
+    1.2938,                  !- <none>
+    1.3115;                  !- <none>
+
+  LifeCycleCost:UsePriceEscalation,
+    U.S. Avg  Commercial-Coal,  !- LCC Price Escalation Name
+    Coal,                    !- Resource
+    2011,                    !- Escalation Start Year
+    January,                 !- Escalation Start Month
+    0.9970,                  !- Year 1 Escalation
+    1.0089,                  !- Year 2 Escalation
+    1.0089,                  !- Year 3 Escalation
+    0.9941,                  !- Year 4 Escalation
+    0.9941,                  !- Year 5 Escalation
+    1.0000,                  !- Year 6 Escalation
+    1.0030,                  !- Year 7 Escalation
+    1.0059,                  !- Year 8 Escalation
+    1.0089,                  !- Year 9 Escalation
+    1.0119,                  !- <none>
+    1.0148,                  !- <none>
+    1.0178,                  !- <none>
+    1.0208,                  !- <none>
+    1.0267,                  !- <none>
+    1.0297,                  !- <none>
+    1.0356,                  !- <none>
+    1.0415,                  !- <none>
+    1.0534,                  !- <none>
+    1.0564,                  !- <none>
+    1.0593,                  !- <none>
+    1.0653,                  !- <none>
+    1.0712,                  !- <none>
+    1.0742,                  !- <none>
+    1.0801,                  !- <none>
+    1.0831,                  !- <none>
+    1.0831,                  !- <none>
+    1.0861,                  !- <none>
+    1.0890,                  !- <none>
+    1.0920,                  !- <none>
+    1.0950;                  !- <none>
+
+  Building,
+    -MidriseApartment-ASHRAE 169-2006-6A created: 2021-03-21 12:17:40 +0000,  !- Name
+    ,                        !- North Axis {deg}
+    City,                    !- Terrain
+    ,                        !- Loads Convergence Tolerance Value {W}
+    ,                        !- Temperature Convergence Tolerance Value {deltaC}
+    ,                        !- Solar Distribution
+    ,                        !- Maximum Number of Warmup Days
+    ;                        !- Minimum Number of Warmup Days
+
+  Zone,
+    Space 0 ZN,              !- Name
+    0,                       !- Direction of Relative North {deg}
+    0,                       !- X Origin {m}
+    0,                       !- Y Origin {m}
+    0,                       !- Z Origin {m}
+    ,                        !- Type
+    1,                       !- Multiplier
+    ,                        !- Ceiling Height {m}
+    ,                        !- Volume {m3}
+    ,                        !- Floor Area {m2}
+    ,                        !- Zone Inside Convection Algorithm
+    ,                        !- Zone Outside Convection Algorithm
+    Yes;                     !- Part of Total Floor Area
+
+  BuildingSurface:Detailed,
+    Surface 1,               !- Name
+    Floor,                   !- Surface Type
+    Foundation F 126 Perim 4575 Area 12839,  !- Construction Name
+    Space 0 ZN,              !- Zone Name
+    ,                        !- Space Name
+    GroundFCfactorMethod,    !- Outside Boundary Condition
+    ,                        !- Outside Boundary Condition Object
+    NoSun,                   !- Sun Exposure
+    NoWind,                  !- Wind Exposure
+    ,                        !- View Factor to Ground
+    ,                        !- Number of Vertices
+    -3.49109290185452,-7.33670715192456,0,  !- X,Y,Z ==> Vertex 1 {m}
+    -8.0742428060796,1.44251230186008,0,  !- X,Y,Z ==> Vertex 2 {m}
+    3.54168045936913,7.33236158621881,0,  !- X,Y,Z ==> Vertex 3 {m}
+    8.04582210553643,-1.44684975166835,0;  !- X,Y,Z ==> Vertex 4 {m}
+
+  BuildingSurface:Detailed,
+    Surface 2,               !- Name
+    Wall,                    !- Surface Type
+    Typical Insulated Steel Framed Exterior Wall R-15.38,  !- Construction Name
+    Space 0 ZN,              !- Zone Name
+    ,                        !- Space Name
+    Outdoors,                !- Outside Boundary Condition
+    ,                        !- Outside Boundary Condition Object
+    SunExposed,              !- Sun Exposure
+    WindExposed,             !- Wind Exposure
+    ,                        !- View Factor to Ground
+    ,                        !- Number of Vertices
+    -8.0742428060796,1.44251230186008,2.59776946120734,  !- X,Y,Z ==> Vertex 1 {m}
+    -8.0742428060796,1.44251230186008,0,  !- X,Y,Z ==> Vertex 2 {m}
+    -3.49109290185452,-7.33670715192456,0,  !- X,Y,Z ==> Vertex 3 {m}
+    -3.49109290185452,-7.33670715192456,2.59776946120734;  !- X,Y,Z ==> Vertex 4 {m}
+
+  FenestrationSurface:Detailed,
+    Sub Surface 1,           !- Name
+    Window,                  !- Surface Type
+    U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39,  !- Construction Name
+    Surface 2,               !- Building Surface Name
+    ,                        !- Outside Boundary Condition Object
+    ,                        !- View Factor to Ground
+    ,                        !- Frame and Divider Name
+    ,                        !- Multiplier
+    ,                        !- Number of Vertices
+    -8.06248821176636,1.41999587424531,1.12756287304044,  !- X,Y,Z ==> Vertex 1 {m}
+    -8.06248821176636,1.41999587424531,0.762,  !- X,Y,Z ==> Vertex 2 {m}
+    -3.50284749616776,-7.31419072430979,0.762,  !- X,Y,Z ==> Vertex 3 {m}
+    -3.50284749616776,-7.31419072430979,1.12756287304044;  !- X,Y,Z ==> Vertex 4 {m}
+
+  BuildingSurface:Detailed,
+    Surface 3,               !- Name
+    Wall,                    !- Surface Type
+    Typical Insulated Steel Framed Exterior Wall R-15.38,  !- Construction Name
+    Space 0 ZN,              !- Zone Name
+    ,                        !- Space Name
+    Outdoors,                !- Outside Boundary Condition
+    ,                        !- Outside Boundary Condition Object
+    SunExposed,              !- Sun Exposure
+    WindExposed,             !- Wind Exposure
+    ,                        !- View Factor to Ground
+    ,                        !- Number of Vertices
+    3.54168045936913,7.33236158621881,2.59776946120734,  !- X,Y,Z ==> Vertex 1 {m}
+    3.54168045936913,7.33236158621881,0,  !- X,Y,Z ==> Vertex 2 {m}
+    -8.0742428060796,1.44251230186008,0,  !- X,Y,Z ==> Vertex 3 {m}
+    -8.0742428060796,1.44251230186008,2.59776946120734;  !- X,Y,Z ==> Vertex 4 {m}
+
+  FenestrationSurface:Detailed,
+    Sub Surface 2,           !- Name
+    Window,                  !- Surface Type
+    U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39,  !- Construction Name
+    Surface 3,               !- Building Surface Name
+    ,                        !- Outside Boundary Condition Object
+    ,                        !- View Factor to Ground
+    ,                        !- Frame and Divider Name
+    ,                        !- Multiplier
+    ,                        !- Number of Vertices
+    3.51902624925025,7.32087477796369,1.12711185945559,  !- X,Y,Z ==> Vertex 1 {m}
+    3.51902624925025,7.32087477796369,0.762,  !- X,Y,Z ==> Vertex 2 {m}
+    -8.05158859596072,1.4539991101152,0.762,  !- X,Y,Z ==> Vertex 3 {m}
+    -8.05158859596072,1.4539991101152,1.12711185945559;  !- X,Y,Z ==> Vertex 4 {m}
+
+  BuildingSurface:Detailed,
+    Surface 4,               !- Name
+    Wall,                    !- Surface Type
+    Typical Insulated Steel Framed Exterior Wall R-15.38,  !- Construction Name
+    Space 0 ZN,              !- Zone Name
+    ,                        !- Space Name
+    Outdoors,                !- Outside Boundary Condition
+    ,                        !- Outside Boundary Condition Object
+    SunExposed,              !- Sun Exposure
+    WindExposed,             !- Wind Exposure
+    ,                        !- View Factor to Ground
+    ,                        !- Number of Vertices
+    8.04582210553643,-1.44684975166835,2.59776946120734,  !- X,Y,Z ==> Vertex 1 {m}
+    8.04582210553643,-1.44684975166835,0,  !- X,Y,Z ==> Vertex 2 {m}
+    3.54168045936913,7.33236158621881,0,  !- X,Y,Z ==> Vertex 3 {m}
+    3.54168045936913,7.33236158621881,2.59776946120734;  !- X,Y,Z ==> Vertex 4 {m}
+
+  FenestrationSurface:Detailed,
+    Sub Surface 3,           !- Name
+    Window,                  !- Surface Type
+    U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39,  !- Construction Name
+    Surface 4,               !- Building Surface Name
+    ,                        !- Outside Boundary Condition Object
+    ,                        !- View Factor to Ground
+    ,                        !- Frame and Divider Name
+    ,                        !- Multiplier
+    ,                        !- Number of Vertices
+    8.03422762324167,-1.42425046007953,1.12756981134074,  !- X,Y,Z ==> Vertex 1 {m}
+    8.03422762324167,-1.42425046007953,0.762,  !- X,Y,Z ==> Vertex 2 {m}
+    3.55327494166389,7.30976229462999,0.762,  !- X,Y,Z ==> Vertex 3 {m}
+    3.55327494166389,7.30976229462999,1.12756981134074;  !- X,Y,Z ==> Vertex 4 {m}
+
+  BuildingSurface:Detailed,
+    Surface 5,               !- Name
+    Wall,                    !- Surface Type
+    Typical Insulated Steel Framed Exterior Wall R-15.38,  !- Construction Name
+    Space 0 ZN,              !- Zone Name
+    ,                        !- Space Name
+    Outdoors,                !- Outside Boundary Condition
+    ,                        !- Outside Boundary Condition Object
+    SunExposed,              !- Sun Exposure
+    WindExposed,             !- Wind Exposure
+    ,                        !- View Factor to Ground
+    ,                        !- Number of Vertices
+    -3.49109290185452,-7.33670715192456,2.59776946120734,  !- X,Y,Z ==> Vertex 1 {m}
+    -3.49109290185452,-7.33670715192456,0,  !- X,Y,Z ==> Vertex 2 {m}
+    8.04582210553643,-1.44684975166835,0,  !- X,Y,Z ==> Vertex 3 {m}
+    8.04582210553643,-1.44684975166835,2.59776946120734;  !- X,Y,Z ==> Vertex 4 {m}
+
+  FenestrationSurface:Detailed,
+    Sub Surface 4,           !- Name
+    Window,                  !- Surface Type
+    U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39,  !- Construction Name
+    Surface 5,               !- Building Surface Name
+    ,                        !- Outside Boundary Condition Object
+    ,                        !- View Factor to Ground
+    ,                        !- Frame and Divider Name
+    ,                        !- Multiplier
+    ,                        !- Number of Vertices
+    -3.46847046935141,-7.32515788581617,1.12711963148932,  !- X,Y,Z ==> Vertex 1 {m}
+    -3.46847046935141,-7.32515788581617,0.762,  !- X,Y,Z ==> Vertex 2 {m}
+    8.02319967303332,-1.45839901777674,0.762,  !- X,Y,Z ==> Vertex 3 {m}
+    8.02319967303332,-1.45839901777674,1.12711963148932;  !- X,Y,Z ==> Vertex 4 {m}
+
+  BuildingSurface:Detailed,
+    Surface 6,               !- Name
+    Roof,                    !- Surface Type
+    Typical IEAD Roof R-22.22,  !- Construction Name
+    Space 0 ZN,              !- Zone Name
+    ,                        !- Space Name
+    Outdoors,                !- Outside Boundary Condition
+    ,                        !- Outside Boundary Condition Object
+    SunExposed,              !- Sun Exposure
+    WindExposed,             !- Wind Exposure
+    ,                        !- View Factor to Ground
+    ,                        !- Number of Vertices
+    8.04582210553643,-1.44684975166835,2.59776946120734,  !- X,Y,Z ==> Vertex 1 {m}
+    3.54168045936913,7.33236158621881,2.59776946120734,  !- X,Y,Z ==> Vertex 2 {m}
+    -8.0742428060796,1.44251230186008,2.59776946120734,  !- X,Y,Z ==> Vertex 3 {m}
+    -3.49109290185452,-7.33670715192456,2.59776946120734;  !- X,Y,Z ==> Vertex 4 {m}
+
+  InternalMass,
+    Space 0 Mass,            !- Name
+    InteriorFurnishings,     !- Construction Name
+    Space 0 ZN,              !- Zone or ZoneList Name
+    ,                        !- Space or SpaceList Name
+    256.786568732814;        !- Surface Area {m2}
+
+  ZoneInfiltration:DesignFlowRate,
+    Space 0 Infiltration,    !- Name
+    Space 0 ZN,              !- Zone or ZoneList or Space or SpaceList Name
+    MidriseApartment Infil,  !- Schedule Name
+    Flow/ExteriorArea,       !- Design Flow Rate Calculation Method
+    ,                        !- Design Flow Rate {m3/s}
+    ,                        !- Flow Rate per Floor Area {m3/s-m2}
+    0.0004928139825,         !- Flow Rate per Exterior Surface Area {m3/s-m2}
+    ,                        !- Air Changes per Hour {1/hr}
+    1,                       !- Constant Term Coefficient
+    0,                       !- Temperature Term Coefficient
+    0,                       !- Velocity Term Coefficient
+    0;                       !- Velocity Squared Term Coefficient
+
+  ZoneControl:Thermostat,
+    Space 0 ZN Thermostat,   !- Name
+    Space 0 ZN,              !- Zone or ZoneList Name
+    Space 0 ZN Thermostat Schedule,  !- Control Type Schedule Name
+    ThermostatSetpoint:DualSetpoint,  !- Control 1 Object Type
+    Space Type 1 Thermostat 1,  !- Control 1 Name
+    ,                        !- Control 2 Object Type
+    ,                        !- Control 2 Name
+    ,                        !- Control 3 Object Type
+    ,                        !- Control 3 Name
+    ,                        !- Control 4 Object Type
+    ,                        !- Control 4 Name
+    0;                       !- Temperature Difference Between Cutout And Setpoint {deltaC}
+
+  Schedule:Compact,
+    Space 0 ZN Thermostat Schedule,  !- Name
+    Space 0 ZN Thermostat Schedule Type Limits,  !- Schedule Type Limits Name
+    Through: 12/31,          !- Field 1
+    For: AllDays,            !- Field 2
+    Until: 24:00,4;          !- Field 3
+
+  ScheduleTypeLimits,
+    Space 0 ZN Thermostat Schedule Type Limits,  !- Name
+    0,                       !- Lower Limit Value
+    4,                       !- Upper Limit Value
+    DISCRETE;                !- Numeric Type
+
+  ThermostatSetpoint:DualSetpoint,
+    Space Type 1 Thermostat 1,  !- Name
+    MidriseApartment Apartment HtgSetp,  !- Heating Setpoint Temperature Schedule Name
+    MidriseApartment Apartment ClgSetp;  !- Cooling Setpoint Temperature Schedule Name
+
+  ScheduleTypeLimits,
+    Temperature,             !- Name
+    ,                        !- Lower Limit Value
+    ,                        !- Upper Limit Value
+    Continuous,              !- Numeric Type
+    temperature;             !- Unit Type
+
+  Schedule:Day:Interval,
+    MidriseApartment Apartment HtgSetp Default,  !- Name
+    Temperature,             !- Schedule Type Limits Name
+    No,                      !- Interpolate to Timestep
+    24:00,                   !- Time 1
+    21.1;                    !- Value Until Time 1
+
+  Schedule:Week:Daily,
+    MidriseApartment Apartment HtgSetp Week Rule - Jan1-Dec31,  !- Name
+    MidriseApartment Apartment HtgSetp Default,  !- Sunday Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Default,  !- Monday Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Default,  !- Tuesday Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Default,  !- Wednesday Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Default,  !- Thursday Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Default,  !- Friday Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Default,  !- Saturday Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Default,  !- Holiday Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Summer Design Day,  !- SummerDesignDay Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Winter Design Day,  !- WinterDesignDay Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Default,  !- CustomDay1 Schedule:Day Name
+    MidriseApartment Apartment HtgSetp Default;  !- CustomDay2 Schedule:Day Name
+
+  Schedule:Year,
+    MidriseApartment Apartment HtgSetp,  !- Name
+    Temperature,             !- Schedule Type Limits Name
+    MidriseApartment Apartment HtgSetp Week Rule - Jan1-Dec31,  !- Schedule:Week Name 1
+    1,                       !- Start Month 1
+    1,                       !- Start Day 1
+    12,                      !- End Month 1
+    31;                      !- End Day 1
+
+  Schedule:Day:Interval,
+    MidriseApartment Apartment HtgSetp Summer Design Day,  !- Name
+    Temperature,             !- Schedule Type Limits Name
+    No,                      !- Interpolate to Timestep
+    24:00,                   !- Time 1
+    21.1;                    !- Value Until Time 1
+
+  Schedule:Day:Interval,
+    MidriseApartment Apartment HtgSetp Winter Design Day,  !- Name
+    Temperature,             !- Schedule Type Limits Name
+    No,                      !- Interpolate to Timestep
+    24:00,                   !- Time 1
+    21.1;                    !- Value Until Time 1
+
+  Schedule:Day:Interval,
+    MidriseApartment Apartment ClgSetp Default,  !- Name
+    Temperature,             !- Schedule Type Limits Name
+    No,                      !- Interpolate to Timestep
+    24:00,                   !- Time 1
+    23.9;                    !- Value Until Time 1
+
+  Schedule:Week:Daily,
+    MidriseApartment Apartment ClgSetp Week Rule - Jan1-Dec31,  !- Name
+    MidriseApartment Apartment ClgSetp Default,  !- Sunday Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Default,  !- Monday Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Default,  !- Tuesday Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Default,  !- Wednesday Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Default,  !- Thursday Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Default,  !- Friday Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Default,  !- Saturday Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Default,  !- Holiday Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Summer Design Day,  !- SummerDesignDay Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Winter Design Day,  !- WinterDesignDay Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Default,  !- CustomDay1 Schedule:Day Name
+    MidriseApartment Apartment ClgSetp Default;  !- CustomDay2 Schedule:Day Name
+
+  Schedule:Year,
+    MidriseApartment Apartment ClgSetp,  !- Name
+    Temperature,             !- Schedule Type Limits Name
+    MidriseApartment Apartment ClgSetp Week Rule - Jan1-Dec31,  !- Schedule:Week Name 1
+    1,                       !- Start Month 1
+    1,                       !- Start Day 1
+    12,                      !- End Month 1
+    31;                      !- End Day 1
+
+  Schedule:Day:Interval,
+    MidriseApartment Apartment ClgSetp Summer Design Day,  !- Name
+    Temperature,             !- Schedule Type Limits Name
+    No,                      !- Interpolate to Timestep
+    24:00,                   !- Time 1
+    23.9;                    !- Value Until Time 1
+
+  Schedule:Day:Interval,
+    MidriseApartment Apartment ClgSetp Winter Design Day,  !- Name
+    Temperature,             !- Schedule Type Limits Name
+    No,                      !- Interpolate to Timestep
+    24:00,                   !- Time 1
+    23.9;                    !- Value Until Time 1
+
+  ZoneHVAC:EquipmentConnections,
+    Space 0 ZN,              !- Zone Name
+    Space 0 ZN Equipment List,  !- Zone Conditioning Equipment List Name
+    Space 0 ZN Inlet Node List,  !- Zone Air Inlet Node or NodeList Name
+    ,                        !- Zone Air Exhaust Node or NodeList Name
+    Space 0 ZN Zone Air Node,!- Zone Air Node Name
+    Space 0 ZN Return Node List;  !- Zone Return Air Node or NodeList Name
+
+  NodeList,
+    Space 0 ZN Inlet Node List,  !- Name
+    Space 0 ZN SAC Diffuser Outlet Air Node;  !- Node 1 Name
+
+  NodeList,
+    Space 0 ZN Return Node List,  !- Name
+    Space 0 ZN Return Air Node;  !- Node 1 Name
+
+  AirTerminal:SingleDuct:ConstantVolume:NoReheat,
+    Space 0 ZN SAC Diffuser, !- Name
+    Always On Discrete,      !- Availability Schedule Name
+    Space 0 ZN SAC Diffuser Inlet Air Node,  !- Air Inlet Node Name
+    Space 0 ZN SAC Diffuser Outlet Air Node,  !- Air Outlet Node Name
+    AutoSize;                !- Maximum Air Flow Rate {m3/s}
+
+  ZoneHVAC:AirDistributionUnit,
+    ADU Space 0 ZN SAC Diffuser,  !- Name
+    Space 0 ZN SAC Diffuser Outlet Air Node,  !- Air Distribution Unit Outlet Node Name
+    AirTerminal:SingleDuct:ConstantVolume:NoReheat,  !- Air Terminal Object Type
+    Space 0 ZN SAC Diffuser; !- Air Terminal Name
+
+  ZoneHVAC:EquipmentList,
+    Space 0 ZN Equipment List,  !- Name
+    SequentialLoad,          !- Load Distribution Scheme
+    ZoneHVAC:AirDistributionUnit,  !- Zone Equipment 1 Object Type
+    ADU Space 0 ZN SAC Diffuser,  !- Zone Equipment 1 Name
+    1,                       !- Zone Equipment 1 Cooling Sequence
+    1,                       !- Zone Equipment 1 Heating or No-Load Sequence
+    ,                        !- Zone Equipment 1 Sequential Cooling Fraction Schedule Name
+    ;                        !- Zone Equipment 1 Sequential Heating Fraction Schedule Name
+
+  Sizing:Zone,
+    Space 0 ZN,              !- Zone or ZoneList Name
+    SupplyAirTemperature,    !- Zone Cooling Design Supply Air Temperature Input Method
+    12.7777777777778,        !- Zone Cooling Design Supply Air Temperature {C}
+    11.11,                   !- Zone Cooling Design Supply Air Temperature Difference {deltaC}
+    SupplyAirTemperature,    !- Zone Heating Design Supply Air Temperature Input Method
+    50.0000000000001,        !- Zone Heating Design Supply Air Temperature {C}
+    11.11,                   !- Zone Heating Design Supply Air Temperature Difference {deltaC}
+    0.008,                   !- Zone Cooling Design Supply Air Humidity Ratio {kgWater/kgDryAir}
+    0.008,                   !- Zone Heating Design Supply Air Humidity Ratio {kgWater/kgDryAir}
+    Space Type 1 Ventilation,!- Design Specification Outdoor Air Object Name
+    ,                        !- Zone Heating Sizing Factor
+    ,                        !- Zone Cooling Sizing Factor
+    DesignDay,               !- Cooling Design Air Flow Method
+    0,                       !- Cooling Design Air Flow Rate {m3/s}
+    0.000762,                !- Cooling Minimum Air Flow per Zone Floor Area {m3/s-m2}
+    0,                       !- Cooling Minimum Air Flow {m3/s}
+    0,                       !- Cooling Minimum Air Flow Fraction
+    DesignDay,               !- Heating Design Air Flow Method
+    0,                       !- Heating Design Air Flow Rate {m3/s}
+    0.002032,                !- Heating Maximum Air Flow per Zone Floor Area {m3/s-m2}
+    0.1415762,               !- Heating Maximum Air Flow {m3/s}
+    0.3,                     !- Heating Maximum Air Flow Fraction
+    ,                        !- Design Specification Zone Air Distribution Object Name
+    No,                      !- Account for Dedicated Outdoor Air System
+    ,                        !- Dedicated Outdoor Air System Control Strategy
+    ,                        !- Dedicated Outdoor Air Low Setpoint Temperature for Design {C}
+    ,                        !- Dedicated Outdoor Air High Setpoint Temperature for Design {C}
+    Sensible Load Only No Latent Load,  !- Zone Load Sizing Method
+    HumidityRatioDifference, !- Zone Latent Cooling Design Supply Air Humidity Ratio Input Method
+    ,                        !- Zone Dehumidification Design Supply Air Humidity Ratio {kgWater/kgDryAir}
+    0.005,                   !- Zone Cooling Design Supply Air Humidity Ratio Difference {kgWater/kgDryAir}
+    HumidityRatioDifference, !- Zone Latent Heating Design Supply Air Humidity Ratio Input Method
+    ,                        !- Zone Humidification Design Supply Air Humidity Ratio {kgWater/kgDryAir}
+    0.005;                   !- Zone Humidification Design Supply Air Humidity Ratio Difference {kgWater/kgDryAir}
+
+  Schedule:Constant,Always On Discrete,OnOff,1;
+
+  Controller:MechanicalVentilation,
+    Controller Mechanical Ventilation 1,  !- Name
+    Always On Discrete,      !- Availability Schedule Name
+    No,                      !- Demand Controlled Ventilation
+    ZoneSum,                 !- System Outdoor Air Method
+    ,                        !- Zone Maximum Outdoor Air Fraction {dimensionless}
+    Space 0 ZN,              !- Zone or ZoneList 1 Name
+    Space Type 1 Ventilation,!- Design Specification Outdoor Air Object Name 1
+    ;                        !- Design Specification Zone Air Distribution Object Name 1
+
+  DesignSpecification:OutdoorAir,
+    Space Type 1 Ventilation,!- Name
+    Sum,                     !- Outdoor Air Method
+    0.0169901079552,         !- Outdoor Air Flow per Person {m3/s-person}
+    0,                       !- Outdoor Air Flow per Zone Floor Area {m3/s-m2}
+    0,                       !- Outdoor Air Flow per Zone {m3/s}
+    0;                       !- Outdoor Air Flow Air Changes per Hour {1/hr}
+
+  SimulationControl,
+    Yes,                     !- Do Zone Sizing Calculation
+    Yes,                     !- Do System Sizing Calculation
+    No,                      !- Do Plant Sizing Calculation
+    No,                      !- Run Simulation for Sizing Periods
+    Yes,                     !- Run Simulation for Weather File Run Periods
+    Yes,                     !- Do HVAC Sizing Simulation for Sizing Periods
+    1;                       !- Maximum Number of HVAC Sizing Simulation Passes
+
+  HeatBalanceAlgorithm,ConductionTransferFunction,200;
+
+  RunPeriod,
+    Run Period 1,            !- Name
+    1,                       !- Begin Month
+    1,                       !- Begin Day of Month
+    2006,                    !- Begin Year
+    12,                      !- End Month
+    31,                      !- End Day of Month
+    2006,                    !- End Year
+    Sunday,                  !- Day of Week for Start Day
+    No,                      !- Use Weather File Holidays and Special Days
+    No,                      !- Use Weather File Daylight Saving Period
+    No,                      !- Apply Weekend Holiday Rule
+    Yes,                     !- Use Weather File Rain Indicators
+    Yes;                     !- Use Weather File Snow Indicators
+
+  ShadowCalculation,
+    PolygonClipping,         !- Shading Calculation Method
+    Periodic,                !- Shading Calculation Update Frequency Method
+    20,                      !- Shading Calculation Update Frequency
+    15000,                   !- Maximum Figures in Shadow Overlap Calculations
+    SutherlandHodgman,       !- Polygon Clipping Algorithm
+    512,                     !- Pixel Counting Resolution
+    SimpleSkyDiffuseModeling,!- Sky Diffuse Modeling Algorithm
+    No,                      !- Output External Shading Calculation Results

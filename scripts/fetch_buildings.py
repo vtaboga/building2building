@@ -23,9 +23,9 @@ def main(cfg: DictConfig) -> None:
         num_floors=building_cfg.num_floors,
         height=building_cfg.height,
         n_buildings=building_cfg.n_buildings,
-        n_weather_files=building_cfg.get('n_weather_files', 2)
+        n_weather_files=building_cfg.n_weather_files,
+        keep_original=building_cfg.keep_original
     )
-    
     if search_result is None:
         logger.error("No buildings found matching the criteria")
         return

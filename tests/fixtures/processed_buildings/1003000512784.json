@@ -1,0 +1,9 @@
+{
+    "building_type": "SmallOffice",
+    "num_floors": 1.0,
+    "area": 909.523491808264,
+    "height": 9.84252,
+    "zone_lists": [
+        "Space 0 ZN"
+    ]
+}

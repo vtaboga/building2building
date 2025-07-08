@@ -7,7 +7,7 @@ from building2building.algorithms.online.baselines import run_constant_baseline
 
 def test_run_baseline():
     # Load building characteristics
-    with open("tests/fixtures/building.json", "r") as f:
+    with open("tests/fixtures/building_1z.json", "r") as f:
         building_characteristics = json.load(f)
     
     # Setup test directories
@@ -18,7 +18,7 @@ def test_run_baseline():
         # Run baseline evaluation
         results = run_constant_baseline(
             env_id="EnergyPlus-v0",
-            path_to_building="tests/fixtures/building.epJSON",
+            path_to_building="tests/fixtures/building_1z.epJSON",
             path_to_weather="tests/fixtures/alaska.epw",
             building_characteristics=building_characteristics,
             heating_setpoint=21.0,

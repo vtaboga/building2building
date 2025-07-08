@@ -1,0 +1,3655 @@
+{
+  "AirLoopHVAC": {
+    "Space 0 ZN SAC": {
+      "availability_manager_list_name": "Air Loop HVAC 1 AvailabilityManagerAssignmentList",
+      "branch_list_name": "Space 0 ZN SAC Supply Branches",
+      "demand_side_inlet_node_names": "Space 0 ZN SAC Demand Inlet Nodes",
+      "demand_side_outlet_node_name": "Space 0 ZN SAC Demand Outlet Node",
+      "design_return_air_flow_fraction_of_supply_air_flow": 1,
+      "design_supply_air_flow_rate": "Autosize",
+      "supply_side_inlet_node_name": "Space 0 ZN SAC Supply Inlet Node",
+      "supply_side_outlet_node_names": "Space 0 ZN SAC Supply Outlet Nodes"
+    }
+  },
+  "AirLoopHVAC:ControllerList": {
+    "Space 0 ZN SAC OA System Controller List": {
+      "controller_1_name": "Space 0 ZN SAC OA System Controller",
+      "controller_1_object_type": "Controller:OutdoorAir"
+    }
+  },
+  "AirLoopHVAC:OutdoorAirSystem": {
+    "Space 0 ZN SAC OA System": {
+      "controller_list_name": "Space 0 ZN SAC OA System Controller List",
+      "outdoor_air_equipment_list_name": "Space 0 ZN SAC OA System Equipment List"
+    }
+  },
+  "AirLoopHVAC:OutdoorAirSystem:EquipmentList": {
+    "Space 0 ZN SAC OA System Equipment List": {
+      "component_1_name": "Space 0 ZN SAC OA System Outdoor Air Mixer",
+      "component_1_object_type": "OutdoorAir:Mixer"
+    }
+  },
+  "AirLoopHVAC:ReturnPath": {
+    "Space 0 ZN SAC Return Path": {
+      "components": [
+        {
+          "component_name": "Air Loop HVAC Zone Mixer 1",
+          "component_object_type": "AirLoopHVAC:ZoneMixer"
+        }
+      ],
+      "return_air_path_outlet_node_name": "Space 0 ZN SAC Demand Outlet Node"
+    }
+  },
+  "AirLoopHVAC:SupplyPath": {
+    "Space 0 ZN SAC Space 0 ZN SAC Demand Inlet Node Supply Path": {
+      "components": [
+        {
+          "component_name": "Air Loop HVAC Zone Splitter 1",
+          "component_object_type": "AirLoopHVAC:ZoneSplitter"
+        }
+      ],
+      "supply_air_path_inlet_node_name": "Space 0 ZN SAC Demand Inlet Node"
+    }
+  },
+  "AirLoopHVAC:ZoneMixer": {
+    "Air Loop HVAC Zone Mixer 1": {
+      "nodes": [
+        {
+          "inlet_node_name": "Space 0 ZN Return Air Node"
+        }
+      ],
+      "outlet_node_name": "Space 0 ZN SAC Demand Outlet Node"
+    }
+  },
+  "AirLoopHVAC:ZoneSplitter": {
+    "Air Loop HVAC Zone Splitter 1": {
+      "inlet_node_name": "Space 0 ZN SAC Demand Inlet Node",
+      "nodes": [
+        {
+          "outlet_node_name": "Space 0 ZN SAC Diffuser Inlet Air Node"
+        }
+      ]
+    }
+  },
+  "AirTerminal:SingleDuct:ConstantVolume:NoReheat": {
+    "Space 0 ZN SAC Diffuser": {
+      "air_inlet_node_name": "Space 0 ZN SAC Diffuser Inlet Air Node",
+      "air_outlet_node_name": "Space 0 ZN SAC Diffuser Outlet Air Node",
+      "availability_schedule_name": "Always On Discrete",
+      "maximum_air_flow_rate": "Autosize"
+    }
+  },
+  "AvailabilityManager:NightCycle": {
+    "Availability Manager Night Cycle 1": {
+      "applicability_schedule_name": "Always On Discrete",
+      "control_type": "CycleOnAny",
+      "cycling_run_time": 3600,
+      "cycling_run_time_control_type": "FixedRunTime",
+      "fan_schedule_name": "ApartmentMidRise All On",
+      "thermostat_tolerance": 1
+    }
+  },
+  "AvailabilityManager:Scheduled": {
+    "Space 0 ZN SAC OA System Availability Manager": {
+      "schedule_name": "Always On Discrete"
+    }
+  },
+  "AvailabilityManagerAssignmentList": {
+    "Air Loop HVAC 1 AvailabilityManagerAssignmentList": {
+      "managers": [
+        {
+          "availability_manager_name": "Availability Manager Night Cycle 1",
+          "availability_manager_object_type": "AvailabilityManager:NightCycle"
+        }
+      ]
+    },
+    "Space 0 ZN SAC OA System Availability Manager List": {
+      "managers": [
+        {
+          "availability_manager_name": "Space 0 ZN SAC OA System Availability Manager",
+          "availability_manager_object_type": "AvailabilityManager:Scheduled"
+        }
+      ]
+    }
+  },
+  "Branch": {
+    "Space 0 ZN SAC Main Branch": {
+      "components": [
+        {
+          "component_inlet_node_name": "Space 0 ZN SAC Supply Inlet Node",
+          "component_name": "Space 0 ZN SAC OA System",
+          "component_object_type": "AirLoopHVAC:OutdoorAirSystem",
+          "component_outlet_node_name": "Space 0 ZN SAC Mixed Air Node"
+        },
+        {
+          "component_inlet_node_name": "Space 0 ZN SAC Mixed Air Node",
+          "component_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER CoilSystem",
+          "component_object_type": "CoilSystem:Cooling:DX",
+          "component_outlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER Outlet Air Node"
+        },
+        {
+          "component_inlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER Outlet Air Node",
+          "component_name": "Space 0 ZN SAC Gas Htg Coil",
+          "component_object_type": "Coil:Heating:Fuel",
+          "component_outlet_node_name": "Space 0 ZN SAC Gas Htg Coil Outlet Air Node"
+        },
+        {
+          "component_inlet_node_name": "Space 0 ZN SAC Gas Htg Coil Outlet Air Node",
+          "component_name": "Space 0 ZN SAC Gas Backup Htg Coil",
+          "component_object_type": "Coil:Heating:Fuel",
+          "component_outlet_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node"
+        },
+        {
+          "component_inlet_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node",
+          "component_name": "Space 0 ZN SAC Fan",
+          "component_object_type": "Fan:ConstantVolume",
+          "component_outlet_node_name": "Space 0 ZN SAC Supply Outlet Node"
+        }
+      ]
+    }
+  },
+  "BranchList": {
+    "Space 0 ZN SAC Supply Branches": {
+      "branches": [
+        {
+          "branch_name": "Space 0 ZN SAC Main Branch"
+        }
+      ]
+    }
+  },
+  "Building": {
+    "-MidriseApartment-ASHRAE 169-2006-6A created: 2021-03-21 12:17:40 +0000": {
+      "terrain": "City"
+    }
+  },
+  "BuildingSurface:Detailed": {
+    "Surface 1": {
+      "construction_name": "Foundation F 126 Perim 4575 Area 12839",
+      "outside_boundary_condition": "GroundFCfactorMethod",
+      "sun_exposure": "NoSun",
+      "surface_type": "Floor",
+      "vertices": [
+        {
+          "vertex_x_coordinate": -3.49109290185452,
+          "vertex_y_coordinate": -7.33670715192456,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": -8.0742428060796,
+          "vertex_y_coordinate": 1.44251230186008,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": 3.54168045936913,
+          "vertex_y_coordinate": 7.33236158621881,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": 8.04582210553643,
+          "vertex_y_coordinate": -1.44684975166835,
+          "vertex_z_coordinate": 0
+        }
+      ],
+      "wind_exposure": "NoWind",
+      "zone_name": "Space 0 ZN"
+    },
+    "Surface 2": {
+      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-15.38",
+      "outside_boundary_condition": "Outdoors",
+      "sun_exposure": "SunExposed",
+      "surface_type": "Wall",
+      "vertices": [
+        {
+          "vertex_x_coordinate": -8.0742428060796,
+          "vertex_y_coordinate": 1.44251230186008,
+          "vertex_z_coordinate": 2.59776946120734
+        },
+        {
+          "vertex_x_coordinate": -8.0742428060796,
+          "vertex_y_coordinate": 1.44251230186008,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": -3.49109290185452,
+          "vertex_y_coordinate": -7.33670715192456,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": -3.49109290185452,
+          "vertex_y_coordinate": -7.33670715192456,
+          "vertex_z_coordinate": 2.59776946120734
+        }
+      ],
+      "wind_exposure": "WindExposed",
+      "zone_name": "Space 0 ZN"
+    },
+    "Surface 3": {
+      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-15.38",
+      "outside_boundary_condition": "Outdoors",
+      "sun_exposure": "SunExposed",
+      "surface_type": "Wall",
+      "vertices": [
+        {
+          "vertex_x_coordinate": 3.54168045936913,
+          "vertex_y_coordinate": 7.33236158621881,
+          "vertex_z_coordinate": 2.59776946120734
+        },
+        {
+          "vertex_x_coordinate": 3.54168045936913,
+          "vertex_y_coordinate": 7.33236158621881,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": -8.0742428060796,
+          "vertex_y_coordinate": 1.44251230186008,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": -8.0742428060796,
+          "vertex_y_coordinate": 1.44251230186008,
+          "vertex_z_coordinate": 2.59776946120734
+        }
+      ],
+      "wind_exposure": "WindExposed",
+      "zone_name": "Space 0 ZN"
+    },
+    "Surface 4": {
+      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-15.38",
+      "outside_boundary_condition": "Outdoors",
+      "sun_exposure": "SunExposed",
+      "surface_type": "Wall",
+      "vertices": [
+        {
+          "vertex_x_coordinate": 8.04582210553643,
+          "vertex_y_coordinate": -1.44684975166835,
+          "vertex_z_coordinate": 2.59776946120734
+        },
+        {
+          "vertex_x_coordinate": 8.04582210553643,
+          "vertex_y_coordinate": -1.44684975166835,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": 3.54168045936913,
+          "vertex_y_coordinate": 7.33236158621881,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": 3.54168045936913,
+          "vertex_y_coordinate": 7.33236158621881,
+          "vertex_z_coordinate": 2.59776946120734
+        }
+      ],
+      "wind_exposure": "WindExposed",
+      "zone_name": "Space 0 ZN"
+    },
+    "Surface 5": {
+      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-15.38",
+      "outside_boundary_condition": "Outdoors",
+      "sun_exposure": "SunExposed",
+      "surface_type": "Wall",
+      "vertices": [
+        {
+          "vertex_x_coordinate": -3.49109290185452,
+          "vertex_y_coordinate": -7.33670715192456,
+          "vertex_z_coordinate": 2.59776946120734
+        },
+        {
+          "vertex_x_coordinate": -3.49109290185452,
+          "vertex_y_coordinate": -7.33670715192456,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": 8.04582210553643,
+          "vertex_y_coordinate": -1.44684975166835,
+          "vertex_z_coordinate": 0
+        },
+        {
+          "vertex_x_coordinate": 8.04582210553643,
+          "vertex_y_coordinate": -1.44684975166835,
+          "vertex_z_coordinate": 2.59776946120734
+        }
+      ],
+      "wind_exposure": "WindExposed",
+      "zone_name": "Space 0 ZN"
+    },
+    "Surface 6": {
+      "construction_name": "Typical IEAD Roof R-22.22",
+      "outside_boundary_condition": "Outdoors",
+      "sun_exposure": "SunExposed",
+      "surface_type": "Roof",
+      "vertices": [
+        {
+          "vertex_x_coordinate": 8.04582210553643,
+          "vertex_y_coordinate": -1.44684975166835,
+          "vertex_z_coordinate": 2.59776946120734
+        },
+        {
+          "vertex_x_coordinate": 3.54168045936913,
+          "vertex_y_coordinate": 7.33236158621881,
+          "vertex_z_coordinate": 2.59776946120734
+        },
+        {
+          "vertex_x_coordinate": -8.0742428060796,
+          "vertex_y_coordinate": 1.44251230186008,
+          "vertex_z_coordinate": 2.59776946120734
+        },
+        {
+          "vertex_x_coordinate": -3.49109290185452,
+          "vertex_y_coordinate": -7.33670715192456,
+          "vertex_z_coordinate": 2.59776946120734
+        }
+      ],
+      "wind_exposure": "WindExposed",
+      "zone_name": "Space 0 ZN"
+    }
+  },
+  "Coil:Cooling:DX:SingleSpeed": {
+    "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER": {
+      "2017_rated_evaporator_fan_power_per_volume_flow_rate": 773.3,
+      "air_inlet_node_name": "Space 0 ZN SAC Mixed Air Node",
+      "air_outlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER Outlet Air Node",
+      "availability_schedule_name": "Always On Discrete",
+      "basin_heater_capacity": 0,
+      "basin_heater_setpoint_temperature": 10,
+      "condenser_type": "AirCooled",
+      "crankcase_heater_capacity": 0,
+      "energy_input_ratio_function_of_flow_fraction_curve_name": "DOE Ref DX Clg Coil Cool-EIR-fFlow",
+      "energy_input_ratio_function_of_temperature_curve_name": "DOE Ref DX Clg Coil Cool-EIR-fT",
+      "evaporative_condenser_air_flow_rate": "Autosize",
+      "evaporative_condenser_effectiveness": 0,
+      "evaporative_condenser_pump_rated_power_consumption": "Autosize",
+      "gross_rated_cooling_cop": 3.14721852276057,
+      "gross_rated_sensible_heat_ratio": "Autosize",
+      "gross_rated_total_cooling_capacity": "Autosize",
+      "maximum_outdoor_dry_bulb_temperature_for_crankcase_heater_operation": 0,
+      "minimum_outdoor_dry_bulb_temperature_for_compressor_operation": -25,
+      "part_load_fraction_correlation_curve_name": "DOE Ref DX Clg Coil Cool-PLF-fPLR",
+      "rated_air_flow_rate": "Autosize",
+      "total_cooling_capacity_function_of_flow_fraction_curve_name": "DOE Ref DX Clg Coil Cool-CAP-fFlow",
+      "total_cooling_capacity_function_of_temperature_curve_name": "DOE Ref DX Clg Coil Cool-Cap-fT"
+    }
+  },
+  "Coil:Heating:Fuel": {
+    "Space 0 ZN SAC Gas Backup Htg Coil": {
+      "air_inlet_node_name": "Space 0 ZN SAC Gas Htg Coil Outlet Air Node",
+      "air_outlet_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node",
+      "availability_schedule_name": "Always On Discrete",
+      "burner_efficiency": 0.8,
+      "fuel_type": "NaturalGas",
+      "nominal_capacity": "Autosize",
+      "off_cycle_parasitic_fuel_load": 0,
+      "on_cycle_parasitic_electric_load": 0,
+      "temperature_setpoint_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node"
+    },
+    "Space 0 ZN SAC Gas Htg Coil": {
+      "air_inlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER Outlet Air Node",
+      "air_outlet_node_name": "Space 0 ZN SAC Gas Htg Coil Outlet Air Node",
+      "availability_schedule_name": "Always On Discrete",
+      "burner_efficiency": 0.8,
+      "fuel_type": "NaturalGas",
+      "nominal_capacity": "Autosize",
+      "off_cycle_parasitic_fuel_load": 0,
+      "on_cycle_parasitic_electric_load": 0,
+      "part_load_fraction_correlation_curve_name": "Curve Cubic 1",
+      "temperature_setpoint_node_name": "Space 0 ZN SAC Gas Htg Coil Outlet Air Node"
+    }
+  },
+  "CoilSystem:Cooling:DX": {
+    "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER CoilSystem": {
+      "availability_schedule_name": "Always On Discrete",
+      "cooling_coil_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER",
+      "cooling_coil_object_type": "Coil:Cooling:DX:SingleSpeed",
+      "dx_cooling_coil_system_inlet_node_name": "Space 0 ZN SAC Mixed Air Node",
+      "dx_cooling_coil_system_outlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER Outlet Air Node",
+      "dx_cooling_coil_system_sensor_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER Outlet Air Node"
+    }
+  },
+  "Construction": {
+    "InteriorFurnishings": {
+      "outside_layer": "Std Wood 6inch"
+    },
+    "Typical IEAD Roof R-22.22": {
+      "layer_2": "Typical Insulation R-21.1",
+      "layer_3": "Metal Roof Surface",
+      "outside_layer": "Roof Membrane"
+    },
+    "Typical Insulated Basement Mass Wall": {
+      "outside_layer": "8 in. Concrete Block Basement Wall"
+    },
+    "Typical Insulated Carpeted 6in Slab Floor": {
+      "layer_2": "Typical Carpet Pad",
+      "outside_layer": "6 in. Normalweight Concrete Floor"
+    },
+    "Typical Insulated Exterior Mass Floor": {
+      "layer_2": "4 in. Normalweight Concrete Floor",
+      "layer_3": "Typical Carpet Pad",
+      "outside_layer": "Typical Insulation R-13.21"
+    },
+    "Typical Insulated Metal Door": {
+      "layer_2": "Typical Insulation",
+      "outside_layer": "F08 Metal surface"
+    },
+    "Typical Insulated Steel Framed Exterior Wall R-15.38": {
+      "layer_2": "5/8 in. Gypsum Board",
+      "layer_3": "Typical Insulation R-13.21",
+      "layer_4": "5/8 in. Gypsum Board",
+      "outside_layer": "25mm Stucco"
+    },
+    "Typical Interior Ceiling": {
+      "layer_2": "100mm Normalweight concrete floor",
+      "outside_layer": "CP02 CARPET PAD"
+    },
+    "Typical Interior Door": {
+      "outside_layer": "G05 25mm wood"
+    },
+    "Typical Interior Floor": {
+      "layer_2": "CP02 CARPET PAD",
+      "outside_layer": "100mm Normalweight concrete floor"
+    },
+    "Typical Interior Partition": {
+      "outside_layer": "G05 25mm wood"
+    },
+    "Typical Interior Wall": {
+      "layer_2": "G01 13mm gypsum board",
+      "outside_layer": "G01 13mm gypsum board"
+    },
+    "Typical Interior Window": {
+      "outside_layer": "Clear 3mm"
+    },
+    "Typical Overhead Door": {
+      "outside_layer": "Typical Insulation"
+    },
+    "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39": {
+      "outside_layer": "U 0.52 SHGC 0.39 Simple Glazing U-0.93 SHGC 0.39"
+    },
+    "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39 1": {
+      "outside_layer": "U 0.52 SHGC 0.39 Simple Glazing U-0.93 SHGC 0.39 1"
+    },
+    "U 0.88 SHGC 0.16 Sgl Ref-A-L Clr 6mm": {
+      "outside_layer": "REF A CLEAR LO 6MM"
+    }
+  },
+  "Construction:FfactorGroundFloor": {
+    "Foundation F 126 Perim 4575 Area 12839": {
+      "area": 128.393284366407,
+      "f_factor": 1.26343630645112,
+      "perimeterexposed": 45.7479772412044
+    }
+  },
+  "Controller:MechanicalVentilation": {
+    "Controller Mechanical Ventilation 1": {
+      "availability_schedule_name": "Always On Discrete",
+      "demand_controlled_ventilation": "No",
+      "system_outdoor_air_method": "ZoneSum",
+      "zone_specifications": [
+        {
+          "design_specification_outdoor_air_object_name": "Space Type 1 Ventilation",
+          "zone_or_zonelist_name": "Space 0 ZN"
+        }
+      ]
+    }
+  },
+  "Controller:OutdoorAir": {
+    "Space 0 ZN SAC OA System Controller": {
+      "actuator_node_name": "Space 0 ZN SAC Outdoor Air Node",
+      "control_high_indoor_humidity_based_on_outdoor_humidity_ratio": "Yes",
+      "economizer_control_action_type": "ModulateFlow",
+      "economizer_control_type": "NoEconomizer",
+      "economizer_maximum_limit_dry_bulb_temperature": 28,
+      "economizer_maximum_limit_enthalpy": 64000,
+      "heat_recovery_bypass_control_type": "BypassWhenWithinEconomizerLimits",
+      "high_humidity_control": "No",
+      "lockout_type": "LockoutWithCompressor",
+      "maximum_outdoor_air_flow_rate": "Autosize",
+      "mechanical_ventilation_controller_name": "Controller Mechanical Ventilation 1",
+      "minimum_limit_type": "FixedMinimum",
+      "minimum_outdoor_air_flow_rate": "Autosize",
+      "minimum_outdoor_air_schedule_name": "Always On Discrete",
+      "mixed_air_node_name": "Space 0 ZN SAC Mixed Air Node",
+      "relief_air_outlet_node_name": "Space 0 ZN SAC Relief Air Node",
+      "return_air_node_name": "Space 0 ZN SAC Supply Inlet Node"
+    }
+  },
+  "Curve:Biquadratic": {
+    "DOE Ref DX Clg Coil Cool-Cap-fT": {
+      "coefficient1_constant": 0.9712123,
+      "coefficient2_x": -0.015275502,
+      "coefficient3_x_2": 0.0014434524,
+      "coefficient4_y": -0.00039321,
+      "coefficient5_y_2": -6.8364e-06,
+      "coefficient6_x_y": -0.0002905956,
+      "maximum_value_of_x": 100,
+      "maximum_value_of_y": 100,
+      "minimum_value_of_x": -100,
+      "minimum_value_of_y": -100
+    },
+    "DOE Ref DX Clg Coil Cool-EIR-fT": {
+      "coefficient1_constant": 0.28687133,
+      "coefficient2_x": 0.023902164,
+      "coefficient3_x_2": -0.000810648,
+      "coefficient4_y": 0.013458546,
+      "coefficient5_y_2": 0.0003389364,
+      "coefficient6_x_y": -0.0004870044,
+      "maximum_value_of_x": 100,
+      "maximum_value_of_y": 100,
+      "minimum_value_of_x": -100,
+      "minimum_value_of_y": -100
+    }
+  },
+  "Curve:Cubic": {
+    "Curve Cubic 1": {
+      "coefficient1_constant": 0.8,
+      "coefficient2_x": 0.2,
+      "coefficient3_x_2": 0,
+      "coefficient4_x_3": 0,
+      "maximum_value_of_x": 1,
+      "minimum_value_of_x": 0
+    },
+    "DOE Ref DX Clg Coil Cool-CAP-fFlow": {
+      "coefficient1_constant": 1,
+      "coefficient2_x": 0,
+      "coefficient3_x_2": 0,
+      "coefficient4_x_3": 0,
+      "maximum_value_of_x": 100,
+      "minimum_value_of_x": -100
+    },
+    "DOE Ref DX Clg Coil Cool-EIR-fFlow": {
+      "coefficient1_constant": 1,
+      "coefficient2_x": 0,
+      "coefficient3_x_2": 0,
+      "coefficient4_x_3": 0,
+      "maximum_value_of_x": 100,
+      "minimum_value_of_x": -100
+    }
+  },
+  "Curve:Quadratic": {
+    "DOE Ref DX Clg Coil Cool-PLF-fPLR": {
+      "coefficient1_constant": 0.90949556,
+      "coefficient2_x": 0.09864773,
+      "coefficient3_x_2": -0.00819488,
+      "maximum_value_of_x": 1,
+      "minimum_value_of_x": 0
+    }
+  },
+  "DesignSpecification:OutdoorAir": {
+    "Space Type 1 Ventilation": {
+      "outdoor_air_flow_air_changes_per_hour": 0,
+      "outdoor_air_flow_per_person": 0.0169901079552,
+      "outdoor_air_flow_per_zone": 0,
+      "outdoor_air_flow_per_zone_floor_area": 0,
+      "outdoor_air_method": "Sum"
+    }
+  },
+  "ElectricEquipment": {
+    "Space Type 1 Elec Equip": {
+      "design_level_calculation_method": "Watts/Area",
+      "end_use_subcategory": "General",
+      "fraction_latent": 0,
+      "fraction_lost": 0,
+      "fraction_radiant": 0.5,
+      "schedule_name": "ApartmentMidRise EQP_APT_SCH",
+      "watts_per_floor_area": 4.305,
+      "zone_or_zonelist_or_space_or_spacelist_name": "Space Type 1"
+    }
+  },
+  "Exterior:Lights": {
+    "NonDimming Exterior Lights Def": {
+      "control_option": "AstronomicalClock",
+      "design_level": 164,
+      "end_use_subcategory": "General",
+      "schedule_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON"
+    }
+  },
+  "Fan:ConstantVolume": {
+    "Space 0 ZN SAC Fan": {
+      "air_inlet_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node",
+      "air_outlet_node_name": "Space 0 ZN SAC Supply Outlet Node",
+      "availability_schedule_name": "ApartmentMidRise All On",
+      "end_use_subcategory": "CAV System Fans",
+      "fan_total_efficiency": 0.53625,
+      "maximum_flow_rate": "Autosize",
+      "motor_efficiency": 0.825,
+      "motor_in_airstream_fraction": 1,
+      "pressure_rise": 622.722275
+    }
+  },
+  "FenestrationSurface:Detailed": {
+    "Sub Surface 1": {
+      "building_surface_name": "Surface 2",
+      "construction_name": "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39",
+      "surface_type": "Window",
+      "vertex_1_x_coordinate": -8.06248821176636,
+      "vertex_1_y_coordinate": 1.41999587424531,
+      "vertex_1_z_coordinate": 1.12756287304044,
+      "vertex_2_x_coordinate": -8.06248821176636,
+      "vertex_2_y_coordinate": 1.41999587424531,
+      "vertex_2_z_coordinate": 0.762,
+      "vertex_3_x_coordinate": -3.50284749616776,
+      "vertex_3_y_coordinate": -7.31419072430979,
+      "vertex_3_z_coordinate": 0.762,
+      "vertex_4_x_coordinate": -3.50284749616776,
+      "vertex_4_y_coordinate": -7.31419072430979,
+      "vertex_4_z_coordinate": 1.12756287304044
+    },
+    "Sub Surface 2": {
+      "building_surface_name": "Surface 3",
+      "construction_name": "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39",
+      "surface_type": "Window",
+      "vertex_1_x_coordinate": 3.51902624925025,
+      "vertex_1_y_coordinate": 7.32087477796369,
+      "vertex_1_z_coordinate": 1.12711185945559,
+      "vertex_2_x_coordinate": 3.51902624925025,
+      "vertex_2_y_coordinate": 7.32087477796369,
+      "vertex_2_z_coordinate": 0.762,
+      "vertex_3_x_coordinate": -8.05158859596072,
+      "vertex_3_y_coordinate": 1.4539991101152,
+      "vertex_3_z_coordinate": 0.762,
+      "vertex_4_x_coordinate": -8.05158859596072,
+      "vertex_4_y_coordinate": 1.4539991101152,
+      "vertex_4_z_coordinate": 1.12711185945559
+    },
+    "Sub Surface 3": {
+      "building_surface_name": "Surface 4",
+      "construction_name": "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39",
+      "surface_type": "Window",
+      "vertex_1_x_coordinate": 8.03422762324167,
+      "vertex_1_y_coordinate": -1.42425046007953,
+      "vertex_1_z_coordinate": 1.12756981134074,
+      "vertex_2_x_coordinate": 8.03422762324167,
+      "vertex_2_y_coordinate": -1.42425046007953,
+      "vertex_2_z_coordinate": 0.762,
+      "vertex_3_x_coordinate": 3.55327494166389,
+      "vertex_3_y_coordinate": 7.30976229462999,
+      "vertex_3_z_coordinate": 0.762,
+      "vertex_4_x_coordinate": 3.55327494166389,
+      "vertex_4_y_coordinate": 7.30976229462999,
+      "vertex_4_z_coordinate": 1.12756981134074
+    },
+    "Sub Surface 4": {
+      "building_surface_name": "Surface 5",
+      "construction_name": "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39",
+      "surface_type": "Window",
+      "vertex_1_x_coordinate": -3.46847046935141,
+      "vertex_1_y_coordinate": -7.32515788581617,
+      "vertex_1_z_coordinate": 1.12711963148932,
+      "vertex_2_x_coordinate": -3.46847046935141,
+      "vertex_2_y_coordinate": -7.32515788581617,
+      "vertex_2_z_coordinate": 0.762,
+      "vertex_3_x_coordinate": 8.02319967303332,
+      "vertex_3_y_coordinate": -1.45839901777674,
+      "vertex_3_z_coordinate": 0.762,
+      "vertex_4_x_coordinate": 8.02319967303332,
+      "vertex_4_y_coordinate": -1.45839901777674,
+      "vertex_4_z_coordinate": 1.12711963148932
+    }
+  },
+  "GlobalGeometryRules": {
+    "GlobalGeometryRules 1": {
+      "coordinate_system": "Relative",
+      "daylighting_reference_point_coordinate_system": "Relative",
+      "rectangular_surface_coordinate_system": "Relative",
+      "starting_vertex_position": "UpperLeftCorner",
+      "vertex_entry_direction": "Counterclockwise"
+    }
+  },
+  "HeatBalanceAlgorithm": {
+    "HeatBalanceAlgorithm 1": {
+      "algorithm": "ConductionTransferFunction",
+      "surface_temperature_upper_limit": 200
+    }
+  },
+  "InternalMass": {
+    "Space 0 Mass": {
+      "construction_name": "InteriorFurnishings",
+      "surface_area": 256.786568732814,
+      "zone_or_zonelist_name": "Space 0 ZN"
+    }
+  },
+  "LifeCycleCost:NonrecurringCost": {
+    "Default Cost": {
+      "category": "Construction",
+      "cost": 0,
+      "start_of_costs": "ServicePeriod"
+    }
+  },
+  "LifeCycleCost:Parameters": {
+    "Life Cycle Cost Parameters": {
+      "base_date_year": 2011,
+      "depreciation_method": "None",
+      "discounting_convention": "EndOfYear",
+      "inflation_approach": "ConstantDollar",
+      "length_of_study_period_in_years": 25,
+      "real_discount_rate": 0.03,
+      "service_date_year": 2011
+    }
+  },
+  "LifeCycleCost:UsePriceEscalation": {
+    "LifeCycleCost:UsePriceEscalation 1": {
+      "escalation_start_month": "January",
+      "escalation_start_year": 2011,
+      "escalations": [
+        {
+          "year_escalation": 0.9838
+        },
+        {
+          "year_escalation": 0.973
+        },
+        {
+          "year_escalation": 0.9632
+        },
+        {
+          "year_escalation": 0.9611
+        },
+        {
+          "year_escalation": 0.9571
+        },
+        {
+          "year_escalation": 0.9553
+        },
+        {
+          "year_escalation": 0.9539
+        },
+        {
+          "year_escalation": 0.9521
+        },
+        {
+          "year_escalation": 0.9546
+        },
+        {
+          "year_escalation": 0.955
+        },
+        {
+          "year_escalation": 0.9553
+        },
+        {
+          "year_escalation": 0.9564
+        },
+        {
+          "year_escalation": 0.9575
+        },
+        {
+          "year_escalation": 0.9596
+        },
+        {
+          "year_escalation": 0.9618
+        },
+        {
+          "year_escalation": 0.9614
+        },
+        {
+          "year_escalation": 0.9618
+        },
+        {
+          "year_escalation": 0.9618
+        },
+        {
+          "year_escalation": 0.9593
+        },
+        {
+          "year_escalation": 0.9589
+        },
+        {
+          "year_escalation": 0.9607
+        },
+        {
+          "year_escalation": 0.9625
+        },
+        {
+          "year_escalation": 0.965
+        },
+        {
+          "year_escalation": 0.9708
+        },
+        {
+          "year_escalation": 0.9751
+        },
+        {
+          "year_escalation": 0.9762
+        },
+        {
+          "year_escalation": 0.9766
+        },
+        {
+          "year_escalation": 0.9766
+        },
+        {
+          "year_escalation": 0.9769
+        },
+        {
+          "year_escalation": 0.9773
+        }
+      ],
+      "lcc_price_escalation_name": "U.S. Avg  Commercial-Electricity",
+      "resource": "Electricity"
+    },
+    "LifeCycleCost:UsePriceEscalation 2": {
+      "escalation_start_month": "January",
+      "escalation_start_year": 2011,
+      "escalations": [
+        {
+          "year_escalation": 0.9714
+        },
+        {
+          "year_escalation": 0.973
+        },
+        {
+          "year_escalation": 0.9942
+        },
+        {
+          "year_escalation": 1.0164
+        },
+        {
+          "year_escalation": 1.0541
+        },
+        {
+          "year_escalation": 1.0928
+        },
+        {
+          "year_escalation": 1.1267
+        },
+        {
+          "year_escalation": 1.158
+        },
+        {
+          "year_escalation": 1.1792
+        },
+        {
+          "year_escalation": 1.1967
+        },
+        {
+          "year_escalation": 1.22
+        },
+        {
+          "year_escalation": 1.2333
+        },
+        {
+          "year_escalation": 1.2566
+        },
+        {
+          "year_escalation": 1.2709
+        },
+        {
+          "year_escalation": 1.2826
+        },
+        {
+          "year_escalation": 1.2985
+        },
+        {
+          "year_escalation": 1.3102
+        },
+        {
+          "year_escalation": 1.325
+        },
+        {
+          "year_escalation": 1.3261
+        },
+        {
+          "year_escalation": 1.3282
+        },
+        {
+          "year_escalation": 1.3324
+        },
+        {
+          "year_escalation": 1.3356
+        },
+        {
+          "year_escalation": 1.3431
+        },
+        {
+          "year_escalation": 1.351
+        },
+        {
+          "year_escalation": 1.3568
+        },
+        {
+          "year_escalation": 1.3606
+        },
+        {
+          "year_escalation": 1.3637
+        },
+        {
+          "year_escalation": 1.3674
+        },
+        {
+          "year_escalation": 1.3706
+        },
+        {
+          "year_escalation": 1.3743
+        }
+      ],
+      "lcc_price_escalation_name": "U.S. Avg  Commercial-Distillate Oil",
+      "resource": "FuelOilNo1"
+    },
+    "LifeCycleCost:UsePriceEscalation 3": {
+      "escalation_start_month": "January",
+      "escalation_start_year": 2011,
+      "escalations": [
+        {
+          "year_escalation": 0.8469
+        },
+        {
+          "year_escalation": 0.8257
+        },
+        {
+          "year_escalation": 0.8681
+        },
+        {
+          "year_escalation": 0.8988
+        },
+        {
+          "year_escalation": 0.9289
+        },
+        {
+          "year_escalation": 0.9604
+        },
+        {
+          "year_escalation": 0.9897
+        },
+        {
+          "year_escalation": 1.0075
+        },
+        {
+          "year_escalation": 1.0314
+        },
+        {
+          "year_escalation": 1.0554
+        },
+        {
+          "year_escalation": 1.0861
+        },
+        {
+          "year_escalation": 1.1278
+        },
+        {
+          "year_escalation": 1.1497
+        },
+        {
+          "year_escalation": 1.162
+        },
+        {
+          "year_escalation": 1.1743
+        },
+        {
+          "year_escalation": 1.1852
+        },
+        {
+          "year_escalation": 1.1948
+        },
+        {
+          "year_escalation": 1.2037
+        },
+        {
+          "year_escalation": 1.2071
+        },
+        {
+          "year_escalation": 1.2119
+        },
+        {
+          "year_escalation": 1.2139
+        },
+        {
+          "year_escalation": 1.2194
+        },
+        {
+          "year_escalation": 1.2276
+        },
+        {
+          "year_escalation": 1.2365
+        },
+        {
+          "year_escalation": 1.242
+        },
+        {
+          "year_escalation": 1.2461
+        },
+        {
+          "year_escalation": 1.2509
+        },
+        {
+          "year_escalation": 1.255
+        },
+        {
+          "year_escalation": 1.2591
+        },
+        {
+          "year_escalation": 1.2638
+        }
+      ],
+      "lcc_price_escalation_name": "U.S. Avg  Commercial-Residual Oil",
+      "resource": "FuelOilNo2"
+    },
+    "LifeCycleCost:UsePriceEscalation 4": {
+      "escalation_start_month": "January",
+      "escalation_start_year": 2011,
+      "escalations": [
+        {
+          "year_escalation": 0.9823
+        },
+        {
+          "year_escalation": 0.9557
+        },
+        {
+          "year_escalation": 0.9279
+        },
+        {
+          "year_escalation": 0.9257
+        },
+        {
+          "year_escalation": 0.9346
+        },
+        {
+          "year_escalation": 0.9412
+        },
+        {
+          "year_escalation": 0.9512
+        },
+        {
+          "year_escalation": 0.9645
+        },
+        {
+          "year_escalation": 0.9856
+        },
+        {
+          "year_escalation": 1.0067
+        },
+        {
+          "year_escalation": 1.0222
+        },
+        {
+          "year_escalation": 1.041
+        },
+        {
+          "year_escalation": 1.061
+        },
+        {
+          "year_escalation": 1.0787
+        },
+        {
+          "year_escalation": 1.0942
+        },
+        {
+          "year_escalation": 1.1098
+        },
+        {
+          "year_escalation": 1.122
+        },
+        {
+          "year_escalation": 1.1308
+        },
+        {
+          "year_escalation": 1.1386
+        },
+        {
+          "year_escalation": 1.1486
+        },
+        {
+          "year_escalation": 1.1619
+        },
+        {
+          "year_escalation": 1.1763
+        },
+        {
+          "year_escalation": 1.1918
+        },
+        {
+          "year_escalation": 1.2118
+        },
+        {
+          "year_escalation": 1.2284
+        },
+        {
+          "year_escalation": 1.2439
+        },
+        {
+          "year_escalation": 1.2605
+        },
+        {
+          "year_escalation": 1.2772
+        },
+        {
+          "year_escalation": 1.2938
+        },
+        {
+          "year_escalation": 1.3115
+        }
+      ],
+      "lcc_price_escalation_name": "U.S. Avg  Commercial-Natural gas",
+      "resource": "NaturalGas"
+    },
+    "LifeCycleCost:UsePriceEscalation 5": {
+      "escalation_start_month": "January",
+      "escalation_start_year": 2011,
+      "escalations": [
+        {
+          "year_escalation": 0.997
+        },
+        {
+          "year_escalation": 1.0089
+        },
+        {
+          "year_escalation": 1.0089
+        },
+        {
+          "year_escalation": 0.9941
+        },
+        {
+          "year_escalation": 0.9941
+        },
+        {
+          "year_escalation": 1.0
+        },
+        {
+          "year_escalation": 1.003
+        },
+        {
+          "year_escalation": 1.0059
+        },
+        {
+          "year_escalation": 1.0089
+        },
+        {
+          "year_escalation": 1.0119
+        },
+        {
+          "year_escalation": 1.0148
+        },
+        {
+          "year_escalation": 1.0178
+        },
+        {
+          "year_escalation": 1.0208
+        },
+        {
+          "year_escalation": 1.0267
+        },
+        {
+          "year_escalation": 1.0297
+        },
+        {
+          "year_escalation": 1.0356
+        },
+        {
+          "year_escalation": 1.0415
+        },
+        {
+          "year_escalation": 1.0534
+        },
+        {
+          "year_escalation": 1.0564
+        },
+        {
+          "year_escalation": 1.0593
+        },
+        {
+          "year_escalation": 1.0653
+        },
+        {
+          "year_escalation": 1.0712
+        },
+        {
+          "year_escalation": 1.0742
+        },
+        {
+          "year_escalation": 1.0801
+        },
+        {
+          "year_escalation": 1.0831
+        },
+        {
+          "year_escalation": 1.0831
+        },
+        {
+          "year_escalation": 1.0861
+        },
+        {
+          "year_escalation": 1.089
+        },
+        {
+          "year_escalation": 1.092
+        },
+        {
+          "year_escalation": 1.095
+        }
+      ],
+      "lcc_price_escalation_name": "U.S. Avg  Commercial-Coal",
+      "resource": "Coal"
+    }
+  },
+  "Lights": {
+    "Space Type 1 Lights": {
+      "design_level_calculation_method": "Watts/Area",
+      "end_use_subcategory": "General",
+      "fraction_radiant": 0,
+      "fraction_replaceable": 0,
+      "fraction_visible": 0,
+      "return_air_fraction": 0,
+      "schedule_name": "MidriseApartment Apartment Light",
+      "watts_per_floor_area": 4.197921,
+      "zone_or_zonelist_or_space_or_spacelist_name": "Space Type 1"
+    }
+  },
+  "Material": {
+    "4 in. Normalweight Concrete Floor": {
+      "conductivity": 2.31,
+      "density": 2321.99999999999,
+      "roughness": "MediumRough",
+      "solar_absorptance": 0.7,
+      "specific_heat": 831.999999999997,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.1016,
+      "visible_absorptance": 0.7
+    },
+    "5/8 in. Gypsum Board": {
+      "conductivity": 0.159999999999999,
+      "density": 799.999999999999,
+      "roughness": "MediumSmooth",
+      "solar_absorptance": 0.7,
+      "specific_heat": 1090,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.0159,
+      "visible_absorptance": 0.7
+    },
+    "6 in. Normalweight Concrete Floor": {
+      "conductivity": 2.31,
+      "density": 2321.99999999999,
+      "roughness": "MediumRough",
+      "solar_absorptance": 0.7,
+      "specific_heat": 831.999999999997,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.1524,
+      "visible_absorptance": 0.7
+    },
+    "8 in. Concrete Block Basement Wall": {
+      "conductivity": 1.326,
+      "density": 1841.99999999999,
+      "roughness": "MediumRough",
+      "solar_absorptance": 0.7,
+      "specific_heat": 911.999999999999,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.2032,
+      "visible_absorptance": 0.7
+    },
+    "25mm Stucco": {
+      "conductivity": 0.719999999999999,
+      "density": 1855.99999999999,
+      "roughness": "Smooth",
+      "solar_absorptance": 0.7,
+      "specific_heat": 839.999999999997,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.0254,
+      "visible_absorptance": 0.7
+    },
+    "100mm Normalweight concrete floor": {
+      "conductivity": 2.31,
+      "density": 2322,
+      "roughness": "MediumSmooth",
+      "solar_absorptance": 0.7,
+      "specific_heat": 832,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.1016,
+      "visible_absorptance": 0.7
+    },
+    "F08 Metal surface": {
+      "conductivity": 45.2800000000001,
+      "density": 7823.99999999999,
+      "roughness": "Smooth",
+      "solar_absorptance": 0.7,
+      "specific_heat": 500,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.0008,
+      "visible_absorptance": 0.7
+    },
+    "G01 13mm gypsum board": {
+      "conductivity": 0.16,
+      "density": 800,
+      "roughness": "Smooth",
+      "solar_absorptance": 0.7,
+      "specific_heat": 1090,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.0127,
+      "visible_absorptance": 0.5
+    },
+    "G05 25mm wood": {
+      "conductivity": 0.15,
+      "density": 608,
+      "roughness": "MediumSmooth",
+      "solar_absorptance": 0.5,
+      "specific_heat": 1630,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.0254,
+      "visible_absorptance": 0.5
+    },
+    "M10 200mm concrete block basement wall": {
+      "conductivity": 1.326,
+      "density": 1842,
+      "roughness": "MediumRough",
+      "solar_absorptance": 0.7,
+      "specific_heat": 912,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.2032,
+      "visible_absorptance": 0.7
+    },
+    "Metal Roof Surface": {
+      "conductivity": 45.2799999999999,
+      "density": 7823.99999999999,
+      "roughness": "Smooth",
+      "solar_absorptance": 0.7,
+      "specific_heat": 499.999999999996,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.000799999999999998,
+      "visible_absorptance": 0.7
+    },
+    "Roof Membrane": {
+      "conductivity": 0.16,
+      "density": 1121.29,
+      "roughness": "VeryRough",
+      "solar_absorptance": 0.7,
+      "specific_heat": 1460,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.0095,
+      "visible_absorptance": 0.7
+    },
+    "Std Wood 6inch": {
+      "conductivity": 0.12,
+      "density": 540,
+      "roughness": "MediumSmooth",
+      "solar_absorptance": 0.7,
+      "specific_heat": 1210,
+      "thermal_absorptance": 0.9,
+      "thickness": 0.15,
+      "visible_absorptance": 0.7
+    }
+  },
+  "Material:NoMass": {
+    "CP02 CARPET PAD": {
+      "roughness": "VeryRough",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9,
+      "thermal_resistance": 0.21648,
+      "visible_absorptance": 0.8
+    },
+    "CP02 CARPET PAD 1": {
+      "roughness": "VeryRough",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9,
+      "thermal_resistance": 0.21648,
+      "visible_absorptance": 0.8
+    },
+    "Nonres_Floor_Insulation": {
+      "roughness": "MediumSmooth",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9,
+      "thermal_resistance": 2.88291975297193,
+      "visible_absorptance": 0.7
+    },
+    "Typical Carpet Pad": {
+      "roughness": "Smooth",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9,
+      "thermal_resistance": 0.216479986995276,
+      "visible_absorptance": 0.8
+    },
+    "Typical Insulation": {
+      "roughness": "Smooth",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9,
+      "thermal_resistance": 0.0282222222222221,
+      "visible_absorptance": 0.7
+    },
+    "Typical Insulation R-13.21": {
+      "roughness": "Smooth",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9,
+      "thermal_resistance": 2.3256660073585,
+      "visible_absorptance": 0.7
+    },
+    "Typical Insulation R-21.1": {
+      "roughness": "Smooth",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9,
+      "thermal_resistance": 3.71680102626785,
+      "visible_absorptance": 0.7
+    }
+  },
+  "NodeList": {
+    "Space 0 ZN Inlet Node List": {
+      "nodes": [
+        {
+          "node_name": "Space 0 ZN SAC Diffuser Outlet Air Node"
+        }
+      ]
+    },
+    "Space 0 ZN Return Node List": {
+      "nodes": [
+        {
+          "node_name": "Space 0 ZN Return Air Node"
+        }
+      ]
+    },
+    "Space 0 ZN SAC Demand Inlet Nodes": {
+      "nodes": [
+        {
+          "node_name": "Space 0 ZN SAC Demand Inlet Node"
+        }
+      ]
+    },
+    "Space 0 ZN SAC Supply Outlet Nodes": {
+      "nodes": [
+        {
+          "node_name": "Space 0 ZN SAC Supply Outlet Node"
+        }
+      ]
+    }
+  },
+  "OutdoorAir:Mixer": {
+    "Space 0 ZN SAC OA System Outdoor Air Mixer": {
+      "mixed_air_node_name": "Space 0 ZN SAC Mixed Air Node",
+      "outdoor_air_stream_node_name": "Space 0 ZN SAC Outdoor Air Node",
+      "relief_air_stream_node_name": "Space 0 ZN SAC Relief Air Node",
+      "return_air_stream_node_name": "Space 0 ZN SAC Supply Inlet Node"
+    }
+  },
+  "OutdoorAir:Node": {
+    "Model Outdoor Air Node": {}
+  },
+  "OutdoorAir:NodeList": {
+    "OutdoorAir:NodeList 1": {
+      "nodes": [
+        {
+          "node_or_nodelist_name": "Space 0 ZN SAC Outdoor Air Node"
+        }
+      ]
+    }
+  },
+  "Output:Meter": {
+    "Output:Meter 1": {
+      "key_name": "Electricity:Facility",
+      "reporting_frequency": "Timestep"
+    },
+    "Output:Meter 2": {
+      "key_name": "NaturalGas:Facility",
+      "reporting_frequency": "Timestep"
+    },
+    "Output:Meter 3": {
+      "key_name": "DistrictCooling:Facility",
+      "reporting_frequency": "Timestep"
+    },
+    "Output:Meter 4": {
+      "key_name": "DistrictHeating:Facility",
+      "reporting_frequency": "Timestep"
+    }
+  },
+  "Output:Meter:MeterFileOnly": {
+    "Output:Meter:MeterFileOnly 1": {
+      "key_name": "NaturalGas:Facility",
+      "reporting_frequency": "Daily"
+    },
+    "Output:Meter:MeterFileOnly 2": {
+      "key_name": "Electricity:Facility",
+      "reporting_frequency": "Timestep"
+    },
+    "Output:Meter:MeterFileOnly 3": {
+      "key_name": "Electricity:Facility",
+      "reporting_frequency": "Daily"
+    }
+  },
+  "Output:SQLite": {
+    "Output:SQLite 1": {
+      "option_type": "SimpleAndTabular"
+    }
+  },
+  "Output:Table:Monthly": {
+    "Building Energy Performance - District Cooling": {
+      "digits_after_decimal": 2,
+      "variable_details": [
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "InteriorLights:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "ExteriorLights:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "InteriorEquipment:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "ExteriorEquipment:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Fans:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Pumps:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Heating:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Cooling:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "HeatRejection:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Humidifier:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "HeatRecovery:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "WaterSystems:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Cogeneration:DistrictCooling"
+        }
+      ]
+    },
+    "Building Energy Performance - District Cooling Peak Demand": {
+      "digits_after_decimal": 2,
+      "variable_details": [
+        {
+          "aggregation_type_for_variable_or_meter": "Maximum",
+          "variable_or_meter_name": "DistrictCooling:Facility"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "InteriorLights:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "ExteriorLights:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "InteriorEquipment:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "ExteriorEquipment:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Fans:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Pumps:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Heating:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Cooling:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "HeatRejection:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Humidifier:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "HeatRecovery:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "WaterSystems:DistrictCooling"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Cogeneration:DistrictCooling"
+        }
+      ]
+    },
+    "Building Energy Performance - District Heating": {
+      "digits_after_decimal": 2,
+      "variable_details": [
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "InteriorLights:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "ExteriorLights:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "InteriorEquipment:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "ExteriorEquipment:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Fans:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Pumps:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Heating:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Cooling:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "HeatRejection:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Humidifier:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "HeatRecovery:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "WaterSystems:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Cogeneration:DistrictHeating"
+        }
+      ]
+    },
+    "Building Energy Performance - District Heating Peak Demand": {
+      "digits_after_decimal": 2,
+      "variable_details": [
+        {
+          "aggregation_type_for_variable_or_meter": "Maximum",
+          "variable_or_meter_name": "DistrictHeating:Facility"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "InteriorLights:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "ExteriorLights:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "InteriorEquipment:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "ExteriorEquipment:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Fans:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Pumps:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Heating:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Cooling:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "HeatRejection:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Humidifier:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "HeatRecovery:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "WaterSystems:DistrictHeating"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Cogeneration:DistrictHeating"
+        }
+      ]
+    },
+    "Building Energy Performance - Electricity": {
+      "digits_after_decimal": 2,
+      "variable_details": [
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "InteriorLights:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "ExteriorLights:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "InteriorEquipment:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "ExteriorEquipment:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Fans:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Pumps:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Heating:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Cooling:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "HeatRejection:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Humidifier:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "HeatRecovery:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "WaterSystems:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Cogeneration:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Refrigeration:Electricity"
+        }
+      ]
+    },
+    "Building Energy Performance - Electricity Peak Demand": {
+      "digits_after_decimal": 2,
+      "variable_details": [
+        {
+          "aggregation_type_for_variable_or_meter": "Maximum",
+          "variable_or_meter_name": "Electricity:Facility"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "InteriorLights:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "ExteriorLights:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "InteriorEquipment:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "ExteriorEquipment:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Fans:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Pumps:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Heating:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Cooling:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "HeatRejection:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Humidifier:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "HeatRecovery:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "WaterSystems:Electricity"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Cogeneration:Electricity"
+        }
+      ]
+    },
+    "Building Energy Performance - Natural Gas": {
+      "digits_after_decimal": 2,
+      "variable_details": [
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "InteriorEquipment:NaturalGas"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "ExteriorEquipment:NaturalGas"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Heating:NaturalGas"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Cooling:NaturalGas"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "WaterSystems:NaturalGas"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "SumOrAverage",
+          "variable_or_meter_name": "Cogeneration:NaturalGas"
+        }
+      ]
+    },
+    "Building Energy Performance - Natural Gas Peak Demand": {
+      "digits_after_decimal": 2,
+      "variable_details": [
+        {
+          "aggregation_type_for_variable_or_meter": "Maximum",
+          "variable_or_meter_name": "NaturalGas:Facility"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "InteriorEquipment:NaturalGas"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "ExteriorEquipment:NaturalGas"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Heating:NaturalGas"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Cooling:NaturalGas"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "WaterSystems:NaturalGas"
+        },
+        {
+          "aggregation_type_for_variable_or_meter": "ValueWhenMaximumOrMinimum",
+          "variable_or_meter_name": "Cogeneration:NaturalGas"
+        }
+      ]
+    }
+  },
+  "Output:Table:SummaryReports": {
+    "Output:Table:SummaryReports 1": {
+      "reports": [
+        {
+          "report_name": "AllSummary"
+        }
+      ]
+    }
+  },
+  "Output:VariableDictionary": {
+    "Output:VariableDictionary 1": {
+      "key_field": "IDF",
+      "sort_option": "Unsorted"
+    }
+  },
+  "OutputControl:Files": {
+    "OutputControl:Files 1": {
+      "output_audit": "No",
+      "output_bnd": "No",
+      "output_csv": "Yes",
+      "output_dbg": "No",
+      "output_delightdfdmp": "No",
+      "output_delighteldmp": "No",
+      "output_delightin": "No",
+      "output_dfs": "No",
+      "output_dxf": "No",
+      "output_edd": "No",
+      "output_eio": "No",
+      "output_end": "Yes",
+      "output_eso": "No",
+      "output_extshd": "No",
+      "output_glhe": "No",
+      "output_json": "No",
+      "output_mdd": "No",
+      "output_mtd": "No",
+      "output_mtr": "No",
+      "output_perflog": "No",
+      "output_rdd": "No",
+      "output_sci": "No",
+      "output_screen": "No",
+      "output_shd": "No",
+      "output_sln": "No",
+      "output_sqlite": "No",
+      "output_system_sizing": "No",
+      "output_tabular": "Yes",
+      "output_tarcog": "No",
+      "output_wrl": "No",
+      "output_zone_sizing": "No"
+    }
+  },
+  "OutputControl:Table:Style": {
+    "OutputControl:Table:Style 1": {
+      "column_separator": "HTML"
+    }
+  },
+  "People": {
+    "Space Type 1 People": {
+      "activity_level_schedule_name": "MidriseApartment Activity",
+      "air_velocity_schedule_name": "Air Velocity Schedule",
+      "clothing_insulation_schedule_name": "Clothing Schedule",
+      "fraction_radiant": 0.3,
+      "number_of_people_calculation_method": "People/Area",
+      "number_of_people_schedule_name": "MidriseApartment Apartment Occ",
+      "people_per_floor_area": 0.017939858,
+      "work_efficiency_schedule_name": "Work Efficiency Schedule",
+      "zone_or_zonelist_or_space_or_spacelist_name": "Space Type 1"
+    }
+  },
+  "RunPeriod": {
+    "Run Period 1": {
+      "apply_weekend_holiday_rule": "No",
+      "begin_day_of_month": 1,
+      "begin_month": 1,
+      "begin_year": 2006,
+      "day_of_week_for_start_day": "Sunday",
+      "end_day_of_month": 31,
+      "end_month": 12,
+      "end_year": 2006,
+      "use_weather_file_daylight_saving_period": "No",
+      "use_weather_file_holidays_and_special_days": "No",
+      "use_weather_file_rain_indicators": "Yes",
+      "use_weather_file_snow_indicators": "Yes"
+    }
+  },
+  "RunPeriodControl:DaylightSavingTime": {
+    "RunPeriodControl:DaylightSavingTime 1": {
+      "end_date": "1st Sunday in November",
+      "start_date": "2nd Sunday in March"
+    }
+  },
+  "Schedule:Compact": {
+    "Space 0 ZN Thermostat Schedule": {
+      "data": [
+        {
+          "field": "Through: 12/31"
+        },
+        {
+          "field": "For: AllDays"
+        },
+        {
+          "field": "Until: 24:00"
+        },
+        {
+          "field": 4
+        }
+      ],
+      "schedule_type_limits_name": "Space 0 ZN Thermostat Schedule Type Limits"
+    },
+    "Space Type 1 Thermostat 1 Cooling Setpoint": {
+      "data": [
+        {
+          "field": "Through: 12/31"
+        },
+        {
+          "field": "For: AllDays"
+        },
+        {
+          "field": "Until: 24:00"
+        },
+        {
+          "field": 25.0
+        }
+      ],
+      "schedule_type_limits_name": "Temperature"
+    },
+    "Space Type 1 Thermostat 1 Heating Setpoint": {
+      "data": [
+        {
+          "field": "Through: 12/31"
+        },
+        {
+          "field": "For: AllDays"
+        },
+        {
+          "field": "Until: 24:00"
+        },
+        {
+          "field": 20.0
+        }
+      ],
+      "schedule_type_limits_name": "Temperature"
+    }
+  },
+  "Schedule:Constant": {
+    "Always Off Discrete": {
+      "hourly_value": 0
+    },
+    "Always On Continuous": {
+      "hourly_value": 1
+    },
+    "Always On Discrete": {
+      "hourly_value": 1,
+      "schedule_type_limits_name": "OnOff"
+    }
+  },
+  "Schedule:Day:Interval": {
+    "Air Velocity Schedule Default": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 0.2
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Velocity"
+    },
+    "ApartmentMidRise All On Default": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No"
+    },
+    "ApartmentMidRise All On Summer Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No"
+    },
+    "ApartmentMidRise All On Winter Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No"
+    },
+    "ApartmentMidRise COMPACT HVAC-ALWAYS 1 Default": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "ApartmentMidRise COMPACT HVAC-ALWAYS 1 Summer Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "ApartmentMidRise COMPACT HVAC-ALWAYS 1 Winter Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "ApartmentMidRise EQP_APT_SCH Default": {
+      "data": [
+        {
+          "time": "01:00",
+          "value_until_time": 0.45
+        },
+        {
+          "time": "02:00",
+          "value_until_time": 0.41
+        },
+        {
+          "time": "03:00",
+          "value_until_time": 0.39
+        },
+        {
+          "time": "05:00",
+          "value_until_time": 0.38
+        },
+        {
+          "time": "06:00",
+          "value_until_time": 0.43
+        },
+        {
+          "time": "07:00",
+          "value_until_time": 0.54
+        },
+        {
+          "time": "08:00",
+          "value_until_time": 0.65
+        },
+        {
+          "time": "09:00",
+          "value_until_time": 0.66
+        },
+        {
+          "time": "10:00",
+          "value_until_time": 0.67
+        },
+        {
+          "time": "11:00",
+          "value_until_time": 0.69
+        },
+        {
+          "time": "12:00",
+          "value_until_time": 0.7
+        },
+        {
+          "time": "13:00",
+          "value_until_time": 0.69
+        },
+        {
+          "time": "14:00",
+          "value_until_time": 0.66
+        },
+        {
+          "time": "15:00",
+          "value_until_time": 0.65
+        },
+        {
+          "time": "16:00",
+          "value_until_time": 0.68
+        },
+        {
+          "time": "17:00",
+          "value_until_time": 0.8
+        },
+        {
+          "time": "19:00",
+          "value_until_time": 1
+        },
+        {
+          "time": "20:00",
+          "value_until_time": 0.93
+        },
+        {
+          "time": "21:00",
+          "value_until_time": 0.89
+        },
+        {
+          "time": "22:00",
+          "value_until_time": 0.85
+        },
+        {
+          "time": "23:00",
+          "value_until_time": 0.71
+        },
+        {
+          "time": "24:00",
+          "value_until_time": 0.58
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "ApartmentMidRise EQP_APT_SCH Summer Design Day": {
+      "data": [
+        {
+          "time": "01:00",
+          "value_until_time": 0.45
+        },
+        {
+          "time": "02:00",
+          "value_until_time": 0.41
+        },
+        {
+          "time": "03:00",
+          "value_until_time": 0.39
+        },
+        {
+          "time": "05:00",
+          "value_until_time": 0.38
+        },
+        {
+          "time": "06:00",
+          "value_until_time": 0.43
+        },
+        {
+          "time": "07:00",
+          "value_until_time": 0.54
+        },
+        {
+          "time": "08:00",
+          "value_until_time": 0.65
+        },
+        {
+          "time": "09:00",
+          "value_until_time": 0.66
+        },
+        {
+          "time": "10:00",
+          "value_until_time": 0.67
+        },
+        {
+          "time": "11:00",
+          "value_until_time": 0.69
+        },
+        {
+          "time": "12:00",
+          "value_until_time": 0.7
+        },
+        {
+          "time": "13:00",
+          "value_until_time": 0.69
+        },
+        {
+          "time": "14:00",
+          "value_until_time": 0.66
+        },
+        {
+          "time": "15:00",
+          "value_until_time": 0.65
+        },
+        {
+          "time": "16:00",
+          "value_until_time": 0.68
+        },
+        {
+          "time": "17:00",
+          "value_until_time": 0.8
+        },
+        {
+          "time": "19:00",
+          "value_until_time": 1
+        },
+        {
+          "time": "20:00",
+          "value_until_time": 0.93
+        },
+        {
+          "time": "21:00",
+          "value_until_time": 0.89
+        },
+        {
+          "time": "22:00",
+          "value_until_time": 0.85
+        },
+        {
+          "time": "23:00",
+          "value_until_time": 0.71
+        },
+        {
+          "time": "24:00",
+          "value_until_time": 0.58
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "ApartmentMidRise EQP_APT_SCH Winter Design Day": {
+      "data": [
+        {
+          "time": "01:00",
+          "value_until_time": 0.45
+        },
+        {
+          "time": "02:00",
+          "value_until_time": 0.41
+        },
+        {
+          "time": "03:00",
+          "value_until_time": 0.39
+        },
+        {
+          "time": "05:00",
+          "value_until_time": 0.38
+        },
+        {
+          "time": "06:00",
+          "value_until_time": 0.43
+        },
+        {
+          "time": "07:00",
+          "value_until_time": 0.54
+        },
+        {
+          "time": "08:00",
+          "value_until_time": 0.65
+        },
+        {
+          "time": "09:00",
+          "value_until_time": 0.66
+        },
+        {
+          "time": "10:00",
+          "value_until_time": 0.67
+        },
+        {
+          "time": "11:00",
+          "value_until_time": 0.69
+        },
+        {
+          "time": "12:00",
+          "value_until_time": 0.7
+        },
+        {
+          "time": "13:00",
+          "value_until_time": 0.69
+        },
+        {
+          "time": "14:00",
+          "value_until_time": 0.66
+        },
+        {
+          "time": "15:00",
+          "value_until_time": 0.65
+        },
+        {
+          "time": "16:00",
+          "value_until_time": 0.68
+        },
+        {
+          "time": "17:00",
+          "value_until_time": 0.8
+        },
+        {
+          "time": "19:00",
+          "value_until_time": 1
+        },
+        {
+          "time": "20:00",
+          "value_until_time": 0.93
+        },
+        {
+          "time": "21:00",
+          "value_until_time": 0.89
+        },
+        {
+          "time": "22:00",
+          "value_until_time": 0.85
+        },
+        {
+          "time": "23:00",
+          "value_until_time": 0.71
+        },
+        {
+          "time": "24:00",
+          "value_until_time": 0.58
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Summer Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Winter Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "Clothing Schedule Default Winter Clothes": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Any Number"
+    },
+    "Clothing Schedule Summer Clothes": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 0.5
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Any Number"
+    },
+    "Economizer Max OA Fraction 70 pct Default": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 0.7
+        }
+      ],
+      "interpolate_to_timestep": "No"
+    },
+    "MidriseApartment Activity Default": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 120
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "ActivityLevel"
+    },
+    "MidriseApartment Activity Summer Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 120
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "ActivityLevel"
+    },
+    "MidriseApartment Activity Winter Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 120
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "ActivityLevel"
+    },
+    "MidriseApartment Apartment ClgSetp Default": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 23.9
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Temperature"
+    },
+    "MidriseApartment Apartment ClgSetp Summer Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 23.9
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Temperature"
+    },
+    "MidriseApartment Apartment ClgSetp Winter Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 23.9
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Temperature"
+    },
+    "MidriseApartment Apartment HtgSetp Default": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 21.1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Temperature"
+    },
+    "MidriseApartment Apartment HtgSetp Summer Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 21.1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Temperature"
+    },
+    "MidriseApartment Apartment HtgSetp Winter Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 21.1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Temperature"
+    },
+    "MidriseApartment Apartment Light Default": {
+      "data": [
+        {
+          "time": "04:00",
+          "value_until_time": 0.067
+        },
+        {
+          "time": "05:00",
+          "value_until_time": 0.187
+        },
+        {
+          "time": "06:00",
+          "value_until_time": 0.394
+        },
+        {
+          "time": "07:00",
+          "value_until_time": 0.44
+        },
+        {
+          "time": "08:00",
+          "value_until_time": 0.393
+        },
+        {
+          "time": "09:00",
+          "value_until_time": 0.172
+        },
+        {
+          "time": "15:00",
+          "value_until_time": 0.119
+        },
+        {
+          "time": "16:00",
+          "value_until_time": 0.206
+        },
+        {
+          "time": "17:00",
+          "value_until_time": 0.439
+        },
+        {
+          "time": "18:00",
+          "value_until_time": 0.616
+        },
+        {
+          "time": "19:00",
+          "value_until_time": 0.829
+        },
+        {
+          "time": "20:00",
+          "value_until_time": 0.986
+        },
+        {
+          "time": "21:00",
+          "value_until_time": 1
+        },
+        {
+          "time": "22:00",
+          "value_until_time": 0.692
+        },
+        {
+          "time": "23:00",
+          "value_until_time": 0.384
+        },
+        {
+          "time": "24:00",
+          "value_until_time": 0.16
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "MidriseApartment Apartment Light Summer Design Day": {
+      "data": [
+        {
+          "time": "04:00",
+          "value_until_time": 0.067
+        },
+        {
+          "time": "05:00",
+          "value_until_time": 0.187
+        },
+        {
+          "time": "06:00",
+          "value_until_time": 0.394
+        },
+        {
+          "time": "07:00",
+          "value_until_time": 0.44
+        },
+        {
+          "time": "08:00",
+          "value_until_time": 0.393
+        },
+        {
+          "time": "09:00",
+          "value_until_time": 0.172
+        },
+        {
+          "time": "15:00",
+          "value_until_time": 0.119
+        },
+        {
+          "time": "16:00",
+          "value_until_time": 0.206
+        },
+        {
+          "time": "17:00",
+          "value_until_time": 0.439
+        },
+        {
+          "time": "18:00",
+          "value_until_time": 0.616
+        },
+        {
+          "time": "19:00",
+          "value_until_time": 0.829
+        },
+        {
+          "time": "20:00",
+          "value_until_time": 0.986
+        },
+        {
+          "time": "21:00",
+          "value_until_time": 1
+        },
+        {
+          "time": "22:00",
+          "value_until_time": 0.692
+        },
+        {
+          "time": "23:00",
+          "value_until_time": 0.384
+        },
+        {
+          "time": "24:00",
+          "value_until_time": 0.16
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "MidriseApartment Apartment Light Winter Design Day": {
+      "data": [
+        {
+          "time": "04:00",
+          "value_until_time": 0.067
+        },
+        {
+          "time": "05:00",
+          "value_until_time": 0.187
+        },
+        {
+          "time": "06:00",
+          "value_until_time": 0.394
+        },
+        {
+          "time": "07:00",
+          "value_until_time": 0.44
+        },
+        {
+          "time": "08:00",
+          "value_until_time": 0.393
+        },
+        {
+          "time": "09:00",
+          "value_until_time": 0.172
+        },
+        {
+          "time": "15:00",
+          "value_until_time": 0.119
+        },
+        {
+          "time": "16:00",
+          "value_until_time": 0.206
+        },
+        {
+          "time": "17:00",
+          "value_until_time": 0.439
+        },
+        {
+          "time": "18:00",
+          "value_until_time": 0.616
+        },
+        {
+          "time": "19:00",
+          "value_until_time": 0.829
+        },
+        {
+          "time": "20:00",
+          "value_until_time": 0.986
+        },
+        {
+          "time": "21:00",
+          "value_until_time": 1
+        },
+        {
+          "time": "22:00",
+          "value_until_time": 0.692
+        },
+        {
+          "time": "23:00",
+          "value_until_time": 0.384
+        },
+        {
+          "time": "24:00",
+          "value_until_time": 0.16
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "MidriseApartment Apartment Occ Default": {
+      "data": [
+        {
+          "time": "07:00",
+          "value_until_time": 1
+        },
+        {
+          "time": "08:00",
+          "value_until_time": 0.85
+        },
+        {
+          "time": "09:00",
+          "value_until_time": 0.39
+        },
+        {
+          "time": "16:00",
+          "value_until_time": 0.25
+        },
+        {
+          "time": "17:00",
+          "value_until_time": 0.3
+        },
+        {
+          "time": "18:00",
+          "value_until_time": 0.52
+        },
+        {
+          "time": "21:00",
+          "value_until_time": 0.87
+        },
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "MidriseApartment Apartment Occ Summer Design Day": {
+      "data": [
+        {
+          "time": "07:00",
+          "value_until_time": 1
+        },
+        {
+          "time": "08:00",
+          "value_until_time": 0.85
+        },
+        {
+          "time": "09:00",
+          "value_until_time": 0.39
+        },
+        {
+          "time": "16:00",
+          "value_until_time": 0.25
+        },
+        {
+          "time": "17:00",
+          "value_until_time": 0.3
+        },
+        {
+          "time": "18:00",
+          "value_until_time": 0.52
+        },
+        {
+          "time": "21:00",
+          "value_until_time": 0.87
+        },
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "MidriseApartment Apartment Occ Winter Design Day": {
+      "data": [
+        {
+          "time": "07:00",
+          "value_until_time": 1
+        },
+        {
+          "time": "08:00",
+          "value_until_time": 0.85
+        },
+        {
+          "time": "09:00",
+          "value_until_time": 0.39
+        },
+        {
+          "time": "16:00",
+          "value_until_time": 0.25
+        },
+        {
+          "time": "17:00",
+          "value_until_time": 0.3
+        },
+        {
+          "time": "18:00",
+          "value_until_time": 0.52
+        },
+        {
+          "time": "21:00",
+          "value_until_time": 0.87
+        },
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "MidriseApartment Infil Default": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "MidriseApartment Infil Summer Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "MidriseApartment Infil Winter Design Day": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 1
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    },
+    "Work Efficiency Schedule Default": {
+      "data": [
+        {
+          "time": "24:00",
+          "value_until_time": 0
+        }
+      ],
+      "interpolate_to_timestep": "No",
+      "schedule_type_limits_name": "Fractional"
+    }
+  },
+  "Schedule:Week:Daily": {
+    "Air Velocity Schedule Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "Air Velocity Schedule Default",
+      "customday2_schedule_day_name": "Air Velocity Schedule Default",
+      "friday_schedule_day_name": "Air Velocity Schedule Default",
+      "holiday_schedule_day_name": "Air Velocity Schedule Default",
+      "monday_schedule_day_name": "Air Velocity Schedule Default",
+      "saturday_schedule_day_name": "Air Velocity Schedule Default",
+      "summerdesignday_schedule_day_name": "Air Velocity Schedule Default",
+      "sunday_schedule_day_name": "Air Velocity Schedule Default",
+      "thursday_schedule_day_name": "Air Velocity Schedule Default",
+      "tuesday_schedule_day_name": "Air Velocity Schedule Default",
+      "wednesday_schedule_day_name": "Air Velocity Schedule Default",
+      "winterdesignday_schedule_day_name": "Air Velocity Schedule Default"
+    },
+    "ApartmentMidRise All On Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "ApartmentMidRise All On Default",
+      "customday2_schedule_day_name": "ApartmentMidRise All On Default",
+      "friday_schedule_day_name": "ApartmentMidRise All On Default",
+      "holiday_schedule_day_name": "ApartmentMidRise All On Default",
+      "monday_schedule_day_name": "ApartmentMidRise All On Default",
+      "saturday_schedule_day_name": "ApartmentMidRise All On Default",
+      "summerdesignday_schedule_day_name": "ApartmentMidRise All On Summer Design Day",
+      "sunday_schedule_day_name": "ApartmentMidRise All On Default",
+      "thursday_schedule_day_name": "ApartmentMidRise All On Default",
+      "tuesday_schedule_day_name": "ApartmentMidRise All On Default",
+      "wednesday_schedule_day_name": "ApartmentMidRise All On Default",
+      "winterdesignday_schedule_day_name": "ApartmentMidRise All On Winter Design Day"
+    },
+    "ApartmentMidRise EQP_APT_SCH Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Default",
+      "customday2_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Default",
+      "friday_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Default",
+      "holiday_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Default",
+      "monday_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Default",
+      "saturday_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Default",
+      "summerdesignday_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Summer Design Day",
+      "sunday_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Default",
+      "thursday_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Default",
+      "tuesday_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Default",
+      "wednesday_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Default",
+      "winterdesignday_schedule_day_name": "ApartmentMidRise EQP_APT_SCH Winter Design Day"
+    },
+    "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default",
+      "customday2_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default",
+      "friday_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default",
+      "holiday_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default",
+      "monday_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default",
+      "saturday_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default",
+      "summerdesignday_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Summer Design Day",
+      "sunday_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default",
+      "thursday_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default",
+      "tuesday_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default",
+      "wednesday_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Default",
+      "winterdesignday_schedule_day_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Winter Design Day"
+    },
+    "Clothing Schedule Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "customday2_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "friday_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "holiday_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "monday_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "saturday_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "summerdesignday_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "sunday_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "thursday_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "tuesday_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "wednesday_schedule_day_name": "Clothing Schedule Default Winter Clothes",
+      "winterdesignday_schedule_day_name": "Clothing Schedule Default Winter Clothes"
+    },
+    "MidriseApartment Activity Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "MidriseApartment Activity Default",
+      "customday2_schedule_day_name": "MidriseApartment Activity Default",
+      "friday_schedule_day_name": "MidriseApartment Activity Default",
+      "holiday_schedule_day_name": "MidriseApartment Activity Default",
+      "monday_schedule_day_name": "MidriseApartment Activity Default",
+      "saturday_schedule_day_name": "MidriseApartment Activity Default",
+      "summerdesignday_schedule_day_name": "MidriseApartment Activity Summer Design Day",
+      "sunday_schedule_day_name": "MidriseApartment Activity Default",
+      "thursday_schedule_day_name": "MidriseApartment Activity Default",
+      "tuesday_schedule_day_name": "MidriseApartment Activity Default",
+      "wednesday_schedule_day_name": "MidriseApartment Activity Default",
+      "winterdesignday_schedule_day_name": "MidriseApartment Activity Winter Design Day"
+    },
+    "MidriseApartment Apartment ClgSetp Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "MidriseApartment Apartment ClgSetp Default",
+      "customday2_schedule_day_name": "MidriseApartment Apartment ClgSetp Default",
+      "friday_schedule_day_name": "MidriseApartment Apartment ClgSetp Default",
+      "holiday_schedule_day_name": "MidriseApartment Apartment ClgSetp Default",
+      "monday_schedule_day_name": "MidriseApartment Apartment ClgSetp Default",
+      "saturday_schedule_day_name": "MidriseApartment Apartment ClgSetp Default",
+      "summerdesignday_schedule_day_name": "MidriseApartment Apartment ClgSetp Summer Design Day",
+      "sunday_schedule_day_name": "MidriseApartment Apartment ClgSetp Default",
+      "thursday_schedule_day_name": "MidriseApartment Apartment ClgSetp Default",
+      "tuesday_schedule_day_name": "MidriseApartment Apartment ClgSetp Default",
+      "wednesday_schedule_day_name": "MidriseApartment Apartment ClgSetp Default",
+      "winterdesignday_schedule_day_name": "MidriseApartment Apartment ClgSetp Winter Design Day"
+    },
+    "MidriseApartment Apartment HtgSetp Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "MidriseApartment Apartment HtgSetp Default",
+      "customday2_schedule_day_name": "MidriseApartment Apartment HtgSetp Default",
+      "friday_schedule_day_name": "MidriseApartment Apartment HtgSetp Default",
+      "holiday_schedule_day_name": "MidriseApartment Apartment HtgSetp Default",
+      "monday_schedule_day_name": "MidriseApartment Apartment HtgSetp Default",
+      "saturday_schedule_day_name": "MidriseApartment Apartment HtgSetp Default",
+      "summerdesignday_schedule_day_name": "MidriseApartment Apartment HtgSetp Summer Design Day",
+      "sunday_schedule_day_name": "MidriseApartment Apartment HtgSetp Default",
+      "thursday_schedule_day_name": "MidriseApartment Apartment HtgSetp Default",
+      "tuesday_schedule_day_name": "MidriseApartment Apartment HtgSetp Default",
+      "wednesday_schedule_day_name": "MidriseApartment Apartment HtgSetp Default",
+      "winterdesignday_schedule_day_name": "MidriseApartment Apartment HtgSetp Winter Design Day"
+    },
+    "MidriseApartment Apartment Light Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "MidriseApartment Apartment Light Default",
+      "customday2_schedule_day_name": "MidriseApartment Apartment Light Default",
+      "friday_schedule_day_name": "MidriseApartment Apartment Light Default",
+      "holiday_schedule_day_name": "MidriseApartment Apartment Light Default",
+      "monday_schedule_day_name": "MidriseApartment Apartment Light Default",
+      "saturday_schedule_day_name": "MidriseApartment Apartment Light Default",
+      "summerdesignday_schedule_day_name": "MidriseApartment Apartment Light Summer Design Day",
+      "sunday_schedule_day_name": "MidriseApartment Apartment Light Default",
+      "thursday_schedule_day_name": "MidriseApartment Apartment Light Default",
+      "tuesday_schedule_day_name": "MidriseApartment Apartment Light Default",
+      "wednesday_schedule_day_name": "MidriseApartment Apartment Light Default",
+      "winterdesignday_schedule_day_name": "MidriseApartment Apartment Light Winter Design Day"
+    },
+    "MidriseApartment Apartment Occ Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "MidriseApartment Apartment Occ Default",
+      "customday2_schedule_day_name": "MidriseApartment Apartment Occ Default",
+      "friday_schedule_day_name": "MidriseApartment Apartment Occ Default",
+      "holiday_schedule_day_name": "MidriseApartment Apartment Occ Default",
+      "monday_schedule_day_name": "MidriseApartment Apartment Occ Default",
+      "saturday_schedule_day_name": "MidriseApartment Apartment Occ Default",
+      "summerdesignday_schedule_day_name": "MidriseApartment Apartment Occ Summer Design Day",
+      "sunday_schedule_day_name": "MidriseApartment Apartment Occ Default",
+      "thursday_schedule_day_name": "MidriseApartment Apartment Occ Default",
+      "tuesday_schedule_day_name": "MidriseApartment Apartment Occ Default",
+      "wednesday_schedule_day_name": "MidriseApartment Apartment Occ Default",
+      "winterdesignday_schedule_day_name": "MidriseApartment Apartment Occ Winter Design Day"
+    },
+    "MidriseApartment Infil Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "MidriseApartment Infil Default",
+      "customday2_schedule_day_name": "MidriseApartment Infil Default",
+      "friday_schedule_day_name": "MidriseApartment Infil Default",
+      "holiday_schedule_day_name": "MidriseApartment Infil Default",
+      "monday_schedule_day_name": "MidriseApartment Infil Default",
+      "saturday_schedule_day_name": "MidriseApartment Infil Default",
+      "summerdesignday_schedule_day_name": "MidriseApartment Infil Summer Design Day",
+      "sunday_schedule_day_name": "MidriseApartment Infil Default",
+      "thursday_schedule_day_name": "MidriseApartment Infil Default",
+      "tuesday_schedule_day_name": "MidriseApartment Infil Default",
+      "wednesday_schedule_day_name": "MidriseApartment Infil Default",
+      "winterdesignday_schedule_day_name": "MidriseApartment Infil Winter Design Day"
+    },
+    "Work Efficiency Schedule Week Rule - Jan1-Dec31": {
+      "customday1_schedule_day_name": "Work Efficiency Schedule Default",
+      "customday2_schedule_day_name": "Work Efficiency Schedule Default",
+      "friday_schedule_day_name": "Work Efficiency Schedule Default",
+      "holiday_schedule_day_name": "Work Efficiency Schedule Default",
+      "monday_schedule_day_name": "Work Efficiency Schedule Default",
+      "saturday_schedule_day_name": "Work Efficiency Schedule Default",
+      "summerdesignday_schedule_day_name": "Work Efficiency Schedule Default",
+      "sunday_schedule_day_name": "Work Efficiency Schedule Default",
+      "thursday_schedule_day_name": "Work Efficiency Schedule Default",
+      "tuesday_schedule_day_name": "Work Efficiency Schedule Default",
+      "wednesday_schedule_day_name": "Work Efficiency Schedule Default",
+      "winterdesignday_schedule_day_name": "Work Efficiency Schedule Default"
+    }
+  },
+  "Schedule:Year": {
+    "Air Velocity Schedule": {
+      "schedule_type_limits_name": "Velocity",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "Air Velocity Schedule Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "ApartmentMidRise All On": {
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "ApartmentMidRise All On Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "ApartmentMidRise EQP_APT_SCH": {
+      "schedule_type_limits_name": "Fractional",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "ApartmentMidRise EQP_APT_SCH Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "ApartmentMidRise Exterior_Lgt_ALWAYS_ON": {
+      "schedule_type_limits_name": "Fractional",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "ApartmentMidRise Exterior_Lgt_ALWAYS_ON Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "Clothing Schedule": {
+      "schedule_type_limits_name": "Any Number",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "Clothing Schedule Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "MidriseApartment Activity": {
+      "schedule_type_limits_name": "ActivityLevel",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "MidriseApartment Activity Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "MidriseApartment Apartment ClgSetp": {
+      "schedule_type_limits_name": "Temperature",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "MidriseApartment Apartment ClgSetp Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "MidriseApartment Apartment HtgSetp": {
+      "schedule_type_limits_name": "Temperature",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "MidriseApartment Apartment HtgSetp Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "MidriseApartment Apartment Light": {
+      "schedule_type_limits_name": "Fractional",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "MidriseApartment Apartment Light Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "MidriseApartment Apartment Occ": {
+      "schedule_type_limits_name": "Fractional",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "MidriseApartment Apartment Occ Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "MidriseApartment Infil": {
+      "schedule_type_limits_name": "Fractional",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "MidriseApartment Infil Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    },
+    "Work Efficiency Schedule": {
+      "schedule_type_limits_name": "Fractional",
+      "schedule_weeks": [
+        {
+          "end_day": 31,
+          "end_month": 12,
+          "schedule_week_name": "Work Efficiency Schedule Week Rule - Jan1-Dec31",
+          "start_day": 1,
+          "start_month": 1
+        }
+      ]
+    }
+  },
+  "ScheduleTypeLimits": {
+    "ActivityLevel": {
+      "lower_limit_value": 0,
+      "numeric_type": "Continuous",
+      "unit_type": "ActivityLevel"
+    },
+    "Any Number": {},
+    "Fractional": {
+      "lower_limit_value": 0,
+      "numeric_type": "Continuous",
+      "upper_limit_value": 1
+    },
+    "OnOff": {
+      "lower_limit_value": 0,
+      "numeric_type": "Discrete",
+      "unit_type": "Availability",
+      "upper_limit_value": 1
+    },
+    "Space 0 ZN Thermostat Schedule Type Limits": {
+      "lower_limit_value": 0,
+      "numeric_type": "Discrete",
+      "upper_limit_value": 4
+    },
+    "Temperature": {
+      "numeric_type": "Continuous",
+      "unit_type": "Temperature"
+    },
+    "Velocity": {
+      "lower_limit_value": 0,
+      "numeric_type": "Continuous",
+      "unit_type": "Velocity"
+    }
+  },
+  "SetpointManager:MixedAir": {
+    "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER Outlet Air Node OS Default SPM": {
+      "control_variable": "Temperature",
+      "fan_inlet_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node",
+      "fan_outlet_node_name": "Space 0 ZN SAC Supply Outlet Node",
+      "reference_setpoint_node_name": "Space 0 ZN SAC Supply Outlet Node",
+      "setpoint_node_or_nodelist_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 51kBtu/hr 9.7SEER Outlet Air Node"
+    },
+    "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node OS Default SPM": {
+      "control_variable": "Temperature",
+      "fan_inlet_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node",
+      "fan_outlet_node_name": "Space 0 ZN SAC Supply Outlet Node",
+      "reference_setpoint_node_name": "Space 0 ZN SAC Supply Outlet Node",
+      "setpoint_node_or_nodelist_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node"
+    },
+    "Space 0 ZN SAC Gas Htg Coil Outlet Air Node OS Default SPM": {
+      "control_variable": "Temperature",
+      "fan_inlet_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node",
+      "fan_outlet_node_name": "Space 0 ZN SAC Supply Outlet Node",
+      "reference_setpoint_node_name": "Space 0 ZN SAC Supply Outlet Node",
+      "setpoint_node_or_nodelist_name": "Space 0 ZN SAC Gas Htg Coil Outlet Air Node"
+    },
+    "Space 0 ZN SAC Mixed Air Node OS Default SPM": {
+      "control_variable": "Temperature",
+      "fan_inlet_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node",
+      "fan_outlet_node_name": "Space 0 ZN SAC Supply Outlet Node",
+      "reference_setpoint_node_name": "Space 0 ZN SAC Supply Outlet Node",
+      "setpoint_node_or_nodelist_name": "Space 0 ZN SAC Mixed Air Node"
+    }
+  },
+  "SetpointManager:SingleZone:Reheat": {
+    "Space 0 ZN SAC Setpoint Manager SZ Reheat": {
+      "control_variable": "Temperature",
+      "control_zone_name": "Space 0 ZN",
+      "maximum_supply_air_temperature": 50.0000000000001,
+      "minimum_supply_air_temperature": 12.7777777777778,
+      "setpoint_node_or_nodelist_name": "Space 0 ZN SAC Supply Outlet Node",
+      "zone_inlet_node_name": "Space 0 ZN SAC Diffuser Outlet Air Node",
+      "zone_node_name": "Space 0 ZN Zone Air Node"
+    }
+  },
+  "ShadowCalculation": {
+    "ShadowCalculation 1": {
+      "disable_self_shading_from_shading_zone_groups_to_other_zones": "No",
+      "disable_self_shading_within_shading_zone_groups": "No",
+      "maximum_figures_in_shadow_overlap_calculations": 15000,
+      "output_external_shading_calculation_results": "No",
+      "pixel_counting_resolution": 512,
+      "polygon_clipping_algorithm": "SutherlandHodgman",
+      "shading_calculation_method": "PolygonClipping",
+      "shading_calculation_update_frequency": 20,
+      "shading_calculation_update_frequency_method": "Periodic",
+      "sky_diffuse_modeling_algorithm": "SimpleSkyDiffuseModeling"
+    }
+  },
+  "SimulationControl": {
+    "SimulationControl 1": {
+      "do_hvac_sizing_simulation_for_sizing_periods": "Yes",
+      "do_plant_sizing_calculation": "No",
+      "do_system_sizing_calculation": "Yes",
+      "do_zone_sizing_calculation": "Yes",
+      "maximum_number_of_hvac_sizing_simulation_passes": 1,
+      "run_simulation_for_sizing_periods": "No",
+      "run_simulation_for_weather_file_run_periods": "Yes"
+    }
+  },
+  "Site:GroundTemperature:FCfactorMethod": {
+    "Site:GroundTemperature:FCfactorMethod 1": {
+      "april_ground_temperature": -7.2,
+      "august_ground_temperature": 13.8,
+      "december_ground_temperature": 15.1,
+      "february_ground_temperature": 2.8,
+      "january_ground_temperature": 8.7,
+      "july_ground_temperature": 7.8,
+      "june_ground_temperature": -0.5,
+      "march_ground_temperature": -1.5,
+      "may_ground_temperature": -5.6,
+      "november_ground_temperature": 19.8,
+      "october_ground_temperature": 21.1,
+      "september_ground_temperature": 19.3
+    }
+  },
+  "Site:Location": {
+    "Burlington International Ap_VT_USA": {
+      "elevation": 101,
+      "latitude": 44.47,
+      "longitude": -73.15,
+      "time_zone": -5
+    }
+  },
+  "Site:WaterMainsTemperature": {
+    "Site:WaterMainsTemperature 1": {
+      "annual_average_outdoor_air_temperature": 7.8,
+      "calculation_method": "Correlation",
+      "maximum_difference_in_monthly_average_outdoor_air_temperatures": 28.3
+    }
+  },
+  "Sizing:Parameters": {
+    "Sizing:Parameters 1": {
+      "cooling_sizing_factor": 1.2,
+      "heating_sizing_factor": 1.2
+    }
+  },
+  "Sizing:System": {
+    "Sizing:System 1": {
+      "100_outdoor_air_in_cooling": "No",
+      "100_outdoor_air_in_heating": "No",
+      "airloop_name": "Space 0 ZN SAC",
+      "central_cooling_capacity_control_method": "OnOff",
+      "central_cooling_design_supply_air_humidity_ratio": 0.0085,
+      "central_cooling_design_supply_air_temperature": 12.7777777777778,
+      "central_heating_design_supply_air_humidity_ratio": 0.008,
+      "central_heating_design_supply_air_temperature": 50.0000000000001,
+      "central_heating_maximum_system_air_flow_ratio": 1,
+      "cooling_design_capacity": "Autosize",
+      "cooling_design_capacity_method": "CoolingDesignCapacity",
+      "cooling_design_capacity_per_floor_area": 234.7,
+      "cooling_fraction_of_autosized_cooling_supply_air_flow_rate": 1,
+      "cooling_supply_air_flow_rate": 0,
+      "cooling_supply_air_flow_rate_method": "DesignDay",
+      "cooling_supply_air_flow_rate_per_floor_area": 0.0099676501,
+      "cooling_supply_air_flow_rate_per_unit_cooling_capacity": 3.9475456e-05,
+      "design_outdoor_air_flow_rate": "Autosize",
+      "fraction_of_autosized_cooling_design_capacity": 1,
+      "fraction_of_autosized_heating_design_capacity": 1,
+      "heating_design_capacity": "Autosize",
+      "heating_design_capacity_method": "HeatingDesignCapacity",
+      "heating_design_capacity_per_floor_area": 157,
+      "heating_fraction_of_autosized_cooling_supply_air_flow_rate": 1,
+      "heating_fraction_of_autosized_heating_supply_air_flow_rate": 1,
+      "heating_supply_air_flow_rate": 0,
+      "heating_supply_air_flow_rate_method": "DesignDay",
+      "heating_supply_air_flow_rate_per_floor_area": 0.0099676501,
+      "heating_supply_air_flow_rate_per_unit_heating_capacity": 3.1588213e-05,
+      "precool_design_humidity_ratio": 0.008,
+      "precool_design_temperature": 12.7777777777778,
+      "preheat_design_humidity_ratio": 0.008,
+      "preheat_design_temperature": 7.22222222222229,
+      "system_outdoor_air_method": "ZoneSum",
+      "type_of_load_to_size_on": "Sensible",
+      "type_of_zone_sum_to_use": "NonCoincident",
+      "zone_maximum_outdoor_air_fraction": 1
+    }
+  },
+  "Sizing:Zone": {
+    "Sizing:Zone 1": {
+      "account_for_dedicated_outdoor_air_system": "No",
+      "cooling_design_air_flow_method": "DesignDay",
+      "cooling_design_air_flow_rate": 0,
+      "cooling_minimum_air_flow": 0,
+      "cooling_minimum_air_flow_fraction": 0,
+      "cooling_minimum_air_flow_per_zone_floor_area": 0.000762,
+      "design_specification_outdoor_air_object_name": "Space Type 1 Ventilation",
+      "heating_design_air_flow_method": "DesignDay",
+      "heating_design_air_flow_rate": 0,
+      "heating_maximum_air_flow": 0.1415762,
+      "heating_maximum_air_flow_fraction": 0.3,
+      "heating_maximum_air_flow_per_zone_floor_area": 0.002032,
+      "zone_cooling_design_supply_air_humidity_ratio": 0.008,
+      "zone_cooling_design_supply_air_humidity_ratio_difference": 0.005,
+      "zone_cooling_design_supply_air_temperature": 12.7777777777778,
+      "zone_cooling_design_supply_air_temperature_difference": 11.11,
+      "zone_cooling_design_supply_air_temperature_input_method": "SupplyAirTemperature",
+      "zone_heating_design_supply_air_humidity_ratio": 0.008,
+      "zone_heating_design_supply_air_temperature": 50.0000000000001,
+      "zone_heating_design_supply_air_temperature_difference": 11.11,
+      "zone_heating_design_supply_air_temperature_input_method": "SupplyAirTemperature",
+      "zone_humidification_design_supply_air_humidity_ratio_difference": 0.005,
+      "zone_latent_cooling_design_supply_air_humidity_ratio_input_method": "HumidityRatioDifference",
+      "zone_latent_heating_design_supply_air_humidity_ratio_input_method": "HumidityRatioDifference",
+      "zone_load_sizing_method": "Sensible Load Only No Latent Load",
+      "zone_or_zonelist_name": "Space 0 ZN"
+    }
+  },
+  "SizingPeriod:DesignDay": {
+    "Burlington International Ap Ann Clg .4% Condns DB=>MWB": {
+      "ashrae_clear_sky_optical_depth_for_beam_irradiance_taub_": 0.459,
+      "ashrae_clear_sky_optical_depth_for_diffuse_irradiance_taud_": 2.002,
+      "barometric_pressure": 100118,
+      "daily_dry_bulb_temperature_range": 10.7,
+      "day_of_month": 21,
+      "day_type": "SummerDesignDay",
+      "daylight_saving_time_indicator": "No",
+      "dry_bulb_temperature_range_modifier_type": "DefaultMultipliers",
+      "humidity_condition_type": "WetBulb",
+      "maximum_dry_bulb_temperature": 31.3,
+      "month": 7,
+      "rain_indicator": "No",
+      "snow_indicator": "No",
+      "solar_model_indicator": "ASHRAETau",
+      "wetbulb_or_dewpoint_at_maximum_dry_bulb": 21.7,
+      "wind_direction": 170,
+      "wind_speed": 4.5
+    },
+    "Burlington International Ap Ann Htg 99.6% Condns DB": {
+      "barometric_pressure": 100118,
+      "daily_dry_bulb_temperature_range": 0,
+      "day_of_month": 21,
+      "day_type": "WinterDesignDay",
+      "daylight_saving_time_indicator": "No",
+      "dry_bulb_temperature_range_modifier_type": "DefaultMultipliers",
+      "humidity_condition_type": "WetBulb",
+      "maximum_dry_bulb_temperature": -22.4,
+      "month": 1,
+      "rain_indicator": "No",
+      "sky_clearness": 0,
+      "snow_indicator": "No",
+      "solar_model_indicator": "ASHRAEClearSky",
+      "wetbulb_or_dewpoint_at_maximum_dry_bulb": -22.4,
+      "wind_direction": 60,
+      "wind_speed": 3
+    }
+  },
+  "SurfaceConvectionAlgorithm:Inside": {
+    "SurfaceConvectionAlgorithm:Inside 1": {
+      "algorithm": "TARP"
+    }
+  },
+  "SurfaceConvectionAlgorithm:Outside": {
+    "SurfaceConvectionAlgorithm:Outside 1": {
+      "algorithm": "DOE-2"
+    }
+  },
+  "ThermostatSetpoint:DualSetpoint": {
+    "Space Type 1 Thermostat 1": {
+      "cooling_setpoint_temperature_schedule_name": "Space Type 1 Thermostat 1 Cooling Setpoint",
+      "heating_setpoint_temperature_schedule_name": "Space Type 1 Thermostat 1 Heating Setpoint"
+    }
+  },
+  "Timestep": {
+    "Timestep 1": {
+      "number_of_timesteps_per_hour": 1
+    }
+  },
+  "Version": {
+    "Version 1": {
+      "version_identifier": "24.1"
+    }
+  },
+  "WindowMaterial:Glazing": {
+    "Clear 3mm": {
+      "back_side_infrared_hemispherical_emissivity": 0.84,
+      "back_side_solar_reflectance_at_normal_incidence": 0.075,
+      "back_side_visible_reflectance_at_normal_incidence": 0.081,
+      "conductivity": 0.9,
+      "dirt_correction_factor_for_solar_and_visible_transmittance": 1,
+      "front_side_infrared_hemispherical_emissivity": 0.84,
+      "front_side_solar_reflectance_at_normal_incidence": 0.075,
+      "front_side_visible_reflectance_at_normal_incidence": 0.081,
+      "infrared_transmittance_at_normal_incidence": 0,
+      "optical_data_type": "SpectralAverage",
+      "solar_diffusing": "No",
+      "solar_transmittance_at_normal_incidence": 0.837,
+      "thickness": 0.00299999999999999,
+      "visible_transmittance_at_normal_incidence": 0.898
+    },
+    "REF A CLEAR LO 6MM": {
+      "back_side_infrared_hemispherical_emissivity": 0.4,
+      "back_side_solar_reflectance_at_normal_incidence": 0.493,
+      "back_side_visible_reflectance_at_normal_incidence": 0.37,
+      "conductivity": 0.9,
+      "dirt_correction_factor_for_solar_and_visible_transmittance": 1,
+      "front_side_infrared_hemispherical_emissivity": 0.84,
+      "front_side_solar_reflectance_at_normal_incidence": 0.341,
+      "front_side_visible_reflectance_at_normal_incidence": 0.41,
+      "infrared_transmittance_at_normal_incidence": 0,
+      "optical_data_type": "SpectralAverage",
+      "solar_diffusing": "No",
+      "solar_transmittance_at_normal_incidence": 0.066,
+      "thickness": 0.00599999999999998,
+      "visible_transmittance_at_normal_incidence": 0.08
+    }
+  },
+  "WindowMaterial:SimpleGlazingSystem": {
+    "U 0.52 SHGC 0.39 Simple Glazing U-0.93 SHGC 0.39": {
+      "solar_heat_gain_coefficient": 0.39,
+      "u_factor": 5.29157157236382,
+      "visible_transmittance": 0.31
+    },
+    "U 0.52 SHGC 0.39 Simple Glazing U-0.93 SHGC 0.39 1": {
+      "solar_heat_gain_coefficient": 0.39,
+      "u_factor": 5.29157157236382,
+      "visible_transmittance": 0.31
+    }
+  },
+  "Zone": {
+    "Space 0 ZN": {
+      "direction_of_relative_north": 0,
+      "multiplier": 1,
+      "part_of_total_floor_area": "Yes",
+      "x_origin": 0,
+      "y_origin": 0,
+      "z_origin": 0
+    }
+  },
+  "ZoneControl:Thermostat": {
+    "Space 0 ZN Thermostat": {
+      "control_1_name": "Space Type 1 Thermostat 1",
+      "control_1_object_type": "ThermostatSetpoint:DualSetpoint",
+      "control_type_schedule_name": "Space 0 ZN Thermostat Schedule",
+      "temperature_difference_between_cutout_and_setpoint": 0,
+      "zone_or_zonelist_name": "Space 0 ZN"
+    }
+  },
+  "ZoneHVAC:AirDistributionUnit": {
+    "ADU Space 0 ZN SAC Diffuser": {
+      "air_distribution_unit_outlet_node_name": "Space 0 ZN SAC Diffuser Outlet Air Node",
+      "air_terminal_name": "Space 0 ZN SAC Diffuser",
+      "air_terminal_object_type": "AirTerminal:SingleDuct:ConstantVolume:NoReheat"
+    }
+  },
+  "ZoneHVAC:EquipmentConnections": {
+    "ZoneHVAC:EquipmentConnections 1": {
+      "zone_air_inlet_node_or_nodelist_name": "Space 0 ZN Inlet Node List",
+      "zone_air_node_name": "Space 0 ZN Zone Air Node",
+      "zone_conditioning_equipment_list_name": "Space 0 ZN Equipment List",
+      "zone_name": "Space 0 ZN",
+      "zone_return_air_node_or_nodelist_name": "Space 0 ZN Return Node List"
+    }
+  },
+  "ZoneHVAC:EquipmentList": {
+    "Space 0 ZN Equipment List": {
+      "equipment": [
+        {
+          "zone_equipment_cooling_sequence": 1,
+          "zone_equipment_heating_or_no_load_sequence": 1,
+          "zone_equipment_name": "ADU Space 0 ZN SAC Diffuser",
+          "zone_equipment_object_type": "ZoneHVAC:AirDistributionUnit"
+        }
+      ],
+      "load_distribution_scheme": "SequentialLoad"
+    }
+  },
+  "ZoneInfiltration:DesignFlowRate": {
+    "Space 0 Infiltration": {
+      "constant_term_coefficient": 1,
+      "design_flow_rate_calculation_method": "Flow/ExteriorArea",
+      "flow_rate_per_exterior_surface_area": 0.0004928139825,
+      "schedule_name": "MidriseApartment Infil",
+      "temperature_term_coefficient": 0,
+      "velocity_squared_term_coefficient": 0,
+      "velocity_term_coefficient": 0,
+      "zone_or_zonelist_or_space_or_spacelist_name": "Space 0 ZN"
+    },
+    "Space Type 1 Infiltration": {
+      "constant_term_coefficient": 1,
+      "design_flow_rate_calculation_method": "Flow/ExteriorWallArea",
+      "flow_rate_per_exterior_surface_area": 0.00113284,
+      "schedule_name": "MidriseApartment Infil",
+      "temperature_term_coefficient": 0,
+      "velocity_squared_term_coefficient": 0,
+      "velocity_term_coefficient": 0,
+      "zone_or_zonelist_or_space_or_spacelist_name": "Space Type 1"
+    }
+  },
+  "ZoneList": {
+    "Space Type 1": {
+      "zones": [
+        {
+          "zone_name": "Space 0 ZN"
+        }
+      ]
+    }
+  }
+}
