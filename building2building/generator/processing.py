@@ -186,6 +186,10 @@ def transition_idf(idf_path: Path, state: str, county: str, target_version: str 
         final_epjson_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(epjson_path, final_epjson_path)
 
+        # Add setpoint control immediately after conversion, as in the old version
+        logger.info("Adding setpoint controls to epJSON...")
+        add_setpoint_control_to_epjson(str(final_epjson_path))
+
         # Clean up
         if not keep_original:
             idf_path.unlink()
@@ -198,7 +202,7 @@ def process_idf(building_files: List[tuple], state: str, county: str, keep_origi
     Process IDF files if they haven't been processed already.
 
     Args:
-        idf_files (List[int]): List of IDF file IDs
+        building_files (List[tuple]): List of tuples containing (idf_id, characteristics)
         state (str): Two-letter state code
         county (str): County name
         keep_original (bool): If True, keep original IDF files after processing
@@ -234,6 +238,19 @@ def process_idf(building_files: List[tuple], state: str, county: str, keep_origi
         # Process the file
         processed_path = transition_idf(original_path, state, county, keep_original=keep_original, output_dir=output_dir)
         if processed_path:
+            # Add additional required modifications to the epJSON file
+            logger.info("Adding HVAC meters to epJSON...")
+            add_hvac_meters_to_epjson(str(processed_path))
+            
+            logger.info("Adding outdoor air meters to epJSON...")
+            add_outdoor_air_meters_to_epjson(str(processed_path))
+            
+            logger.info("Adding outdoor air nodes to epJSON...")
+            add_outdoor_air_nodes_if_missing(str(processed_path))
+            
+            logger.info("Setting timestep to 4 per hour...")
+            modify_timestep(str(processed_path), timesteps_per_hour=4)
+            
             processed_paths.append(processed_path)
 
             # Save the building characteristics as a JSON file
