@@ -37,14 +37,14 @@ EOF
     # Update after successful PPA addition
     apt-get update || (sleep 5 && apt-get update)
 
-    # Install Python 3.11 and dependencies
-    apt-get install -y python3.11 python3.11-venv python3.11-dev wget git build-essential
+    # Install Python 3.10 and dependencies
+    apt-get install -y python3.10 python3.10-venv python3.10-dev wget git build-essential
 
     # Additional system dependencies that might be needed for aiohttp
-    apt-get install -y python3.11-distutils gcc libc-dev
+    apt-get install -y python3.10-distutils gcc libc-dev
 
     # Print Python version for debugging
-    python3.11 --version
+    python3.10 --version
     
     # Install EnergyPlus using the exact command
     cd /opt
@@ -53,7 +53,7 @@ EOF
     
     # Setup Python virtual environment
     cd /opt/repository
-    python3.11 -m venv .venv
+    python3.10 -m venv .venv
     . .venv/bin/activate
     pip install --upgrade pip
     

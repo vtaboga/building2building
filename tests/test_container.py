@@ -111,8 +111,8 @@ import pandas
 import matplotlib
 
 version = sys.version_info
-if version.major != 3 or version.minor != 11:
-    raise RuntimeError(f"Expected Python 3.11, but got {version.major}.{version.minor}")
+if version.major != 3 or version.minor != 10:
+    raise RuntimeError(f"Expected Python 3.10, but got {version.major}.{version.minor}")
 
 print('Python environment test successful!')
 """
