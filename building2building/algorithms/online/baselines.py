@@ -4,7 +4,7 @@ import json
 import os
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from building2building.simulator.utils import TrajectoryLogger
 from building2building.utils.results_parsing import parse_trajectories
 from building2building.simulator.wrappers import CustomRescaleAction, NormalizeObservation

@@ -8,9 +8,6 @@ import queue
 import pathlib
 import traceback
 from ctypes import c_void_p
-import logging
-
-logger = logging.getLogger(__name__)
 
 api = pyenergyplus.api.EnergyPlusAPI()
 
@@ -339,7 +336,7 @@ class EnergyPlusSimulation:
                     self.weather_path,
                     self.building_path,
                 ]
-                logger.debug(f"args: {args}")
+                print(f"args: {args}")
                 exit_code = api.runtime.run_energyplus(
                     state,
                     [

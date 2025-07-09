@@ -6,7 +6,7 @@ from omegaconf import DictConfig, OmegaConf
 from hydra.core.hydra_config import HydraConfig
 from typing import Dict, Any, cast
 import json
-
+import shutil   
 from building2building.algorithms.online.dqn import main
 
 # Make sure to import your environment to register it
@@ -21,10 +21,13 @@ def main_hydra(cfg: DictConfig) -> None:
     output_dir = Path(HydraConfig.get().runtime.output_dir)
     logger = logging.getLogger(__name__)
     
-    # Create subdirectories
-    (output_dir / 'models').mkdir(exist_ok=True)
-    (output_dir / 'data').mkdir(exist_ok=True)
-    (output_dir / 'eplus_output').mkdir(exist_ok=True)
+    # Remove unused subdirectories that Hydra might create
+    unused_dirs = ['models', 'data', 'eplus_output']
+    for unused_dir in unused_dirs:
+        unused_path = output_dir / unused_dir
+        if unused_path.exists():
+            shutil.rmtree(unused_path)
+            logger.info(f"Removed unused directory: {unused_path}")
     
     # Initialize W&B following best practices
     if cfg.get('track', False):
@@ -70,6 +73,12 @@ def main_hydra(cfg: DictConfig) -> None:
     
     # Hydra automatically saves config to .hydra/config.yaml
     logger.info(f"Config automatically saved to: {output_dir}/.hydra/config.yaml")
+    logger.info(f"Final results structure:")
+    logger.info(f"  - EnergyPlus outputs: {output_dir}/eplus_outputs/")
+    logger.info(f"  - Test results: {output_dir}/test_results/")
+    logger.info(f"  - Model: {output_dir}/model.pt")
+    logger.info(f"  - Training log: {output_dir}/train_dqn.log")
+    logger.info(f"  - TensorBoard logs: {output_dir}/logs/")
 
 
 if __name__ == "__main__":

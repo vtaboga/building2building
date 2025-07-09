@@ -14,7 +14,9 @@ container/*.sif
 container/*.sh
 building2building.egg-info/
 results/
+!tests/fixtures/results/
 wandb/
+!configs/wandb/
 configs/energyplus_simulator.json
 notebooks/
 OfflineRL-Kit/

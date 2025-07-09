@@ -34,8 +34,8 @@ def get_singularity_cmd():
 def test_energyplus_simulation(output_dir):
     """Test that EnergyPlus can run a simulation successfully in the container."""
     project_root = get_project_root()
-    epjson_path = project_root / "tests" / "fixtures" / "small_office.epJSON"
-    weather_path = project_root / "tests" / "fixtures" / "weather_small_office.epw"
+    epjson_path = project_root / "tests" / "fixtures" / "processed_buildings" / "1003000523385.epJSON"
+    weather_path = project_root / "tests" / "fixtures" / "weather" / "weather_vt_1.epw"
     container_path = project_root / "container" / "container.sif"
     
     # Verify container exists
@@ -45,15 +45,16 @@ def test_energyplus_simulation(output_dir):
     singularity_cmd = get_singularity_cmd()
     cmd = [
         singularity_cmd, "exec",
-        "-B", f"{epjson_path.parent}:/input",
+        "-B", f"{epjson_path.parent}:/input/buildings",
+        "-B", f"{weather_path.parent}:/input/weather",
         "-B", f"{output_dir}:/output",
-        "--pwd", "/input",
+        "--pwd", "/input/buildings",
         str(container_path),
         "energyplus",
-        "-w", "/input/weather_small_office.epw",
+        "-w", "/input/weather/weather_vt_1.epw",
         "-d", "/output",
         "-r",
-        "small_office.epJSON"
+        "1003000523385.epJSON"
     ]
     
     try:
@@ -65,14 +66,19 @@ def test_energyplus_simulation(output_dir):
         )
         
         # Wait for files to be written
-        time.sleep(15)
+        time.sleep(5)
         
         # Verify simulation completed successfully
         assert result.returncode == 0, "EnergyPlus simulation failed"
         assert "EnergyPlus Completed Successfully" in result.stderr, "EnergyPlus did not complete successfully"
         
         # Check for expected output files
-        expected_files = ["eplusout.err", "eplusout.rdd"]
+        expected_files = [
+            "eplusout.err",  # Error file (always generated)
+            "eplusout.end",  # End file with simulation status
+            "eplusout.csv",  # CSV output file
+            "eplustbl.htm"   # HTML table output
+        ]
         missing_files = []
         for file in expected_files:
             if not (output_dir / file).exists():
@@ -105,8 +111,8 @@ import pandas
 import matplotlib
 
 version = sys.version_info
-if version.major != 3 or version.minor != 10:
-    raise RuntimeError(f"Expected Python 3.10, but got {version.major}.{version.minor}")
+if version.major != 3 or version.minor != 11:
+    raise RuntimeError(f"Expected Python 3.11, but got {version.major}.{version.minor}")
 
 print('Python environment test successful!')
 """

@@ -1,0 +1,37 @@
+name: Run Selected Tests
+
+on:
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Create and activate virtual environment
+      run: |
+        python -m venv .venv
+        source .venv/bin/activate
+        echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
+        echo "PATH=$VIRTUAL_ENV/bin:$PATH" >> $GITHUB_ENV
+        
+    - name: Install test dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r test-requirements.txt
+        PYTHONPATH=$PWD pip install -e . --no-deps
+        
+    - name: Run specific tests
+      run: |
+        pytest tests/test_idf_search.py::TestSearchMetadata \
+              tests/test_idf_search.py::TestMetadataLoading \
+              tests/test_idf_search.py::TestSearchIDF \
+              tests/test_gym_wrapper.py::TestRDFParsing::test_get_controllable_setpoints -v 

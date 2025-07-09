@@ -123,12 +123,12 @@
         },
         {
           "component_inlet_node_name": "Space 0 ZN SAC Mixed Air Node",
-          "component_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER CoilSystem",
+          "component_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER CoilSystem",
           "component_object_type": "CoilSystem:Cooling:DX",
-          "component_outlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER Outlet Air Node"
+          "component_outlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER Outlet Air Node"
         },
         {
-          "component_inlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER Outlet Air Node",
+          "component_inlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER Outlet Air Node",
           "component_name": "Space 0 ZN SAC Gas Htg Coil",
           "component_object_type": "Coil:Heating:Fuel",
           "component_outlet_node_name": "Space 0 ZN SAC Gas Htg Coil Outlet Air Node"
@@ -158,45 +158,35 @@
     }
   },
   "Building": {
-    "-MidriseApartment-ASHRAE 169-2006-3A created: 2021-03-20 22:36:43 +0000": {
+    "-MidriseApartment-ASHRAE 169-2006-6A created: 2021-03-21 12:17:22 +0000": {
       "terrain": "City"
     }
   },
   "BuildingSurface:Detailed": {
     "Surface 1": {
-      "construction_name": "Foundation F 126 Perim 4961 Area 14133",
+      "construction_name": "Foundation F 126 Perim 4428 Area 12242",
       "outside_boundary_condition": "GroundFCfactorMethod",
       "sun_exposure": "NoSun",
       "surface_type": "Floor",
       "vertices": [
         {
-          "vertex_x_coordinate": 3.35372400515875,
-          "vertex_y_coordinate": -5.86055792292071,
+          "vertex_x_coordinate": -7.81893976542726,
+          "vertex_y_coordinate": -0.185195643993713,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": -6.48360902294897,
-          "vertex_y_coordinate": -5.86055642160263,
+          "vertex_x_coordinate": 0.237514919860747,
+          "vertex_y_coordinate": 7.81614590171298,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": -6.48360201179613,
-          "vertex_y_coordinate": 5.22795969155982,
+          "vertex_x_coordinate": 7.82006053952966,
+          "vertex_y_coordinate": 0.259323593518323,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": 7.23189555155346,
-          "vertex_y_coordinate": 5.22796019168388,
-          "vertex_z_coordinate": 0
-        },
-        {
-          "vertex_x_coordinate": 7.23190141678897,
-          "vertex_y_coordinate": -3.08842690851211,
-          "vertex_z_coordinate": 0
-        },
-        {
-          "vertex_x_coordinate": 3.35372309851453,
-          "vertex_y_coordinate": -3.08842891009918,
+          "vertex_x_coordinate": -0.236394183087963,
+          "vertex_y_coordinate": -7.85315719172596,
           "vertex_z_coordinate": 0
         }
       ],
@@ -204,220 +194,150 @@
       "zone_name": "Space 0 ZN"
     },
     "Surface 2": {
-      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-4.44",
+      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-15.38",
       "outside_boundary_condition": "Outdoors",
       "sun_exposure": "SunExposed",
       "surface_type": "Wall",
       "vertices": [
         {
-          "vertex_x_coordinate": -6.48360902294897,
-          "vertex_y_coordinate": -5.86055642160263,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": 0.237514919860747,
+          "vertex_y_coordinate": 7.81614590171298,
+          "vertex_z_coordinate": 1.36001658132163
         },
         {
-          "vertex_x_coordinate": -6.48360902294897,
-          "vertex_y_coordinate": -5.86055642160263,
+          "vertex_x_coordinate": 0.237514919860747,
+          "vertex_y_coordinate": 7.81614590171298,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": 3.35372400515875,
-          "vertex_y_coordinate": -5.86055792292071,
+          "vertex_x_coordinate": -7.81893976542726,
+          "vertex_y_coordinate": -0.185195643993713,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": 3.35372400515875,
-          "vertex_y_coordinate": -5.86055792292071,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": -7.81893976542726,
+          "vertex_y_coordinate": -0.185195643993713,
+          "vertex_z_coordinate": 1.36001658132163
         }
       ],
       "wind_exposure": "WindExposed",
       "zone_name": "Space 0 ZN"
     },
     "Surface 3": {
-      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-4.44",
+      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-15.38",
       "outside_boundary_condition": "Outdoors",
       "sun_exposure": "SunExposed",
       "surface_type": "Wall",
       "vertices": [
         {
-          "vertex_x_coordinate": -6.48360201179613,
-          "vertex_y_coordinate": 5.22795969155982,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": 7.82006053952966,
+          "vertex_y_coordinate": 0.259323593518323,
+          "vertex_z_coordinate": 1.36001658132163
         },
         {
-          "vertex_x_coordinate": -6.48360201179613,
-          "vertex_y_coordinate": 5.22795969155982,
+          "vertex_x_coordinate": 7.82006053952966,
+          "vertex_y_coordinate": 0.259323593518323,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": -6.48360902294897,
-          "vertex_y_coordinate": -5.86055642160263,
+          "vertex_x_coordinate": 0.237514919860747,
+          "vertex_y_coordinate": 7.81614590171298,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": -6.48360902294897,
-          "vertex_y_coordinate": -5.86055642160263,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": 0.237514919860747,
+          "vertex_y_coordinate": 7.81614590171298,
+          "vertex_z_coordinate": 1.36001658132163
         }
       ],
       "wind_exposure": "WindExposed",
       "zone_name": "Space 0 ZN"
     },
     "Surface 4": {
-      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-4.44",
+      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-15.38",
       "outside_boundary_condition": "Outdoors",
       "sun_exposure": "SunExposed",
       "surface_type": "Wall",
       "vertices": [
         {
-          "vertex_x_coordinate": 7.23189555155346,
-          "vertex_y_coordinate": 5.22796019168388,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": -0.236394183087963,
+          "vertex_y_coordinate": -7.85315719172596,
+          "vertex_z_coordinate": 1.36001658132163
         },
         {
-          "vertex_x_coordinate": 7.23189555155346,
-          "vertex_y_coordinate": 5.22796019168388,
+          "vertex_x_coordinate": -0.236394183087963,
+          "vertex_y_coordinate": -7.85315719172596,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": -6.48360201179613,
-          "vertex_y_coordinate": 5.22795969155982,
+          "vertex_x_coordinate": 7.82006053952966,
+          "vertex_y_coordinate": 0.259323593518323,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": -6.48360201179613,
-          "vertex_y_coordinate": 5.22795969155982,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": 7.82006053952966,
+          "vertex_y_coordinate": 0.259323593518323,
+          "vertex_z_coordinate": 1.36001658132163
         }
       ],
       "wind_exposure": "WindExposed",
       "zone_name": "Space 0 ZN"
     },
     "Surface 5": {
-      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-4.44",
+      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-15.38",
       "outside_boundary_condition": "Outdoors",
       "sun_exposure": "SunExposed",
       "surface_type": "Wall",
       "vertices": [
         {
-          "vertex_x_coordinate": 7.23190141678897,
-          "vertex_y_coordinate": -3.08842690851211,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": -7.81893976542726,
+          "vertex_y_coordinate": -0.185195643993713,
+          "vertex_z_coordinate": 1.36001658132163
         },
         {
-          "vertex_x_coordinate": 7.23190141678897,
-          "vertex_y_coordinate": -3.08842690851211,
+          "vertex_x_coordinate": -7.81893976542726,
+          "vertex_y_coordinate": -0.185195643993713,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": 7.23189555155346,
-          "vertex_y_coordinate": 5.22796019168388,
+          "vertex_x_coordinate": -0.236394183087963,
+          "vertex_y_coordinate": -7.85315719172596,
           "vertex_z_coordinate": 0
         },
         {
-          "vertex_x_coordinate": 7.23189555155346,
-          "vertex_y_coordinate": 5.22796019168388,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": -0.236394183087963,
+          "vertex_y_coordinate": -7.85315719172596,
+          "vertex_z_coordinate": 1.36001658132163
         }
       ],
       "wind_exposure": "WindExposed",
       "zone_name": "Space 0 ZN"
     },
     "Surface 6": {
-      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-4.44",
-      "outside_boundary_condition": "Outdoors",
-      "sun_exposure": "SunExposed",
-      "surface_type": "Wall",
-      "vertices": [
-        {
-          "vertex_x_coordinate": 3.35372309851453,
-          "vertex_y_coordinate": -3.08842891009918,
-          "vertex_z_coordinate": 1.76365786615238
-        },
-        {
-          "vertex_x_coordinate": 3.35372309851453,
-          "vertex_y_coordinate": -3.08842891009918,
-          "vertex_z_coordinate": 0
-        },
-        {
-          "vertex_x_coordinate": 7.23190141678897,
-          "vertex_y_coordinate": -3.08842690851211,
-          "vertex_z_coordinate": 0
-        },
-        {
-          "vertex_x_coordinate": 7.23190141678897,
-          "vertex_y_coordinate": -3.08842690851211,
-          "vertex_z_coordinate": 1.76365786615238
-        }
-      ],
-      "wind_exposure": "WindExposed",
-      "zone_name": "Space 0 ZN"
-    },
-    "Surface 7": {
-      "construction_name": "Typical Insulated Steel Framed Exterior Wall R-4.44",
-      "outside_boundary_condition": "Outdoors",
-      "sun_exposure": "SunExposed",
-      "surface_type": "Wall",
-      "vertices": [
-        {
-          "vertex_x_coordinate": 3.35372400515875,
-          "vertex_y_coordinate": -5.86055792292071,
-          "vertex_z_coordinate": 1.76365786615238
-        },
-        {
-          "vertex_x_coordinate": 3.35372400515875,
-          "vertex_y_coordinate": -5.86055792292071,
-          "vertex_z_coordinate": 0
-        },
-        {
-          "vertex_x_coordinate": 3.35372309851453,
-          "vertex_y_coordinate": -3.08842891009918,
-          "vertex_z_coordinate": 0
-        },
-        {
-          "vertex_x_coordinate": 3.35372309851453,
-          "vertex_y_coordinate": -3.08842891009918,
-          "vertex_z_coordinate": 1.76365786615238
-        }
-      ],
-      "wind_exposure": "WindExposed",
-      "zone_name": "Space 0 ZN"
-    },
-    "Surface 8": {
-      "construction_name": "Typical IEAD Roof R-10.0",
+      "construction_name": "Typical IEAD Roof R-22.22",
       "outside_boundary_condition": "Outdoors",
       "sun_exposure": "SunExposed",
       "surface_type": "Roof",
       "vertices": [
         {
-          "vertex_x_coordinate": 3.35372309851453,
-          "vertex_y_coordinate": -3.08842891009918,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": -0.236394183087963,
+          "vertex_y_coordinate": -7.85315719172596,
+          "vertex_z_coordinate": 1.36001658132163
         },
         {
-          "vertex_x_coordinate": 7.23190141678897,
-          "vertex_y_coordinate": -3.08842690851211,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": 7.82006053952966,
+          "vertex_y_coordinate": 0.259323593518323,
+          "vertex_z_coordinate": 1.36001658132163
         },
         {
-          "vertex_x_coordinate": 7.23189555155346,
-          "vertex_y_coordinate": 5.22796019168388,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": 0.237514919860747,
+          "vertex_y_coordinate": 7.81614590171298,
+          "vertex_z_coordinate": 1.36001658132163
         },
         {
-          "vertex_x_coordinate": -6.48360201179613,
-          "vertex_y_coordinate": 5.22795969155982,
-          "vertex_z_coordinate": 1.76365786615238
-        },
-        {
-          "vertex_x_coordinate": -6.48360902294897,
-          "vertex_y_coordinate": -5.86055642160263,
-          "vertex_z_coordinate": 1.76365786615238
-        },
-        {
-          "vertex_x_coordinate": 3.35372400515875,
-          "vertex_y_coordinate": -5.86055792292071,
-          "vertex_z_coordinate": 1.76365786615238
+          "vertex_x_coordinate": -7.81893976542726,
+          "vertex_y_coordinate": -0.185195643993713,
+          "vertex_z_coordinate": 1.36001658132163
         }
       ],
       "wind_exposure": "WindExposed",
@@ -425,10 +345,10 @@
     }
   },
   "Coil:Cooling:DX:SingleSpeed": {
-    "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER": {
+    "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER": {
       "2017_rated_evaporator_fan_power_per_volume_flow_rate": 773.3,
       "air_inlet_node_name": "Space 0 ZN SAC Mixed Air Node",
-      "air_outlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER Outlet Air Node",
+      "air_outlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER Outlet Air Node",
       "availability_schedule_name": "Always On Discrete",
       "basin_heater_capacity": 0,
       "basin_heater_setpoint_temperature": 10,
@@ -439,7 +359,7 @@
       "evaporative_condenser_air_flow_rate": "Autosize",
       "evaporative_condenser_effectiveness": 0,
       "evaporative_condenser_pump_rated_power_consumption": "Autosize",
-      "gross_rated_cooling_cop": 3.47821114455424,
+      "gross_rated_cooling_cop": 3.14721852276057,
       "gross_rated_sensible_heat_ratio": "Autosize",
       "gross_rated_total_cooling_capacity": "Autosize",
       "maximum_outdoor_dry_bulb_temperature_for_crankcase_heater_operation": 0,
@@ -463,7 +383,7 @@
       "temperature_setpoint_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node"
     },
     "Space 0 ZN SAC Gas Htg Coil": {
-      "air_inlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER Outlet Air Node",
+      "air_inlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER Outlet Air Node",
       "air_outlet_node_name": "Space 0 ZN SAC Gas Htg Coil Outlet Air Node",
       "availability_schedule_name": "Always On Discrete",
       "burner_efficiency": 0.8,
@@ -476,21 +396,21 @@
     }
   },
   "CoilSystem:Cooling:DX": {
-    "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER CoilSystem": {
+    "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER CoilSystem": {
       "availability_schedule_name": "Always On Discrete",
-      "cooling_coil_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER",
+      "cooling_coil_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER",
       "cooling_coil_object_type": "Coil:Cooling:DX:SingleSpeed",
       "dx_cooling_coil_system_inlet_node_name": "Space 0 ZN SAC Mixed Air Node",
-      "dx_cooling_coil_system_outlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER Outlet Air Node",
-      "dx_cooling_coil_system_sensor_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER Outlet Air Node"
+      "dx_cooling_coil_system_outlet_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER Outlet Air Node",
+      "dx_cooling_coil_system_sensor_node_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER Outlet Air Node"
     }
   },
   "Construction": {
     "InteriorFurnishings": {
       "outside_layer": "Std Wood 6inch"
     },
-    "Typical IEAD Roof R-10.0": {
-      "layer_2": "Typical Insulation R-8.88",
+    "Typical IEAD Roof R-22.22": {
+      "layer_2": "Typical Insulation R-21.1",
       "layer_3": "Metal Roof Surface",
       "outside_layer": "Roof Membrane"
     },
@@ -504,15 +424,15 @@
     "Typical Insulated Exterior Mass Floor": {
       "layer_2": "4 in. Normalweight Concrete Floor",
       "layer_3": "Typical Carpet Pad",
-      "outside_layer": "Typical Insulation R-2.27"
+      "outside_layer": "Typical Insulation R-13.21"
     },
     "Typical Insulated Metal Door": {
       "layer_2": "Typical Insulation",
       "outside_layer": "F08 Metal surface"
     },
-    "Typical Insulated Steel Framed Exterior Wall R-4.44": {
+    "Typical Insulated Steel Framed Exterior Wall R-15.38": {
       "layer_2": "5/8 in. Gypsum Board",
-      "layer_3": "Typical Insulation R-2.27",
+      "layer_3": "Typical Insulation R-13.21",
       "layer_4": "5/8 in. Gypsum Board",
       "outside_layer": "25mm Stucco"
     },
@@ -540,21 +460,21 @@
     "Typical Overhead Door": {
       "outside_layer": "Typical Insulation"
     },
+    "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39": {
+      "outside_layer": "U 0.52 SHGC 0.39 Simple Glazing U-0.93 SHGC 0.39"
+    },
+    "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39 1": {
+      "outside_layer": "U 0.52 SHGC 0.39 Simple Glazing U-0.93 SHGC 0.39 1"
+    },
     "U 0.88 SHGC 0.16 Sgl Ref-A-L Clr 6mm": {
       "outside_layer": "REF A CLEAR LO 6MM"
-    },
-    "U 1.22 SHGC 0.54 Simple Glazing Window SHGC 0.54": {
-      "outside_layer": "U 1.22 SHGC 0.54 Simple Glazing SHGC 0.54"
-    },
-    "U 1.22 SHGC 0.54 Simple Glazing Window SHGC 0.54 1": {
-      "outside_layer": "U 1.22 SHGC 0.54 Simple Glazing SHGC 0.54 1"
     }
   },
   "Construction:FfactorGroundFloor": {
-    "Foundation F 126 Perim 4961 Area 14133": {
-      "area": 141.333798629873,
+    "Foundation F 126 Perim 4428 Area 12242": {
+      "area": 122.420787071831,
       "f_factor": 1.26343630645112,
-      "perimeterexposed": 49.6080411359168
+      "perimeterexposed": 44.2769473864027
     }
   },
   "Controller:MechanicalVentilation": {
@@ -697,105 +617,71 @@
   "FenestrationSurface:Detailed": {
     "Sub Surface 1": {
       "building_surface_name": "Surface 2",
-      "construction_name": "U 1.22 SHGC 0.54 Simple Glazing Window SHGC 0.54",
+      "construction_name": "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39",
       "surface_type": "Window",
-      "vertex_1_x_coordinate": -6.45820902294897,
-      "vertex_1_y_coordinate": -5.86055642547903,
-      "vertex_1_z_coordinate": 1.01019377422029,
-      "vertex_2_x_coordinate": -6.45820902294897,
-      "vertex_2_y_coordinate": -5.86055642547903,
+      "vertex_1_x_coordinate": 0.219492870175806,
+      "vertex_1_y_coordinate": 7.79824713848326,
+      "vertex_1_z_coordinate": 0.95325799830066,
+      "vertex_2_x_coordinate": 0.219492870175806,
+      "vertex_2_y_coordinate": 7.79824713848326,
       "vertex_2_z_coordinate": 0.762,
-      "vertex_3_x_coordinate": 3.32832400515875,
-      "vertex_3_y_coordinate": -5.8605579190443,
+      "vertex_3_x_coordinate": -7.80091771574231,
+      "vertex_3_y_coordinate": -0.167296880763995,
       "vertex_3_z_coordinate": 0.762,
-      "vertex_4_x_coordinate": 3.32832400515875,
-      "vertex_4_y_coordinate": -5.8605579190443,
-      "vertex_4_z_coordinate": 1.01019377422029
+      "vertex_4_x_coordinate": -7.80091771574231,
+      "vertex_4_y_coordinate": -0.167296880763995,
+      "vertex_4_z_coordinate": 0.95325799830066
     },
     "Sub Surface 2": {
       "building_surface_name": "Surface 3",
-      "construction_name": "U 1.22 SHGC 0.54 Simple Glazing Window SHGC 0.54",
+      "construction_name": "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39",
       "surface_type": "Window",
-      "vertex_1_x_coordinate": -6.48360202785628,
-      "vertex_1_y_coordinate": 5.20255969155983,
-      "vertex_1_z_coordinate": 1.0100484898598,
-      "vertex_2_x_coordinate": -6.48360202785628,
-      "vertex_2_y_coordinate": 5.20255969155983,
+      "vertex_1_x_coordinate": 7.8020695365371,
+      "vertex_1_y_coordinate": 0.277253563159168,
+      "vertex_1_z_coordinate": 0.953310159418121,
+      "vertex_2_x_coordinate": 7.8020695365371,
+      "vertex_2_y_coordinate": 0.277253563159168,
       "vertex_2_z_coordinate": 0.762,
-      "vertex_3_x_coordinate": -6.48360900688882,
-      "vertex_3_y_coordinate": -5.83515642160263,
+      "vertex_3_x_coordinate": 0.25550592285331,
+      "vertex_3_y_coordinate": 7.79821593207213,
       "vertex_3_z_coordinate": 0.762,
-      "vertex_4_x_coordinate": -6.48360900688882,
-      "vertex_4_y_coordinate": -5.83515642160263,
-      "vertex_4_z_coordinate": 1.0100484898598
+      "vertex_4_x_coordinate": 0.25550592285331,
+      "vertex_4_y_coordinate": 7.79821593207213,
+      "vertex_4_z_coordinate": 0.953310159418121
     },
     "Sub Surface 3": {
       "building_surface_name": "Surface 4",
-      "construction_name": "U 1.22 SHGC 0.54 Simple Glazing Window SHGC 0.54",
+      "construction_name": "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39",
       "surface_type": "Window",
-      "vertex_1_x_coordinate": 7.20649555155346,
-      "vertex_1_y_coordinate": 5.22796019075769,
-      "vertex_1_z_coordinate": 1.00983002386342,
-      "vertex_2_x_coordinate": 7.20649555155346,
-      "vertex_2_y_coordinate": 5.22796019075769,
+      "vertex_1_x_coordinate": -0.218496012246618,
+      "vertex_1_y_coordinate": -7.83513455372443,
+      "vertex_1_z_coordinate": 0.953252090347845,
+      "vertex_2_x_coordinate": -0.218496012246618,
+      "vertex_2_y_coordinate": -7.83513455372443,
       "vertex_2_z_coordinate": 0.762,
-      "vertex_3_x_coordinate": -6.45820201179613,
-      "vertex_3_y_coordinate": 5.22795969248601,
+      "vertex_3_x_coordinate": 7.80216236868831,
+      "vertex_3_y_coordinate": 0.241300955516794,
       "vertex_3_z_coordinate": 0.762,
-      "vertex_4_x_coordinate": -6.45820201179613,
-      "vertex_4_y_coordinate": 5.22795969248601,
-      "vertex_4_z_coordinate": 1.00983002386342
+      "vertex_4_x_coordinate": 7.80216236868831,
+      "vertex_4_y_coordinate": 0.241300955516794,
+      "vertex_4_z_coordinate": 0.953252090347845
     },
     "Sub Surface 4": {
       "building_surface_name": "Surface 5",
-      "construction_name": "U 1.22 SHGC 0.54 Simple Glazing Window SHGC 0.54",
+      "construction_name": "U 0.52 SHGC 0.39 Simple Glazing Window U-0.52 SHGC 0.39",
       "surface_type": "Window",
-      "vertex_1_x_coordinate": 7.2319013988753,
-      "vertex_1_y_coordinate": -3.06302690851212,
-      "vertex_1_z_coordinate": 1.01042961412425,
-      "vertex_2_x_coordinate": 7.2319013988753,
-      "vertex_2_y_coordinate": -3.06302690851212,
+      "vertex_1_x_coordinate": -7.80108012763453,
+      "vertex_1_y_coordinate": -0.203256467283715,
+      "vertex_1_z_coordinate": 0.953303499272689,
+      "vertex_2_x_coordinate": -7.80108012763453,
+      "vertex_2_y_coordinate": -0.203256467283715,
       "vertex_2_z_coordinate": 0.762,
-      "vertex_3_x_coordinate": 7.23189556946713,
-      "vertex_3_y_coordinate": 5.20256019168389,
+      "vertex_3_x_coordinate": -0.254253820880687,
+      "vertex_3_y_coordinate": -7.83509636843595,
       "vertex_3_z_coordinate": 0.762,
-      "vertex_4_x_coordinate": 7.23189556946713,
-      "vertex_4_y_coordinate": 5.20256019168389,
-      "vertex_4_z_coordinate": 1.01042961412425
-    },
-    "Sub Surface 5": {
-      "building_surface_name": "Surface 6",
-      "construction_name": "U 1.22 SHGC 0.54 Simple Glazing Window SHGC 0.54",
-      "surface_type": "Window",
-      "vertex_1_x_coordinate": 3.37912309851453,
-      "vertex_1_y_coordinate": -3.08842889698985,
-      "vertex_1_z_coordinate": 1.01218931446082,
-      "vertex_2_x_coordinate": 3.37912309851453,
-      "vertex_2_y_coordinate": -3.08842889698985,
-      "vertex_2_z_coordinate": 0.762,
-      "vertex_3_x_coordinate": 7.20650141678897,
-      "vertex_3_y_coordinate": -3.08842692162144,
-      "vertex_3_z_coordinate": 0.762,
-      "vertex_4_x_coordinate": 7.20650141678897,
-      "vertex_4_y_coordinate": -3.08842692162144,
-      "vertex_4_z_coordinate": 1.01218931446082
-    },
-    "Sub Surface 6": {
-      "building_surface_name": "Surface 7",
-      "construction_name": "U 1.22 SHGC 0.54 Simple Glazing Window SHGC 0.54",
-      "surface_type": "Window",
-      "vertex_1_x_coordinate": 3.3537239968515,
-      "vertex_1_y_coordinate": -5.83515792292071,
-      "vertex_1_z_coordinate": 1.0135212957707,
-      "vertex_2_x_coordinate": 3.3537239968515,
-      "vertex_2_y_coordinate": -5.83515792292071,
-      "vertex_2_z_coordinate": 0.762,
-      "vertex_3_x_coordinate": 3.35372310682178,
-      "vertex_3_y_coordinate": -3.11382891009918,
-      "vertex_3_z_coordinate": 0.762,
-      "vertex_4_x_coordinate": 3.35372310682178,
-      "vertex_4_y_coordinate": -3.11382891009918,
-      "vertex_4_z_coordinate": 1.0135212957707
+      "vertex_4_x_coordinate": -0.254253820880687,
+      "vertex_4_y_coordinate": -7.83509636843595,
+      "vertex_4_z_coordinate": 0.953303499272689
     }
   },
   "GlobalGeometryRules": {
@@ -816,7 +702,7 @@
   "InternalMass": {
     "Space 0 Mass": {
       "construction_name": "InteriorFurnishings",
-      "surface_area": 282.667597259747,
+      "surface_area": 244.841574143661,
       "zone_or_zonelist_name": "Space 0 ZN"
     }
   },
@@ -1511,18 +1397,18 @@
       "thermal_resistance": 0.0282222222222221,
       "visible_absorptance": 0.7
     },
-    "Typical Insulation R-2.27": {
+    "Typical Insulation R-13.21": {
       "roughness": "Smooth",
       "solar_absorptance": 0.7,
       "thermal_absorptance": 0.9,
-      "thermal_resistance": 0.398990493569176,
+      "thermal_resistance": 2.3256660073585,
       "visible_absorptance": 0.7
     },
-    "Typical Insulation R-8.88": {
+    "Typical Insulation R-21.1": {
       "roughness": "Smooth",
       "solar_absorptance": 0.7,
       "thermal_absorptance": 0.9,
-      "thermal_resistance": 1.56434322570634,
+      "thermal_resistance": 3.71680102626785,
       "visible_absorptance": 0.7
     }
   },
@@ -1591,6 +1477,14 @@
     },
     "Output:Meter 4": {
       "key_name": "DistrictHeating:Facility",
+      "reporting_frequency": "Timestep"
+    },
+    "Output:Meter:ElectricityHVAC": {
+      "key_name": "Electricity:HVAC",
+      "reporting_frequency": "Timestep"
+    },
+    "Output:Meter:NaturalGasHVAC": {
+      "key_name": "NaturalGas:HVAC",
       "reporting_frequency": "Timestep"
     }
   },
@@ -3403,12 +3297,12 @@
     }
   },
   "SetpointManager:MixedAir": {
-    "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER Outlet Air Node OS Default SPM": {
+    "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER Outlet Air Node OS Default SPM": {
       "control_variable": "Temperature",
       "fan_inlet_node_name": "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node",
       "fan_outlet_node_name": "Space 0 ZN SAC Supply Outlet Node",
       "reference_setpoint_node_name": "Space 0 ZN SAC Supply Outlet Node",
-      "setpoint_node_or_nodelist_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 56kBtu/hr 11.06SEER Outlet Air Node"
+      "setpoint_node_or_nodelist_name": "Space 0 ZN SAC 1spd DX AC Clg Coil 29kBtu/hr 9.7SEER Outlet Air Node"
     },
     "Space 0 ZN SAC Gas Backup Htg Coil Outlet Air Node OS Default SPM": {
       "control_variable": "Temperature",
@@ -3470,33 +3364,33 @@
   },
   "Site:GroundTemperature:FCfactorMethod": {
     "Site:GroundTemperature:FCfactorMethod 1": {
-      "april_ground_temperature": 4.1,
-      "august_ground_temperature": 22.1,
-      "december_ground_temperature": 24.3,
-      "february_ground_temperature": 12.1,
-      "january_ground_temperature": 16.7,
-      "july_ground_temperature": 16.8,
-      "june_ground_temperature": 12.4,
-      "march_ground_temperature": 6.8,
-      "may_ground_temperature": 6.6,
-      "november_ground_temperature": 27.5,
-      "october_ground_temperature": 28.3,
-      "september_ground_temperature": 26
+      "april_ground_temperature": -7.2,
+      "august_ground_temperature": 13.8,
+      "december_ground_temperature": 15.1,
+      "february_ground_temperature": 2.8,
+      "january_ground_temperature": 8.7,
+      "july_ground_temperature": 7.8,
+      "june_ground_temperature": -0.5,
+      "march_ground_temperature": -1.5,
+      "may_ground_temperature": -5.6,
+      "november_ground_temperature": 19.8,
+      "october_ground_temperature": 21.1,
+      "september_ground_temperature": 19.3
     }
   },
   "Site:Location": {
-    "Memphis International Ap_TN_USA": {
-      "elevation": 81,
-      "latitude": 35.07,
-      "longitude": -89.98,
-      "time_zone": -6
+    "Burlington International Ap_VT_USA": {
+      "elevation": 101,
+      "latitude": 44.47,
+      "longitude": -73.15,
+      "time_zone": -5
     }
   },
   "Site:WaterMainsTemperature": {
     "Site:WaterMainsTemperature 1": {
-      "annual_average_outdoor_air_temperature": 16.975,
+      "annual_average_outdoor_air_temperature": 7.8,
       "calculation_method": "Correlation",
-      "maximum_difference_in_monthly_average_outdoor_air_temperatures": 24.2
+      "maximum_difference_in_monthly_average_outdoor_air_temperatures": 28.3
     }
   },
   "Sizing:Parameters": {
@@ -3577,42 +3471,42 @@
     }
   },
   "SizingPeriod:DesignDay": {
-    "Memphis International Ap Ann Clg .4% Condns DB=>MWB": {
-      "ashrae_clear_sky_optical_depth_for_beam_irradiance_taub_": 0.512,
-      "ashrae_clear_sky_optical_depth_for_diffuse_irradiance_taud_": 1.892,
-      "barometric_pressure": 100356,
-      "daily_dry_bulb_temperature_range": 9.2,
+    "Burlington International Ap Ann Clg .4% Condns DB=>MWB": {
+      "ashrae_clear_sky_optical_depth_for_beam_irradiance_taub_": 0.459,
+      "ashrae_clear_sky_optical_depth_for_diffuse_irradiance_taud_": 2.002,
+      "barometric_pressure": 100118,
+      "daily_dry_bulb_temperature_range": 10.7,
       "day_of_month": 21,
       "day_type": "SummerDesignDay",
       "daylight_saving_time_indicator": "No",
       "dry_bulb_temperature_range_modifier_type": "DefaultMultipliers",
       "humidity_condition_type": "WetBulb",
-      "maximum_dry_bulb_temperature": 35.6,
+      "maximum_dry_bulb_temperature": 31.3,
       "month": 7,
       "rain_indicator": "No",
       "snow_indicator": "No",
       "solar_model_indicator": "ASHRAETau",
-      "wetbulb_or_dewpoint_at_maximum_dry_bulb": 25.2,
-      "wind_direction": 240,
-      "wind_speed": 3.8
+      "wetbulb_or_dewpoint_at_maximum_dry_bulb": 21.7,
+      "wind_direction": 170,
+      "wind_speed": 4.5
     },
-    "Memphis International Ap Ann Htg 99.6% Condns DB": {
-      "barometric_pressure": 100356,
+    "Burlington International Ap Ann Htg 99.6% Condns DB": {
+      "barometric_pressure": 100118,
       "daily_dry_bulb_temperature_range": 0,
       "day_of_month": 21,
       "day_type": "WinterDesignDay",
       "daylight_saving_time_indicator": "No",
       "dry_bulb_temperature_range_modifier_type": "DefaultMultipliers",
       "humidity_condition_type": "WetBulb",
-      "maximum_dry_bulb_temperature": -8.3,
+      "maximum_dry_bulb_temperature": -22.4,
       "month": 1,
       "rain_indicator": "No",
       "sky_clearness": 0,
       "snow_indicator": "No",
       "solar_model_indicator": "ASHRAEClearSky",
-      "wetbulb_or_dewpoint_at_maximum_dry_bulb": -8.3,
-      "wind_direction": 0,
-      "wind_speed": 4.1
+      "wetbulb_or_dewpoint_at_maximum_dry_bulb": -22.4,
+      "wind_direction": 60,
+      "wind_speed": 3
     }
   },
   "SurfaceConvectionAlgorithm:Inside": {
@@ -3633,7 +3527,7 @@
   },
   "Timestep": {
     "Timestep 1": {
-      "number_of_timesteps_per_hour": 1
+      "number_of_timesteps_per_hour": 4
     }
   },
   "Version": {
@@ -3676,15 +3570,15 @@
     }
   },
   "WindowMaterial:SimpleGlazingSystem": {
-    "U 1.22 SHGC 0.54 Simple Glazing SHGC 0.54": {
-      "solar_heat_gain_coefficient": 0.54,
-      "u_factor": 6.92748127615845,
-      "visible_transmittance": 0.38
+    "U 0.52 SHGC 0.39 Simple Glazing U-0.93 SHGC 0.39": {
+      "solar_heat_gain_coefficient": 0.39,
+      "u_factor": 5.29157157236382,
+      "visible_transmittance": 0.31
     },
-    "U 1.22 SHGC 0.54 Simple Glazing SHGC 0.54 1": {
-      "solar_heat_gain_coefficient": 0.54,
-      "u_factor": 6.92748127615845,
-      "visible_transmittance": 0.38
+    "U 0.52 SHGC 0.39 Simple Glazing U-0.93 SHGC 0.39 1": {
+      "solar_heat_gain_coefficient": 0.39,
+      "u_factor": 5.29157157236382,
+      "visible_transmittance": 0.31
     }
   },
   "Zone": {
@@ -3739,7 +3633,7 @@
     "Space 0 Infiltration": {
       "constant_term_coefficient": 1,
       "design_flow_rate_calculation_method": "Flow/ExteriorArea",
-      "flow_rate_per_exterior_surface_area": 0.0003919984627,
+      "flow_rate_per_exterior_surface_area": 0.0003380278822,
       "schedule_name": "MidriseApartment Infil",
       "temperature_term_coefficient": 0,
       "velocity_squared_term_coefficient": 0,
@@ -3764,6 +3658,33 @@
           "zone_name": "Space 0 ZN"
         }
       ]
+    }
+  },
+  "Output:Variable": {
+    "Output:Variable Site Outdoor Air Drybulb Temperature": {
+      "key_value": "Environment",
+      "variable_name": "Site Outdoor Air Drybulb Temperature",
+      "reporting_frequency": "Timestep"
+    },
+    "Output:Variable Site Outdoor Air Humidity Ratio": {
+      "key_value": "Environment",
+      "variable_name": "Site Outdoor Air Humidity Ratio",
+      "reporting_frequency": "Timestep"
+    },
+    "Output:Variable Site Outdoor Air Relative Humidity": {
+      "key_value": "Environment",
+      "variable_name": "Site Outdoor Air Relative Humidity",
+      "reporting_frequency": "Timestep"
+    },
+    "Output:Variable Site Outdoor Air Wetbulb Temperature": {
+      "key_value": "Environment",
+      "variable_name": "Site Outdoor Air Wetbulb Temperature",
+      "reporting_frequency": "Timestep"
+    },
+    "Output:Variable Site Outdoor Air Dewpoint Temperature": {
+      "key_value": "Environment",
+      "variable_name": "Site Outdoor Air Dewpoint Temperature",
+      "reporting_frequency": "Timestep"
     }
   }
 }
