@@ -33,7 +33,7 @@ Before you begin, ensure you have one of the following container engines install
    ```
 
 ### EnergyPlus path
-To use the python EnergyPlus api, python needs to know the path to the EnergyPlus folder. By default, the installation script search EnergyPlus at the default location in Unbutu, Winbdows or Mac. To avoid any problem, you can also manually specify the path when executing the setup script. For instance:
+To use the python EnergyPlus api, python needs to know the path to the EnergyPlus folder. By default, the installation script search EnergyPlus at the default location in Unbutu, Windows or Mac. To avoid any problem, you can also manually specify the path when executing the setup script. For instance:
 
    ```bash
 ./setup.sh --energyplus_path="/mnt/c/Program Files/EnergyPlus-24-1-0"
@@ -50,10 +50,10 @@ The `src/generator` directory contains scripts to search through the database fo
 
 Example usage:
 ```bash
-python -m scripts.fetch_building --state "AL" --county "Pike" --building-type "SmallHotel" --area 1140 --num-floors 6 --n-buildings 4
+python -m scripts.fetch_building
 ```
 
-This will search for the 4 buildings best matching the description in the Pike county in Alabama. The operations to get there are:
+This will search for the 4 buildings best matching the description in the Orleans county in Vermont, as defined in the Hydra default configuration. The operations to get there are:
 
 1. Download the IDF files of the county
 2. Download the metadata of the state
@@ -64,17 +64,17 @@ This will search for the 4 buildings best matching the description in the Pike c
 
 Files are kept in memory in `data/` to only do the download and processing steps once.
 
-**Note:** Step 3 takes a while (~30 to 60 min) because the metadata is organized per state and the data per county. We need to fetch the county for each building of the state. This step is only done the first time you specify a new state and is valid for all counties within the state.
-
-**Note:** After an idf file has been processed and converted to an epJSON, the idf version in `data/idf` is deleted to free some memory. If a later query identify this file as a match in the metadata, it will be used without being re-processed.
+**Note:** After an idf file has been processed and converted to an epJSON. If a later query identify this epJSON file as a match in the metadata, it will be used without being re-processed.
 
 ### Runing baselines
 
 To run a simulation with a constant policy, execute `scripts/run_baseline.py`. For instance:
 
 ```bash
-python -m scripts.run_baseline -s AL -c Pike -b 6014003399143 --heating-setpoint 20.0 --cooling-setpoint 23.0
+python -m scripts.run_baseline
 ```
+
+to run a simulation with the default parameters defined in `confs/`
 
 The results are stored in `results/constant_basline_{some_unique_name}`.
 
@@ -83,7 +83,7 @@ The results are stored in `results/constant_basline_{some_unique_name}`.
 The implementation of RL algorithms is taken from (Clean RL)[https://github.com/vwxyzjn/cleanrl]. At the moment only PPO with continuous actions is supported. To launch a training, execute `scripts/train_ppo.py`. For instance:
 
 ```bash
-python -m scripts.train_ppo -s "AL" -c "Pike" -b 6014003413384 --seed 1 --track
+python -m scripts.train_ppo 
 ```
 The ```--track``` arguments triggers the logging with wandb. 
 The results are stored in `results/ppo_training_{some_unique_name}`. If wandb is used, the unique run id is added at the end of the results folder name for convenience. 
@@ -104,7 +104,7 @@ Upon executing `setup.sh`, a Singularity container is built using `container/con
 Any python script can be executed in the container using `scripts/container_main.sh`. Simply execute the script and scpecify which python file to use. For intance:
 
 ```bash
-./scripts/container_main.sh scripts/fetch_buildings.py -s AL -c Pike -b 6014003399143 --heating-setpoint 20.0 --cooling-setpoint 23.0
+./scripts/container_main.sh scripts/fetch_buildings.py 
 ```
 
 Don't forget to change the .sh permission the first time:
@@ -114,6 +114,8 @@ chmod +x /scripts/container_main.sh
 ```
 
 ### Slurm scripts
+
+**TO DO** Update this section for Hydra
 
 Slurm scripts are stored in `jobs/`. When a job is launched, a temporary directory is allocated and relevant data as well as the container are copied to this temporary directory.
 The paths to the different folders are written in `.env` when `setup.sh` is executed. These paths are specific to the Mila cluster. 
@@ -136,9 +138,11 @@ This project follows a structured branching strategy to maintain code quality:
 ### Workflow for Contributors
 1. Always create feature branches from `dev`, not `main`
 2. Name your branch with a descriptive name and use a prefix: `feature/new_cool_feature` or `fix/issue_i_am_fixing`
-3. Create unitests in `tests/` for new features and make sure other tests pass.
-4. Submit pull requests to the `dev` branch when your work is complete
-5. For convenience there is no automated tests on Github yet, it is on you to review the code you are merging on `dev`. 
+3. Create unitests in `tests/` for new features.
+4. **Run all the tests locally before submitting a pull request to `dev`. Some tests are automated but most require EnergyPlus and are not handled by GitHub upon merging.**
+5. Submit pull requests to the `dev` branch when your work is complete.
+
+****
 
 ### Release Process
 - Periodically, `dev` is merged into `main` after thorough testing
