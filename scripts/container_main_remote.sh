@@ -95,8 +95,9 @@ echo "Running $SCRIPT_NAME in container with scratch directory: $SCRATCH_DIR"
     bash -c "
       # Activate the virtual environment and run the script from the host-mounted directory
       source /opt/repository/.venv/bin/activate
-      # Set WANDB_DIR environment variable to ensure wandb uses the correct directory
+      # Set environment variables
       export WANDB_DIR=/opt/repository/wandb
+      export SCRATCH_DIR='$SCRATCH_DIR'
       python /opt/repository-host/$SCRIPT_PATH $*
     "
 

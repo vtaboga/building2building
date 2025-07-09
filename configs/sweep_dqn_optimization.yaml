@@ -1,0 +1,101 @@
+# W&B Sweep Configuration for DQN Bayesian Optimization
+# This file defines the hyperparameter sweep for optimizing DQN performance
+
+# Sweep configuration
+program: scripts/train_dqn.py
+method: bayes
+metric:
+  goal: maximize
+  name: validation/episodic_return
+early_terminate:
+  type: hyperband
+  min_iter: 100000
+
+# Parameters to optimize
+parameters:
+  # Tuned parameters
+  dqn.learning_rate:
+    distribution: log_uniform_values
+    min: 1e-5
+    max: 1e-2
+  
+  dqn.tau:
+    values: [1.0, 0.995, 0.99, 0.95]
+  
+  dqn.target_network_frequency:
+    values: [250, 500, 1000, 2000]
+  
+  dqn.batch_size:
+    values: [32, 64, 128, 256]
+  
+  dqn.exploration_fraction:
+    distribution: uniform
+    min: 0.05
+    max: 0.2
+  
+  dqn.train_frequency:
+    values: [1, 4, 10, 20]
+  
+  # Fixed parameters (keeping defaults from dqn.yaml)
+  dqn.buffer_size:
+    value: 1000000
+  
+  dqn.gamma:
+    value: 0.99
+  
+  dqn.start_e:
+    value: 1.0
+
+  dqn.end_e:
+    value: 0.05
+  
+  dqn.learning_starts:
+    value: 50000
+  
+  dqn.num_envs:
+    value: 1
+  
+  dqn.eval_frequency:
+    value: 10000
+  
+  # Training parameters
+  training.total_timesteps:
+    value: 500000
+  
+  training.save_model:
+    value: true
+  
+  # Fixed seed
+  seed:
+    value: 1
+  
+  # W&B configuration for individual runs
+  project:
+    value: "building2building"
+  
+  entity:
+    value: null
+  
+  tags:
+    value: ["sweep", "dqn", "optimization"]
+  
+  # Environment parameters (fixed)
+  state:
+    value: "VT"
+  county:
+    value: "Orleans"
+  building_id:
+    value: "1003000512784"
+  weather:
+    value: "USA_VT_Middlebury.State.AP.721028_TMYx.epw"
+  weather_validation:
+    value: "USA_VT_Bennington-Morse.State.AP.726166_TMYx.2004-2018.epw"
+  reward_type:
+    value: "base"
+  energy_weight:
+    value: 1.0
+
+# W&B project configuration
+project: building2building
+entity: null  # Will use default entity
+name: dqn_bayes_opt 
