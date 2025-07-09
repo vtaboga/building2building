@@ -34,4 +34,4 @@ jobs:
         pytest tests/test_idf_search.py::TestSearchMetadata \
               tests/test_idf_search.py::TestMetadataLoading \
               tests/test_idf_search.py::TestSearchIDF \
-              tests/test_gym_wrapper.py::TestGymWrapper::test_get_controllable_setpoints -v 
+              tests/test_gym_wrapper.py::TestRDFParsing::test_get_controllable_setpoints -v 
