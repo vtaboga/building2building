@@ -10,7 +10,6 @@ from minergym.environment import EnergyPlusEnvironment
 from minergym.ontology import Ontology
 from minergym.simulation import ActuatorHole, EnergyPlusSimulation
 
-from building2building.env import setup_energyplus_path
 from building2building.simulator.action_spaces import (
     action_transform,
     create_action_space,
