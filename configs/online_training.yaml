@@ -1,0 +1,25 @@
+# Online training configuration with composition and seed sweep
+# Supports both PPO and DQN algorithms
+
+defaults:
+  - environment: vt_small_office
+  - wandb: default
+  - policies: ppo  # Default policy, override with policies=ppo or policies=dqn
+  - _self_
+
+seed: 1
+
+# W&B tracking
+track: true
+
+# Hydra configuration for organized output directories
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      seed: 1,2,3,4,5
+  run:
+    dir: results/online_training_${policies}_${building_id}_${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: results/online_training_multirun_${now:%Y-%m-%d_%H-%M-%S}
+    subdir: seed_${seed} 

@@ -11,9 +11,18 @@ early_terminate:
   type: hyperband
   min_iter: 100000
 
+# Number of runs to perform
+count: 10
+
 # Parameters to optimize
 parameters:
-  # Tuned parameters
+  # W&B configuration (can be overridden by sweeps)
+  project:
+    value: "building2building"
+  entity:
+    value: null
+  
+  # DQN hyperparameters to tune
   dqn.learning_rate:
     distribution: log_uniform_values
     min: 1e-5
@@ -36,7 +45,7 @@ parameters:
   dqn.train_frequency:
     values: [1, 4, 10, 20]
   
-  # Fixed parameters (keeping defaults from dqn.yaml)
+  # Fixed parameters
   dqn.buffer_size:
     value: 1000000
   
@@ -69,12 +78,9 @@ parameters:
   seed:
     value: 1
   
-  # W&B configuration for individual runs
-  project:
-    value: "building2building"
-  
-  entity:
-    value: null
+  # W&B configuration
+  track:
+    value: true
   
   tags:
     value: ["sweep", "dqn", "optimization"]
@@ -93,9 +99,4 @@ parameters:
   reward_type:
     value: "base"
   energy_weight:
-    value: 1.0
-
-# W&B project configuration
-project: building2building
-entity: null  # Will use default entity
-name: dqn_bayes_opt 
+    value: 1.0 
