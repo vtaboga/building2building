@@ -1,5 +1,6 @@
 import os
 import unittest
+from pathlib import Path
 
 import pandas as pd
 from building2building.generator.search_idf import search_metadata
@@ -9,13 +10,12 @@ class TestSearchMetadata(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Load the fixture data
-        fixture_path = os.path.join("tests", "fixtures", "test_metadata.csv")
-        cls.metadata = pd.read_csv(fixture_path)
+        cls.metadata_path = Path("tests", "fixtures", "test_metadata.csv")
 
     def test_exact_match(self):
         """Test search with exact matching parameters"""
         results = search_metadata(
-            self.metadata,
+            self.metadata_path,
             building_type="SmallHotel",
             area=1140,
             num_floors=6,
@@ -31,7 +31,7 @@ class TestSearchMetadata(unittest.TestCase):
     def test_no_matches(self):
         """Test search with non-existent building type"""
         results = search_metadata(
-            self.metadata,
+            self.metadata_path,
             building_type="NonExistentType",
             area=5000,
             num_floors=2,
@@ -44,7 +44,7 @@ class TestSearchMetadata(unittest.TestCase):
         """Test search returning multiple buildings"""
         n_buildings = 3
         results = search_metadata(
-            self.metadata,
+            self.metadata_path,
             building_type="MediumOffice",
             area=500,
             num_floors=4,

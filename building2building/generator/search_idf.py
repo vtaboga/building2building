@@ -4,10 +4,10 @@ import logging
 import os
 import shutil
 import tempfile
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
-from typing import Callable, Tuple, TypeAlias, reveal_type
+from typing import Any, Callable, Tuple, TypeAlias, reveal_type
 
 import duckdb
 import pandas as pd
@@ -33,10 +33,11 @@ class BuildingMetadata:
 
 
 def search_metadata(
-    metadata: pd.DataFrame,
-    building_type: str,
-    area: float | None,
-    num_floors: int | None,
+    metadata_path: Path,
+    county: str | None = None,
+    building_type: str | None = None,
+    area: float | None = None,
+    num_floors: int | None = None,
     height: float | None = None,
     n_buildings: int = 1,
 ) -> list[tuple[int, BuildingMetadata]]:
@@ -47,69 +48,74 @@ def search_metadata(
     3. Area (if provided)
     4. Height (if provided)
     """
-    # Filter by building type (required)
-    filtered = metadata[metadata["BuildingType"] == building_type].copy()
 
-    if filtered.empty:
-        logger.warning(f"No buildings found of type: {building_type}")
-        return []
+    where_conditions: list[tuple[str, str]] = []
 
-    # Initialize difference columns with 0 (no difference)
-    filtered["Floors_diff"] = 0
-    filtered["Area_diff"] = 0
-    filtered["Height_diff"] = 0
+    if county is not None:
+        where_conditions.append(("County", county))
 
-    # Calculate differences for provided criteria
+    if building_type is not None:
+        where_conditions.append(("BuildingType", building_type))
+
+    order_by_parts: list[tuple[str, float]] = []
+
     if num_floors is not None:
-        filtered["Floors_diff"] = (filtered["NumFloors"] - num_floors).abs()
+        order_by_parts.append(("NumFloors", num_floors))
 
     if area is not None:
-        filtered["Area_diff"] = (filtered["Area"] - area).abs()
+        order_by_parts.append(("Area", area))
 
     if height is not None:
-        filtered["Height_diff"] = (filtered["Height"] - height).abs()
+        order_by_parts.append(("Height", height))
 
-    # Sort by criteria in specified order: floors, area, height
-    sorted_filtered = filtered.sort_values(
-        by=["Floors_diff", "Area_diff", "Height_diff"]
-    )
-
-    # Get the top n_buildings IDs and their characteristics
-    result = [
-        (
-            int(row["ID"]),
-            BuildingMetadata(
-                building_type=str(row["BuildingType"]),
-                num_floors=int(row["NumFloors"]),
-                area=float(row["Area"]),
-                height=float(row["Height"]),
-            ),
-        )
-        for _, row in sorted_filtered.head(n_buildings).iterrows()
-    ]
-
-    logger.debug(f"Found {len(result)} matching buildings")
-    return result
-
-
-def load_metadata(metadata_path: Path, county: str | None = None) -> pd.DataFrame:
-    """
-    Load and filter metadata for the specified state and county.
-    """
-    if county is None:
-        query = f"SELECT * FROM '{metadata_path}'"
+    if metadata_path.suffix == ".csv":
+        read_function = "read_csv"
     else:
-        logger.debug(f"Will filtered metadata for county {county}")
-        query = f"SELECT * FROM '{metadata_path}' WHERE County = '{county}'"
+        read_function = "read_parquet"
 
-    logger.debug(f"Executing query `{query}`")
-    df = duckdb.query(query).to_df()
-    logger.debug(f"Loaded metadata.")
+    query_parts = [f"SELECT * FROM {read_function}(?)"]
 
-    return df
+    params: list[Any] = [str(metadata_path)]
+
+    if where_conditions:
+        where_clauses = []
+        for col, val in where_conditions:
+            where_clauses.append(f"{col} = ?")
+            params.append(val)
+        query_parts.append(f"WHERE {' AND '.join(where_clauses)}")
+
+    if order_by_parts:
+        distance_terms = []
+        for col, val in order_by_parts:
+            distance_terms.append(f"ABS({col} - ?) ASC")
+            params.append(val)
+        distance_expr = " , ".join(distance_terms)
+        query_parts.append(f"ORDER BY {distance_expr}")
+
+    query_parts.append("LIMIT ?")
+    params.append(n_buildings)
+
+    query = " ".join(query_parts)
+
+    res = duckdb.query(query, params=params)
+    out = []
+    for row in res.to_df().itertuples():
+        out.append(
+            (
+                int(row.ID),
+                BuildingMetadata(
+                    building_type=(row.BuildingType),
+                    num_floors=(row.NumFloors),
+                    area=(row.Area),
+                    height=(row.Height),
+                ),
+            )
+        )
+
+    return out
 
 
-EPJSONProcessor: TypeAlias = Callable[[Path], Path]
+EPJSONProcessor: TypeAlias = Callable[[Path, Path], Any]
 
 
 def hash_processors(processors: list[EPJSONProcessor], hash_length=16) -> str:
@@ -158,14 +164,13 @@ def process_idf(
 def search_idf(
     state: str,
     county: str,
-    building_type: str,
-    area: float | None,
-    num_floors: int,
-    height: float | None,
     n_buildings: int,
-    n_weather_files: int,
+    building_type: str | None = None,
+    area: float | None = None,
+    num_floors: int | None = None,
+    height: float | None = None,
     processors: list[EPJSONProcessor] = [],
-) -> Tuple[list[Tuple[Path, BuildingCharacteristics]], list[Path]]:
+) -> list[Tuple[Path, BuildingCharacteristics]]:
     """
     Search and process IDF files matching the specified criteria.
     """
@@ -181,71 +186,67 @@ def search_idf(
     building_files: list[Path] = []
     building_infos: list[BuildingCharacteristics] = []
     # Load metadata
-    try:
-        download_metadata(state=state)
+    download_metadata(state=state)
 
-        metadata_path = processing.process_metadata(state=state)
-        metadata = load_metadata(metadata_path, county=county)
-        logger.debug(f"Loaded metadata with shape: {metadata.shape}")
+    metadata_path = processing.process_metadata(state=state)
 
-        # Search for matching IDF files
-        matching_buildings = search_metadata(
-            metadata, building_type, area, num_floors, height, n_buildings
+    # Search for matching IDF files
+    matching_buildings = search_metadata(
+        metadata_path,
+        county,
+        n_buildings=n_buildings,
+        building_type=building_type,
+        area=area,
+        num_floors=num_floors,
+        height=height,
+    )
+    if matching_buildings:
+        logger.info(
+            f"Found {len(matching_buildings)} matching IDF files: {matching_buildings}"
         )
-        if matching_buildings:
-            logger.info(
-                f"Found {len(matching_buildings)} matching IDF files: {matching_buildings}"
-            )
+    else:
+        raise Exception("No matching IDF files found")
+
+    for building_id, building_info in matching_buildings:
+        building_path = Path(
+            "data", "idf", f"{state}_{county}_IDF", f"{building_id}.idf"
+        )
+
+        if len(processors) != 0:
+            processors_hash = "." + hash_processors(processors)
         else:
-            raise Exception("No matching IDF files found")
+            processors_hash = ""
 
-        for building_id, building_info in matching_buildings:
-            building_path = Path(
-                "data", "idf", f"{state}_{county}_IDF", f"{building_id}.idf"
+        tmp_dir = Path("data", "processed_buildings", state, county)
+        processed_path = (
+            tmp_dir / building_path.with_suffix(f"{processors_hash}.epJSON").name
+        )
+
+        if not processed_path.exists():
+            processed_path.parent.mkdir(exist_ok=True, parents=True)
+            process_idf(building_path, tmp_dir, processed_path, processors)
+
+        info_path = processed_path.with_suffix(".json")
+        if not info_path.exists():
+            ont = Ontology.from_json(processed_path)
+            # Add zone lists to characteristics
+            zone_list: list[str] = [n.toPython() for n in ont.zones()]
+            building_characteristics = BuildingCharacteristics(
+                building_info.building_type,
+                building_info.num_floors,
+                building_info.area,
+                building_info.height,
+                zone_list,
             )
 
-            if len(processors) != 0:
-                processors_hash = "." + hash_processors(processors)
-            else:
-                processors_hash = ""
+            building_characteristics.save_json(info_path)
+            logger.info(f"Saved characteristics to {info_path}")
+        else:
+            building_characteristics = BuildingCharacteristics.load_json(info_path)
 
-            tmp_dir = Path("data", "processed_buildings", state, county)
-            processed_path = (
-                tmp_dir / building_path.with_suffix(f"{processors_hash}.epJSON").name
-            )
-
-            if not processed_path.exists():
-                process_idf(building_path, tmp_dir, processed_path, processors)
-
-            info_path = processed_path.with_suffix(".json")
-            if not info_path.exists():
-                ont = Ontology.from_json(processed_path)
-                # Add zone lists to characteristics
-                zone_list: list[str] = [n.toPython() for n in ont.zones()]
-                building_characteristics = BuildingCharacteristics(
-                    building_info.building_type,
-                    building_info.num_floors,
-                    building_info.area,
-                    building_info.height,
-                    zone_list,
-                )
-
-                with open(info_path, "w") as json_file:
-                    json.dump(building_info, json_file, indent=4)
-                    logger.info(f"Saved characteristics to {info_path}")
-            else:
-                building_characteristics = BuildingCharacteristics.load_json(info_path)
-
-            building_files.append(processed_path)
-            building_infos.append(building_characteristics)
-
-        # Download associated weather files
-        weather_files = download_epw(state_code=state, n_files=n_weather_files)
-
-    except Exception as e:
-        logger.error(f"Error during IDF search and processing: {e}")
-        raise
+        building_files.append(processed_path)
+        building_infos.append(building_characteristics)
 
     # Create tuples of (path_to_building, dict_of_characteristics)
 
-    return list(zip(building_files, building_infos)), weather_files
+    return list(zip(building_files, building_infos))
