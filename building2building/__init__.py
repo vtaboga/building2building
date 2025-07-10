@@ -1,9 +1,20 @@
 from pathlib import Path
 
+from gymnasium.envs.registration import register
+
 from building2building.env import setup_energyplus_path
 from building2building.generator.downloader import download_epw
 from building2building.generator.search_idf import EPJSONProcessor, search_idf
 from building2building.types import BuildingConfig
+
+register(
+    id="EnergyPlus-v0",
+    entry_point="building2building.simulator.create_simulator:create_simulator",
+    kwargs={
+        "building_config": None,  # Will be provided when creating env
+    },
+)
+
 
 setup_energyplus_path()
 
