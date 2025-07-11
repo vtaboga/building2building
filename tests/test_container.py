@@ -1,9 +1,11 @@
 import os
-import subprocess
-import pytest
 import shutil
-from pathlib import Path
+import subprocess
 import time
+from pathlib import Path
+
+import pytest
+
 
 def get_project_root() -> Path:
     """Returns project root folder."""
@@ -16,12 +18,13 @@ def output_dir():
     project_root = get_project_root()
     output_dir = project_root / "tests" / "output"
     output_dir.mkdir(exist_ok=True)
-    
+
     yield output_dir
-    
+
     # Cleanup after test
     if output_dir.exists():
         shutil.rmtree(output_dir)
+
 
 def get_singularity_cmd():
     """Get the appropriate singularity command (singularity or apptainer)"""
@@ -31,78 +34,96 @@ def get_singularity_cmd():
         return "apptainer"
     raise RuntimeError("Neither singularity nor apptainer found in PATH")
 
+
 def test_energyplus_simulation(output_dir):
     """Test that EnergyPlus can run a simulation successfully in the container."""
     project_root = get_project_root()
-    epjson_path = project_root / "tests" / "fixtures" / "processed_buildings" / "1003000523385.epJSON"
+    epjson_path = (
+        project_root
+        / "tests"
+        / "fixtures"
+        / "processed_buildings"
+        / "1003000523385.epJSON"
+    )
     weather_path = project_root / "tests" / "fixtures" / "weather" / "weather_vt_1.epw"
     container_path = project_root / "container" / "container.sif"
-    
+
     # Verify container exists
-    assert container_path.exists(), "Container not found at: {}".format(container_path)
-    
+    if not container_path.exists():
+        pytest.skip(f"Container not found at: {container_path}")
+
     # Run EnergyPlus simulation
     singularity_cmd = get_singularity_cmd()
     cmd = [
-        singularity_cmd, "exec",
-        "-B", f"{epjson_path.parent}:/input/buildings",
-        "-B", f"{weather_path.parent}:/input/weather",
-        "-B", f"{output_dir}:/output",
-        "--pwd", "/input/buildings",
+        singularity_cmd,
+        "exec",
+        "-B",
+        f"{epjson_path.parent}:/input/buildings",
+        "-B",
+        f"{weather_path.parent}:/input/weather",
+        "-B",
+        f"{output_dir}:/output",
+        "--pwd",
+        "/input/buildings",
         str(container_path),
         "energyplus",
-        "-w", "/input/weather/weather_vt_1.epw",
-        "-d", "/output",
+        "-w",
+        "/input/weather/weather_vt_1.epw",
+        "-d",
+        "/output",
         "-r",
-        "1003000523385.epJSON"
+        "1003000523385.epJSON",
     ]
-    
+
     try:
-        result = subprocess.run(
-            cmd,
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+
         # Wait for files to be written
         time.sleep(5)
-        
+
         # Verify simulation completed successfully
         assert result.returncode == 0, "EnergyPlus simulation failed"
-        assert "EnergyPlus Completed Successfully" in result.stderr, "EnergyPlus did not complete successfully"
-        
+        assert "EnergyPlus Completed Successfully" in result.stderr, (
+            "EnergyPlus did not complete successfully"
+        )
+
         # Check for expected output files
         expected_files = [
             "eplusout.err",  # Error file (always generated)
             "eplusout.end",  # End file with simulation status
             "eplusout.csv",  # CSV output file
-            "eplustbl.htm"   # HTML table output
+            "eplustbl.htm",  # HTML table output
         ]
         missing_files = []
         for file in expected_files:
             if not (output_dir / file).exists():
                 missing_files.append(file)
-        
+
         if missing_files:
-            output_files = list(output_dir.glob('*'))
-            pytest.fail(f"Missing expected output files: {', '.join(missing_files)}\n"
-                       f"Found files: {', '.join(f.name for f in output_files)}")
-            
+            output_files = list(output_dir.glob("*"))
+            pytest.fail(
+                f"Missing expected output files: {', '.join(missing_files)}\n"
+                f"Found files: {', '.join(f.name for f in output_files)}"
+            )
+
     except subprocess.CalledProcessError as e:
-        pytest.fail(f"EnergyPlus simulation failed with error:\n"
-                   f"STDOUT:\n{e.stdout}\n"
-                   f"STDERR:\n{e.stderr}\n"
-                   f"Return code: {e.returncode}")
+        pytest.fail(
+            f"EnergyPlus simulation failed with error:\n"
+            f"STDOUT:\n{e.stdout}\n"
+            f"STDERR:\n{e.stderr}\n"
+            f"Return code: {e.returncode}"
+        )
+
 
 def test_python_environment(output_dir):
     """Test that the Python environment in the container works correctly."""
     project_root = get_project_root()
     container_path = project_root / "container" / "container.sif"
-    
+
     # Verify container exists
-    assert container_path.exists(), "Container not found at: {}".format(container_path)
-    
+    if not container_path.exists():
+        pytest.skip(f"Container not found at: {container_path}")
+
     # Test Python version and imports
     test_script = """
 import sys
@@ -116,27 +137,27 @@ if version.major != 3 or version.minor != 10:
 
 print('Python environment test successful!')
 """
-    
+
     singularity_cmd = get_singularity_cmd()
     cmd = [
-        singularity_cmd, "exec",
+        singularity_cmd,
+        "exec",
         str(container_path),
-        "/opt/repository/.venv/bin/python", "-c", test_script
+        "/opt/repository/.venv/bin/python",
+        "-c",
+        test_script,
     ]
-    
+
     try:
-        result = subprocess.run(
-            cmd,
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+
         assert result.returncode == 0, "Python environment test failed"
         assert "Python environment test successful!" in result.stdout
-        
+
     except subprocess.CalledProcessError as e:
-        pytest.fail(f"Python environment test failed with error:\n"
-                   f"STDOUT:\n{e.stdout}\n"
-                   f"STDERR:\n{e.stderr}\n"
-                   f"Return code: {e.returncode}") 
+        pytest.fail(
+            f"Python environment test failed with error:\n"
+            f"STDOUT:\n{e.stdout}\n"
+            f"STDERR:\n{e.stderr}\n"
+            f"Return code: {e.returncode}"
+        )

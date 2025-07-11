@@ -29,7 +29,7 @@ def download_county_boundaries():
 
     if not zip_file_name.exists():
         logger.info("Downloading county boundaries...")
-        download_file_progress(url, zip_file_name, description="Downloading county boundaries")
+        download_file_progress(url, zip_file_name, description="Downloading county boundaries", verify=False)
 
     boundaries_dir = Path("data", "metadata", "counties")
 

@@ -1,16 +1,22 @@
-import unittest
-from unittest.mock import patch, Mock
-import pandas as pd
+import hashlib
+import json
 import os
 import pathlib
-import json
-from deepdiff import DeepDiff
-from building2building.generator.search_idf import search_metadata, load_metadata, search_idf
-from building2building.generator.processing import process_idf
-from pathlib import Path
 import shutil
+import unittest
 from contextlib import contextmanager
-import hashlib
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pandas as pd
+from building2building.generator.processing import process_idf
+from building2building.generator.search_idf import (
+    load_metadata,
+    search_idf,
+    search_metadata,
+)
+from deepdiff import DeepDiff
+
 
 def get_file_hash(filepath):
     """Get MD5 hash of a file"""
@@ -20,6 +26,7 @@ def get_file_hash(filepath):
         for chunk in iter(lambda: f.read(4096), b""):
             md5_hash.update(chunk)
     return md5_hash.hexdigest()
+
 
 @contextmanager
 def cd(newdir):
@@ -33,12 +40,13 @@ def cd(newdir):
     finally:
         os.chdir(prevdir)
 
+
 class TestSearchMetadata(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Load the fixture data
-        cls.fixtures_dir = pathlib.Path('tests/fixtures')
-        cls.metadata_path = cls.fixtures_dir / 'metadata' / 'test_metadata.csv'
+        cls.fixtures_dir = pathlib.Path("tests/fixtures")
+        cls.metadata_path = cls.fixtures_dir / "metadata" / "test_metadata.csv"
         cls.metadata = pd.read_csv(cls.metadata_path)
 
     def test_exact_match(self):
@@ -49,16 +57,16 @@ class TestSearchMetadata(unittest.TestCase):
             area=1574.74,
             num_floors=1,
             height=10.76,
-            n_buildings=1
+            n_buildings=1,
         )
         self.assertEqual(len(results), 1)
         # Check that result is a tuple with ID and characteristics
         building_id, characteristics = results[0]
         self.assertEqual(building_id, 1002000365954)
-        self.assertEqual(characteristics['building_type'], "SmallOffice")
-        self.assertEqual(characteristics['num_floors'], 1)
-        self.assertEqual(characteristics['area'], 1574.74)
-        self.assertEqual(characteristics['height'], 10.76)
+        self.assertEqual(characteristics["building_type"], "SmallOffice")
+        self.assertEqual(characteristics["num_floors"], 1)
+        self.assertEqual(characteristics["area"], 1574.74)
+        self.assertEqual(characteristics["height"], 10.76)
 
     def test_exact_match_medium_office(self):
         """Test search with exact matching parameters for MediumOffice"""
@@ -68,25 +76,25 @@ class TestSearchMetadata(unittest.TestCase):
             area=2676.54,
             num_floors=4,
             height=47.83,
-            n_buildings=1
+            n_buildings=1,
         )
         self.assertEqual(len(results), 1)
         building_id, characteristics = results[0]
         self.assertEqual(building_id, 1002000365947)
-        self.assertEqual(characteristics['building_type'], "MediumOffice")
-        self.assertEqual(characteristics['num_floors'], 4)
-        self.assertEqual(characteristics['area'], 2676.54)
-        self.assertEqual(characteristics['height'], 47.83)
+        self.assertEqual(characteristics["building_type"], "MediumOffice")
+        self.assertEqual(characteristics["num_floors"], 4)
+        self.assertEqual(characteristics["area"], 2676.54)
+        self.assertEqual(characteristics["height"], 47.83)
 
     def test_no_matches(self):
         """Test search with non-existent building type"""
         results = search_metadata(
-            self.metadata,
+            self.metadata_path,
             building_type="NonExistentType",
             area=5000,
             num_floors=2,
             height=8,
-            n_buildings=1
+            n_buildings=1,
         )
         self.assertEqual(len(results), 0)
 
@@ -98,21 +106,25 @@ class TestSearchMetadata(unittest.TestCase):
             area=1000,
             num_floors=1,
             height=10.0,
-            n_buildings=2
+            n_buildings=2,
         )
         self.assertEqual(len(results), 2)
-        
+
         # Check that results are tuples with ID and characteristics
         for building_id, characteristics in results:
             self.assertIsInstance(building_id, (int, type(building_id)))
-            self.assertEqual(characteristics['building_type'], "SmallOffice")
-            self.assertEqual(characteristics['num_floors'], 1)
+            self.assertEqual(characteristics["building_type"], "SmallOffice")
+            self.assertEqual(characteristics["num_floors"], 1)
             # Area and height should be close to target values but not exact
-            self.assertLess(abs(characteristics['area'] - 1000), 1000)  # Within 1000 sq ft
-            self.assertLess(abs(characteristics['height'] - 10.0), 5)   # Within 5 ft
+            self.assertLess(
+                abs(characteristics["area"] - 1000), 1000
+            )  # Within 1000 sq ft
+            self.assertLess(abs(characteristics["height"] - 10.0), 5)  # Within 5 ft
 
         # Get the IDs in sorted order
-        found_ids = sorted([int(building_id) for building_id, _ in results])  # Convert to int for proper comparison
+        found_ids = sorted(
+            [int(building_id) for building_id, _ in results]
+        )  # Convert to int for proper comparison
         # These should be the IDs of single zone files in fixtures
         expected_ids = [1002000365954, 1003000523385]  # IDs from fixtures
         self.assertEqual(found_ids, expected_ids)
@@ -125,17 +137,19 @@ class TestSearchMetadata(unittest.TestCase):
             area=3000.0,
             num_floors=2,
             height=40.0,
-            n_buildings=2  # Request 2 but expect only 1
+            n_buildings=2,  # Request 2 but expect only 1
         )
         self.assertEqual(len(results), 1)  # Should only find one hospital
-        
+
         # Check that result is a tuple with ID and characteristics
         building_id, characteristics = results[0]
-        self.assertEqual(building_id, 1002000365956)  # ID of the only hospital in test metadata
-        self.assertEqual(characteristics['building_type'], "Hospital")
-        self.assertEqual(characteristics['num_floors'], 2)
-        self.assertEqual(characteristics['area'], 3000.00)
-        self.assertEqual(characteristics['height'], 40.00)
+        self.assertEqual(
+            building_id, 1002000365956
+        )  # ID of the only hospital in test metadata
+        self.assertEqual(characteristics["building_type"], "Hospital")
+        self.assertEqual(characteristics["num_floors"], 2)
+        self.assertEqual(characteristics["area"], 3000.00)
+        self.assertEqual(characteristics["height"], 40.00)
 
     def test_sorting_order(self):
         """Test that buildings are returned in correct order based on similarity to criteria"""
@@ -145,26 +159,28 @@ class TestSearchMetadata(unittest.TestCase):
             area=1500,  # Target values that don't exactly match any building
             num_floors=1,
             height=11.0,
-            n_buildings=3
+            n_buildings=3,
         )
-        
-        self.assertGreaterEqual(len(results), 2, "Should find at least 2 buildings for comparison")
-        
+
+        self.assertGreaterEqual(
+            len(results), 2, "Should find at least 2 buildings for comparison"
+        )
+
         # Get the differences for each result
         diffs = []
         for building_id, chars in results:
-            area_diff = abs(chars['area'] - 1500)
-            height_diff = abs(chars['height'] - 11.0)
+            area_diff = abs(chars["area"] - 1500)
+            height_diff = abs(chars["height"] - 11.0)
             diffs.append((area_diff, height_diff))
-            
+
         # Check that results are sorted by area difference first, then height
         for i in range(len(diffs) - 1):
             # Either the first building should have smaller area difference
             # or equal area difference but smaller height difference
             self.assertTrue(
-                diffs[i][0] < diffs[i+1][0] or 
-                (diffs[i][0] == diffs[i+1][0] and diffs[i][1] <= diffs[i+1][1]),
-                f"Results not properly sorted at position {i}"
+                diffs[i][0] < diffs[i + 1][0]
+                or (diffs[i][0] == diffs[i + 1][0] and diffs[i][1] <= diffs[i + 1][1]),
+                f"Results not properly sorted at position {i}",
             )
 
     def test_edge_cases(self):
@@ -176,10 +192,10 @@ class TestSearchMetadata(unittest.TestCase):
             area=0,
             num_floors=0,
             height=0,
-            n_buildings=1
+            n_buildings=1,
         )
         self.assertGreaterEqual(len(zero_results), 0)
-        
+
         # Test with negative values
         negative_results = search_metadata(
             self.metadata,
@@ -187,10 +203,10 @@ class TestSearchMetadata(unittest.TestCase):
             area=-1000,
             num_floors=-1,
             height=-10,
-            n_buildings=1
+            n_buildings=1,
         )
         self.assertGreaterEqual(len(negative_results), 0)
-        
+
         # Test with None for optional parameters
         none_results = search_metadata(
             self.metadata,
@@ -198,10 +214,10 @@ class TestSearchMetadata(unittest.TestCase):
             area=None,
             num_floors=None,
             height=None,
-            n_buildings=1
+            n_buildings=1,
         )
         self.assertGreaterEqual(len(none_results), 0)
-        
+
         # Test with extreme values
         extreme_results = search_metadata(
             self.metadata,
@@ -209,71 +225,84 @@ class TestSearchMetadata(unittest.TestCase):
             area=1e6,  # Very large area
             num_floors=100,  # Very tall building
             height=1000,  # Extreme height
-            n_buildings=1
+            n_buildings=1,
         )
         self.assertGreaterEqual(len(extreme_results), 0)
-        
+
         # For any results returned, verify the structure is correct
         for results in [zero_results, negative_results, none_results, extreme_results]:
             if results:
                 building_id, characteristics = results[0]
                 self.assertIsInstance(building_id, (int, type(building_id)))
-                self.assertEqual(characteristics['building_type'], "SmallOffice")
-                self.assertIn('num_floors', characteristics)
-                self.assertIn('area', characteristics)
-                self.assertIn('height', characteristics)
+                self.assertEqual(characteristics["building_type"], "SmallOffice")
+                self.assertIn("num_floors", characteristics)
+                self.assertIn("area", characteristics)
+                self.assertIn("height", characteristics)
 
 
 class TestMetadataLoading(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.fixtures_dir = pathlib.Path('tests/fixtures')
-        cls.metadata_path = cls.fixtures_dir / 'metadata' / 'test_metadata.csv'
+        cls.fixtures_dir = pathlib.Path("tests/fixtures")
+        cls.metadata_path = cls.fixtures_dir / "metadata" / "test_metadata.csv"
 
     def test_load_metadata_all_counties(self):
         """Test loading metadata without county filtering"""
         df = load_metadata(self.metadata_path)
         self.assertIsInstance(df, pd.DataFrame)
         self.assertFalse(df.empty)
-        self.assertEqual(df['State_Abbr'].unique()[0], 'VT')
+        self.assertEqual(df["State_Abbr"].unique()[0], "VT")
         # Verify county column exists and has values
-        self.assertIn('County', df.columns)
-        self.assertTrue(all(df['County'].notna()))
+        self.assertIn("County", df.columns)
+        self.assertTrue(all(df["County"].notna()))
 
     def test_load_metadata_with_county(self):
         """Test loading metadata with county filter"""
-        df = load_metadata(self.metadata_path, county='Caledonia')
+        df = load_metadata(self.metadata_path, county="Caledonia")
         self.assertIsInstance(df, pd.DataFrame)
         self.assertFalse(df.empty)
-        self.assertTrue(all(df['County'] == 'Caledonia'))
+        self.assertTrue(all(df["County"] == "Caledonia"))
 
     def test_load_metadata_nonexistent_county(self):
         """Test loading metadata with a county that doesn't exist in the data"""
-        df = load_metadata(self.metadata_path, county='Orleans')
+        df = load_metadata(self.metadata_path, county="Orleans")
         self.assertIsInstance(df, pd.DataFrame)
-        self.assertTrue(df.empty)  # Should return empty DataFrame for non-existent county
+        self.assertTrue(
+            df.empty
+        )  # Should return empty DataFrame for non-existent county
+
 
 class TestSearchIDF(unittest.TestCase):
     def setUp(self):
-        self.fixtures_dir = pathlib.Path('tests/fixtures')
-        self.metadata_path = self.fixtures_dir / 'metadata' / 'test_metadata.csv'
+        self.fixtures_dir = pathlib.Path("tests/fixtures")
+        self.metadata_path = self.fixtures_dir / "metadata" / "test_metadata.csv"
         # Define fixture paths for test files
-        self.fixture_idf_1z = self.fixtures_dir / 'idf' / '1003000523385.idf'
-        self.fixture_epjson_1z = self.fixtures_dir / 'processed_buildings' / '1003000523385.epJSON'
-        self.fixture_idf_5z = self.fixtures_dir / 'idf' / '1003000523385.idf'
-        self.fixture_epjson_5z = self.fixtures_dir / 'processed_buildings' / '1003000523385.epJSON'
-        self.fixture_weather_1 = self.fixtures_dir / 'weather' / 'weather_vt_1.epw'
-        self.fixture_weather_2 = self.fixtures_dir / 'weather' / 'weather_vt_2.epw'
+        self.fixture_idf_1z = self.fixtures_dir / "idf" / "1003000523385.idf"
+        self.fixture_epjson_1z = (
+            self.fixtures_dir / "processed_buildings" / "1003000523385.epJSON"
+        )
+        self.fixture_idf_5z = self.fixtures_dir / "idf" / "1003000523385.idf"
+        self.fixture_epjson_5z = (
+            self.fixtures_dir / "processed_buildings" / "1003000523385.epJSON"
+        )
+        self.fixture_weather_1 = self.fixtures_dir / "weather" / "weather_vt_1.epw"
+        self.fixture_weather_2 = self.fixtures_dir / "weather" / "weather_vt_2.epw"
 
-    @patch('building2building.generator.search_idf.download_and_extract_county_idf')
-    @patch('building2building.generator.search_idf.download_metadata')
-    @patch('building2building.generator.search_idf.process_metadata')
-    @patch('building2building.generator.search_idf.process_idf')
-    @patch('building2building.generator.search_idf.download_epw')
-    @patch('os.path.join')
-    def test_search_idf_small_office(self, mock_path_join, mock_download_epw, mock_process_idf, 
-                            mock_process_metadata, mock_download_metadata, 
-                            mock_download_county):
+    @patch("building2building.generator.search_idf.download_and_extract_county_idf")
+    @patch("building2building.generator.search_idf.download_metadata")
+    @patch("building2building.generator.search_idf.process_metadata")
+    @patch("building2building.generator.search_idf.process_idf")
+    @patch("building2building.generator.search_idf.download_epw")
+    @patch("os.path.join")
+    def test_search_idf_small_office(
+        self,
+        mock_path_join,
+        mock_download_epw,
+        mock_process_idf,
+        mock_process_metadata,
+        mock_download_metadata,
+        mock_download_county,
+    ):
         """Test search_idf with SmallOffice parameters"""
         # Set up mocks
         mock_download_county.return_value = self.fixtures_dir
@@ -283,49 +312,55 @@ class TestSearchIDF(unittest.TestCase):
         mock_path_join.return_value = str(self.fixture_epjson_1z)
 
         buildings, weather_files = search_idf(
-            state='VT',
-            county='Caledonia',
-            building_type='SmallOffice',
+            state="VT",
+            county="Caledonia",
+            building_type="SmallOffice",
             area=1574.74,
             num_floors=1,
             height=10.76,
             n_buildings=1,
             n_weather_files=1,
-            keep_original=True
+            keep_original=True,
         )
-        
+
         # Check return structure
         self.assertIsInstance(buildings, list)
         self.assertIsInstance(weather_files, list)
-        
+
         # Check building data structure
         if buildings:
             building_path, characteristics = buildings[0]
             self.assertEqual(building_path, str(self.fixture_epjson_1z))
-            self.assertEqual(characteristics['building_type'], 'SmallOffice')
-            self.assertEqual(characteristics['num_floors'], 1)
-            self.assertEqual(characteristics['area'], 1574.74)
-            self.assertEqual(characteristics['height'], 10.76)
-            
+            self.assertEqual(characteristics["building_type"], "SmallOffice")
+            self.assertEqual(characteristics["num_floors"], 1)
+            self.assertEqual(characteristics["area"], 1574.74)
+            self.assertEqual(characteristics["height"], 10.76)
+
         # Check weather files
         if weather_files:
             self.assertEqual(weather_files[0], str(self.fixture_weather_1))
 
         # Verify mocks were called correctly
-        mock_download_county.assert_called_once_with('VT', 'Caledonia')
-        mock_download_metadata.assert_called_once_with(state='VT')
-        mock_process_metadata.assert_called_once_with(state='VT')
+        mock_download_county.assert_called_once_with("VT", "Caledonia")
+        mock_download_metadata.assert_called_once_with(state="VT")
+        mock_process_metadata.assert_called_once_with(state="VT")
         self.assertEqual(mock_download_epw.call_count, 1)
 
-    @patch('building2building.generator.search_idf.download_and_extract_county_idf')
-    @patch('building2building.generator.search_idf.download_metadata')
-    @patch('building2building.generator.search_idf.process_metadata')
-    @patch('building2building.generator.search_idf.process_idf')
-    @patch('building2building.generator.search_idf.download_epw')
-    @patch('os.path.join')
-    def test_search_idf_medium_office(self, mock_path_join, mock_download_epw, mock_process_idf, 
-                                        mock_process_metadata, mock_download_metadata, 
-                                        mock_download_county):
+    @patch("building2building.generator.search_idf.download_and_extract_county_idf")
+    @patch("building2building.generator.search_idf.download_metadata")
+    @patch("building2building.generator.search_idf.process_metadata")
+    @patch("building2building.generator.search_idf.process_idf")
+    @patch("building2building.generator.search_idf.download_epw")
+    @patch("os.path.join")
+    def test_search_idf_medium_office(
+        self,
+        mock_path_join,
+        mock_download_epw,
+        mock_process_idf,
+        mock_process_metadata,
+        mock_download_metadata,
+        mock_download_county,
+    ):
         """Test search_idf with MediumOffice parameters"""
         # Set up mocks
         mock_download_county.return_value = self.fixtures_dir
@@ -335,93 +370,103 @@ class TestSearchIDF(unittest.TestCase):
         mock_path_join.return_value = str(self.fixture_epjson_5z)
 
         buildings, weather_files = search_idf(
-            state='VT',
-            county='Caledonia',
-            building_type='MediumOffice',
+            state="VT",
+            county="Caledonia",
+            building_type="MediumOffice",
             area=2676.54,
             num_floors=4,
             height=47.83,
             n_buildings=1,
             n_weather_files=1,
-            keep_original=True
+            keep_original=True,
         )
-        
+
         # Check return structure
         self.assertIsInstance(buildings, list)
         self.assertIsInstance(weather_files, list)
-        
+
         # Check building data structure
         if buildings:
             building_path, characteristics = buildings[0]
             self.assertEqual(building_path, str(self.fixture_epjson_5z))
-            self.assertEqual(characteristics['building_type'], 'MediumOffice')
-            self.assertEqual(characteristics['num_floors'], 4)
-            self.assertEqual(characteristics['area'], 2676.54)
-            self.assertEqual(characteristics['height'], 47.83)
-            
+            self.assertEqual(characteristics["building_type"], "MediumOffice")
+            self.assertEqual(characteristics["num_floors"], 4)
+            self.assertEqual(characteristics["area"], 2676.54)
+            self.assertEqual(characteristics["height"], 47.83)
+
         # Check weather files
         if weather_files:
             self.assertEqual(weather_files[0], str(self.fixture_weather_1))
 
         # Verify mocks were called correctly
-        mock_download_county.assert_called_once_with('VT', 'Caledonia')
-        mock_download_metadata.assert_called_once_with(state='VT')
-        mock_process_metadata.assert_called_once_with(state='VT')
+        mock_download_county.assert_called_once_with("VT", "Caledonia")
+        mock_download_metadata.assert_called_once_with(state="VT")
+        mock_process_metadata.assert_called_once_with(state="VT")
         self.assertEqual(mock_download_epw.call_count, 1)
 
-    @patch('building2building.generator.search_idf.download_and_extract_county_idf')
-    @patch('building2building.generator.search_idf.download_metadata')
-    def test_search_idf_invalid_params(self, mock_download_metadata, mock_download_county):
+    @patch("building2building.generator.search_idf.download_and_extract_county_idf")
+    @patch("building2building.generator.search_idf.download_metadata")
+    def test_search_idf_invalid_params(
+        self, mock_download_metadata, mock_download_county
+    ):
         """Test search with invalid parameters"""
         mock_download_county.side_effect = Exception("Invalid state or county")
-        
+
         with self.assertRaises(Exception):
             search_idf(
-                state='INVALID',
-                county='INVALID',
-                building_type='NonExistentType',
+                state="INVALID",
+                county="INVALID",
+                building_type="NonExistentType",
                 area=0,
                 num_floors=0,
                 height=None,
                 n_buildings=1,
                 n_weather_files=1,
-                keep_original=True
+                keep_original=True,
             )
 
-    @patch('building2building.generator.search_idf.download_and_extract_county_idf')
-    @patch('building2building.generator.search_idf.download_metadata')
-    @patch('building2building.generator.search_idf.process_metadata')
-    def test_search_idf_nonexistent_county(self, mock_process_metadata, mock_download_metadata, mock_download_county):
+    @patch("building2building.generator.search_idf.download_and_extract_county_idf")
+    @patch("building2building.generator.search_idf.download_metadata")
+    @patch("building2building.generator.search_idf.process_metadata")
+    def test_search_idf_nonexistent_county(
+        self, mock_process_metadata, mock_download_metadata, mock_download_county
+    ):
         """Test search_idf with a county that doesn't exist in the metadata"""
         mock_download_county.return_value = self.fixtures_dir
         mock_process_metadata.return_value = self.metadata_path
 
         with self.assertRaises(Exception) as context:
             search_idf(
-                state='VT',
-                county='Orleans',  # County not in test metadata
-                building_type='SmallOffice',
+                state="VT",
+                county="Orleans",  # County not in test metadata
+                building_type="SmallOffice",
                 area=1000,
                 num_floors=1,
                 height=10.0,
                 n_buildings=1,
                 n_weather_files=1,
-                keep_original=True
+                keep_original=True,
             )
-        
+
         # Verify the error message indicates no buildings were found
         self.assertIn("No matching IDF files found", str(context.exception))
 
-    @patch('building2building.generator.search_idf.download_and_extract_county_idf')
-    @patch('building2building.generator.search_idf.download_metadata')
-    @patch('building2building.generator.search_idf.process_metadata')
-    @patch('building2building.generator.search_idf.process_idf')
-    def test_corrupted_idf_files(self, mock_process_idf, mock_process_metadata, 
-                              mock_download_metadata, mock_download_county):
+    @patch("building2building.generator.search_idf.download_and_extract_county_idf")
+    @patch("building2building.generator.search_idf.download_metadata")
+    @patch("building2building.generator.search_idf.process_metadata")
+    @patch("building2building.generator.search_idf.process_idf")
+    def test_corrupted_idf_files(
+        self,
+        mock_process_idf,
+        mock_process_metadata,
+        mock_download_metadata,
+        mock_download_county,
+    ):
         """Test handling of corrupted and missing IDF files"""
         # Create a temporary corrupted IDF file
         import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.idf', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".idf", delete=False) as f:
             # Write invalid IDF content
             f.write("This is not a valid IDF file content\n")
             f.write("It should cause processing to fail\n")
@@ -431,23 +476,25 @@ class TestSearchIDF(unittest.TestCase):
             # Set up mocks
             mock_download_county.return_value = self.fixtures_dir
             mock_process_metadata.return_value = self.metadata_path
-            
+
             # Mock process_idf to simulate failure
-            mock_process_idf.side_effect = Exception("Failed to process corrupted IDF file")
+            mock_process_idf.side_effect = Exception(
+                "Failed to process corrupted IDF file"
+            )
 
             with self.assertRaises(Exception) as context:
                 search_idf(
-                    state='VT',
-                    county='Caledonia',
-                    building_type='SmallOffice',
+                    state="VT",
+                    county="Caledonia",
+                    building_type="SmallOffice",
                     area=1500,
                     num_floors=1,
                     height=10.0,
                     n_buildings=1,
                     n_weather_files=1,
-                    keep_original=True
+                    keep_original=True,
                 )
-            
+
             # Verify that the error is related to IDF processing
             self.assertIn("Failed to process", str(context.exception))
 
@@ -457,135 +504,143 @@ class TestSearchIDF(unittest.TestCase):
 
             with self.assertRaises(Exception) as context:
                 search_idf(
-                    state='VT',
-                    county='Caledonia',
-                    building_type='SmallOffice',
+                    state="VT",
+                    county="Caledonia",
+                    building_type="SmallOffice",
                     area=1500,
                     num_floors=1,
                     height=10.0,
                     n_buildings=1,
                     n_weather_files=1,
-                    keep_original=True
+                    keep_original=True,
                 )
-            
+
             # Verify that the error is related to missing file
             self.assertIn("not found", str(context.exception).lower())
-            
+
         finally:
             # Clean up the temporary file
             os.unlink(corrupted_path)
 
-    @patch('building2building.generator.search_idf.download_and_extract_county_idf')
-    @patch('building2building.generator.search_idf.download_metadata')
+    @patch("building2building.generator.search_idf.download_and_extract_county_idf")
+    @patch("building2building.generator.search_idf.download_metadata")
     def test_invalid_state_code(self, mock_download_metadata, mock_download_county):
         """Test search with invalid state code"""
         mock_download_metadata.side_effect = Exception("Invalid state code")
-        
+
         with self.assertRaises(Exception) as context:
             search_idf(
-                state='XX',  # Invalid state code
-                county='Caledonia',
-                building_type='SmallOffice',
+                state="XX",  # Invalid state code
+                county="Caledonia",
+                building_type="SmallOffice",
                 area=1500,
                 num_floors=1,
                 height=10.0,
                 n_buildings=1,
                 n_weather_files=1,
-                keep_original=True
+                keep_original=True,
             )
-        
+
         self.assertIn("Invalid state code", str(context.exception))
 
-    @patch('building2building.generator.search_idf.download_and_extract_county_idf')
-    @patch('building2building.generator.search_idf.download_metadata')
-    @patch('building2building.generator.search_idf.process_metadata')
-    def test_invalid_building_type(self, mock_process_metadata, mock_download_metadata, mock_download_county):
+    @patch("building2building.generator.search_idf.download_and_extract_county_idf")
+    @patch("building2building.generator.search_idf.download_metadata")
+    @patch("building2building.generator.search_idf.process_metadata")
+    def test_invalid_building_type(
+        self, mock_process_metadata, mock_download_metadata, mock_download_county
+    ):
         """Test search with non-existent building type"""
         mock_download_county.return_value = self.fixtures_dir
         mock_process_metadata.return_value = self.metadata_path
 
         with self.assertRaises(Exception) as context:
             search_idf(
-                state='VT',
-                county='Caledonia',
-                building_type='NonExistentBuildingType',  # Invalid building type
+                state="VT",
+                county="Caledonia",
+                building_type="NonExistentBuildingType",  # Invalid building type
                 area=1500,
                 num_floors=1,
                 height=10.0,
                 n_buildings=1,
                 n_weather_files=1,
-                keep_original=True
+                keep_original=True,
             )
-        
+
         self.assertIn("No matching IDF files found", str(context.exception))
 
-    @patch('building2building.generator.search_idf.download_and_extract_county_idf')
-    @patch('building2building.generator.search_idf.download_metadata')
-    @patch('building2building.generator.search_idf.process_metadata')
-    @patch('building2building.generator.search_idf.download_epw')
-    def test_download_failures(self, mock_download_epw, mock_process_metadata, 
-                           mock_download_metadata, mock_download_county):
+    @patch("building2building.generator.search_idf.download_and_extract_county_idf")
+    @patch("building2building.generator.search_idf.download_metadata")
+    @patch("building2building.generator.search_idf.process_metadata")
+    @patch("building2building.generator.search_idf.download_epw")
+    def test_download_failures(
+        self,
+        mock_download_epw,
+        mock_process_metadata,
+        mock_download_metadata,
+        mock_download_county,
+    ):
         """Test handling of download failures"""
         # Test metadata download failure
         mock_download_metadata.side_effect = Exception("Failed to download metadata")
-        
+
         with self.assertRaises(Exception) as context:
             search_idf(
-                state='VT',
-                county='Caledonia',
-                building_type='SmallOffice',
+                state="VT",
+                county="Caledonia",
+                building_type="SmallOffice",
                 area=1500,
                 num_floors=1,
                 height=10.0,
                 n_buildings=1,
                 n_weather_files=1,
-                keep_original=True
+                keep_original=True,
             )
-        
+
         self.assertIn("Failed to download metadata", str(context.exception))
-        
+
         # Test weather file download failure
         mock_download_metadata.reset_mock()
         mock_download_metadata.side_effect = None
         mock_process_metadata.return_value = self.metadata_path
         mock_download_county.return_value = self.fixtures_dir
         mock_download_epw.side_effect = Exception("Failed to download weather files")
-        
+
         with self.assertRaises(Exception) as context:
             search_idf(
-                state='VT',
-                county='Caledonia',
-                building_type='SmallOffice',
+                state="VT",
+                county="Caledonia",
+                building_type="SmallOffice",
                 area=1500,
                 num_floors=1,
                 height=10.0,
                 n_buildings=1,
                 n_weather_files=1,
-                keep_original=True
+                keep_original=True,
             )
-        
+
         self.assertIn("Failed to download weather files", str(context.exception))
+
 
 class TestProcessIDF(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
-        self.fixtures_dir = Path('tests/fixtures').resolve()  # Get absolute path
+        self.fixtures_dir = Path("tests/fixtures").resolve()  # Get absolute path
         # Create main output directory
-        self.test_output_dir = self.fixtures_dir / 'test_output' / 'VT' / 'TestCounty'
+        self.test_output_dir = self.fixtures_dir / "test_output" / "VT" / "TestCounty"
         self.test_output_dir.mkdir(parents=True, exist_ok=True)
         # Create temp directory for transitions
-        self.temp_dir = self.test_output_dir / 'temp'
+        self.temp_dir = self.test_output_dir / "temp"
         self.temp_dir.mkdir(exist_ok=True)
 
     def tearDown(self):
         """Clean up test files"""
         # Remove the test_output directory
-        test_output_root = self.fixtures_dir / 'test_output'
+        test_output_root = self.fixtures_dir / "test_output"
         if test_output_root.exists():
             shutil.rmtree(test_output_root)
-            
+
         # Remove temp_transition directory in fixtures/idf if it exists
-        temp_transition_dir = self.fixtures_dir / 'idf' / 'temp_transition'
+        temp_transition_dir = self.fixtures_dir / "idf" / "temp_transition"
         if temp_transition_dir.exists():
             shutil.rmtree(temp_transition_dir)
 
@@ -593,14 +648,16 @@ class TestProcessIDF(unittest.TestCase):
         """Test processing a single IDF file"""
         # Test data
         building_id = 1003000523385
-        
+
         # Load the actual characteristics from the reference JSON file
-        ref_characteristics_path = self.fixtures_dir / 'processed_buildings' / f"{building_id}.json"
+        ref_characteristics_path = (
+            self.fixtures_dir / "processed_buildings" / f"{building_id}.json"
+        )
         with open(ref_characteristics_path) as f:
             test_characteristics = json.load(f)
-        
+
         # Verify input file exists
-        input_dir = self.fixtures_dir / 'idf'
+        input_dir = self.fixtures_dir / "idf"
         input_file = input_dir / f"{building_id}.idf"
 
         # Process the IDF file
@@ -611,23 +668,23 @@ class TestProcessIDF(unittest.TestCase):
                 county="TestCounty",
                 keep_original=True,
                 output_dir=self.test_output_dir,
-                input_dir=input_dir
+                input_dir=input_dir,
             )
-        
+
         # Check that we got a result
         self.assertEqual(len(processed_paths), 1)
-        
+
         # Check that output file exists and is epJSON
         output_path = processed_paths[0]
         self.assertTrue(output_path.exists())
-        self.assertEqual(output_path.suffix, '.epJSON')
-        
+        self.assertEqual(output_path.suffix, ".epJSON")
+
         # Check that characteristics file was created
         characteristics_path = self.test_output_dir / f"{building_id}.json"
         self.assertTrue(characteristics_path.exists())
 
         # Compare with reference files
-        ref_dir = self.fixtures_dir / 'processed_buildings'
+        ref_dir = self.fixtures_dir / "processed_buildings"
         ref_epjson = ref_dir / f"{building_id}.epJSON"
 
         # Compare epJSON files by loading and comparing contents
@@ -636,5 +693,3 @@ class TestProcessIDF(unittest.TestCase):
             ref_epjson_content = json.load(f2)
             diff = DeepDiff(test_epjson, ref_epjson_content, significant_digits=6)
             self.assertEqual(diff, {}, "Generated epJSON file differs from reference")
-
-       

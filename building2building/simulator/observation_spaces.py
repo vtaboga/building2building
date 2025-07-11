@@ -66,7 +66,7 @@ def observation_transform(obs, floor_area: float|None = None) -> np.ndarray:
     return values
 
 
-def create_observation_space(obs_template: Dict[str, Any]) -> Tuple[gym.spaces.Box, Any]:
+def create_observation_space(obs_template: Dict[str, Any]) -> Tuple[gym.spaces.Box, list[str]]:
     """Create the observation space with appropriate bounds for each variable type.
     
     The observation space contains in order:
