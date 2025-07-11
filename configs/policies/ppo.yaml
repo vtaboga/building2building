@@ -1,5 +1,8 @@
 # @package _global_
 # PPO Training configuration
+
+policy_type: ppo
+
 training:
   total_timesteps: 400000
   save_model: true

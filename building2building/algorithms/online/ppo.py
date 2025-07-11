@@ -75,7 +75,7 @@ class Agent(nn.Module):
         return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
 
 
-def main(cfg, building_path, weather_path, weather_validation_path, building_characteristics, results_dir):
+def main(cfg, building_path, weather_path, weather_validation_path, building_characteristics, results_dir, wandb_run=None):
     """
     Main function to run PPO algorithm.
     
@@ -107,6 +107,9 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
     logger = logging.getLogger("ppo")
     logger.addHandler(file_handler)
     logger.setLevel(logging.INFO)
+
+    if wandb_run:
+        logger.info(f"TensorBoard logs will be synced from: {run_dir}")
     
     # Setup tensorboard - save in run-specific directory
     writer = SummaryWriter(os.path.join(run_dir, "logs"))
@@ -363,6 +366,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
 
     envs.close()
     writer.close()
+    if wandb_run:
+        wandb.finish()
 
 
 def ppo_evaluate(

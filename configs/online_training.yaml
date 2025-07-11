@@ -19,7 +19,7 @@ hydra:
     params:
       seed: 1,2,3,4,5
   run:
-    dir: results/online_training_${policies}_${building_id}_${now:%Y-%m-%d_%H-%M-%S}
+    dir: results/online_training_${now:%Y-%m-%d_%H-%M-%S}
   sweep:
     dir: results/online_training_multirun_${now:%Y-%m-%d_%H-%M-%S}
     subdir: seed_${seed} 

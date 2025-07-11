@@ -13,6 +13,7 @@ from typing import Dict, Any, cast
 import json
 import shutil
 import os
+from datetime import datetime
 
 from building2building.algorithms.online.ppo import main as ppo_main
 from building2building.algorithms.online.dqn import main as dqn_main
@@ -28,26 +29,17 @@ def train_ppo(cfg: DictConfig, results_dir: str = None) -> None:
     output_dir = Path(results_dir) if results_dir else Path(HydraConfig.get().runtime.output_dir)
     logger = logging.getLogger(__name__)
     
-    # Remove unused subdirectories that Hydra might create
-    unused_dirs = ['models', 'data', 'eplus_output']
-    for unused_dir in unused_dirs:
-        unused_path = output_dir / unused_dir
-        if unused_path.exists():
-            shutil.rmtree(unused_path)
-            logger.info(f"Removed unused directory: {unused_path}")
-    
     # Initialize W&B with simple multirun handling
     if cfg.get('track', False):
         try:
             # Convert config to proper dict for wandb
             config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+            logger.info(f"Config: {config_dict}")
             
-            # Create unique run name with key parameters
-            run_name = cfg.get('name', 'ppo_training')
-            if hasattr(cfg, 'seed'):
-                run_name += f"_seed{cfg.seed}"
-            if hasattr(cfg, 'energy_weight'):
-                run_name += f"_energy{cfg.energy_weight}"
+            # Create unique group and run name
+            sweep_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            group_name = f"{config_dict['policy_type']}_bldg_{config_dict['building_id']}_{sweep_timestamp}"
+            run_name = f"{config_dict['policy_type']}_bldg_{config_dict['building_id']}_seed{config_dict['seed']}"
             
             # Use reinit=True for multirun compatibility
             wandb_run = wandb.init(
@@ -55,7 +47,9 @@ def train_ppo(cfg: DictConfig, results_dir: str = None) -> None:
                 project=cfg.project,
                 config=cast(Dict[str, Any], config_dict) if isinstance(config_dict, dict) else {},
                 name=run_name,
+                group=group_name,
                 tags=cfg.get('tags', []),
+                sync_tensorboard=True,
                 reinit=True  # Allow reinitialization for multirun
             )
             logger.info(f"W&B initialized: {wandb_run.url}")
@@ -87,7 +81,8 @@ def train_ppo(cfg: DictConfig, results_dir: str = None) -> None:
             weather_path=weather_path,
             weather_validation_path=weather_validation_path,
             building_characteristics=building_characteristics,
-            results_dir=str(output_dir)
+            results_dir=str(output_dir),
+            wandb_run=wandb_run
         )
         logger.info("PPO training completed successfully")
     except Exception as e:
@@ -96,12 +91,6 @@ def train_ppo(cfg: DictConfig, results_dir: str = None) -> None:
     
     # Hydra automatically saves config to .hydra/config.yaml
     logger.info(f"Config automatically saved to: {output_dir}/.hydra/config.yaml")
-    logger.info(f"Final results structure:")
-    logger.info(f"  - EnergyPlus outputs: {output_dir}/eplus_outputs/")
-    logger.info(f"  - Test results: {output_dir}/test_results/")
-    logger.info(f"  - Model: {output_dir}/model.pt")
-    logger.info(f"  - Training log: {output_dir}/train_ppo.log")
-    logger.info(f"  - TensorBoard logs: {output_dir}/logs/")
 
 
 def train_dqn(cfg: DictConfig, results_dir: str = None) -> None:
@@ -110,29 +99,18 @@ def train_dqn(cfg: DictConfig, results_dir: str = None) -> None:
     # Get Hydra's output directory and setup logging
     output_dir = Path(results_dir) if results_dir else Path(HydraConfig.get().runtime.output_dir)
     logger = logging.getLogger(__name__)
-    job_name = HydraConfig.get().job.name
-    print(f"Job name: {job_name}")
-    
-    # Remove unused subdirectories that Hydra might create
-    #unused_dirs = ['models', 'data', 'eplus_output']
-    #for unused_dir in unused_dirs:
-    #    unused_path = output_dir / unused_dir
-    #     if unused_path.exists():
-    #         shutil.rmtree(unused_path)
-    #         logger.info(f"Removed unused directory: {unused_path}")
-    
+
     # Initialize W&B with simple multirun handling
     if cfg.get('track', False):
         try:
             # Convert config to proper dict for wandb
             config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-            
-            # Create unique run name with key parameters
-            run_name = cfg.get('name', 'dqn_training')
-            if hasattr(cfg, 'seed'):
-                run_name += f"_seed{cfg.seed}"
-            if hasattr(cfg, 'energy_weight'):
-                run_name += f"_energy{cfg.energy_weight}"
+            logger.info(f"Config: {config_dict}")
+        
+            # Create unique group and run name
+            sweep_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            group_name = f"{config_dict['policy_type']}_bldg_{config_dict['building_id']}_{sweep_timestamp}"
+            run_name = f"{config_dict['policy_type']}_bldg_{config_dict['building_id']}_seed{config_dict['seed']}"
             
             # Use reinit=True for multirun compatibility
             wandb_run = wandb.init(
@@ -140,10 +118,12 @@ def train_dqn(cfg: DictConfig, results_dir: str = None) -> None:
                 project=cfg.get('project'),
                 config=cast(Dict[str, Any], config_dict) if isinstance(config_dict, dict) else {},
                 name=run_name,
+                group=group_name,
                 tags=cfg.get('tags', []),
+                sync_tensorboard=True,
                 reinit=True  # Allow reinitialization for multirun
             )
-            logger.info(f"W&B initialized: {wandb_run.url}")
+            logger.info(f"W&B initialized with tensorboard sync: {wandb_run.url}")
         except Exception as e:
             logger.error(f"W&B initialization failed: {e}")
             logger.error("Continuing without W&B tracking...")
@@ -171,7 +151,8 @@ def train_dqn(cfg: DictConfig, results_dir: str = None) -> None:
             weather_path=weather_path,
             weather_validation_path=weather_validation_path,
             building_characteristics=building_characteristics,
-            results_dir=str(output_dir)
+            results_dir=str(output_dir),
+            wandb_run=wandb_run
         )
         logger.info("DQN training completed successfully")
     except Exception as e:
@@ -180,12 +161,6 @@ def train_dqn(cfg: DictConfig, results_dir: str = None) -> None:
     
     # Hydra automatically saves config to .hydra/config.yaml
     logger.info(f"Config automatically saved to: {output_dir}/.hydra/config.yaml")
-    logger.info(f"Final results structure:")
-    logger.info(f"  - EnergyPlus outputs: {output_dir}/eplus_outputs/")
-    logger.info(f"  - Test results: {output_dir}/test_results/")
-    logger.info(f"  - Model: {output_dir}/model.pt")
-    logger.info(f"  - Training log: {output_dir}/train_dqn.log")
-    logger.info(f"  - TensorBoard logs: {output_dir}/logs/")
 
 
 def get_training_function(algorithm: str):
