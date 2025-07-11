@@ -140,19 +140,6 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
     logger = logging.getLogger("dqn")
     logger.addHandler(file_handler)
     logger.setLevel(logging.INFO)
-
-    # Setup wandb tracking
-    if cfg.get('track', False):
-        import wandb
-        wandb.init(
-            project=cfg.get('project', 'building2building'),
-            entity=cfg.get('entity'),
-            sync_tensorboard=True,
-            config=dict(cfg),
-            name=run_name,
-            monitor_gym=True,
-            save_code=True,
-        )
     
     # Setup logging and tensorboard
     writer = SummaryWriter(os.path.join(run_dir, "logs"))

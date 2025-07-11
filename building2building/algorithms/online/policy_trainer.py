@@ -36,48 +36,33 @@ def train_ppo(cfg: DictConfig, results_dir: str = None) -> None:
             shutil.rmtree(unused_path)
             logger.info(f"Removed unused directory: {unused_path}")
     
-    # Initialize W&B following best practices
+    # Initialize W&B with simple multirun handling
     if cfg.get('track', False):
-        # Check if W&B is already initialized (e.g., during sweeps)
-        if wandb.run is None:
-            # Only initialize W&B if not already initialized (not in sweep mode)
-            try:
-                # Test basic W&B connectivity
-                logger.info("Testing W&B connectivity...")
-                # Check if project name is provided
-                project_name = cfg.get('project')
-                if project_name is None:
-                    raise ValueError("Project name is not set in configuration")
-                logger.info(f"W&B connectivity test passed for project: {project_name}")
-            except Exception as e:
-                logger.error(f"W&B connectivity test failed: {e}")
-                logger.error("This could be due to:")
-                logger.error("1. Invalid API key - run 'wandb login'")
-                logger.error("2. Network connectivity issues")
-                logger.error("3. Invalid project/entity configuration")
-                raise Exception(f"W&B connectivity test failed: {e}")
+        try:
+            # Convert config to proper dict for wandb
+            config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
             
-            try:
-                # Convert config to proper dict for wandb
-                config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-                wandb_run = wandb.init(
-                    entity=cfg.entity,
-                    project=cfg.project,
-                    config=cast(Dict[str, Any], config_dict) if isinstance(config_dict, dict) else {},
-                    name=cfg.get('name', 'ppo_training'),
-                    tags=cfg.get('tags', []),
-                    settings=wandb.Settings(init_timeout=60)  # Increase timeout to 5 minutes
-                )
-                logger.info(f"W&B initialized: {wandb_run.url}")
-            except Exception as e:
-                logger.error(f"W&B initialization failed after connectivity test: {e}")
-                logger.error("Attempting to continue without W&B tracking...")
-                # Don't raise the exception, just log it and continue without W&B
-                wandb.run = None
-        else:
-            logger.info("W&B already initialized (likely in sweep mode)")
-            # Don't try to update config in sweep mode - the sweep agent handles this
-            logger.info("Skipping W&B config update in sweep mode")
+            # Create unique run name with key parameters
+            run_name = cfg.get('name', 'ppo_training')
+            if hasattr(cfg, 'seed'):
+                run_name += f"_seed{cfg.seed}"
+            if hasattr(cfg, 'energy_weight'):
+                run_name += f"_energy{cfg.energy_weight}"
+            
+            # Use reinit=True for multirun compatibility
+            wandb_run = wandb.init(
+                entity=cfg.entity,
+                project=cfg.project,
+                config=cast(Dict[str, Any], config_dict) if isinstance(config_dict, dict) else {},
+                name=run_name,
+                tags=cfg.get('tags', []),
+                reinit=True  # Allow reinitialization for multirun
+            )
+            logger.info(f"W&B initialized: {wandb_run.url}")
+        except Exception as e:
+            logger.error(f"W&B initialization failed: {e}")
+            logger.error("Continuing without W&B tracking...")
+            wandb.run = None
     
     # Load building characteristics and set up paths
     building_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.epJSON"
@@ -125,57 +110,44 @@ def train_dqn(cfg: DictConfig, results_dir: str = None) -> None:
     # Get Hydra's output directory and setup logging
     output_dir = Path(results_dir) if results_dir else Path(HydraConfig.get().runtime.output_dir)
     logger = logging.getLogger(__name__)
+    job_name = HydraConfig.get().job.name
+    print(f"Job name: {job_name}")
     
     # Remove unused subdirectories that Hydra might create
-    unused_dirs = ['models', 'data', 'eplus_output']
-    for unused_dir in unused_dirs:
-        unused_path = output_dir / unused_dir
-        if unused_path.exists():
-            shutil.rmtree(unused_path)
-            logger.info(f"Removed unused directory: {unused_path}")
+    #unused_dirs = ['models', 'data', 'eplus_output']
+    #for unused_dir in unused_dirs:
+    #    unused_path = output_dir / unused_dir
+    #     if unused_path.exists():
+    #         shutil.rmtree(unused_path)
+    #         logger.info(f"Removed unused directory: {unused_path}")
     
-    # Initialize W&B following best practices
+    # Initialize W&B with simple multirun handling
     if cfg.get('track', False):
-        # Check if W&B is already initialized (e.g., during sweeps)
-        if wandb.run is None:
-            # Simple diagnostic test for W&B connectivity
-            try:
-                # Test basic W&B connectivity
-                logger.info("Testing W&B connectivity...")
-                # Check if project name is provided
-                project_name = cfg.get('project')
-                if project_name is None:
-                    raise ValueError("Project name is not set in configuration")
-                logger.info(f"W&B connectivity test passed for project: {project_name}")
-            except Exception as e:
-                logger.error(f"W&B connectivity test failed: {e}")
-                logger.error("This could be due to:")
-                logger.error("1. Invalid API key - run 'wandb login'")
-                logger.error("2. Network connectivity issues")
-                logger.error("3. Invalid project/entity configuration")
-                raise Exception(f"W&B connectivity test failed: {e}")
+        try:
+            # Convert config to proper dict for wandb
+            config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
             
-            try:
-                # Convert config to proper dict for wandb
-                config_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-                wandb_run = wandb.init(
-                    entity=cfg.get('entity'),
-                    project=cfg.get('project'),
-                    config=cast(Dict[str, Any], config_dict) if isinstance(config_dict, dict) else {},
-                    name=cfg.get('name', 'dqn_training'),
-                    tags=cfg.get('tags', []),
-                    settings=wandb.Settings(init_timeout=60)  # Increase timeout to 5 minutes
-                )
-                logger.info(f"W&B initialized: {wandb_run.url}")
-            except Exception as e:
-                logger.error(f"W&B initialization failed after connectivity test: {e}")
-                logger.error("Attempting to continue without W&B tracking...")
-                # Don't raise the exception, just log it and continue without W&B
-                wandb.run = None
-        else:
-            logger.info("W&B already initialized (likely in sweep mode)")
-            # Don't try to update config in sweep mode - the sweep agent handles this
-            logger.info("Skipping W&B config update in sweep mode")
+            # Create unique run name with key parameters
+            run_name = cfg.get('name', 'dqn_training')
+            if hasattr(cfg, 'seed'):
+                run_name += f"_seed{cfg.seed}"
+            if hasattr(cfg, 'energy_weight'):
+                run_name += f"_energy{cfg.energy_weight}"
+            
+            # Use reinit=True for multirun compatibility
+            wandb_run = wandb.init(
+                entity=cfg.get('entity'),
+                project=cfg.get('project'),
+                config=cast(Dict[str, Any], config_dict) if isinstance(config_dict, dict) else {},
+                name=run_name,
+                tags=cfg.get('tags', []),
+                reinit=True  # Allow reinitialization for multirun
+            )
+            logger.info(f"W&B initialized: {wandb_run.url}")
+        except Exception as e:
+            logger.error(f"W&B initialization failed: {e}")
+            logger.error("Continuing without W&B tracking...")
+            wandb.run = None
     
     # Load building characteristics and set up paths
     building_path = f"data/processed_buildings/{cfg.state}/{cfg.county}/{cfg.building_id}.epJSON"

@@ -90,6 +90,7 @@ echo "Running $SCRIPT_NAME in container with scratch directory: $SCRATCH_DIR"
     --bind "$SCRATCH_DATA_DIR:/opt/repository/data" \
     --bind "$REPO_RESULTS_DIR:/opt/repository/results" \
     --bind "$SCRATCH_WANDB_DIR:/opt/repository/wandb" \
+    --bind "$REPO_ROOT/configs:/opt/repository/configs" \
     --pwd /opt/repository \
     "$CONTAINER" \
     bash -c "

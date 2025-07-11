@@ -2,7 +2,7 @@
 # DQN Training configuration
 
 training:
-  total_timesteps: 1000000
+  total_timesteps: 100000
   save_model: true
 
 dqn:
@@ -16,6 +16,6 @@ dqn:
   start_e: 1.0
   end_e: 0.05
   exploration_fraction: 0.1
-  learning_starts: 50000
+  learning_starts: 10000
   train_frequency: 10
   eval_frequency: 10000 
