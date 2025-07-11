@@ -4,7 +4,7 @@
 policy_type: dqn
 
 training:
-  total_timesteps: 300
+  total_timesteps: 175200
   save_model: true
 
 dqn:
@@ -18,6 +18,6 @@ dqn:
   start_e: 1.0
   end_e: 0.05
   exploration_fraction: 0.1
-  learning_starts: 100
+  learning_starts: 4380
   train_frequency: 10
-  eval_frequency: 100 
+  eval_frequency: 8760 

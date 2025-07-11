@@ -4,7 +4,7 @@
 policy_type: ppo
 
 training:
-  total_timesteps: 400000
+  total_timesteps: 175200
   save_model: true
 
 ppo:
@@ -23,4 +23,4 @@ ppo:
   vf_coef: 0.5
   max_grad_norm: 0.5
   target_kl: null
-  eval_frequency: 10000 
+  eval_frequency: 8760 
