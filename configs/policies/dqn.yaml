@@ -4,7 +4,7 @@
 policy_type: dqn
 
 training:
-  total_timesteps: 1000
+  total_timesteps: 300
   save_model: true
 
 dqn:

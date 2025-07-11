@@ -24,7 +24,7 @@ def main_hydra(cfg: DictConfig) -> None:
         raise ValueError("Invalid or missing algorithm. Please specify policies=ppo or policies=dqn")
 
     logging.info(f"Starting {algorithm.upper()} training")
-
+    
     # Get and run the appropriate training function
     try:
         train_func = get_training_function(algorithm)
