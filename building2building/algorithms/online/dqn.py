@@ -2,6 +2,7 @@
 import os
 import random
 import time
+import wandb
 from typing import Callable, Optional
 import gymnasium as gym
 import numpy as np
@@ -108,7 +109,7 @@ class QNetwork(nn.Module):
         return action
 
 
-def main(cfg, building_path, weather_path, weather_validation_path, building_characteristics, results_dir):
+def main(cfg, building_path, weather_path, weather_validation_path, building_characteristics, results_dir, wandb_run=None):
     """
     Main function to run DQN algorithm.
     
@@ -140,21 +141,10 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
     logger = logging.getLogger("dqn")
     logger.addHandler(file_handler)
     logger.setLevel(logging.INFO)
-
-    # Setup wandb tracking
-    if cfg.get('track', False):
-        import wandb
-        wandb.init(
-            project=cfg.get('project', 'building2building'),
-            entity=cfg.get('entity'),
-            sync_tensorboard=True,
-            config=dict(cfg),
-            name=run_name,
-            monitor_gym=True,
-            save_code=True,
-        )
     
-    # Setup logging and tensorboard
+    if wandb_run:
+        logger.info(f"TensorBoard logs will be synced from: {run_dir}")
+    
     writer = SummaryWriter(os.path.join(run_dir, "logs"))
     writer.add_text(
         "hyperparameters",
@@ -386,6 +376,8 @@ def main(cfg, building_path, weather_path, weather_validation_path, building_cha
 
     envs.close()
     writer.close()
+    if wandb_run:
+        wandb.finish()
 
 
 def dqn_evaluate(

@@ -90,13 +90,15 @@ echo "Running $SCRIPT_NAME in container with scratch directory: $SCRATCH_DIR"
     --bind "$SCRATCH_DATA_DIR:/opt/repository/data" \
     --bind "$REPO_RESULTS_DIR:/opt/repository/results" \
     --bind "$SCRATCH_WANDB_DIR:/opt/repository/wandb" \
+    --bind "$REPO_ROOT/configs:/opt/repository/configs" \
     --pwd /opt/repository \
     "$CONTAINER" \
     bash -c "
       # Activate the virtual environment and run the script from the host-mounted directory
       source /opt/repository/.venv/bin/activate
-      # Set WANDB_DIR environment variable to ensure wandb uses the correct directory
+      # Set environment variables
       export WANDB_DIR=/opt/repository/wandb
+      export SCRATCH_DIR='$SCRATCH_DIR'
       python /opt/repository-host/$SCRIPT_PATH $*
     "
 

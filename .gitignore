@@ -20,3 +20,4 @@ wandb/
 configs/energyplus_simulator.json
 notebooks/
 OfflineRL-Kit/
+jobs/
