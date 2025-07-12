@@ -4,6 +4,9 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import gymnasium as gym
+import numpy as np
+
 # Make sure to import your environment to register it
 import building2building.simulator
 from building2building.simulator.utils import TrajectoryLogger

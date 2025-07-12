@@ -2,10 +2,8 @@ import io
 import logging
 import os
 import re
-import shutil
 import zipfile
 from pathlib import Path
-from typing import *
 
 import requests
 from bs4 import BeautifulSoup
@@ -74,7 +72,7 @@ def download_epw(
     Returns:
         list[str] or str or None: List of paths to the EPW files if successful, None otherwise
     """
-    save_dir.mkdir(exist_ok=True)
+    save_dir.mkdir(exist_ok=True, parents=True)
     existing_files: list[Path] = list(save_dir.iterdir()) if save_dir.exists() else []
 
     # Check for already existing files

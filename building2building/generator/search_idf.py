@@ -261,12 +261,4 @@ def search_idf(
         building_files.append(processed_path)
         building_infos.append(building_characteristics)
 
-    # Create tuples of (path_to_building, dict_of_characteristics)
-    base_path = os.path.join("data/processed_buildings", f"{state}", f"{county}")
-
-    building_files = [
-        (os.path.join(base_path, f"{building[0]}.epJSON"), building[1])
-        for building in building_files
-    ]
-
     return list(zip(building_files, building_infos))

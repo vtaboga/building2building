@@ -6,10 +6,6 @@ import gymnasium as gym
 import minergym.config as config
 import minergym.simulation as simulation
 import numpy as np
-from minergym.environment import EnergyPlusEnvironment
-from minergym.ontology import Ontology
-from minergym.simulation import ActuatorHole, EnergyPlusSimulation
-
 from building2building.simulator.action_spaces import (
     action_transform,
     create_action_space,
@@ -24,6 +20,9 @@ from building2building.simulator.rewards import (
     base_reward_function,
 )
 from building2building.types import BuildingConfig
+from minergym.environment import EnergyPlusEnvironment
+from minergym.ontology import Ontology
+from minergym.simulation import ActuatorHole, EnergyPlusSimulation
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +69,6 @@ def create_simulator(building_config: BuildingConfig) -> gym.Env:
 
     setpoints = get_controllable_setpoints(ont)
 
-    setpoints = get_controllable_setpoints_rdf(rdf)
     actuators = {}
     controlled_zones = list(setpoints.keys())
     all_zones = building_config.characteristics.zone_lists
@@ -123,9 +121,6 @@ def create_simulator(building_config: BuildingConfig) -> gym.Env:
         lambda obs: observation_transform(obs, building_config.characteristics.area),
         action_space,
         lambda act: action_transform(act, actuators),
-        building_characteristics,
-        controlled_zones,
-        observation_names,
     )
 
     gymenv.metadata = {
