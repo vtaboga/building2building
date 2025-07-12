@@ -32,6 +32,21 @@ dependencies = [
     "bs4",
 ]
 
+[project.optional-dependencies]
+test = [
+    "deepdiff",
+    "pytest",
+    "pytest-mock",
+]
+dev = [
+    "pyright",
+    "nodeenv",
+    # ... your dev dependencies
+]
+
+all = ["building2building[test,dev]"]
+
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["building2building*"]
