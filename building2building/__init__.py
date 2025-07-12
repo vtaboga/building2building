@@ -2,7 +2,7 @@ from pathlib import Path
 
 from gymnasium.envs.registration import register
 
-from building2building.env import setup_energyplus_path
+from building2building.env import setup_data_path, setup_energyplus_path
 from building2building.generator.downloader import download_epw
 from building2building.generator.search_idf import EPJSONProcessor, search_idf
 from building2building.simulator.create_simulator import create_simulator
@@ -18,6 +18,8 @@ register(
 
 
 setup_energyplus_path()
+
+setup_data_path()
 
 search_building = search_idf
 

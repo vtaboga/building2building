@@ -7,13 +7,14 @@ import tempfile
 from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Tuple, TypeAlias, reveal_type
+from typing import Any, Callable, Tuple, TypeAlias
 
 import duckdb
 import pandas as pd
 from minergym.ontology import Ontology
 
 import building2building.generator.processing as processing
+from building2building.env import DATA_PATH, get_unprocessed_idf_dir
 from building2building.generator.downloader import (
     download_and_extract_county_idf,
     download_epw,
@@ -126,12 +127,33 @@ def hash_processors(processors: list[EPJSONProcessor], hash_length=16) -> str:
     return hash_hex
 
 
+def get_intermediate_results_path() -> Path:
+    return DATA_PATH.get() / "intermediate_results"
+
+
+def get_processed_epjson_path(
+    state: str,
+    county: str,
+    building_id: int,
+    processors: list[EPJSONProcessor],
+) -> Path:
+    if len(processors) != 0:
+        processors_hash = "." + hash_processors(processors)
+    else:
+        processors_hash = ""
+
+    tmp_dir = DATA_PATH.get() / "processed_buildings" / state / county
+    processed_path = tmp_dir / f"{building_id}{processors_hash}.epJSON"
+    return processed_path
+
+
 def process_idf(
     in_path: Path,
-    tmp_path: Path,
     out_path: Path,
     processors: list[EPJSONProcessor] = [],
 ):
+    tmp_path = get_intermediate_results_path()
+
     all_processors = (
         [processing.specialized_upgrade_idf(t) for t in processing.transitions]
         + [processing.convert_idf]
@@ -222,23 +244,16 @@ def search_idf(
         raise Exception("No matching IDF files found")
 
     for building_id, building_info in matching_buildings:
-        building_path = Path(
-            "data", "idf", f"{state}_{county}_IDF", f"{building_id}.idf"
+        building_path = (
+            get_unprocessed_idf_dir() / f"{state}_{county}_IDF/{building_id}.idf"
+        )
+        processed_path = get_processed_epjson_path(
+            state, county, building_id, processors
         )
 
-        if len(processors) != 0:
-            processors_hash = "." + hash_processors(processors)
-        else:
-            processors_hash = ""
-
-        tmp_dir = Path("data", "processed_buildings", state, county)
-        processed_path = (
-            tmp_dir / building_path.with_suffix(f"{processors_hash}.epJSON").name
-        )
-
+        processed_path.parent.mkdir(exist_ok=True, parents=True)
         if not processed_path.exists():
-            processed_path.parent.mkdir(exist_ok=True, parents=True)
-            process_idf(building_path, tmp_dir, processed_path, processors)
+            process_idf(building_path, processed_path, processors)
 
         info_path = processed_path.with_suffix(".json")
         if not info_path.exists():

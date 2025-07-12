@@ -9,6 +9,12 @@ import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
+from building2building.env import (
+    get_metadata_dir,
+    get_unprocessed_idf_dir,
+    get_weather_dir,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,9 +62,7 @@ def extract_zip_progress(zip_path: Path, dst_dir: Path, description: str | None 
                 progress_bar.update(file_info.file_size)
 
 
-def download_epw(
-    state_code, city_name=None, save_dir=Path("data/weather"), n_files=2
-) -> list[Path]:
+def download_epw(state_code, city_name=None, n_files=2) -> list[Path]:
     """
     Download up to n_files EPW weather files for a specific city and state.
     If city_name is None, downloads any available weather files from the state.
@@ -72,7 +76,7 @@ def download_epw(
     Returns:
         list[str] or str or None: List of paths to the EPW files if successful, None otherwise
     """
-    save_dir.mkdir(exist_ok=True, parents=True)
+    save_dir = get_weather_dir()
     existing_files: list[Path] = list(save_dir.iterdir()) if save_dir.exists() else []
 
     # Check for already existing files
@@ -206,7 +210,7 @@ def get_available_counties() -> list[tuple[str, str]]:
     return sorted(counties)  # Sort by state code and county name
 
 
-def download_and_extract_county_idf(state_code: str, county_name: str) -> str:
+def download_and_extract_county_idf(state_code: str, county_name: str) -> Path:
     """
     Downloads and extracts a county IDF zip file from ESS-DIVE if not already downloaded.
 
@@ -221,8 +225,7 @@ def download_and_extract_county_idf(state_code: str, county_name: str) -> str:
     folder_name = f"{state_code}_{county_name}_IDF"
 
     # Create output directory if it doesn't exist
-    output_dir = Path("data/idf")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = get_unprocessed_idf_dir()
 
     # Create specific folder for this county
     county_dir = output_dir / folder_name
@@ -271,11 +274,8 @@ def download_metadata(state: str):
         state (str): Two-letter state code (e.g., 'AK')
     """
     metadata_url = "https://tier2.ess-dive.lbl.gov/doi-10-15485-2283980/data/MAv1_CSVS/"
-    output_dir = "data/metadata"
+    output_dir = get_metadata_dir()
     target_file = f"{state}.csv"
-
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
 
     # Check if file already exists
     file_url = metadata_url + target_file

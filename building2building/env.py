@@ -90,9 +90,50 @@ def find_energyplus_path(manual_path=None) -> Path:
     raise Exception("EnergyPlus installation not found")
 
 
+def get_cache_dir():
+    if os.name == "nt":  # Windows
+        return Path(os.environ.get("LOCALAPPDATA", "~")) / "building2building"
+    elif os.name == "posix":  # Linux/macOS
+        if "XDG_CACHE_HOME" in os.environ:
+            return Path(os.environ["XDG_CACHE_HOME"]) / "building2building"
+        else:
+            return Path.home() / ".cache" / "building2building"
+    else:
+        return Path.home() / ".building2building"  # Fallback
+
+
 def setup_energyplus_path():
     energyplus_path = find_energyplus_path()
     if energyplus_path not in sys.path:
         ENERGYPLUS_PATH.set(energyplus_path)
         sys.path.append(str(energyplus_path))
         logger.info(f"Added EnergyPlus path: {energyplus_path}")
+
+
+DATA_PATH: ContextVar[Path] = ContextVar("DATA_PATH")
+
+
+def setup_data_path():
+    DATA_PATH.set(get_cache_dir())
+
+
+def get_unprocessed_idf_dir() -> Path:
+    """Return the directory where we put unprocessed idf files."""
+    p = DATA_PATH.get() / "idf"
+    p.mkdir(exist_ok=True, parents=True)
+    return p
+
+
+def get_weather_dir() -> Path:
+    p = DATA_PATH.get() / "weather"
+    p.mkdir(exist_ok=True, parents=True)
+    return p
+
+
+def get_metadata_dir() -> Path:
+    p = DATA_PATH.get() / "metadata"
+    p.mkdir(exist_ok=True, parents=True)
+    return p
+
+
+Path.home()
