@@ -2,11 +2,11 @@ from pathlib import Path
 
 from gymnasium.envs.registration import register
 
-from building2building.env import setup_data_path, setup_energyplus_path
+from building2building.env import DataPaths, setup_energyplus_path
 from building2building.generator.downloader import download_epw
 from building2building.generator.search_idf import EPJSONProcessor, search_idf
 from building2building.simulator.create_simulator import create_simulator
-from building2building.types import BuildingConfig, RewardType
+from building2building.types import BuildingConfig, RewardType, StateCode
 
 register(
     id="EnergyPlus-v0",
@@ -19,12 +19,12 @@ register(
 
 setup_energyplus_path()
 
-setup_data_path()
+DataPaths.setup()
 
 search_building = search_idf
 
 
-def search_weather(state: str, n_files: int) -> list[Path]:
+def search_weather(state: StateCode, n_files: int) -> list[Path]:
     """
     Search and download weather files for a given state.
 
@@ -40,7 +40,7 @@ def search_weather(state: str, n_files: int) -> list[Path]:
 
 
 def building_config(
-    state: str,
+    state: StateCode,
     county: str,
     building_type: str | None = None,
     area: float | None = None,
@@ -98,7 +98,7 @@ def building_config(
 
 
 def building_env(
-    state: str,
+    state: StateCode,
     county: str,
     building_type: str | None = None,
     area: float | None = None,

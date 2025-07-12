@@ -19,12 +19,11 @@ from typing import (
     reveal_type,
 )
 
+import geopandas as gpd
 import pandas as pd
 from minergym.ontology import Ontology
 
 import building2building.env as env
-from building2building.generator.utils import get_counties_from_coords_batch
-from building2building.utils import cd
 
 logger = logging.getLogger(__name__)
 
@@ -37,51 +36,6 @@ def timer(name="Code block"):
     finally:
         end = time.perf_counter()
         logger.info(f"{name} took {end - start:.4f} seconds")
-
-
-def process_metadata(state: str) -> Path:
-    """
-    Process all metadata CSV files in the metadata directory to get the county name for each row.
-    For each file:
-    1. Loads the CSV
-    2. If County column exists, skip the file as it's already processed
-    3. Parses the Centroid column to extract latitude and longitude
-    4. Creates a new County column with the county name for each coordinate pair
-
-    Returns the path of the processed file.
-    """
-
-    path_in = env.get_metadata_dir() / f"{state}.csv"
-    path_out = env.get_metadata_dir() / f"{state}_processed.parquet"
-
-    if path_out.exists():
-        return path_out
-
-    # Read the CSV file
-    df = pd.read_csv(path_in)
-
-    logger.info(f"Processing metadata for state: {state}")
-
-    # Split the Centroid column into latitude and longitude
-    df[["Latitude", "Longitude"]] = df["Centroid"].str.split("/", expand=True)
-
-    # Convert to float
-    df["Latitude"] = df["Latitude"].astype(float)
-    df["Longitude"] = df["Longitude"].astype(float)
-
-    # Process all coordinates at once
-    logger.debug("Getting county names for all coordinates...")
-    coords_list = list(zip(df["Latitude"], df["Longitude"]))
-    counties = get_counties_from_coords_batch(coords_list)
-
-    # Add counties to dataframe
-    df["County"] = counties
-
-    # Save the updated CSV file
-    df.to_parquet(path_out)
-    logger.info(f"Successfully processed and wrote to {path_out}")
-
-    return path_out
 
 
 transitions = [

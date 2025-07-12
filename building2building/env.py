@@ -110,30 +110,45 @@ def setup_energyplus_path():
         logger.info(f"Added EnergyPlus path: {energyplus_path}")
 
 
-DATA_PATH: ContextVar[Path] = ContextVar("DATA_PATH")
+class DataPaths:
+    """Singleton-like class managing processing context variables."""
 
+    _data_path: ContextVar[Path] = ContextVar("data_path")
 
-def setup_data_path():
-    DATA_PATH.set(get_cache_dir())
+    _processed: str = "processed"
 
+    _unprocessed: str = "unprocessed"
 
-def get_unprocessed_idf_dir() -> Path:
-    """Return the directory where we put unprocessed idf files."""
-    p = DATA_PATH.get() / "idf"
-    p.mkdir(exist_ok=True, parents=True)
-    return p
+    _metadata: str = "metadata"
 
+    _weather: str = "weather"
 
-def get_weather_dir() -> Path:
-    p = DATA_PATH.get() / "weather"
-    p.mkdir(exist_ok=True, parents=True)
-    return p
+    _intermediate: str = "intermediate"
 
+    @classmethod
+    def setup(cls):
+        cls._data_path.set(get_cache_dir())
 
-def get_metadata_dir() -> Path:
-    p = DATA_PATH.get() / "metadata"
-    p.mkdir(exist_ok=True, parents=True)
-    return p
+    @classmethod
+    def data_dir(cls):
+        return cls._data_path.get()
 
+    @classmethod
+    def weather_dir(cls):
+        return cls.data_dir() / cls._weather
 
-Path.home()
+    @classmethod
+    def metadata_dir(cls):
+        return cls.data_dir() / cls._metadata
+
+    @classmethod
+    def processed_dir(cls):
+        return cls.data_dir() / cls._processed
+
+    @classmethod
+    def unprocessed_dir(cls):
+        return cls.data_dir() / cls._unprocessed
+
+    @classmethod
+    def intermediate_dir(cls):
+        return cls.data_dir() / cls._intermediate

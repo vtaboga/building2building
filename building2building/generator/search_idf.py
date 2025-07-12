@@ -14,13 +14,14 @@ import pandas as pd
 from minergym.ontology import Ontology
 
 import building2building.generator.processing as processing
-from building2building.env import DATA_PATH, get_unprocessed_idf_dir
+from building2building.env import DataPaths
 from building2building.generator.downloader import (
     download_and_extract_county_idf,
     download_epw,
     download_metadata,
+    process_metadata,
 )
-from building2building.types import BuildingCharacteristics
+from building2building.types import BuildingCharacteristics, StateCode
 
 logger = logging.getLogger(__name__)
 
@@ -127,12 +128,8 @@ def hash_processors(processors: list[EPJSONProcessor], hash_length=16) -> str:
     return hash_hex
 
 
-def get_intermediate_results_path() -> Path:
-    return DATA_PATH.get() / "intermediate_results"
-
-
 def get_processed_epjson_path(
-    state: str,
+    state: StateCode,
     county: str,
     building_id: int,
     processors: list[EPJSONProcessor],
@@ -142,7 +139,7 @@ def get_processed_epjson_path(
     else:
         processors_hash = ""
 
-    tmp_dir = DATA_PATH.get() / "processed_buildings" / state / county
+    tmp_dir = DataPaths.processed_dir() / state / county
     processed_path = tmp_dir / f"{building_id}{processors_hash}.epJSON"
     return processed_path
 
@@ -152,7 +149,7 @@ def process_idf(
     out_path: Path,
     processors: list[EPJSONProcessor] = [],
 ):
-    tmp_path = get_intermediate_results_path()
+    tmp_path = DataPaths.intermediate_dir()
 
     all_processors = (
         [processing.specialized_upgrade_idf(t) for t in processing.transitions]
@@ -184,7 +181,7 @@ def process_idf(
 
 
 def search_idf(
-    state: str,
+    state: StateCode,
     county: str,
     n_buildings: int,
     building_type: str | None = None,
@@ -224,7 +221,7 @@ def search_idf(
     # Load metadata
     download_metadata(state=state)
 
-    metadata_path = processing.process_metadata(state=state)
+    metadata_path = process_metadata(state=state)
 
     # Search for matching IDF files
     matching_buildings = search_metadata(
@@ -245,7 +242,7 @@ def search_idf(
 
     for building_id, building_info in matching_buildings:
         building_path = (
-            get_unprocessed_idf_dir() / f"{state}_{county}_IDF/{building_id}.idf"
+            DataPaths.unprocessed_dir() / f"{state}_{county}_IDF/{building_id}.idf"
         )
         processed_path = get_processed_epjson_path(
             state, county, building_id, processors
