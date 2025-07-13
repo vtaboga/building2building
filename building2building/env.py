@@ -130,25 +130,37 @@ class DataPaths:
         cls._data_path.set(get_cache_dir())
 
     @classmethod
-    def data_dir(cls):
-        return cls._data_path.get()
+    def data_dir(cls) -> Path:
+        p = cls._data_path.get()
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
     @classmethod
-    def weather_dir(cls):
-        return cls.data_dir() / cls._weather
+    def weather_dir(cls) -> Path:
+        p = cls.data_dir() / cls._weather
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
     @classmethod
-    def metadata_dir(cls):
-        return cls.data_dir() / cls._metadata
+    def metadata_dir(cls) -> Path:
+        p = cls.data_dir() / cls._metadata
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
     @classmethod
-    def processed_dir(cls):
-        return cls.data_dir() / cls._processed
+    def processed_dir(cls) -> Path:
+        p = cls.data_dir() / cls._processed
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
     @classmethod
-    def unprocessed_dir(cls):
-        return cls.data_dir() / cls._unprocessed
+    def unprocessed_dir(cls) -> Path:
+        p = cls.data_dir() / cls._unprocessed
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
     @classmethod
-    def intermediate_dir(cls):
-        return cls.data_dir() / cls._intermediate
+    def intermediate_dir(cls) -> Path:
+        p = cls.data_dir() / cls._intermediate
+        p.mkdir(parents=True, exist_ok=True)
+        return p
