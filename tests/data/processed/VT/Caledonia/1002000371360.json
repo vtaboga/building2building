@@ -1,0 +1,7 @@
+{
+    "area":          1608,
+    "building_type": "SmallOffice",
+    "height":        14,
+    "num_floors":    1,
+    "zone_lists":    ["Space 0 ZN", "Space 1 ZN"]
+}
