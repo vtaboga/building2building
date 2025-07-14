@@ -1,21 +1,23 @@
-import hydra
 import logging
-from omegaconf import DictConfig
+
+import hydra
+from building2building import search_weather
 from building2building.generator.search_idf import search_idf
+from omegaconf import DictConfig
+
+logger = logging.getLogger(__name__)
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="default_config")
 def main(cfg: DictConfig) -> None:
     """Main function for searching building files with Hydra configuration."""
-    
-    # Setup logging
-    logger = logging.getLogger(__name__)
-    
+
     # Extract building configuration
     building_cfg = cfg.building
-    
+
     logger.info("Searching for building files...")
-    search_result = search_idf(
+
+    buildings = search_idf(
         state=building_cfg.state,
         county=building_cfg.county,
         building_type=building_cfg.building_type,
@@ -23,17 +25,19 @@ def main(cfg: DictConfig) -> None:
         num_floors=building_cfg.num_floors,
         height=building_cfg.height,
         n_buildings=building_cfg.n_buildings,
-        n_weather_files=building_cfg.n_weather_files,
-        keep_original=building_cfg.keep_original
     )
-    if search_result is None:
+
+    weathers = search_weather(
+        building_cfg.state,
+        n_files=1,
+    )
+
+    if len(buildings) == 0:
         logger.error("No buildings found matching the criteria")
         return
-    
-    buildings, path_to_weather = search_result
-    
+
     logger.info(f"Found {len(buildings)} buildings")
-    logger.info(f"Weather file path: {path_to_weather}")
+    logger.info(f"Weather file path: {weathers[0]}")
     logger.info("Done!")
 
 
