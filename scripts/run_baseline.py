@@ -5,6 +5,7 @@ from pathlib import Path
 
 import hydra
 from building2building.algorithms.online.baselines import run_constant_baseline
+from building2building.env import DataPaths
 from building2building.types import BuildingCharacteristics, BuildingConfig
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
@@ -24,20 +25,14 @@ def main(cfg: DictConfig) -> None:
 
     # Setup paths
 
-    building_path: Path = (
-        Path("data/processed_buildings")
-        / cfg.state
-        / cfg.county
-        / f"{cfg.building_id}.epJSON"
+    building_path = (
+        DataPaths.processed_dir() / cfg.state / cfg.county / f"{cfg.building_id}.epJSON"
     )
-    characteristics_path: Path = (
-        Path("data/processed_buildings")
-        / cfg.state
-        / cfg.county
-        / f"{cfg.building_id}.json"
+    characteristics_path = (
+        DataPaths.processed_dir() / cfg.state / cfg.county / f"{cfg.building_id}.json"
     )
     weather_path: Path = (
-        Path("data/weather") / cfg.weather_validation
+        DataPaths.weather_dir() / cfg.weather_validation
     )  # No training, apply policy to validation weather
 
     try:
