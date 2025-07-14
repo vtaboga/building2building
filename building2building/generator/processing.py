@@ -38,7 +38,7 @@ def timer(name="Code block"):
         logger.info(f"{name} took {end - start:.4f} seconds")
 
 
-transitions = [
+Transition: TypeAlias = Literal[
     "9.4.0-to-9.5.0",
     "9.5.0-to-9.6.0",
     "9.6.0-to-22.1.0",
@@ -48,7 +48,15 @@ transitions = [
     "23.2.0-to-24.1.0",
 ]
 
-Transition: TypeAlias = Union[*(Literal[t] for t in transitions)]
+transitions: list[Transition] = [
+    "9.4.0-to-9.5.0",
+    "9.5.0-to-9.6.0",
+    "9.6.0-to-22.1.0",
+    "22.1.0-to-22.2.0",
+    "22.2.0-to-23.1.0",
+    "23.1.0-to-23.2.0",
+    "23.2.0-to-24.1.0",
+]
 
 
 def upgrade_idf(idf_in: Path, idf_out: Path, transition: Transition):
@@ -153,7 +161,7 @@ def convert_idf(idf_path: Path, epjson_path: Path):
         shutil.copy(temp_epjson_path, epjson_path)
 
 
-def add_hvac_meters_to_epjson(epjson_path: Path, output_path: Path) -> None:
+def add_hvac_meters_to_epjson(epjson_path: Path, output_path: Path):
     """
     Check if HVAC energy consumption meters exist in an epJSON file.
     If not, add the meters and save the modified epJSON.
@@ -209,9 +217,6 @@ def add_hvac_meters_to_epjson(epjson_path: Path, output_path: Path) -> None:
                     "Found existing NaturalGas:HVAC meter file only with Timestep reporting."
                 )
 
-    # Add meters if they don't exist
-    modified = False
-
     # Make sure the Output:Meter category exists
     if "Output:Meter" not in epjson:
         epjson["Output:Meter"] = {}
@@ -224,7 +229,6 @@ def add_hvac_meters_to_epjson(epjson_path: Path, output_path: Path) -> None:
             "reporting_frequency": "Timestep",
         }
         print(f"Added Electricity:HVAC meter with Timestep reporting.")
-        modified = True
 
     # Add natural gas HVAC meter if needed
     if not has_gas_hvac_meter:
@@ -234,15 +238,9 @@ def add_hvac_meters_to_epjson(epjson_path: Path, output_path: Path) -> None:
             "reporting_frequency": "Timestep",
         }
         print(f"Added NaturalGas:HVAC meter with Timestep reporting.")
-        modified = True
 
-    # Save the modified epJSON if changes were made
-    if modified:
-        with open(output_path, "w") as f:
-            json.dump(epjson, f, indent=4)
-        print(f"Modified epJSON saved to {output_path}")
-    else:
-        print("No changes needed. All required meters already exist.")
+    with open(output_path, "w") as f:
+        json.dump(epjson, f, indent=4)
 
 
 def check_meter_availability(epjson_path: str) -> Dict[str, bool]:

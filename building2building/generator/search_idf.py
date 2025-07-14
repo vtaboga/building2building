@@ -159,7 +159,10 @@ def process_idf(
         [processing.specialized_upgrade_idf(t) for t in processing.transitions]
         + [processing.convert_idf]
         + processors
-        + [processing.add_setpoint_control_to_epjson]
+        + [
+            processing.add_setpoint_control_to_epjson,
+            processing.add_hvac_meters_to_epjson,
+        ]
     )
 
     def path_until(processors):
