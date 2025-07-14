@@ -1,0 +1,52 @@
+<!-- -*- mode: markdown -*- -->
+
+# Building2Building Project - LLM Code Guidelines
+
+## Project Overview
+This is a reinforcement learning framework for EnergyPlus building simulation.
+- Main package: `building2building/`
+- Uses Python 3.10+, PyTorch, Gymnasium, and EnergyPlus
+- Follows scientific Python conventions with type hints
+
+## Code Style & Standards
+
+### Code format
+- Use the black code formatter.
+- Don't write lines with only whitespaces and don't keep trailing whitespaces at
+  the end of a line.
+
+### Use types
+
+we want as many bugs as possible to be caught by the type checker.
+
+- Always use type hints for function parameters and returns
+- Use `from typing import` for complex types
+- Prefer `pathlib.Path` over string paths
+- Use `@dataclass` over ad-hoc dicts.
+- when ingesting untyped data (for instance, to put it into a record), fail as
+  soon as possible, instead of assuming the data has the right type. write
+  load_json class method and save_json in the dataclass definition.
+- When only a finite (and reasonably sized) set of literal values are allowed,
+  use `Litera[...]` instead of `str`.
+
+### Error Handling
+- Don't catch exceptions that are unrecoverable.
+- Always validate user inputs early in functions
+
+### Testing
+- Use pytest with descriptive test function names starting with `test_`
+- Use `pytest.raises()` for exception testing
+- Put test data in `tests/data/` directory
+- Mock external dependencies (EnergyPlus, file downloads, etc.)
+
+### Paths
+- Use `DataPaths` class for consistent path resolution.
+- Again, use `Path` and never `str` for path variables.
+
+## What NOT to do
+- Don't use string concatenation for paths - use Path methods
+- Don't ignore type hints - this is a typed codebase
+- Don't create giant functions - break complex logic into smaller functions
+- Don't hardcode file paths - use DataPaths or configuration
+- Don't ignore existing abstractions (use StateCode, not raw strings)
+
