@@ -42,6 +42,7 @@ def search_weather(state: StateCode, n_files: int) -> list[Path]:
 def building_config(
     state: StateCode,
     county: str,
+    building_id: int | None = None,
     building_type: str | None = None,
     area: float | None = None,
     num_floors: int | None = None,
@@ -77,6 +78,7 @@ def building_config(
         state,
         county,
         1,
+        building_id=building_id,
         building_type=building_type,
         area=area,
         num_floors=num_floors,
@@ -100,6 +102,7 @@ def building_config(
 def building_env(
     state: StateCode,
     county: str,
+    building_id: int | None = None,
     building_type: str | None = None,
     area: float | None = None,
     num_floors: int | None = None,
@@ -127,6 +130,7 @@ def building_env(
     config = building_config(
         state,
         county,
+        building_id=building_id,
         building_type=building_type,
         area=area,
         num_floors=num_floors,

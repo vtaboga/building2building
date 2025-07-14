@@ -37,6 +37,7 @@ class BuildingMetadata:
 def search_metadata(
     metadata_path: Path,
     county: str | None = None,
+    building_id: int | None = None,
     building_type: str | None = None,
     area: float | None = None,
     num_floors: int | None = None,
@@ -51,7 +52,10 @@ def search_metadata(
     4. Height (if provided)
     """
 
-    where_conditions: list[tuple[str, str]] = []
+    where_conditions: list[tuple[str, str | int]] = []
+
+    if building_id is not None:
+        where_conditions.append(("ID", building_id))
 
     if county is not None:
         where_conditions.append(("County", county))
@@ -184,6 +188,7 @@ def search_idf(
     state: StateCode,
     county: str,
     n_buildings: int,
+    building_id: int | None = None,
     building_type: str | None = None,
     area: float | None = None,
     num_floors: int | None = None,
@@ -196,13 +201,12 @@ def search_idf(
     Args:
         state (str): Two-letter state code
         county (str): County name
-        building_type (str): Type of building to search for
-        area (float): Target floor area
-        num_floors (int): Target number of floors
-        height (float|None): Target building height
         n_buildings (int): Number of buildings to return
-        n_weather_files (int): Number of weather files to return
-        keep_original (bool): If True, keep original IDF files after processing
+        building_id (int | None): The id to filter for.
+        building_type (str | None): Type of building to search for
+        area (float | None): Target floor area
+        num_floors (int | None): Target number of floors
+        height (float|None): Target building height
 
     Returns:
         Tuple[list[Tuple[str, dict]], list[str]]: List of (building_path, characteristics) tuples and list of weather file paths
@@ -227,6 +231,7 @@ def search_idf(
     matching_buildings = search_metadata(
         metadata_path,
         county,
+        building_id=building_id,
         n_buildings=n_buildings,
         building_type=building_type,
         area=area,
