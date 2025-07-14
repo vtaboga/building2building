@@ -9,7 +9,10 @@ import building2building.env as b2benv
 import gymnasium as gym
 import numpy as np
 import pytest
-from building2building.simulator.action_spaces import get_controllable_setpoints
+from building2building.simulator.action_spaces import (
+    DualSetpoint,
+    get_controllable_setpoints,
+)
 from building2building.types import BuildingCharacteristics, BuildingConfig
 from minergym.ontology import Ontology
 
@@ -71,32 +74,14 @@ def test_get_controllable_setpoints(ont_building):
     assert "Space 1 ZN" in setpoints_1z, "Expected zone 'Space 0 ZN' in first building"
 
     zone_setpoints_1z = setpoints_1z["Space 1 ZN"]
-    assert len(zone_setpoints_1z) == 2, (
-        "Expected exactly two setpoints in first building"
-    )
-
-    # Check heating setpoint for first building
-    heating_1z = next(
-        sp for sp in zone_setpoints_1z if sp["setpoint_type"] == "heating"
-    )
-    assert heating_1z["schedule_name"] == "Space Type 1 Thermostat 2 Heating Setpoint"
-
-    assert heating_1z["control_type"] == "DualSetpoint"
-    assert (
-        heating_1z["actuator_key"]
-        == "Zone Temperature Control,Temperature Heating Setpoint,Space 1 ZN"
-    )
-
-    # Check cooling setpoint for first building
-    cooling_1z = next(
-        sp for sp in zone_setpoints_1z if sp["setpoint_type"] == "cooling"
-    )
-    assert cooling_1z["schedule_name"] == "Space Type 1 Thermostat 2 Cooling Setpoint"
-    assert cooling_1z["control_type"] == "DualSetpoint"
-    assert (
-        cooling_1z["actuator_key"]
-        == "Zone Temperature Control,Temperature Cooling Setpoint,Space 1 ZN"
-    )
+    assert zone_setpoints_1z == [
+        DualSetpoint(
+            heating_actuator="Zone Temperature Control,Temperature Heating Setpoint,Space 1 ZN",
+            heating_schedule="Space Type 1 Thermostat 2 Heating Setpoint",
+            cooling_actuator="Zone Temperature Control,Temperature Cooling Setpoint,Space 1 ZN",
+            cooling_schedule="Space Type 1 Thermostat 2 Cooling Setpoint",
+        )
+    ]
 
 
 def test_gym_environment_creation(

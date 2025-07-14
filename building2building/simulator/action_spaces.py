@@ -1,59 +1,53 @@
 import logging
 import urllib.parse
-from typing import Dict, List
+from dataclasses import dataclass
+from typing import Callable, Union
 
 import gymnasium as gym
 import minergym.ontology as ontology
 import numpy as np
+from minergym.simulation import ActuatorHole
 from rdflib.term import Node
 
 logger = logging.getLogger(__name__)
 
 
-def action_transform(act, actuators):
-    """Transform raw actions into heating and cooling setpoints.
-
-    Args:
-        act: Raw actions from the policy
-        actuators: Dictionary of actuators with their schedule names
-    """
-    # Get schedule names from actuators
-    schedule_names = list(actuators.keys())
-
-    # Ensure we have exactly two schedules (heating and cooling)
-    if len(schedule_names) != 2:
-        raise ValueError(
-            f"Expected 2 schedule names (heating and cooling), got {len(schedule_names)}"
-        )
-
-    # Sort to ensure consistent ordering (heating should be first due to alphabetical order)
-    schedule_names.sort()
-
-    heating_setpoint = round(act[0], 1)
-    offset = round(act[1], 1)
-
-    return {
-        schedule_names[0]: heating_setpoint
-        + offset,  # Cooling setpoint (first alphabetically)
-        schedule_names[1]: heating_setpoint,  # Heating setpoint (second alphabetically)
-    }
+@dataclass
+class DualSetpoint:
+    heating_actuator: str
+    heating_schedule: str
+    cooling_actuator: str
+    cooling_schedule: str
 
 
-def create_action_space(actuators) -> gym.spaces.Box:
-    """Create a Gymnasium action space for temperature setpoints."""
-    # Verify we have exactly two actuators (heating and cooling)
-    if len(actuators) != 2:
-        raise ValueError(
-            f"Expected 2 actuators (heating and cooling), got {len(actuators)}"
-        )
-
-    # Temperature bounds
-    # The first valus is the heating setpoint
-    # The second value is the offset from the heating setpoint to the cooling setpoint: T_cooling = T_heating + offset
-    return gym.spaces.Box(np.array([15.0, 1.0]), np.array([25.0, 15.0]))
+@dataclass
+class SingleHeating:
+    actuator: str
+    schedule: str
 
 
-def get_controllable_setpoints(ont: ontology.Ontology) -> Dict[str, List[Dict]]:
+@dataclass
+class SingleCooling:
+    actuator: str
+    schedule: str
+
+
+@dataclass
+class SingleHeatingOrCooling:
+    heating_actuator: str
+    heating_schedule: str
+    cooling_actuator: str
+    cooling_schedule: str
+
+
+ThermostatSetpoint = Union[
+    DualSetpoint, SingleHeating, SingleCooling, SingleHeatingOrCooling
+]
+
+
+def get_controllable_setpoints(
+    ont: ontology.Ontology,
+) -> dict[str, list[ThermostatSetpoint]]:
     """
     Analyzes an RDF representation of an EnergyPlus model to identify zone temperature
     setpoints that can be overwritten with the Python/EnergyPlus API.
@@ -75,7 +69,7 @@ def get_controllable_setpoints(ont: ontology.Ontology) -> Dict[str, List[Dict]]:
             }
     """
     # Initialize result dictionary
-    zone_setpoints = {}
+    zone_setpoints: dict[str, list[ThermostatSetpoint]] = {}
 
     # Step 1: Find all zones
 
@@ -197,23 +191,14 @@ def get_controllable_setpoints(ont: ontology.Ontology) -> Dict[str, List[Dict]]:
 
                     # Add heating setpoint with decoded zone name
                     decoded_zone = str(zone)
-                    zone_setpoints[zone_name].append(
-                        {
-                            "setpoint_type": "heating",
-                            "actuator_key": f"Zone Temperature Control,Temperature Heating Setpoint,{decoded_zone}",
-                            "schedule_name": heating_schedule,
-                            "control_type": "DualSetpoint",
-                        }
-                    )
 
-                    # Add cooling setpoint
                     zone_setpoints[zone_name].append(
-                        {
-                            "setpoint_type": "cooling",
-                            "actuator_key": f"Zone Temperature Control,Temperature Cooling Setpoint,{decoded_zone}",
-                            "schedule_name": cooling_schedule,
-                            "control_type": "DualSetpoint",
-                        }
+                        DualSetpoint(
+                            heating_actuator=f"Zone Temperature Control,Temperature Heating Setpoint,{decoded_zone}",
+                            heating_schedule=heating_schedule,
+                            cooling_actuator=f"Zone Temperature Control,Temperature Cooling Setpoint,{decoded_zone}",
+                            cooling_schedule=cooling_schedule,
+                        )
                     )
 
             elif control_type == "ThermostatSetpoint:SingleHeating":
@@ -234,12 +219,10 @@ def get_controllable_setpoints(ont: ontology.Ontology) -> Dict[str, List[Dict]]:
                     decoded_zone = str(zone)
 
                     zone_setpoints[zone_name].append(
-                        {
-                            "setpoint_type": "heating",
-                            "actuator_key": f"Zone Temperature Control,Temperature Heating Setpoint,{decoded_zone}",
-                            "schedule_name": schedule,
-                            "control_type": "SingleHeating",
-                        }
+                        SingleHeating(
+                            actuator=f"Zone Temperature Control,Temperature Heating Setpoint,{decoded_zone}",
+                            schedule=schedule,
+                        )
                     )
 
             elif control_type == "ThermostatSetpoint:SingleCooling":
@@ -259,12 +242,10 @@ def get_controllable_setpoints(ont: ontology.Ontology) -> Dict[str, List[Dict]]:
                     decoded_zone = urllib.parse.unquote(zone)
 
                     zone_setpoints[zone_name].append(
-                        {
-                            "setpoint_type": "cooling",
-                            "actuator_key": f"Zone Temperature Control,Temperature Cooling Setpoint,{decoded_zone}",
-                            "schedule_name": schedule,
-                            "control_type": "SingleCooling",
-                        }
+                        SingleCooling(
+                            actuator=f"Zone Temperature Control,Temperature Cooling Setpoint,{decoded_zone}",
+                            schedule=schedule,
+                        )
                     )
 
             elif control_type == "ThermostatSetpoint:SingleHeatingOrCooling":
@@ -286,21 +267,98 @@ def get_controllable_setpoints(ont: ontology.Ontology) -> Dict[str, List[Dict]]:
 
                     # This type can switch between heating and cooling, so create both actuator keys
                     zone_setpoints[zone_name].append(
-                        {
-                            "setpoint_type": "heating",
-                            "actuator_key": f"Zone Temperature Control,Temperature Heating Setpoint,{decoded_zone}",
-                            "schedule_name": schedule,
-                            "control_type": "SingleHeatingOrCooling",
-                        }
+                        SingleHeatingOrCooling(
+                            heating_actuator=f"Zone Temperature Control,Temperature Heating Setpoint,{decoded_zone}",
+                            heating_schedule=schedule,
+                            cooling_actuator=f"Zone Temperature Control,Temperature Cooling Setpoint,{decoded_zone}",
+                            cooling_schedule=schedule,
+                        )
                     )
-
-                    zone_setpoints[zone_name].append(
-                        {
-                            "setpoint_type": "cooling",
-                            "actuator_key": f"Zone Temperature Control,Temperature Cooling Setpoint,{decoded_zone}",
-                            "schedule_name": schedule,
-                            "control_type": "SingleHeatingOrCooling",
-                        }
-                    )
+            else:
+                logger.debug(f"found strange control type: {control_type}")
 
     return zone_setpoints
+
+
+def template_space_transform(
+    setpoints: list[ThermostatSetpoint],
+) -> tuple[list[ActuatorHole], gym.Space, Callable[[np.ndarray], list[float]]]:
+    """From a list like the dict returned by `get_controllable_setpoints`,
+    return a tuple containing an appropriate action template, a gym.Space and a
+    function to turn a space-shaped action into a template-shaped action.
+
+    """
+
+    actuator_template: list[ActuatorHole] = []
+    actuator_bounds: list[tuple[float, float]] = []
+
+    for setpoint in setpoints:
+        match setpoint:
+            case DualSetpoint() as sp:
+                actuator_template.append(
+                    ActuatorHole(
+                        "Schedule:Compact", "Schedule Value", sp.heating_schedule
+                    )
+                )
+                actuator_bounds.append((15.0, 25.0))
+                actuator_template.append(
+                    ActuatorHole(
+                        "Schedule:Compact", "Schedule Value", sp.cooling_schedule
+                    )
+                )
+                actuator_bounds.append((1.0, 15.0))
+
+            case SingleHeating() as sp:
+                actuator_template.append(
+                    ActuatorHole("Schedule:Compact", "Schedule Value", sp.schedule)
+                )
+                actuator_bounds.append((15.0, 25.0))
+            case SingleCooling() as sp:
+                actuator_template.append(
+                    ActuatorHole("Schedule:Compact", "Schedule Value", sp.schedule)
+                )
+                actuator_bounds.append((16.0, 40.0))
+            case SingleHeatingOrCooling() as sp:
+                # Is this how we are supposed to do this ?
+                actuator_template.append(
+                    ActuatorHole(
+                        "Schedule:Compact", "Schedule Value", sp.heating_schedule
+                    )
+                )
+                actuator_bounds.append((15.0, 25.0))
+                actuator_template.append(
+                    ActuatorHole(
+                        "Schedule:Compact", "Schedule Value", sp.cooling_schedule
+                    )
+                )
+                actuator_bounds.append((1.0, 15.0))
+            case _:
+                raise Exception("Unreachable.")
+
+        lows, highs = zip(*actuator_bounds)
+        actuator_space = gym.spaces.Box(np.array(lows), np.array(highs))
+
+        def transform(action_np: np.ndarray) -> list[float]:
+            o = []
+            i = 0
+            for sp in setpoints:
+                match sp:
+                    case DualSetpoint():
+                        o.append(action_np[i])
+                        o.append(action_np[i + 1] + action_np[i])
+                        i += 2
+                    case SingleHeating():
+                        o.append(action_np[i])
+                        i += 1
+                    case SingleCooling():
+                        o.append(action_np[i])
+                        i += 1
+                    case SingleHeatingOrCooling():
+                        o.append(action_np[i])
+                        o.append(action_np[i + 1] + action_np[i])
+                        i += 2
+                    case _:
+                        raise Exception("Unreachable")
+            return o
+
+        return actuator_template, actuator_space, transform

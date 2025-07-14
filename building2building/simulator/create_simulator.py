@@ -7,9 +7,8 @@ import minergym.config as config
 import minergym.simulation as simulation
 import numpy as np
 from building2building.simulator.action_spaces import (
-    action_transform,
-    create_action_space,
     get_controllable_setpoints,
+    template_space_transform,
 )
 from building2building.simulator.observation_spaces import (
     create_observation_space,
@@ -29,10 +28,8 @@ logger = logging.getLogger(__name__)
 
 def auto_add_energy(ont: Ontology, obs_template: dict[str, Any]) -> None:
     """Add HVAC energy consumption meters to the observation template."""
-    if "energy" not in obs_template:
-        obs_template["energy"] = {}
 
-    energy = obs_template["energy"]
+    energy = obs_template.setdefault("energy", {})
     # Add whole building HVAC energy meters only
     energy["HVAC_electricity"] = simulation.MeterHole("Electricity:HVAC")
     energy["HVAC_natural_gas"] = simulation.MeterHole("NaturalGas:HVAC")
@@ -74,21 +71,20 @@ def create_simulator(building_config: BuildingConfig) -> gym.Env:
     all_zones = building_config.characteristics.zone_lists
     uncontrolled_zones = [zone for zone in all_zones if zone not in controlled_zones]
 
-    for zone_setpoints in setpoints.values():
-        for setpoint in zone_setpoints:
-            actuators[setpoint["schedule_name"]] = ActuatorHole(
-                "Schedule:Compact", "Schedule Value", setpoint["schedule_name"]
-            )
+    thermostat_list = [elem for list in setpoints.values() for elem in list]
+
+    action_template, action_space, action_transform = template_space_transform(
+        thermostat_list
+    )
 
     observation_space, observation_names = create_observation_space(obs_template)
-    action_space = create_action_space(actuators)
 
     def make_energyplus() -> EnergyPlusSimulation:
         sim = EnergyPlusSimulation(
             building_config.path_to_building,
             building_config.path_to_weather,
             obs_template,
-            actuators,
+            action_template,
             verbose=False,
         )
         # Set the log directory if provided
@@ -120,7 +116,7 @@ def create_simulator(building_config: BuildingConfig) -> gym.Env:
         observation_space,
         lambda obs: observation_transform(obs, building_config.characteristics.area),
         action_space,
-        lambda act: action_transform(act, actuators),
+        action_transform,
     )
 
     gymenv.metadata = {
