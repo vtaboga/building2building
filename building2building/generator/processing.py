@@ -16,7 +16,6 @@ from typing import (
     Optional,
     TypeAlias,
     Union,
-    reveal_type,
 )
 
 import geopandas as gpd

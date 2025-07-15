@@ -12,7 +12,7 @@ import sys
 from contextvars import ContextVar
 from importlib.util import find_spec
 from pathlib import Path
-from typing import TypeVar, reveal_type
+from typing import TypeVar
 
 ENERGYPLUS_PATH: ContextVar[Path] = ContextVar("ENERGYPLUS_PATH")
 

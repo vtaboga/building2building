@@ -2,7 +2,9 @@ import dataclasses
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Self, get_args
+from typing import Literal, get_args
+
+from typing_extensions import Self
 
 
 @dataclass

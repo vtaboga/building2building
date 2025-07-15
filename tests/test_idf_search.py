@@ -17,7 +17,6 @@ from building2building.generator.search_idf import (
     search_idf,
     search_metadata,
 )
-from deepdiff import DeepDiff
 
 DataPaths._data_path.set(Path("tests/data").resolve())
 

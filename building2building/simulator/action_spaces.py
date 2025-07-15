@@ -1,6 +1,6 @@
 import logging
 import urllib.parse
-from typing import Dict, List, reveal_type
+from typing import Dict, List
 
 import gymnasium as gym
 import minergym.ontology as ontology
