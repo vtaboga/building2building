@@ -13,7 +13,7 @@ from shapely.geometry import Point
 from tqdm import tqdm
 
 from building2building.env import DataPaths
-from building2building.types import StateCode
+from building2building.types import StateCode, validate_state_code
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +221,15 @@ def download_and_extract_county_idf(state_code: StateCode, county_name: str) -> 
     Returns:
         str: Path to the county directory containing IDF files
     """
+
+    # Validate the county name
+
+    m = state_county_map()
+    if county_name not in m[state_code]:
+        raise Exception(
+            f"'{county_name}' not a valid county for state '{state_code}'. Available counties: {m[state_code]}"
+        )
+
     # Format the folder name for download
     folder_name = f"{state_code}_{county_name}_IDF"
 
@@ -499,3 +508,31 @@ def get_counties_from_coords_batch(coords_list: list[tuple[float, float]]) -> li
     counties.sindex  # create an index to accelerate inclusion calculations
     results = fast_county_lookup(coords_list, counties)
     return list(results["NAME"])
+
+
+def download_manifest() -> Path:
+    url = "https://tier2.ess-dive.lbl.gov/doi-10-15485-2283980/manifest-md5.txt"
+
+    dst_path = DataPaths.metadata_dir() / "manifest.txt"
+
+    if not dst_path.exists():
+        download_file_progress(url, dst_path, "Downloading dataset manifest")
+
+    return dst_path
+
+
+def state_county_map() -> dict[StateCode, set[str]]:
+    filename = download_manifest()
+
+    result: dict[StateCode, set[str]] = {}
+    with open(filename, "r") as f:
+        for line in f:
+            if "IDF.zip" in line:
+                md5, path = line.strip().split("  ")
+                # Extract state_county from path like ./data/Counties_IDF/TX_Crosby_IDF.zip
+                state_county = path.split("/")[-1].replace("_IDF.zip", "")
+                state, county = state_county.split("_", 1)
+                county = county.replace("_", " ")
+
+                result.setdefault(validate_state_code(state), set()).add(county)
+    return result
