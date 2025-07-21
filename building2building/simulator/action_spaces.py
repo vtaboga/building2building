@@ -12,7 +12,7 @@ from rdflib.term import Node
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class DualSetpoint:
     heating_actuator: str
     heating_schedule: str
@@ -20,19 +20,19 @@ class DualSetpoint:
     cooling_schedule: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class SingleHeating:
     actuator: str
     schedule: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class SingleCooling:
     actuator: str
     schedule: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class SingleHeatingOrCooling:
     heating_actuator: str
     heating_schedule: str
