@@ -402,7 +402,7 @@ def download_county_boundaries():
             verify=False,
         )
 
-    boundaries_dir = Path("data", "metadata", "counties")
+    boundaries_dir = DataPaths.metadata_dir() / "counties"
 
     if not boundaries_dir.exists():
         logger.info("Extracting county boundaries...")
