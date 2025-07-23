@@ -16,12 +16,15 @@ actuator state and actions to thermostats.
 
 from __future__ import annotations
 
+import itertools
+import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, Self, Type, TypeVar, reveal_type
+from typing import Any, Callable, Generic, Self, Type, TypeVar, Union, reveal_type
 
 import gymnasium
 import minergym.environment
 import numpy as np
+import rdflib
 from building2building.simulator.action_spaces import (
     DualSetpoint,
     SingleCooling,
@@ -32,75 +35,61 @@ from building2building.simulator.action_spaces import (
 )
 from building2building.types import BuildingConfig
 from gymnasium.spaces import Box, Dict, Space, Tuple
-from minergym.ontology import Ontology
+from minergym.ontology import Ontology, UndirectedGraph
 from minergym.simulation import ActuatorHole, EnergyPlusSimulation, VariableHole
 
-A = TypeVar("A")
-B = TypeVar("B")
+from .transform_utils import Transform, transform_dict
+
+logger = logging.getLogger(__name__)
+
+
+def zone_center(ont: Ontology, zone: rdflib.Node) -> np.ndarray:
+    """Given a zone name, find its center point by computing the mean of all the
+    centers of all its surfaces."""
+    surfaces = ont.zone_surfaces(zone)
+
+    logger.debug(f"there are {len(surfaces)} surfaces")
+
+    center = np.zeros((3,))
+
+    for surface in surfaces:
+        points = ont.surface_vertices(surface)
+        surface_center = np.zeros((3,))
+        for point in points:
+            surface_center += np.array(point)
+            center += surface_center / len(points)
+
+    return center / len(surfaces)
 
 
 @dataclass(frozen=True)
-class Transform(Generic[A, B]):
-    """A tuple containing a template, a gymnasium space codifying that template
-    and an isomorphism between the two represetations.
-
-            transform
-    domain <---------> codomain
-
-    """
-
-    domain: A
-    codomain: B
-    transform: Callable[[Any], Any]
-    detransform: Callable[[Any], Any]
-
-    def inverse(self):
-        return Transform(self.codomain, self.domain, self.detransform, self.transform)
+class ZoneContext:
+    center: np.ndarray
 
 
-def transform_dict(d: dict[str, Transform[Any, Space]]) -> Transform[Any, Space]:
-    template: Any = {k: v.domain for k, v in d.items()}
-    space: Space = Dict({k: v.codomain for k, v in d.items()})
-
-    def transform(a):
-        return {k: v.transform(a[k]) for k, v in d.items()}
-
-    def detransform(b):
-        return {k: v.detransform(b[k]) for k, v in d.items()}
-
-    return Transform(template, space, transform, detransform)
+@dataclass(frozen=True)
+class ActuatorContext:
+    thermostat: ThermostatSetpoint
 
 
-def transform_list(l: list[Transform[Any, Space]]) -> Transform[Any, Space]:
-    def transform(a):
-        return tuple(s.transform(e) for s, e in zip(l, a))
-
-    def detransform(b):
-        return [s.detransform(e) for s, e in zip(l, b)]
-
-    return Transform(
-        [v.domain for v in l],
-        Tuple([v.codomain for v in l]),
-        transform,
-        detransform,
-    )
+NodeContext = Union[ZoneContext, ActuatorContext]
 
 
-def reward_function(thing) -> float:
-    return 0.0
+MorphologyContext = dict[str, NodeContext]
 
 
-def action_tst(ont: Ontology) -> Transform[Any, Space]:
-    thermostats = get_controllable_setpoints(ont)
-    thermostats_set: set[ThermostatSetpoint] = set(
-        elem for list in thermostats.values() for elem in list
-    )
+def morphology_context(ont: Ontology) -> MorphologyContext:
+    contexes = {}
 
-    thermostat_dict = {
-        f"thermostat_{i}": thermostat_tst(v) for i, v in enumerate(thermostats_set)
-    }
+    for z in ont.zones():
+        center = zone_center(ont, z)
 
-    return transform_dict(thermostat_dict)
+        contexes[z.toPython()] = ZoneContext(center=center)
+
+    for sp in set(itertools.chain(*get_controllable_setpoints(ont).values())):
+        contexes[sp.name] = ActuatorContext(sp)
+
+    return contexes
 
 
 def thermostat_tst(t: ThermostatSetpoint) -> Transform[Any, Space]:
@@ -176,33 +165,23 @@ def thermostat_tst(t: ThermostatSetpoint) -> Transform[Any, Space]:
 
 
 def observation_tst(
-    ont: Ontology,
+    ctx: MorphologyContext,
 ) -> Transform:
-    """Return a template,space,transform tuple for the building corresponding to
-    the given ontology."""
+    """Return a TST for the building's observation space."""
 
-    zones: list[str] = [z.toPython() for z in ont.zones()]
+    def thing(k: str, v: NodeContext) -> Transform[Any, Space]:
+        match v:
+            case ActuatorContext():
+                return thermostat_tst(v.thermostat)
+            case ZoneContext():
+                return Transform(
+                    VariableHole("ZONE AIR TEMPERATURE", k),
+                    Box(0.0, 100.0),
+                    lambda x: x,
+                    lambda x: x,
+                )
 
-    thermostats = get_controllable_setpoints(ont)
-    thermostats_set: set[ThermostatSetpoint] = set(
-        elem for list in thermostats.values() for elem in list
-    )
-
-    thermostat_dict = {
-        f"thermostat_{i}": thermostat_tst(v) for i, v in enumerate(thermostats_set)
-    }
-
-    temp_dict = {
-        z: Transform[Any, Space](
-            VariableHole("ZONE AIR TEMPERATURE", z),
-            Box(0.0, 100.0),
-            lambda x: x,
-            lambda x: x,
-        )
-        for z in zones
-    }
-
-    proprio_tst = transform_dict({**temp_dict, **thermostat_dict})
+    proprio_tst = transform_dict({k: thing(k, v) for k, v in ctx.items()})
 
     exterio_tst = transform_dict(
         {
@@ -228,12 +207,28 @@ def observation_tst(
     return obs_tst
 
 
+def action_tst(ctx: MorphologyContext) -> Transform[Any, Space]:
+    def thing(c: NodeContext) -> Transform[Any, Space]:
+        match c:
+            case ZoneContext():
+                return Transform(
+                    tuple(),
+                    Tuple([]),
+                    lambda x: x,
+                    lambda x: x,
+                )
+            case ActuatorContext():
+                return thermostat_tst(c.thermostat)
+
+    return transform_dict({k: thing(v) for k, v in ctx.items()})
+
+
 def create_morph_env(config: BuildingConfig) -> gymnasium.Env:
     ont = Ontology.from_json(config.path_to_building)
+    ctx = morphology_context(ont)
 
-    o_tst = observation_tst(ont)
-
-    a_tst = action_tst(ont)
+    o_tst = observation_tst(ctx)
+    a_tst = action_tst(ctx)
 
     def make_energyplus():
         sim = EnergyPlusSimulation(
@@ -247,7 +242,7 @@ def create_morph_env(config: BuildingConfig) -> gymnasium.Env:
 
     return minergym.environment.EnergyPlusEnvironment(
         make_energyplus,
-        reward_function,
+        lambda _: 0.0,  # TODO: implement an actual reward function.
         o_tst.codomain,
         o_tst.transform,
         a_tst.codomain,

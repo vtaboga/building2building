@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DualSetpoint:
+    name: str
     heating_actuator: str
     heating_schedule: str
     cooling_actuator: str
@@ -22,18 +23,21 @@ class DualSetpoint:
 
 @dataclass(frozen=True)
 class SingleHeating:
+    name: str
     actuator: str
     schedule: str
 
 
 @dataclass(frozen=True)
 class SingleCooling:
+    name: str
     actuator: str
     schedule: str
 
 
 @dataclass(frozen=True)
 class SingleHeatingOrCooling:
+    name: str
     heating_actuator: str
     heating_schedule: str
     cooling_actuator: str
@@ -51,22 +55,6 @@ def get_controllable_setpoints(
     """
     Analyzes an RDF representation of an EnergyPlus model to identify zone temperature
     setpoints that can be overwritten with the Python/EnergyPlus API.
-
-    Args:
-        rdf_graph (rdflib.Graph): RDF graph representation of an epJSON file
-
-    Returns:
-        Dict[str, List[Dict]]: Dictionary mapping zones to their controllable setpoints
-            {
-                "zone_name": [
-                    {
-                        "setpoint_type": "heating" or "cooling",
-                        "actuator_key": "key to use with API",
-                        "schedule_name": "original schedule name",
-                        "control_type": "type of thermostat control"
-                    }
-                ]
-            }
     """
     # Initialize result dictionary
     zone_setpoints: dict[str, list[ThermostatSetpoint]] = {}
@@ -194,6 +182,7 @@ def get_controllable_setpoints(
 
                     zone_setpoints[zone_name].append(
                         DualSetpoint(
+                            name=setpoint.toPython(),
                             heating_actuator=f"Zone Temperature Control,Temperature Heating Setpoint,{decoded_zone}",
                             heating_schedule=heating_schedule,
                             cooling_actuator=f"Zone Temperature Control,Temperature Cooling Setpoint,{decoded_zone}",
@@ -220,6 +209,7 @@ def get_controllable_setpoints(
 
                     zone_setpoints[zone_name].append(
                         SingleHeating(
+                            name=setpoint.toPython(),
                             actuator=f"Zone Temperature Control,Temperature Heating Setpoint,{decoded_zone}",
                             schedule=schedule,
                         )
@@ -243,6 +233,7 @@ def get_controllable_setpoints(
 
                     zone_setpoints[zone_name].append(
                         SingleCooling(
+                            name=setpoint.toPython(),
                             actuator=f"Zone Temperature Control,Temperature Cooling Setpoint,{decoded_zone}",
                             schedule=schedule,
                         )
@@ -268,6 +259,7 @@ def get_controllable_setpoints(
                     # This type can switch between heating and cooling, so create both actuator keys
                     zone_setpoints[zone_name].append(
                         SingleHeatingOrCooling(
+                            name=setpoint.toPython(),
                             heating_actuator=f"Zone Temperature Control,Temperature Heating Setpoint,{decoded_zone}",
                             heating_schedule=schedule,
                             cooling_actuator=f"Zone Temperature Control,Temperature Cooling Setpoint,{decoded_zone}",
