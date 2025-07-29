@@ -96,11 +96,11 @@ def thermostat_tst(t: ThermostatSetpoint) -> Transform[Any, Space]:
     match t:
         case DualSetpoint():
 
-            def transform(t: list[float]):
+            def transform(t: list[float]) -> np.ndarray:
                 return np.array([t[0], t[1] - t[0]])
 
-            def detransform(a: np.ndarray):
-                return [a[0], a[0] + a[1]]
+            def detransform(a: np.ndarray) -> list[float]:
+                return [float(a[0]), float(a[0] + a[1])]
 
             return Transform(
                 [
@@ -121,27 +121,27 @@ def thermostat_tst(t: ThermostatSetpoint) -> Transform[Any, Space]:
 
         case SingleHeating():
             return Transform(
-                ActuatorHole("Schedule:Compact", "Schedule Value", t.schedule),
-                Box(15, 25),
-                lambda x: x,
-                lambda x: x,
+                [ActuatorHole("Schedule:Compact", "Schedule Value", t.schedule)],
+                Box(np.array([15]), np.array([25])),
+                lambda l: np.array(l),
+                lambda a: a.tolist(),
             )
 
         case SingleCooling():
             return Transform(
                 ActuatorHole("Schedule:Compact", "Schedule Value", t.schedule),
-                Box(16, 40),
-                lambda x: x,
-                lambda x: x,
+                Box(np.array([16]), np.array([40])),
+                lambda l: np.array(l),
+                lambda a: a.tolist(),
             )
 
         case SingleHeatingOrCooling():
 
-            def transform(t: list[float]):
+            def transform(t: list[float]) -> np.ndarray:
                 return np.array([t[0], t[1] - t[0]])
 
-            def detransform(a: np.ndarray):
-                return [a[0], a[0] + a[1]]
+            def detransform(a: np.ndarray) -> list[float]:
+                return [float(a[0]), float(a[0] + a[1])]
 
             return Transform(
                 [
@@ -175,10 +175,10 @@ def observation_tst(
                 return thermostat_tst(v.thermostat)
             case ZoneContext():
                 return Transform(
-                    VariableHole("ZONE AIR TEMPERATURE", k),
-                    Box(0.0, 100.0),
-                    lambda x: x,
-                    lambda x: x,
+                    [VariableHole("ZONE AIR TEMPERATURE", k)],
+                    Box(np.array([0.0]), np.array([100.0])),
+                    lambda lst: np.array(lst),
+                    lambda a: a.tolist(),
                 )
 
     proprio_tst = transform_dict({k: thing(k, v) for k, v in ctx.items()})
@@ -186,13 +186,15 @@ def observation_tst(
     exterio_tst = transform_dict(
         {
             "environment_temp": Transform(
-                VariableHole(
-                    "SITE OUTDOOR AIR DRYBULB TEMPERATURE",
-                    "ENVIRONMENT",
-                ),
-                Box(0.0, 100.0),
-                lambda x: x,
-                lambda x: x,
+                [
+                    VariableHole(
+                        "SITE OUTDOOR AIR DRYBULB TEMPERATURE",
+                        "ENVIRONMENT",
+                    )
+                ],
+                Box(np.array([0.0]), np.array([100.0])),
+                lambda lst: np.array(lst),
+                lambda a: a.tolist(),
             )
         }
     )
@@ -212,10 +214,10 @@ def action_tst(ctx: MorphologyContext) -> Transform[Any, Space]:
         match c:
             case ZoneContext():
                 return Transform(
-                    tuple(),
-                    Tuple([]),
-                    lambda x: x,
-                    lambda x: x,
+                    [],
+                    Box(np.array([]), np.array([])),
+                    lambda l: np.array(l),
+                    lambda a: a.tolist(),
                 )
             case ActuatorContext():
                 return thermostat_tst(c.thermostat)
