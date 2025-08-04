@@ -36,9 +36,18 @@ from building2building.simulator.action_spaces import (
 from building2building.types import BuildingConfig
 from gymnasium.spaces import Box, Dict, Space, Tuple
 from minergym.ontology import Ontology, UndirectedGraph
-from minergym.simulation import ActuatorHole, EnergyPlusSimulation, VariableHole
+from minergym.simulation import (
+    ActuatorHole,
+    EnergyPlusSimulation,
+    FunctionHole,
+    MeterHole,
+    VariableHole,
+)
+from minergym.simulation import (
+    api as epapi,
+)
 
-from .transform_utils import Transform, transform_dict
+from .transform_utils import Transform, transform_cyclical, transform_dict
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +204,37 @@ def observation_tst(
                 Box(np.array([0.0]), np.array([100.0])),
                 lambda lst: np.array(lst),
                 lambda a: a.tolist(),
-            )
+            ),
+            "time": transform_dict(
+                {
+                    "current_time": transform_cyclical(
+                        FunctionHole(epapi.exchange.current_time),
+                        1,
+                        25,
+                    ),
+                    "day_of_year": transform_cyclical(
+                        FunctionHole(epapi.exchange.day_of_year),
+                        1,
+                        366,
+                    ),
+                }
+            ),
+            "energy": transform_dict(
+                {
+                    "electricity": Transform(
+                        MeterHole("Electricity:HVAC"),
+                        Box(0.0, 1000.0),
+                        lambda x: x,
+                        lambda x: x,
+                    ),
+                    "natural_gas": Transform(
+                        MeterHole("NaturalGas:HVAC"),
+                        Box(0.0, 1000.0),
+                        lambda x: x,
+                        lambda x: x,
+                    ),
+                }
+            ),
         }
     )
 
@@ -225,7 +264,9 @@ def action_tst(ctx: MorphologyContext) -> Transform[Any, Space]:
     return transform_dict({k: thing(v) for k, v in ctx.items()})
 
 
-def create_morph_env(config: BuildingConfig) -> gymnasium.Env:
+def create_morph_env(
+    config: BuildingConfig, verbose: bool = True
+) -> minergym.environment.EnergyPlusEnvironment:
     ont = Ontology.from_json(config.path_to_building)
     ctx = morphology_context(ont)
 
@@ -238,15 +279,51 @@ def create_morph_env(config: BuildingConfig) -> gymnasium.Env:
             config.path_to_weather,
             o_tst.domain,
             a_tst.domain,
+            verbose=verbose,
         )
 
         return sim
 
-    return minergym.environment.EnergyPlusEnvironment(
+    def reward(raw_obs) -> float:
+        energy = raw_obs["exterioceptive"]["energy"]
+
+        return -(energy["electricity"] + energy["natural_gas"])
+
+    env = minergym.environment.EnergyPlusEnvironment(
         make_energyplus,
-        lambda _: 0.0,  # TODO: implement an actual reward function.
+        reward,  # TODO: implement an actual reward function.
         o_tst.codomain,
-        o_tst.transform,
+        o_tst,
         a_tst.codomain,
-        a_tst.detransform,
+        a_tst.inverse,
     )
+    env.metadata["config"] = config
+    return env
+
+
+# The ModuMorph paper creates the node wise morphology context by traversing the
+# graph through depth first search and by encoding position and angles relative
+# to a node's parent. In buildings, we can't do that so these procedures are
+# essentially useless for now.
+
+T = TypeVar("T")
+
+
+@dataclass
+class Tree(Generic[T]):
+    value: T
+    children: list[Tree[T]]
+
+
+def depth_first_search(entry: T, g: UndirectedGraph[T]) -> Tree[T]:
+    visited = []
+
+    def go(e):
+        visited.append(e)
+        children = []
+        for neighbor in g[e]:
+            if neighbor not in visited:
+                children.append(go(neighbor))
+        return Tree(e, children)
+
+    return go(entry)

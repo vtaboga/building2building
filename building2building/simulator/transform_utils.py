@@ -21,10 +21,13 @@ provides a couple of "glueing" functions.
 
 """
 
+import cmath
+import math
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, Self, TypeVar
 
-from gymnasium.spaces import Dict, Space, Tuple
+import numpy as np
+from gymnasium.spaces import Box, Dict, Space, Tuple
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -45,8 +48,12 @@ class Transform(Generic[A, B]):
     transform: Callable[[Any], Any]
     detransform: Callable[[Any], Any]
 
+    @property
     def inverse(self):
         return Transform(self.codomain, self.domain, self.detransform, self.transform)
+
+    def __call__(self, x):
+        return self.transform(x)
 
 
 def transform_dict(d: dict[str, Transform[Any, Space]]) -> Transform[Any, Space]:
@@ -72,6 +79,35 @@ def transform_list(l: list[Transform[Any, Space]]) -> Transform[Any, Space]:
     return Transform(
         [v.domain for v in l],
         Tuple([v.codomain for v in l]),
+        transform,
+        detransform,
+    )
+
+
+def transform_cyclical(v: Any, low: float, high: float) -> Transform[Any, Space]:
+    """Produce a cyclical encoding transform for a value that stays within low and
+    high."""
+
+    def transform(x: float) -> np.ndarray:
+        rescaled = (x - low) / (high - low)
+        c = cmath.exp(2 * math.pi * 1j * rescaled)
+        a = np.array([c.real, c.imag])
+        return a
+
+    def detransform(a: np.ndarray) -> float:
+        real, imag = a
+        c = real + imag * 1j
+        phase = cmath.phase(c)
+        if phase < 0:
+            phase += 2 * math.pi
+
+        rescaled = phase / (2 * math.pi)
+        x = rescaled * (high - low) + low
+        return x
+
+    return Transform(
+        v,
+        Box(np.array([-1, -1]), np.array([1, 1])),
         transform,
         detransform,
     )
