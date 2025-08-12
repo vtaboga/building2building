@@ -19,6 +19,7 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Generic, Self, Type, TypeVar, Union, reveal_type
 
 import gymnasium
@@ -33,7 +34,7 @@ from building2building.simulator.action_spaces import (
     ThermostatSetpoint,
     get_controllable_setpoints,
 )
-from building2building.types import BuildingConfig
+from building2building.types import BuildingConfig, RewardType
 from gymnasium.spaces import Box, Dict, Space, Tuple
 from minergym.ontology import Ontology, UndirectedGraph
 from minergym.simulation import (
@@ -47,7 +48,13 @@ from minergym.simulation import (
     api as epapi,
 )
 
-from .transform_utils import Transform, transform_cyclical, transform_dict
+from .transform_utils import (
+    Transform,
+    TransformCyclical,
+    TransformDict,
+    TransformIdentity,
+    TransformInverse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -101,17 +108,46 @@ def morphology_context(ont: Ontology) -> MorphologyContext:
     return contexes
 
 
+@dataclass
+class TransformListToArray(Transform[list, Box]):
+    _domain: Any
+    _codomain: Any
+
+    def domain(self):
+        return self._domain
+
+    def codomain(self):
+        return self._codomain
+
+    def __call__(self, obj):
+        return np.array(obj)
+
+    def reverse(self, obj):
+        return obj.tolist()
+
+
+@dataclass
+class TransformListToArrayShift(Transform[list, Box]):
+    _domain: Any
+    _codomain: Any
+
+    def domain(self):
+        return self._domain
+
+    def codomain(self):
+        return self._codomain
+
+    def __call__(self, t):
+        return np.array([t[0], t[1] - t[0]])
+
+    def reverse(self, obj):
+        return [float(obj[0]), float(obj[0] + obj[1])]
+
+
 def thermostat_tst(t: ThermostatSetpoint) -> Transform[Any, Space]:
     match t:
         case DualSetpoint():
-
-            def transform(t: list[float]) -> np.ndarray:
-                return np.array([t[0], t[1] - t[0]])
-
-            def detransform(a: np.ndarray) -> list[float]:
-                return [float(a[0]), float(a[0] + a[1])]
-
-            return Transform(
+            return TransformListToArrayShift(
                 [
                     ActuatorHole(
                         "Schedule:Compact", "Schedule Value", t.heating_schedule
@@ -124,35 +160,22 @@ def thermostat_tst(t: ThermostatSetpoint) -> Transform[Any, Space]:
                     np.array([15.0, 1.0]),
                     np.array([25.0, 15.0]),
                 ),
-                transform,
-                detransform,
             )
 
         case SingleHeating():
-            return Transform(
+            return TransformListToArray(
                 [ActuatorHole("Schedule:Compact", "Schedule Value", t.schedule)],
                 Box(np.array([15]), np.array([25])),
-                lambda l: np.array(l),
-                lambda a: a.tolist(),
             )
 
         case SingleCooling():
-            return Transform(
+            return TransformListToArray(
                 ActuatorHole("Schedule:Compact", "Schedule Value", t.schedule),
                 Box(np.array([16]), np.array([40])),
-                lambda l: np.array(l),
-                lambda a: a.tolist(),
             )
 
         case SingleHeatingOrCooling():
-
-            def transform(t: list[float]) -> np.ndarray:
-                return np.array([t[0], t[1] - t[0]])
-
-            def detransform(a: np.ndarray) -> list[float]:
-                return [float(a[0]), float(a[0] + a[1])]
-
-            return Transform(
+            return TransformListToArrayShift(
                 [
                     ActuatorHole(
                         "Schedule:Compact", "Schedule Value", t.heating_schedule
@@ -165,12 +188,23 @@ def thermostat_tst(t: ThermostatSetpoint) -> Transform[Any, Space]:
                     np.array([15.0, 1.0]),
                     np.array([25.0, 15.0]),
                 ),
-                transform,
-                detransform,
             )
 
         case _:
             raise Exception(f"Should be unreachable. Got a {t}")
+
+
+# To use multiprocessing to collect many trajectories in parallel, we need to be
+# able to pickle an environment. For that, it must contain no references to
+# local functions with closures. To solve that, we lambda lift everything.
+
+
+def lifted_current_time(state):
+    return epapi.exchange.current_time(state)
+
+
+def lifted_day_of_year(state):
+    return epapi.exchange.day_of_year(state)
 
 
 def observation_tst(
@@ -183,18 +217,16 @@ def observation_tst(
             case ActuatorContext():
                 return thermostat_tst(v.thermostat)
             case ZoneContext():
-                return Transform(
+                return TransformListToArray(
                     [VariableHole("ZONE AIR TEMPERATURE", k)],
                     Box(np.array([0.0]), np.array([100.0])),
-                    lambda lst: np.array(lst),
-                    lambda a: a.tolist(),
                 )
 
-    proprio_tst = transform_dict({k: thing(k, v) for k, v in ctx.items()})
+    proprio_tst = TransformDict({k: thing(k, v) for k, v in ctx.items()})
 
-    exterio_tst = transform_dict(
+    exterio_tst = TransformDict(
         {
-            "environment_temp": Transform(
+            "environment_temp": TransformListToArray(
                 [
                     VariableHole(
                         "SITE OUTDOOR AIR DRYBULB TEMPERATURE",
@@ -202,43 +234,37 @@ def observation_tst(
                     )
                 ],
                 Box(np.array([0.0]), np.array([100.0])),
-                lambda lst: np.array(lst),
-                lambda a: a.tolist(),
             ),
-            "time": transform_dict(
+            "time": TransformDict(
                 {
-                    "current_time": transform_cyclical(
-                        FunctionHole(epapi.exchange.current_time),
+                    "current_time": TransformCyclical(
+                        FunctionHole(lifted_current_time),
                         1,
                         25,
                     ),
-                    "day_of_year": transform_cyclical(
-                        FunctionHole(epapi.exchange.day_of_year),
+                    "day_of_year": TransformCyclical(
+                        FunctionHole(lifted_day_of_year),
                         1,
                         366,
                     ),
                 }
             ),
-            "energy": transform_dict(
+            "energy": TransformDict(
                 {
-                    "electricity": Transform(
+                    "electricity": TransformIdentity(
                         MeterHole("Electricity:HVAC"),
                         Box(0.0, 1000.0),
-                        lambda x: x,
-                        lambda x: x,
                     ),
-                    "natural_gas": Transform(
+                    "natural_gas": TransformIdentity(
                         MeterHole("NaturalGas:HVAC"),
                         Box(0.0, 1000.0),
-                        lambda x: x,
-                        lambda x: x,
                     ),
                 }
             ),
         }
     )
 
-    obs_tst = transform_dict(
+    obs_tst = TransformDict(
         {
             "proprioceptive": proprio_tst,
             "exterioceptive": exterio_tst,
@@ -252,20 +278,44 @@ def action_tst(ctx: MorphologyContext) -> Transform[Any, Space]:
     def thing(c: NodeContext) -> Transform[Any, Space]:
         match c:
             case ZoneContext():
-                return Transform(
+                return TransformListToArray(
                     [],
                     Box(np.array([]), np.array([])),
-                    lambda l: np.array(l),
-                    lambda a: a.tolist(),
                 )
             case ActuatorContext():
                 return thermostat_tst(c.thermostat)
 
-    return transform_dict({k: thing(v) for k, v in ctx.items()})
+    return TransformDict({k: thing(v) for k, v in ctx.items()})
+
+
+@dataclass
+class MakeEnergyPlus:
+    path_to_building: Path
+    path_to_weather: Path
+    observation_template: Any
+    action_template: Any
+    verbose: bool
+
+    def __call__(self) -> EnergyPlusSimulation:
+        return EnergyPlusSimulation(
+            self.path_to_building,
+            self.path_to_weather,
+            self.observation_template,
+            self.action_template,
+            verbose=self.verbose,
+        )
+
+
+@dataclass
+class Reward:
+    def __call__(self, raw_obs) -> float:
+        energy = raw_obs["exterioceptive"]["energy"]
+
+        return -(energy["electricity"] + energy["natural_gas"])
 
 
 def create_morph_env(
-    config: BuildingConfig, verbose: bool = True
+    config: BuildingConfig, verbose: bool = False
 ) -> minergym.environment.EnergyPlusEnvironment:
     ont = Ontology.from_json(config.path_to_building)
     ctx = morphology_context(ont)
@@ -273,29 +323,22 @@ def create_morph_env(
     o_tst = observation_tst(ctx)
     a_tst = action_tst(ctx)
 
-    def make_energyplus():
-        sim = EnergyPlusSimulation(
-            config.path_to_building,
-            config.path_to_weather,
-            o_tst.domain,
-            a_tst.domain,
-            verbose=verbose,
-        )
+    make_energyplus = MakeEnergyPlus(
+        config.path_to_building,
+        config.path_to_weather,
+        o_tst.domain(),
+        a_tst.domain(),
+        verbose,
+    )
 
-        return sim
-
-    def reward(raw_obs) -> float:
-        energy = raw_obs["exterioceptive"]["energy"]
-
-        return -(energy["electricity"] + energy["natural_gas"])
-
+    reward = Reward()
     env = minergym.environment.EnergyPlusEnvironment(
         make_energyplus,
         reward,  # TODO: implement an actual reward function.
-        o_tst.codomain,
+        o_tst.codomain(),
         o_tst,
-        a_tst.codomain,
-        a_tst.inverse,
+        a_tst.codomain(),
+        TransformInverse(a_tst),
     )
     env.metadata["config"] = config
     return env

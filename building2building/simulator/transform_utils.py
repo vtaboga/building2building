@@ -24,90 +24,124 @@ provides a couple of "glueing" functions.
 import cmath
 import math
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, Self, TypeVar
+from typing import Any, Generic, Protocol, TypeVar
 
 import numpy as np
 from gymnasium.spaces import Box, Dict, Space, Tuple
 
-A = TypeVar("A")
-B = TypeVar("B")
+A = TypeVar("A", covariant=True)
+B = TypeVar("B", covariant=True)
 
 
-@dataclass(frozen=True)
-class Transform(Generic[A, B]):
-    """A structure containing a template, a gymnasium space codifying that template
-    and an isomorphism between the two represetations.
+class Transform(Generic[A, B], Protocol):
+    def domain(self) -> A: ...
 
-            transform
-    domain <---------> codomain
+    def codomain(self) -> B: ...
 
-    """
-
-    domain: A
-    codomain: B
-    transform: Callable[[Any], Any]
-    detransform: Callable[[Any], Any]
-
-    @property
-    def inverse(self):
-        return Transform(self.codomain, self.domain, self.detransform, self.transform)
-
-    def __call__(self, x):
-        return self.transform(x)
+    # Forward call
+    def __call__(self, obj) -> Any: ...
+    # Reverse call
+    def reverse(self, obj) -> Any: ...
 
 
-def transform_dict(d: dict[str, Transform[Any, Space]]) -> Transform[Any, Space]:
-    template: Any = {k: v.domain for k, v in d.items()}
-    space: Space = Dict({k: v.codomain for k, v in d.items()})
+@dataclass(slots=True, frozen=True)
+class TransformDict(Transform[Any, Space]):
+    fields: dict[str, Transform[Any, Space]]
 
-    def transform(a):
-        return {k: v.transform(a[k]) for k, v in d.items()}
+    def domain(self) -> Any:
+        return {k: v.domain() for k, v in self.fields.items()}
 
-    def detransform(b):
-        return {k: v.detransform(b[k]) for k, v in d.items()}
+    def codomain(self) -> Space:
+        return Dict({k: v.codomain() for k, v in self.fields.items()})
 
-    return Transform(template, space, transform, detransform)
+    def __call__(self, obj):
+        return {k: v(obj[k]) for k, v in self.fields.items()}
 
-
-def transform_list(l: list[Transform[Any, Space]]) -> Transform[Any, Space]:
-    def transform(a):
-        return tuple(s.transform(e) for s, e in zip(l, a))
-
-    def detransform(b):
-        return [s.detransform(e) for s, e in zip(l, b)]
-
-    return Transform(
-        [v.domain for v in l],
-        Tuple([v.codomain for v in l]),
-        transform,
-        detransform,
-    )
+    def reverse(self, obj) -> Any:
+        return {k: v.reverse(obj[k]) for k, v in self.fields.items()}
 
 
-def transform_cyclical(v: Any, low: float, high: float) -> Transform[Any, Space]:
-    """Produce a cyclical encoding transform for a value that stays within low and
-    high."""
+x: Transform[Any, Space] = TransformDict({})
 
-    def transform(x: float) -> np.ndarray:
-        rescaled = (x - low) / (high - low)
+
+@dataclass(slots=True, frozen=True)
+class TransformList(Transform[Any, Space]):
+    fields: list[Transform[Any, Space]]
+
+    def domain(self):
+        return [field.domain() for field in self.fields]
+
+    def codomain(self):
+        return Tuple([field.codomain() for field in self.fields])
+
+    def __call__(self, obj):
+        return tuple(field(e) for field, e in zip(self.fields, obj))
+
+    def reverse(self, obj):
+        return [field.reverse(e) for field, e in zip(self.fields, obj)]
+
+
+@dataclass(slots=True, frozen=True)
+class TransformCyclical(Transform[Any, Box]):
+    _domain: Any
+    low: float
+    high: float
+
+    def domain(self):
+        return self._domain
+
+    def codomain(self):
+        return Box(np.array([-1, -1]), np.array([1, 1]))
+
+    def __call__(self, x: float) -> np.ndarray:
+        rescaled = (x - self.low) / (self.high - self.low)
         c = cmath.exp(2 * math.pi * 1j * rescaled)
         a = np.array([c.real, c.imag])
         return a
 
-    def detransform(a: np.ndarray) -> float:
-        real, imag = a
+    def reverse(self, obj):
+        real, imag = obj
         c = real + imag * 1j
         phase = cmath.phase(c)
         if phase < 0:
             phase += 2 * math.pi
 
         rescaled = phase / (2 * math.pi)
-        x = rescaled * (high - low) + low
+        x = rescaled * (self.high - self.low) + self.low
+
         return x
 
-    return Transform(
-        v,
-        Box(np.array([-1, -1]), np.array([1, 1])),
-        transform,
-        detransform,
-    )
+
+@dataclass(slots=True, frozen=True)
+class TransformInverse(Transform[A, B]):
+    inner: Transform[B, A]
+
+    def domain(self) -> A:
+        return self.inner.codomain()
+
+    def codomain(self) -> B:
+        return self.inner.domain()
+
+    def __call__(self, obj):
+        return self.inner.reverse(obj)
+
+    def reverse(self, obj):
+        return self.inner(obj)
+
+
+@dataclass(slots=True, frozen=True)
+class TransformIdentity(Transform[A, B]):
+    _domain: A
+    _codomain: B
+
+    def domain(self) -> A:
+        return self._domain
+
+    def codomain(self) -> B:
+        return self._codomain
+
+    def __call__(self, obj):
+        return obj
+
+    def reverse(self, obj):
+        return obj
