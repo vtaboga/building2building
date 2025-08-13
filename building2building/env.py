@@ -67,13 +67,18 @@ def find_energyplus_path(manual_path=None) -> Path:
     if (p := ENERGYPLUS_PATH.get(None)) is not None:
         return p
 
-    # First, check if pyenergyplus is in the load path. If that is the case, we
-    # don't need env variables to find where the various binaries are.
+    # First, we want to look at the ENERGYPLUS_PATH environment variable. If it
+    # is set, this is probably a good choice.
+    if (p := os.getenv("ENERGYPLUS_PATH")) is not None:
+        return Path(p)
 
+    # Then, check if pyenergyplus is in the load path. If that is the case (and
+    # the user did not rearrange the horrible directory hierarchy energyplus
+    # comes with), we can just reuse that path. The binaries will also be there.
     if (spec := find_spec("pyenergyplus")) is not None:
         if spec.origin is not None:
-            # will give us something like 'PLACE/lib/python3.11/site-packages/pyenergyplus/__init__.py'
-            ep_path = Path(spec.origin).parent.parent.parent.parent.parent
+            # will give us something like 'PLACE/EnergyPlus/pyenergyplus/__init__.py'
+            ep_path = Path(spec.origin).parent.parent
             return ep_path
 
     # Then, we want to look at common default places
@@ -81,11 +86,6 @@ def find_energyplus_path(manual_path=None) -> Path:
     for path in common_energyplus_paths():
         if path.exists():
             return path
-
-    # Then, we want to look at the ENERGYPLUS_PATH environment variable.
-
-    if (p := os.getenv("ENERGYPLUS_PATH")) is not None:
-        return Path(p)
 
     raise Exception("EnergyPlus installation not found")
 
