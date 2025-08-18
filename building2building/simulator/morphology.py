@@ -251,13 +251,13 @@ def observation_tst(
             ),
             "energy": TransformDict(
                 {
-                    "electricity": TransformIdentity(
-                        MeterHole("Electricity:HVAC"),
-                        Box(0.0, 1000.0),
+                    "electricity": TransformListToArray(
+                        [MeterHole("Electricity:HVAC")],
+                        Box(np.array([0.0]), np.array([1000.0])),
                     ),
-                    "natural_gas": TransformIdentity(
-                        MeterHole("NaturalGas:HVAC"),
-                        Box(0.0, 1000.0),
+                    "natural_gas": TransformListToArray(
+                        [MeterHole("NaturalGas:HVAC")],
+                        Box(np.array([0.0]), np.array([1000.0])),
                     ),
                 }
             ),
@@ -311,7 +311,7 @@ class Reward:
     def __call__(self, raw_obs) -> float:
         energy = raw_obs["exterioceptive"]["energy"]
 
-        return -(energy["electricity"] + energy["natural_gas"])
+        return -(energy["electricity"][0] + energy["natural_gas"][0])
 
 
 def create_morph_env(
