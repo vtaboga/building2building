@@ -1,13 +1,21 @@
 import logging
 import urllib.parse
 from dataclasses import dataclass
-from typing import Callable, Union
+from typing import Any, Callable, Union
 
-import gymnasium as gym
 import minergym.ontology as ontology
 import numpy as np
+from gymnasium.spaces import Box, Space
 from minergym.simulation import ActuatorHole
 from rdflib.term import Node
+
+from .transform_utils import (
+    Transform,
+    TransformConcat,
+    TransformList,
+    TransformListToArray,
+    TransformListToArrayShift,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -272,85 +280,59 @@ def get_controllable_setpoints(
     return zone_setpoints
 
 
-def template_space_transform(
+def single_thermostat_transform(t: ThermostatSetpoint) -> Transform[list, Box]:
+    match t:
+        case DualSetpoint():
+            return TransformListToArrayShift(
+                [
+                    ActuatorHole(
+                        "Schedule:Compact", "Schedule Value", t.heating_schedule
+                    ),
+                    ActuatorHole(
+                        "Schedule:Compact", "Schedule Value", t.cooling_schedule
+                    ),
+                ],
+                Box(
+                    np.array([15.0, 1.0]),
+                    np.array([25.0, 15.0]),
+                ),
+            )
+
+        case SingleHeating():
+            return TransformListToArray(
+                [ActuatorHole("Schedule:Compact", "Schedule Value", t.schedule)],
+                Box(np.array([15]), np.array([25])),
+            )
+
+        case SingleCooling():
+            return TransformListToArray(
+                ActuatorHole("Schedule:Compact", "Schedule Value", t.schedule),
+                Box(np.array([16]), np.array([40])),
+            )
+
+        case SingleHeatingOrCooling():
+            return TransformListToArrayShift(
+                [
+                    ActuatorHole(
+                        "Schedule:Compact", "Schedule Value", t.heating_schedule
+                    ),
+                    ActuatorHole(
+                        "Schedule:Compact", "Schedule Value", t.cooling_schedule
+                    ),
+                ],
+                Box(
+                    np.array([15.0, 1.0]),
+                    np.array([25.0, 15.0]),
+                ),
+            )
+
+        case _:
+            raise Exception(f"Should be unreachable. Got a {t}")
+
+
+def many_thermostats_transform(
     setpoints: list[ThermostatSetpoint],
-) -> tuple[list[ActuatorHole], gym.Space, Callable[[np.ndarray], list[float]]]:
-    """From a list like the dict returned by `get_controllable_setpoints`,
-    return a tuple containing an appropriate action template, a gym.Space and a
-    function to turn a space-shaped action into a template-shaped action.
-
-    """
-
-    actuator_template: list[ActuatorHole] = []
-    actuator_bounds: list[tuple[float, float]] = []
-
-    for setpoint in setpoints:
-        match setpoint:
-            case DualSetpoint() as sp:
-                actuator_template.append(
-                    ActuatorHole(
-                        "Schedule:Compact", "Schedule Value", sp.heating_schedule
-                    )
-                )
-                actuator_bounds.append((15.0, 25.0))
-                actuator_template.append(
-                    ActuatorHole(
-                        "Schedule:Compact", "Schedule Value", sp.cooling_schedule
-                    )
-                )
-                actuator_bounds.append((1.0, 15.0))
-
-            case SingleHeating() as sp:
-                actuator_template.append(
-                    ActuatorHole("Schedule:Compact", "Schedule Value", sp.schedule)
-                )
-                actuator_bounds.append((15.0, 25.0))
-            case SingleCooling() as sp:
-                actuator_template.append(
-                    ActuatorHole("Schedule:Compact", "Schedule Value", sp.schedule)
-                )
-                actuator_bounds.append((16.0, 40.0))
-            case SingleHeatingOrCooling() as sp:
-                # Is this how we are supposed to do this ?
-                actuator_template.append(
-                    ActuatorHole(
-                        "Schedule:Compact", "Schedule Value", sp.heating_schedule
-                    )
-                )
-                actuator_bounds.append((15.0, 25.0))
-                actuator_template.append(
-                    ActuatorHole(
-                        "Schedule:Compact", "Schedule Value", sp.cooling_schedule
-                    )
-                )
-                actuator_bounds.append((1.0, 15.0))
-            case _:
-                raise Exception("Unreachable.")
-
-        lows, highs = zip(*actuator_bounds)
-        actuator_space = gym.spaces.Box(np.array(lows), np.array(highs))
-
-        def transform(action_np: np.ndarray) -> list[float]:
-            o = []
-            i = 0
-            for sp in setpoints:
-                match sp:
-                    case DualSetpoint():
-                        o.append(action_np[i])
-                        o.append(action_np[i + 1] + action_np[i])
-                        i += 2
-                    case SingleHeating():
-                        o.append(action_np[i])
-                        i += 1
-                    case SingleCooling():
-                        o.append(action_np[i])
-                        i += 1
-                    case SingleHeatingOrCooling():
-                        o.append(action_np[i])
-                        o.append(action_np[i + 1] + action_np[i])
-                        i += 2
-                    case _:
-                        raise Exception("Unreachable")
-            return o
-
-        return actuator_template, actuator_space, transform
+) -> Transform[list, Box]:
+    return TransformConcat(
+        TransformList([single_thermostat_transform(sp) for sp in setpoints])
+    )

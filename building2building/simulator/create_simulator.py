@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -8,13 +9,12 @@ import minergym.simulation as simulation
 import numpy as np
 from building2building.simulator.action_spaces import (
     get_controllable_setpoints,
-    template_space_transform,
+    many_thermostats_transform,
 )
-from building2building.simulator.observation_spaces import (
-    create_observation_space,
-    observation_transform,
-)
+from building2building.simulator.observation_spaces import flat_observation_info
 from building2building.simulator.rewards import (
+    BarrierReward,
+    BaseReward,
     barrier_reward_function,
     base_reward_function,
 )
@@ -23,16 +23,34 @@ from minergym.environment import EnergyPlusEnvironment
 from minergym.ontology import Ontology
 from minergym.simulation import ActuatorHole, EnergyPlusSimulation
 
+from .transform_utils import TransformInverse
+
 logger = logging.getLogger(__name__)
 
 
-def auto_add_energy(ont: Ontology, obs_template: dict[str, Any]) -> None:
-    """Add HVAC energy consumption meters to the observation template."""
+@dataclass
+class MakeEnergyPlus:
+    """This could simply be a closure, but it wouldn't be serializable with
+    pickle."""
 
-    energy = obs_template.setdefault("energy", {})
-    # Add whole building HVAC energy meters only
-    energy["HVAC_electricity"] = simulation.MeterHole("Electricity:HVAC")
-    energy["HVAC_natural_gas"] = simulation.MeterHole("NaturalGas:HVAC")
+    path_to_building: Path
+    path_to_weather: Path
+    observation_template: Any
+    action_template: Any
+    verbose: bool
+    log_dir: Path
+
+    def __call__(self) -> EnergyPlusSimulation:
+        sim = EnergyPlusSimulation(
+            self.path_to_building,
+            self.path_to_weather,
+            self.observation_template,
+            self.action_template,
+            verbose=self.verbose,
+            log_dir=self.log_dir,
+        )
+
+        return sim
 
 
 def create_simulator(building_config: BuildingConfig) -> gym.Env:
@@ -52,77 +70,63 @@ def create_simulator(building_config: BuildingConfig) -> gym.Env:
     """
 
     if not isinstance(building_config, BuildingConfig):
+        # If the type constraints are satisfied, it should be unreachable, but
+        # this function is called through gymnasium.make, which doesn't
+        # propagate type constraints.
         raise Exception(f"{building_config} should have type BuildingConfig")
 
     eplus_output_dir = building_config.eplus_output_dir
 
-    obs_template = {}
     ont = Ontology.from_json(building_config.path_to_building)
-    # Add observations
-    config.auto_add_time(ont, obs_template)
-    config.auto_add_temperature(ont, obs_template)
-    auto_add_energy(ont, obs_template)
-    config.auto_add_weather(ont, obs_template)
 
+    # We compute the observation side stuff
+    obs_info = flat_observation_info(ont)
+
+    # Then the action side stuff
     setpoints = get_controllable_setpoints(ont)
 
-    actuators = {}
+    thermostat_list = [elem for list in setpoints.values() for elem in list]
+
+    action_transform = many_thermostats_transform(thermostat_list)
+
+    make_energyplus = MakeEnergyPlus(
+        building_config.path_to_building,
+        building_config.path_to_weather,
+        obs_info.template,
+        action_transform.domain(),
+        verbose=False,
+        log_dir=eplus_output_dir,
+    )
+
+    if building_config.reward_type == "barrier":
+        reward_function = BarrierReward(
+            building_config.characteristics, setpoints, building_config.energy_weight
+        )
+    elif building_config.reward_type == "base":
+        reward_function = BaseReward(
+            building_config.characteristics, setpoints, building_config.energy_weight
+        )
+    else:
+        raise ValueError(f"Invalid reward type: {building_config.reward_type}")
+
+    # Finally, we compute the data necessary to fillin the metadata
     controlled_zones = list(setpoints.keys())
     all_zones = building_config.characteristics.zone_lists
     uncontrolled_zones = [zone for zone in all_zones if zone not in controlled_zones]
 
-    thermostat_list = [elem for list in setpoints.values() for elem in list]
-
-    action_template, action_space, action_transform = template_space_transform(
-        thermostat_list
-    )
-
-    observation_space, observation_names = create_observation_space(obs_template)
-
-    def make_energyplus() -> EnergyPlusSimulation:
-        sim = EnergyPlusSimulation(
-            building_config.path_to_building,
-            building_config.path_to_weather,
-            obs_template,
-            action_template,
-            verbose=False,
-        )
-        # Set the log directory if provided
-        if eplus_output_dir:
-            sim.log_dir = eplus_output_dir
-        return sim
-
-    def reward_function(obs):
-        if building_config.reward_type == "barrier":
-            return barrier_reward_function(
-                obs,
-                building_config.characteristics,
-                setpoints,
-                building_config.energy_weight,
-            )
-        elif building_config.reward_type == "base":
-            return base_reward_function(
-                obs,
-                building_config.characteristics,
-                setpoints,
-                building_config.energy_weight,
-            )
-        else:
-            raise ValueError(f"Invalid reward type: {building_config.reward_type}")
-
     gymenv = EnergyPlusEnvironment[np.ndarray, np.ndarray](
         make_energyplus,
         reward_function,
-        observation_space,
-        lambda obs: observation_transform(obs, building_config.characteristics.area),
-        action_space,
-        action_transform,
+        obs_info.space,
+        obs_info.flatten,
+        action_transform.codomain(),
+        TransformInverse(action_transform),
     )
 
     gymenv.metadata = {
         "controlled_zones": controlled_zones,
         "uncontrolled_zones": uncontrolled_zones,
-        "observation_names": observation_names,
+        "observation_names": obs_info.slot_names,
     }
 
     return gymenv
