@@ -11,7 +11,10 @@ from building2building.simulator.action_spaces import (
     get_controllable_setpoints,
     many_thermostats_transform,
 )
-from building2building.simulator.observation_spaces import flat_observation_info
+from building2building.simulator.observation_spaces import (
+    dict_observation_info,
+    flat_observation_info,
+)
 from building2building.simulator.rewards import (
     BarrierReward,
     BaseReward,
@@ -127,6 +130,69 @@ def create_simulator(building_config: BuildingConfig) -> gym.Env:
         "controlled_zones": controlled_zones,
         "uncontrolled_zones": uncontrolled_zones,
         "observation_names": obs_info.slot_names,
+    }
+
+    return gymenv
+
+
+def create_simulator_dict(building_config: BuildingConfig) -> gym.Env:
+    if not isinstance(building_config, BuildingConfig):
+        # If the type constraints are satisfied, it should be unreachable, but
+        # this function is called through gymnasium.make, which doesn't
+        # propagate type constraints.
+        raise Exception(f"{building_config} should have type BuildingConfig")
+
+    eplus_output_dir = building_config.eplus_output_dir
+
+    ont = Ontology.from_json(building_config.path_to_building)
+
+    # We compute the observation side stuff
+    obs_info = dict_observation_info(ont)
+
+    # Then the action side stuff
+    setpoints = get_controllable_setpoints(ont)
+
+    thermostat_list = [elem for list in setpoints.values() for elem in list]
+
+    action_transform = many_thermostats_transform(thermostat_list)
+
+    make_energyplus = MakeEnergyPlus(
+        building_config.path_to_building,
+        building_config.path_to_weather,
+        obs_info.domain(),
+        action_transform.domain(),
+        verbose=False,
+        log_dir=eplus_output_dir,
+    )
+
+    if building_config.reward_type == "barrier":
+        reward_function = BarrierReward(
+            building_config.characteristics, setpoints, building_config.energy_weight
+        )
+    elif building_config.reward_type == "base":
+        reward_function = BaseReward(
+            building_config.characteristics, setpoints, building_config.energy_weight
+        )
+    else:
+        raise ValueError(f"Invalid reward type: {building_config.reward_type}")
+
+    # Finally, we compute the data necessary to fillin the metadata
+    controlled_zones = list(setpoints.keys())
+    all_zones = building_config.characteristics.zone_lists
+    uncontrolled_zones = [zone for zone in all_zones if zone not in controlled_zones]
+
+    gymenv = EnergyPlusEnvironment[np.ndarray, np.ndarray](
+        make_energyplus,
+        reward_function,
+        obs_info.codomain(),
+        obs_info,
+        action_transform.codomain(),
+        TransformInverse(action_transform),
+    )
+
+    gymenv.metadata = {
+        "controlled_zones": controlled_zones,
+        "uncontrolled_zones": uncontrolled_zones,
     }
 
     return gymenv

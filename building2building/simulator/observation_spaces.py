@@ -5,9 +5,16 @@ import gymnasium as gym
 import numpy as np
 from building2building.simulator.transform_utils import (
     Transform,
+    TransformCompose,
+    TransformDict,
+    TransformDictSpace,
+    TransformIdentity,
+    TransformListToArray,
+    TransformMonoList,
+    TransformScalarToArray,
     transform_flatten,
 )
-from gymnasium.spaces import Box
+from gymnasium.spaces import Box, Dict
 from minergym.ontology import Ontology
 from minergym.simulation import (
     FunctionHole,
@@ -122,4 +129,62 @@ def flat_observation_info(ont: Ontology) -> ObservationInfo:
             flattened,
         ),
         space=b,
+    )
+
+
+def dict_observation_info(ont: Ontology) -> Transform:
+    return TransformDictSpace(
+        {
+            "temperature": TransformDictSpace(
+                {
+                    z.toPython(): TransformScalarToArray(
+                        VariableHole("ZONE AIR TEMPERATURE", z.toPython()),
+                        -50.0,
+                        50.0,
+                    )
+                    for z in ont.zones()
+                }
+            ),
+            "time": TransformDictSpace(
+                {
+                    "time_of_day": TransformScalarToArray(
+                        FunctionHole(lifted_current_time), 1.0, 25.0
+                    ),
+                    "day_of_year": TransformScalarToArray(
+                        FunctionHole(lifted_day_of_year), 1.0, 366.0
+                    ),
+                }
+            ),
+            "outdoor": TransformDictSpace(
+                {
+                    "temperature": TransformScalarToArray(
+                        VariableHole(
+                            "SITE OUTDOOR AIR DRYBULB TEMPERATURE",
+                            "ENVIRONMENT",
+                        ),
+                        -50.0,
+                        50.0,
+                    ),
+                    "humidity": TransformScalarToArray(
+                        VariableHole(
+                            "Site Outdoor Air Relative Humidity", "Environment"
+                        ),
+                        0.0,
+                        100.0,
+                    ),
+                }
+            ),
+            "energy": TransformDictSpace(
+                {
+                    "natural_gas": TransformScalarToArray(
+                        MeterHole("NaturalGas:HVAC"), 0.0, float("inf")
+                    ),
+                    "electricity": TransformScalarToArray(
+                        MeterHole("Electricity:HVAC"),
+                        0.0,
+                        float("inf"),
+                    ),
+                }
+            ),
+        }
     )

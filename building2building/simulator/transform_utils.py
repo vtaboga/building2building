@@ -83,6 +83,23 @@ class TransformDict(Transform[dict, dict]):
 
 
 @dataclass(slots=True, frozen=True)
+class TransformDictSpace(Transform[dict, Dict]):
+    fields: dict[str, Transform[Any, Any]]
+
+    def domain(self) -> dict:
+        return {k: v.domain() for k, v in self.fields.items()}
+
+    def codomain(self) -> Dict:
+        return Dict({k: v.codomain() for k, v in self.fields.items()})
+
+    def __call__(self, obj):
+        return {k: v(obj[k]) for k, v in self.fields.items()}
+
+    def reverse(self, obj) -> Any:
+        return {k: v.reverse(obj[k]) for k, v in self.fields.items()}
+
+
+@dataclass(slots=True, frozen=True)
 class TransformDictToList(Transform[dict, list]):
     the_dict: dict[str, Transform]
 
@@ -205,6 +222,25 @@ class TransformListToArray(Transform[list, Box]):
 
     def reverse(self, obj):
         return obj.tolist()
+
+
+@dataclass
+class TransformScalarToArray(Transform[Any, Box]):
+    _domain: Any
+    low: float
+    high: float
+
+    def domain(self):
+        return self._domain
+
+    def codomain(self):
+        return Box(np.array([self.low]), np.array([self.high]))
+
+    def __call__(self, obj):
+        return np.array([obj])
+
+    def reverse(self, obj):
+        return obj.tolist()[0]
 
 
 @dataclass
