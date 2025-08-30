@@ -230,8 +230,9 @@ def download_and_extract_county_idf(state_code: StateCode, county_name: str) -> 
             f"'{county_name}' not a valid county for state '{state_code}'. Available counties: {m[state_code]}"
         )
 
+    county_name_with_underscores = county_name.replace(" ", "_")
     # Format the folder name for download
-    folder_name = f"{state_code}_{county_name}_IDF"
+    folder_name = f"{state_code}_{county_name_with_underscores}_IDF"
 
     # Create output directory if it doesn't exist
     output_dir = DataPaths.unprocessed_dir()
@@ -532,6 +533,8 @@ def state_county_map() -> dict[StateCode, set[str]]:
                 # Extract state_county from path like ./data/Counties_IDF/TX_Crosby_IDF.zip
                 state_county = path.split("/")[-1].replace("_IDF.zip", "")
                 state, county = state_county.split("_", 1)
+                # In the database, there are no spaces, but in the filename,
+                # there are.
                 county = county.replace("_", " ")
 
                 result.setdefault(validate_state_code(state), set()).add(county)

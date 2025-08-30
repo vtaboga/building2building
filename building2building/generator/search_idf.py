@@ -249,8 +249,10 @@ def search_idf(
         raise Exception("No matching IDF files found")
 
     for building_id, building_info in matching_buildings:
+        county_with_underscores = county.replace(" ", "_")
         building_path = (
-            DataPaths.unprocessed_dir() / f"{state}_{county}_IDF/{building_id}.idf"
+            DataPaths.unprocessed_dir()
+            / f"{state}_{county_with_underscores}_IDF/{building_id}.idf"
         )
         processed_path = get_processed_epjson_path(
             state, county, building_id, processors
