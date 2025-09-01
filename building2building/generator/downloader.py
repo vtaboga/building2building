@@ -5,6 +5,7 @@ import re
 import zipfile
 from pathlib import Path
 
+import duckdb
 import geopandas as gpd
 import pandas as pd
 import requests
@@ -272,7 +273,61 @@ def download_and_extract_county_idf(state_code: StateCode, county_name: str) -> 
     os.remove(zip_path)
     logger.info(f"Successfully downloaded and extracted {filename}")
 
+    update_metadata_for_county(state_code, county_name)
+
     return county_dir
+
+
+def update_metadata_for_county(state, county):
+    logger.info(f"updating database for county {county}")
+    path_db = DataPaths.metadata_dir() / f"{state}_processed.parquet"
+
+    county_with_underscores = county.replace(" ", "_")
+
+    def exists(id: int) -> bool:
+        building_path = (
+            DataPaths.unprocessed_dir()
+            / f"{state}_{county_with_underscores}_IDF/{id}.idf"
+        )
+        return building_path.exists()
+
+    ids = [
+        id
+        for (id,) in duckdb.query(
+            """SELECT id FROM read_parquet(?)
+            WHERE county = ?""",
+            params=[str(path_db), county],
+        ).fetchall()
+    ]
+    existing_ids = list(filter(exists, ids))
+
+    if existing_ids:  # Only update if there are existing IDs
+        # Load parquet data into a temporary table
+        duckdb.query(
+            """
+            CREATE OR REPLACE TABLE temp_metadata AS 
+            SELECT * FROM read_parquet(?)
+        """,
+            params=[str(path_db)],
+        )
+
+        # Update the temporary table
+        duckdb.query(
+            """
+            UPDATE temp_metadata
+            SET exists = true
+            WHERE ID = ANY(?)
+        """,
+            params=[existing_ids],
+        )
+
+        # Write the updated data back to the parquet file
+        duckdb.query(
+            f"""COPY temp_metadata TO '{str(path_db)}' (FORMAT PARQUET)""",
+        )
+
+        # Clean up the temporary table
+        duckdb.query("DROP TABLE temp_metadata")
 
 
 def download_metadata(state: str):
@@ -336,6 +391,8 @@ def process_metadata(state: str) -> Path:
 
     # Add counties to dataframe
     df["County"] = counties
+    # Add exists to dataframe
+    df["Exists"] = [False] * len(counties)
 
     # Save the updated CSV file
     df.to_parquet(path_out)

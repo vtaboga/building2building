@@ -54,6 +54,8 @@ def search_metadata(
 
     where_conditions: list[tuple[str, str | int]] = []
 
+    where_conditions.append(("Exists", True))
+
     if building_id is not None:
         where_conditions.append(("ID", building_id))
 
@@ -220,8 +222,6 @@ def search_idf(
     )
 
     # Download idf files if not already downloaded
-    county_dir = download_and_extract_county_idf(state, county)
-    logger.debug(f"Using county directory: {county_dir}")
 
     building_files: list[Path] = []
     building_infos: list[BuildingCharacteristics] = []
@@ -229,6 +229,9 @@ def search_idf(
     download_metadata(state=state)
 
     metadata_path = process_metadata(state=state)
+
+    county_dir = download_and_extract_county_idf(state, county)
+    logger.debug(f"Using county directory: {county_dir}")
 
     # Search for matching IDF files
     matching_buildings = search_metadata(

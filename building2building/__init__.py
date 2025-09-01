@@ -39,6 +39,52 @@ def search_weather(state: StateCode, n_files: int) -> list[Path]:
     return weather_files
 
 
+def building_configs(
+    state: StateCode,
+    county: str,
+    building_id: int | None = None,
+    building_type: str | None = None,
+    area: float | None = None,
+    num_floors: int | None = None,
+    height: float | None = None,
+    processors: list[EPJSONProcessor] = [],
+    eplus_output_dir: Path = Path("eplus_out"),
+    reward_type: RewardType = "base",
+    *,
+    n_buildings,
+    n_weathers,
+) -> list[BuildingConfig]:
+    weather_files = search_weather(state, n_weathers)
+    if len(weather_files) == 0:
+        raise Exception("No such weathers")
+    building_files = search_idf(
+        state,
+        county,
+        n_buildings,
+        building_id=building_id,
+        building_type=building_type,
+        area=area,
+        num_floors=num_floors,
+        height=height,
+        processors=processors,
+    )
+    if len(building_files) == 0:
+        raise Exception("No such buildings")
+
+    return [
+        BuildingConfig(
+            path_to_building=building_file,
+            path_to_weather=weather_file,
+            characteristics=characteristics,
+            reward_type=reward_type,
+            energy_weight=1.0,
+            eplus_output_dir=eplus_output_dir,
+        )
+        for (building_file, characteristics) in building_files
+        for weather_file in weather_files
+    ]
+
+
 def building_config(
     state: StateCode,
     county: str,
@@ -146,5 +192,6 @@ __all__ = [
     "search_building",
     "search_weather",
     "building_config",
+    "building_configs",
     "building_env",
 ]
