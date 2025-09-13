@@ -458,26 +458,36 @@ def glue_surfaces(epjson_in: Derivation) -> Derivation:
     return GlueSurfaces(epjson_in)
 
 
-def create_complete_pipeline(
-    input_file: Derivation, energyplus_path: Derivation
-) -> Derivation:
-    """Create a complete processing pipeline from raw IDF to ready-to-go epJSON."""
+all_transitions: list[Transition] = [
+    "9.4.0-to-9.5.0",
+    "9.5.0-to-9.6.0",
+    "9.6.0-to-22.1.0",
+    "22.1.0-to-22.2.0",
+    "22.2.0-to-23.1.0",
+    "23.1.0-to-23.2.0",
+    "23.2.0-to-24.1.0",
+]
 
+
+def upgrade(
+    input_file: Derivation, energyplus_path: Derivation, transitions=all_transitions
+) -> Derivation:
     # Multi-step upgrade process
-    transitions: list[Transition] = [
-        "9.4.0-to-9.5.0",
-        "9.5.0-to-9.6.0",
-        "9.6.0-to-22.1.0",
-        "22.1.0-to-22.2.0",
-        "22.2.0-to-23.1.0",
-        "23.1.0-to-23.2.0",
-        "23.2.0-to-24.1.0",
-    ]
 
     # Chain upgrades
     current = input_file
     for transition in transitions:
         current = upgrade_idf(current, transition, energyplus_path)
+
+    return current
+
+
+def create_complete_pipeline(
+    input_file: Derivation, energyplus_path: Derivation, *, transitions=all_transitions
+) -> Derivation:
+    """Create a complete processing pipeline from raw IDF to ready-to-go epJSON."""
+
+    current = upgrade(input_file, energyplus_path, transitions=transitions)
 
     # Convert to epJSON
     current = convert_idf(current, energyplus_path)
@@ -490,7 +500,7 @@ def create_complete_pipeline(
     current = modify_timestep(current, timesteps_per_hour=4)
     current = add_setpoint_control(current)
 
-    # Final processing
-    current = glue_surfaces(current)
+    # # Final processing
+    # current = glue_surfaces(current)
 
     return current
