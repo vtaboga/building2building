@@ -5,31 +5,39 @@ import shutil
 import sys
 from pathlib import Path
 
-import building2building.env as b2benv
 import gymnasium as gym
 import numpy as np
 import pytest
+from building2building.env import STORE_PATH, energyplus_path
+from building2building.pipeline import create_complete_pipeline
 from building2building.simulator.action_spaces import (
     DualSetpoint,
     get_controllable_setpoints,
 )
-from building2building.types import BuildingCharacteristics, BuildingConfig
+from building2building.store import InputFile, build
+from building2building.types import BaseRewardConfig, BuildingConfig
 from minergym.ontology import Ontology
 
-b2benv.DataPaths._data_path.set(Path("tests/data").resolve())
+here = Path(__file__).parent.resolve()
 
 
 @pytest.fixture
 def weather_file():
-    return (
-        b2benv.DataPaths.weather_dir()
-        / "USA_VT_Bennington-Morse.State.AP.726166_TMYx.2004-2018.epw"
+    return build(
+        STORE_PATH.get(),
+        InputFile(
+            here / "data/USA_VT_Bennington-Morse.State.AP.726166_TMYx.2004-2018.epw",
+        ),
     )
 
 
 @pytest.fixture
 def building_epjson():
-    return b2benv.DataPaths.processed_dir() / "VT/Caledonia/1002000371360.epJSON"
+    x = InputFile(
+        here / "data/1002000371360.idf",
+    )
+
+    return build(STORE_PATH.get(), create_complete_pipeline(x, energyplus_path()))
 
 
 @pytest.fixture
@@ -38,30 +46,14 @@ def ont_building(building_epjson):
 
 
 @pytest.fixture
-def building_characteristics(building_epjson):
-    return BuildingCharacteristics.load_json(building_epjson.with_suffix(".json"))
-
-
-def test_gym_wrapper():
-    # Create environment using gym registration - note the exact ID match
-    pytest.skip("for now")
-    eplus_output_dir = Path("eplus_output")
-
-    building_characteristics = BuildingCharacteristics.load_json(
-        Path("tests/fixtures/building.json")
-    )
-
-    building_config = BuildingConfig(
-        Path("tests/fixtures/building.epJSON"),
-        Path("tests/fixtures/alaska.epw"),
-        building_characteristics,
-        "base",
+def building_config(building_epjson, weather_file):
+    config = BuildingConfig(
+        building_epjson,
+        weather_file,
+        BaseRewardConfig(1000),
         1.0,
-        eplus_output_dir,
+        Path("eplus_output"),
     )
-
-    if b2benv.ENERGYPLUS_PATH.get(None) is None:
-        pytest.skip("Energyplus not installed or not setup.")
 
 
 def test_get_controllable_setpoints(ont_building):
@@ -76,6 +68,7 @@ def test_get_controllable_setpoints(ont_building):
     zone_setpoints_1z = setpoints_1z["Space 1 ZN"]
     assert zone_setpoints_1z == [
         DualSetpoint(
+            name="Space Type 1 Thermostat 2",
             heating_actuator="Zone Temperature Control,Temperature Heating Setpoint,Space 1 ZN",
             heating_schedule="Space Type 1 Thermostat 2 Heating Setpoint",
             cooling_actuator="Zone Temperature Control,Temperature Cooling Setpoint,Space 1 ZN",
@@ -84,16 +77,13 @@ def test_get_controllable_setpoints(ont_building):
     ]
 
 
-def test_gym_environment_creation(
-    building_epjson, weather_file, building_characteristics
-):
+def test_gym_environment_creation(building_epjson, weather_file):
     """Test creating and using the gym environment."""
 
     config = BuildingConfig(
         building_epjson,
         weather_file,
-        building_characteristics,
-        "base",
+        BaseRewardConfig(1000),
         1.0,
         Path("help"),
     )

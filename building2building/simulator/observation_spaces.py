@@ -3,6 +3,15 @@ from typing import Any, Callable
 
 import gymnasium as gym
 import numpy as np
+from gymnasium.spaces import Box, Dict
+from minergym.ontology import Ontology
+from minergym.simulation import (
+    FunctionHole,
+    MeterHole,
+    VariableHole,
+    api,
+)
+
 from building2building.simulator.transform_utils import (
     Transform,
     TransformCompose,
@@ -13,14 +22,6 @@ from building2building.simulator.transform_utils import (
     TransformMonoList,
     TransformScalarToArray,
     transform_flatten,
-)
-from gymnasium.spaces import Box, Dict
-from minergym.ontology import Ontology
-from minergym.simulation import (
-    FunctionHole,
-    MeterHole,
-    VariableHole,
-    api,
 )
 
 

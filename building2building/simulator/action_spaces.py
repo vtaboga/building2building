@@ -306,7 +306,7 @@ def single_thermostat_transform(t: ThermostatSetpoint) -> Transform[list, Box]:
 
         case SingleCooling():
             return TransformListToArray(
-                ActuatorHole("Schedule:Compact", "Schedule Value", t.schedule),
+                [ActuatorHole("Schedule:Compact", "Schedule Value", t.schedule)],
                 Box(np.array([16]), np.array([40])),
             )
 

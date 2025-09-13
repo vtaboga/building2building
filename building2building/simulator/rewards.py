@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 
 import numpy as np
+
 from building2building.simulator.action_spaces import ThermostatSetpoint
-from building2building.types import BuildingCharacteristics
 
 
 def base_reward_function(
     obs,
-    building_characteristics: BuildingCharacteristics,
+    area: float,
     setpoints: dict[str, list[ThermostatSetpoint]] | None = None,
     energy_weight=1.0,
 ) -> float:
@@ -24,7 +24,7 @@ def base_reward_function(
 
     # Energy consumption penalty (in Wh/floor area)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
-    energy_penalty = energy_penalty / 3600.0 / building_characteristics.area
+    energy_penalty = energy_penalty / 3600.0 / area
 
     # If no setpoints provided, return just the power penalty
     if setpoints is None:
@@ -54,19 +54,17 @@ def base_reward_function(
 
 @dataclass
 class BaseReward:
-    building_characteristics: BuildingCharacteristics
+    area: float
     setpoints: dict[str, list[ThermostatSetpoint]]
     energy_weight: float
 
     def __call__(self, obs):
-        return base_reward_function(
-            obs, self.building_characteristics, self.setpoints, self.energy_weight
-        )
+        return base_reward_function(obs, self.area, self.setpoints, self.energy_weight)
 
 
 def barrier_reward_function(
     obs,
-    building_characteristics: BuildingCharacteristics,
+    area: float,
     setpoints: dict[str, list[ThermostatSetpoint]] | None = None,
     energy_weight=1.0,
 ) -> float:
@@ -85,7 +83,7 @@ def barrier_reward_function(
     energy_penalty = (
         obs["energy"]["HVAC_electricity"] + obs["energy"]["HVAC_natural_gas"]
     )
-    energy_penalty = energy_penalty / 3600.0 / building_characteristics.area
+    energy_penalty = energy_penalty / 3600.0 / area
 
     # If no setpoints provided, return just the power penalty
     if setpoints is None:
@@ -113,11 +111,11 @@ def barrier_reward_function(
 
 @dataclass
 class BarrierReward:
-    building_characteristics: BuildingCharacteristics
+    area: float
     setpoints: dict[str, list[ThermostatSetpoint]]
     energy_weight: float
 
     def __call__(self, obs):
         return barrier_reward_function(
-            obs, self.building_characteristics, self.setpoints, self.energy_weight
+            obs, self.area, self.setpoints, self.energy_weight
         )

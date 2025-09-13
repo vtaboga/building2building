@@ -18,10 +18,8 @@ from building2building.store import (
     DownloadFile,
     ExtractZip,
     build,
-    default_hash,
 )
-from building2building.types import BuildingCharacteristics, BuildingConfig
-from minergym.ontology import Ontology
+from building2building.types import BaseRewardConfig, BuildingConfig
 
 logger = logging.getLogger(__name__)
 
@@ -357,22 +355,10 @@ def search_building_config(
         ),
     )
 
-    ont = Ontology.from_json(building_path)
-    zone_list = [n.toPython() for n in ont.zones()]
-
-    characteristics = BuildingCharacteristics(
-        b.BuildingType,
-        b.NumFloors,
-        b.Area,
-        b.Height,
-        zone_list,
-    )
-
     return BuildingConfig(
         building_path,
         Path(weather_file),
-        characteristics,
-        "base",
+        BaseRewardConfig(b.Area),
         1.0,
         eplus_output_dir=eplus_output_dir,
     )

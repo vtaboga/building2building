@@ -4,9 +4,11 @@ from pathlib import Path
 from typing import Any
 
 import gymnasium as gym
-import minergym.config as config
-import minergym.simulation as simulation
 import numpy as np
+from minergym.environment import EnergyPlusEnvironment
+from minergym.ontology import Ontology
+from minergym.simulation import EnergyPlusSimulation
+
 from building2building.simulator.action_spaces import (
     get_controllable_setpoints,
     many_thermostats_transform,
@@ -18,13 +20,12 @@ from building2building.simulator.observation_spaces import (
 from building2building.simulator.rewards import (
     BarrierReward,
     BaseReward,
-    barrier_reward_function,
-    base_reward_function,
 )
-from building2building.types import BuildingConfig
-from minergym.environment import EnergyPlusEnvironment
-from minergym.ontology import Ontology
-from minergym.simulation import ActuatorHole, EnergyPlusSimulation
+from building2building.types import (
+    BarrierRewardConfig,
+    BaseRewardConfig,
+    BuildingConfig,
+)
 
 from .transform_utils import TransformInverse
 
@@ -101,20 +102,22 @@ def create_simulator(building_config: BuildingConfig) -> gym.Env:
         log_dir=eplus_output_dir,
     )
 
-    if building_config.reward_type == "barrier":
+    if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
-            building_config.characteristics, setpoints, building_config.energy_weight
+            building_config.reward_config.area,
+            setpoints,
+            building_config.energy_weight,
         )
-    elif building_config.reward_type == "base":
+    elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
-            building_config.characteristics, setpoints, building_config.energy_weight
+            building_config.reward_config.area, setpoints, building_config.energy_weight
         )
     else:
-        raise ValueError(f"Invalid reward type: {building_config.reward_type}")
+        raise ValueError(f"Invalid reward type: {building_config.reward_config}")
 
     # Finally, we compute the data necessary to fillin the metadata
     controlled_zones = list(setpoints.keys())
-    all_zones = building_config.characteristics.zone_lists
+    all_zones = [z.toPython() for z in ont.zones()]
     uncontrolled_zones = [zone for zone in all_zones if zone not in controlled_zones]
 
     gymenv = EnergyPlusEnvironment[np.ndarray, np.ndarray](
@@ -165,20 +168,20 @@ def create_simulator_dict(building_config: BuildingConfig) -> gym.Env:
         log_dir=eplus_output_dir,
     )
 
-    if building_config.reward_type == "barrier":
+    if building_config.reward_config == "barrier":
         reward_function = BarrierReward(
-            building_config.characteristics, setpoints, building_config.energy_weight
+            building_config.reward_config.area, setpoints, building_config.energy_weight
         )
-    elif building_config.reward_type == "base":
+    elif building_config.reward_config == "base":
         reward_function = BaseReward(
-            building_config.characteristics, setpoints, building_config.energy_weight
+            building_config.reward_config.area, setpoints, building_config.energy_weight
         )
     else:
-        raise ValueError(f"Invalid reward type: {building_config.reward_type}")
+        raise ValueError(f"Invalid reward type: {building_config.reward_config}")
 
     # Finally, we compute the data necessary to fillin the metadata
     controlled_zones = list(setpoints.keys())
-    all_zones = building_config.characteristics.zone_lists
+    all_zones = [z.toPython() for z in ont.zones()]
     uncontrolled_zones = [zone for zone in all_zones if zone not in controlled_zones]
 
     gymenv = EnergyPlusEnvironment[np.ndarray, np.ndarray](

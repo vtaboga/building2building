@@ -2,14 +2,14 @@ from pathlib import Path
 
 from building2building.env import setup_energyplus_path
 from building2building.sources import autobem
+from building2building.sources.autobem import StateCode
 
 setup_energyplus_path()
 
 
 from gymnasium.envs.registration import register
 
-from building2building.simulator.create_simulator import create_simulator
-from building2building.types import StateCode
+from building2building.simulator import create_simulator
 
 register(
     id="EnergyPlus-v0",
@@ -66,5 +66,5 @@ def autobem_env(
 
 __all__ = [
     "autobem_search_config",
-    "building_env",
+    "autobem_env",
 ]

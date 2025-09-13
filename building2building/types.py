@@ -1,114 +1,25 @@
-import dataclasses
-import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, get_args
-
-from typing_extensions import Self
+from typing import Union
 
 
 @dataclass
-class BuildingCharacteristics:
-    building_type: str
-    num_floors: int
+class BaseRewardConfig:
     area: float
-    height: float
-    zone_lists: list[str]
-
-    @classmethod
-    def load_json(cls, json_path: Path) -> Self:
-        """Load building characteristics from a JSON file."""
-        with open(json_path, "r") as f:
-            data = json.load(f)
-
-        return cls.from_dict(data)
-
-    def save_json(self, json_path: Path):
-        with open(json_path, "w") as f:
-            json.dump(dataclasses.asdict(self), f)
-
-    @classmethod
-    def from_dict(cls, data: dict) -> Self:
-        """Create instance from dictionary."""
-        return cls(
-            building_type=data["building_type"],
-            num_floors=data["num_floors"],
-            area=data["area"],
-            height=data["height"],
-            zone_lists=data["zone_lists"],
-        )
 
 
-RewardType = Literal["barrier", "base"]
+@dataclass
+class BarrierRewardConfig:
+    area: float
+
+
+RewardConfig = Union[BaseRewardConfig, BarrierRewardConfig]
 
 
 @dataclass
 class BuildingConfig:
     path_to_building: Path
     path_to_weather: Path
-    characteristics: BuildingCharacteristics
-    reward_type: RewardType
+    reward_config: RewardConfig
     energy_weight: float
     eplus_output_dir: Path
-
-
-StateCode = Literal[
-    "AK",
-    "AL",
-    "AR",
-    "AZ",
-    "CA",
-    "CO",
-    "CT",
-    "DC",
-    "DE",
-    "FL",
-    "GA",
-    "HI",
-    "IA",
-    "ID",
-    "IL",
-    "IN",
-    "KS",
-    "KY",
-    "LA",
-    "MA",
-    "MD",
-    "ME",
-    "MI",
-    "MN",
-    "MO",
-    "MS",
-    "MT",
-    "NC",
-    "ND",
-    "NE",
-    "NH",
-    "NJ",
-    "NM",
-    "NV",
-    "NY",
-    "OH",
-    "OK",
-    "OR",
-    "PA",
-    "RI",
-    "SC",
-    "SD",
-    "TN",
-    "TX",
-    "UT",
-    "VA",
-    "VT",
-    "WA",
-    "WI",
-    "WV",
-    "WY",
-]
-
-
-def validate_state_code(code: str) -> StateCode:
-    if code in get_args(StateCode):
-        return code  # type: ignore
-    else:
-        raise Exception(f"{code} is not a valid state code")
