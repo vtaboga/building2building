@@ -299,9 +299,9 @@ class Symlink(Derivation):
 
 
 def build(store_path: Path, step: Derivation) -> Path:
-    name = step.name()
+    output_name = step.name()
     h = step.hash()
-    loc = store_path / (h.hex() + "-" + name)
+    loc = store_path / (h.hex() + "-" + output_name)
 
     if loc.exists():
         return loc
@@ -312,7 +312,7 @@ def build(store_path: Path, step: Derivation) -> Path:
     for name, dep in step.dependencies().items():
         deps[name] = build(store_path, dep)
 
-    logger.info(f"Building {name}")
+    logger.info(f"Building {output_name}")
     step.build(loc, deps)
 
     return loc
