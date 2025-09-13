@@ -1,7 +1,0 @@
-# CQL specific parameters
-cql:
-  cql_weight: 1.0
-  temperature: 1.0
-  with_lagrange: true
-  lagrange_threshold: 10.0
-  cql_alpha_lr: 0.0003

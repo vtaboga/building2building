@@ -1,8 +1,0 @@
-# TD3BC specific parameters
-td3bc:
-  policy_noise: 0.2
-  noise_clip: 0.5
-  policy_freq: 2
-  alpha: 2.5
-  
-  
