@@ -361,4 +361,6 @@ def search_building_config(
         BaseRewardConfig(b.Area),
         1.0,
         eplus_output_dir=eplus_output_dir,
+        # Empirically, this works for this dataset.
+        warmup_phases=5,
     )

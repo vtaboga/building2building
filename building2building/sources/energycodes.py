@@ -153,3 +153,17 @@ def search_weathers(
     df = expr.to_df()
 
     return df.assign(derivation=df["path"].apply(lambda path: Symlink(Path(path))))
+
+
+def search_config() -> BuildingConfig:
+    b = build(STORE_PATH.get(), search_buildings().iloc[0].derivation)
+    w = build(STORE_PATH.get(), search_weathers().iloc[0].derivation)
+
+    return BuildingConfig(
+        path_to_building=b,
+        path_to_weather=w,
+        reward_config=BaseRewardConfig(1000.0),
+        energy_weight=1.0,
+        eplus_output_dir=Path(tempfile.mkdtemp()),
+        warmup_phases=3,
+    )

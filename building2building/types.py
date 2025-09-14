@@ -23,3 +23,4 @@ class BuildingConfig:
     reward_config: RewardConfig
     energy_weight: float
     eplus_output_dir: Path
+    warmup_phases: int

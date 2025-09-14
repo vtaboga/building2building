@@ -43,6 +43,7 @@ class MakeEnergyPlus:
     action_template: Any
     verbose: bool
     log_dir: Path
+    warmup_phases: int
 
     def __call__(self) -> EnergyPlusSimulation:
         sim = EnergyPlusSimulation(
@@ -52,6 +53,7 @@ class MakeEnergyPlus:
             self.action_template,
             verbose=self.verbose,
             log_dir=self.log_dir,
+            warmup_phases=self.warmup_phases,
         )
 
         return sim
@@ -100,6 +102,7 @@ def create_simulator(building_config: BuildingConfig) -> gym.Env:
         action_transform.domain(),
         verbose=False,
         log_dir=eplus_output_dir,
+        warmup_phases=building_config.warmup_phases,
     )
 
     if isinstance(building_config.reward_config, BarrierRewardConfig):
