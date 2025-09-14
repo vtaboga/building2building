@@ -148,6 +148,7 @@ def get_controllable_setpoints(
             continue
 
         control_type: Node = setpoint_results[0].control_type
+        control_type_str: str = control_type.toPython()
         setpoint: Node = setpoint_results[0].setpoint
         logger.debug(f"Control type: {control_type}")
         logger.debug(f"Setpoint name: {setpoint}")
@@ -159,7 +160,7 @@ def get_controllable_setpoints(
             if zone_name not in zone_setpoints:
                 zone_setpoints[zone_name] = []
 
-            if str(control_type) == "ThermostatSetpoint:DualSetpoint":
+            if control_type_str == "ThermostatSetpoint:DualSetpoint":
                 logger.debug(f"Querying dual setpoint schedules for: {setpoint}")
                 # Get heating and cooling schedule names
                 dual_query = """
@@ -198,7 +199,7 @@ def get_controllable_setpoints(
                         )
                     )
 
-            elif control_type == "ThermostatSetpoint:SingleHeating":
+            elif control_type_str == "ThermostatSetpoint:SingleHeating":
                 # Get heating schedule name
 
                 heating_query = """
@@ -223,7 +224,7 @@ def get_controllable_setpoints(
                         )
                     )
 
-            elif control_type == "ThermostatSetpoint:SingleCooling":
+            elif control_type_str == "ThermostatSetpoint:SingleCooling":
                 # Get cooling schedule name
 
                 cooling_query = """
@@ -247,7 +248,7 @@ def get_controllable_setpoints(
                         )
                     )
 
-            elif control_type == "ThermostatSetpoint:SingleHeatingOrCooling":
+            elif control_type_str == "ThermostatSetpoint:SingleHeatingOrCooling":
                 # Get schedule name
 
                 schedule_query = """
@@ -275,7 +276,7 @@ def get_controllable_setpoints(
                         )
                     )
             else:
-                logger.debug(f"found strange control type: {control_type}")
+                raise Exception(f"unexpected control type: {control_type}")
 
     return zone_setpoints
 
