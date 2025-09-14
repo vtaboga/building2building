@@ -143,45 +143,17 @@ class AddHVACMeters(BaseDerivation):
 
     def build(self, dst: Path, deps):
         with open(deps["input"], "r") as f:
-            epjson = json.load(f)
+            epjson: dict = json.load(f)
 
-        # Check if we already have the necessary meters
-        has_elec_hvac_meter = False
-        has_gas_hvac_meter = False
+        output_meter: dict = epjson.setdefault("Output:Meter", {})
 
-        # Check existing Output:Meter objects
-        if "Output:Meter" in epjson:
-            for meter_key, meter_data in epjson["Output:Meter"].items():
-                if (
-                    meter_data.get("key_name") == "Electricity:HVAC"
-                    and meter_data.get("reporting_frequency") == "Timestep"
-                ):
-                    has_elec_hvac_meter = True
-                if (
-                    meter_data.get("key_name") == "NaturalGas:HVAC"
-                    and meter_data.get("reporting_frequency") == "Timestep"
-                ):
-                    has_gas_hvac_meter = True
+        electricity_hvac = output_meter.setdefault("Output:Meter:ElectricityHVAC", {})
+        electricity_hvac["key_name"] = "Electricity:HVAC"
+        electricity_hvac["reporting_frequency"] = "Timestep"
 
-        # Make sure the Output:Meter category exists
-        if "Output:Meter" not in epjson:
-            epjson["Output:Meter"] = {}
-
-        # Add electricity HVAC meter if needed
-        if not has_elec_hvac_meter:
-            epjson["Output:Meter"]["Output:Meter:ElectricityHVAC"] = {
-                "key_name": "Electricity:HVAC",
-                "reporting_frequency": "Timestep",
-            }
-            logger.info("Added Electricity:HVAC meter with Timestep reporting")
-
-        # Add natural gas HVAC meter if needed
-        if not has_gas_hvac_meter:
-            epjson["Output:Meter"]["Output:Meter:NaturalGasHVAC"] = {
-                "key_name": "NaturalGas:HVAC",
-                "reporting_frequency": "Timestep",
-            }
-            logger.info("Added NaturalGas:HVAC meter with Timestep reporting")
+        natural_gas_hvac = output_meter.setdefault("Output:Meter:NaturalGasHVAC", {})
+        natural_gas_hvac["key_name"] = "NaturalGas:HVAC"
+        natural_gas_hvac["reporting_frequency"] = "Timestep"
 
         with open(dst, "w") as f:
             json.dump(epjson, f, indent=4)

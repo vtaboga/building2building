@@ -59,7 +59,7 @@ class MakeEnergyPlus:
         return sim
 
 
-def create_simulator(building_config: BuildingConfig) -> gym.Env:
+def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     """
     Create a simulator for a given building and weather file.
 

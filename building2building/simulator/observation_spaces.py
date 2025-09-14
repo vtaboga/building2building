@@ -1,3 +1,4 @@
+from ctypes import c_void_p
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -14,12 +15,7 @@ from minergym.simulation import (
 
 from building2building.simulator.transform_utils import (
     Transform,
-    TransformCompose,
-    TransformDict,
     TransformDictSpace,
-    TransformIdentity,
-    TransformListToArray,
-    TransformMonoList,
     TransformScalarToArray,
     transform_flatten,
 )
@@ -49,6 +45,48 @@ class ObservationInfo:
     slot_names: list[str]
     flatten: Callable[[Any], np.ndarray]
     space: Box
+
+
+@dataclass
+class StateZero:
+    pass
+
+
+@dataclass
+class StateHandle:
+    handle: int
+
+
+@dataclass
+class DynamicMeter:
+    """Return the value of the first present meter in its candidate list, or
+    zero.
+
+    When no gas consuming equipment is connected to the HVAC system of a
+    building, the NaturalGas:HVAC meter is unavailable (even if we explicitely
+    add it to the epJSON file). In that case, it makes sense to return zero. In the future,
+
+    """
+
+    candidates: list[str]
+    state: None | StateZero | StateHandle = None
+
+    def __call__(self, state: c_void_p) -> float:
+        if self.state is None:
+            for meter_name in self.candidates:
+                han = api.exchange.get_meter_handle(state, meter_name)
+                if han < 0:
+                    continue
+                self.state = StateHandle(han)
+                break
+            if self.state is None:
+                self.state = StateZero()
+
+        match self.state:
+            case StateHandle(han):
+                return api.exchange.get_meter_value(state, han)
+            case StateZero():
+                return 0.0
 
 
 def flat_observation_info(ont: Ontology) -> ObservationInfo:
@@ -105,12 +143,12 @@ def flat_observation_info(ont: Ontology) -> ObservationInfo:
         "energy": {
             "natural_gas": (
                 "energy_gas",
-                MeterHole("NaturalGas:HVAC"),
+                FunctionHole(DynamicMeter(["NaturalGas:HVAC"])),
                 (0.0, float("inf")),
             ),
             "electricity": (
                 "energy_electricity",
-                MeterHole("Electricity:HVAC"),
+                FunctionHole(DynamicMeter(["Electricity:HVAC"])),
                 (0.0, float("inf")),
             ),
         },
