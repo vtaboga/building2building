@@ -254,6 +254,13 @@ class Child(BaseDerivation):
     def name(self) -> str:
         return Path(self.path).name
 
+    def hash(self) -> bytes:
+        hasher = hashlib.sha256()
+        hasher.update(self.salt())
+        hasher.update(self.input.hash())
+        hasher.update(self.path.encode("utf-8"))
+        return hasher.digest()
+
     def build(
         self,
         dst: Path,
