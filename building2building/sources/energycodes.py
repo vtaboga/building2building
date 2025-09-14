@@ -1,9 +1,9 @@
 import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 import duckdb
-import pandas as pd
 from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import create_complete_pipeline
 from building2building.store import (
@@ -14,6 +14,8 @@ from building2building.store import (
     Symlink,
     build,
 )
+from building2building.types import BaseRewardConfig, BuildingConfig
+from pandas import DataFrame
 
 
 def ASHRAE901_all() -> Derivation:
@@ -58,7 +60,7 @@ class IndexBuildings(BaseDerivation):
         # Sort by building type, then year, then place for consistent ordering
         records.sort(key=lambda x: (x[0], x[1], x[2]))
 
-        df = pd.DataFrame(records, columns=["building_type", "year", "place", "path"])
+        df = DataFrame(records, columns=["building_type", "year", "place", "path"])
         df.to_parquet(str(dst))
 
 
@@ -89,29 +91,29 @@ class IndexWeathers(BaseDerivation):
         # Sort by building type, then year, then place for consistent ordering
         records.sort(key=lambda x: (x[0], x[1], x[2]))
 
-        df = pd.DataFrame(records, columns=["state", "county", "path"])
+        df = DataFrame(records, columns=["state", "county", "path"])
         df.to_parquet(str(dst))
 
 
 def search_buildings(
     building_type: str | None = None, year: int | None = None, place: str | None = None
-) -> pd.DataFrame:
+) -> DataFrame:
     idf_index = build(STORE_PATH.get(), IndexBuildings(ASHRAE901_all()))
     db = duckdb.from_parquet(str(idf_index))
 
     expr = db
-    if building_type != None:
+    if building_type is not None:
         expr = expr.filter(
             duckdb.ColumnExpression("building_type")
             == duckdb.ConstantExpression(building_type)
         )
 
-    if year != None:
+    if year is not None:
         expr = expr.filter(
             duckdb.ColumnExpression("year") == duckdb.ConstantExpression(year)
         )
 
-    if place != None:
+    if place is not None:
         expr = expr.filter(
             duckdb.ColumnExpression("place") == duckdb.ConstantExpression(place)
         )
@@ -136,7 +138,7 @@ def search_buildings(
 def search_weathers(
     state: str | None = None,
     county: str | None = None,
-):
+) -> DataFrame:
     epw_index = build(STORE_PATH.get(), IndexWeathers(ASHRAE901_all()))
     db = duckdb.from_parquet(str(epw_index))
     expr = db
