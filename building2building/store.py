@@ -1,20 +1,36 @@
 # This is a tiny set of utilities for maintaining a content addressed store of
 # artifaces. Inspired by Nix.
+import contextlib
 import hashlib
 import logging
+import os
 import shutil
 import tarfile
 import tempfile
 import zipfile
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+import git
 import requests
-from tqdm import tqdm
+from rich import console, progress
+from rich.live import Live
+from rich.tree import Tree
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def set_contextvar(var: ContextVar, value):
+    token = var.set(value)
+    try:
+        yield
+    finally:
+        var.reset(token)
 
 
 @runtime_checkable
@@ -97,6 +113,54 @@ class Hasher(Protocol):
     def digest(self) -> bytes: ...
 
 
+current_progress_tree: ContextVar[Tree] = ContextVar("current_progress_tree")
+
+
+def build(store_path: Path, step: Derivation) -> Path:
+    def inner(step: Derivation, live: Live) -> Path:
+        progress_tree = current_progress_tree.get()
+
+        node = progress_tree.add(
+            f"[bold]{step.name()}[/bold] [yellow](building dependencies...)[/yellow]"
+        )
+
+        def over():
+            node.label = f"[bold]{output_name}[/bold] [green]✓[/green]"
+
+        with contextlib.ExitStack() as stack:
+            stack.callback(over)
+
+            with set_contextvar(current_progress_tree, node):
+                output_name = step.name()
+                h = step.hash()
+                loc = store_path / (h.hex() + "-" + output_name)
+
+                # Add this step to the tree
+                if loc.exists():
+                    return loc
+
+                loc.parent.mkdir(exist_ok=True)
+
+                deps = {}
+                for name, dep in step.dependencies().items():
+                    deps[name] = inner(dep, live)
+
+                # Update status to show we're building this step
+                node.label = f"[bold]{output_name}[/bold] [blue](building...)[/blue]"
+                step.build(loc, deps)
+
+                # Mark as complete
+
+        return loc
+
+    tree = Tree("Build Process")
+    with Live(tree, refresh_per_second=10) as live:
+        with set_contextvar(current_progress_tree, tree):
+            result = inner(step, live)
+
+    return result
+
+
 def default_hash(salt: bytes, deps: dict[str, Derivation]) -> bytes:
     """The default hash method.
 
@@ -159,6 +223,7 @@ class DownloadFile(Derivation):
         return self.expected_hash
 
     def build(self, dst: Path, *_):
+        progress_tree = current_progress_tree.get()
         # url: str, dest: Path, description: str | None = None, verify: bool = False
 
         # We don't need to verify, we will be checking the hash
@@ -174,16 +239,21 @@ class DownloadFile(Derivation):
         total_size = int(response.headers.get("content-length", 0))
 
         with tempfile.NamedTemporaryFile("wb", delete=False) as outfile:
-            with tqdm(
-                total=total_size,
-                unit="B",
-                unit_scale=True,
-                desc=f"Downloading {self.name()}",
-            ) as progress_bar:
-                for data in response.iter_content(block_size):
-                    progress_bar.update(len(data))
-                    hasher.update(data)
-                    outfile.write(data)
+            progress_bar = progress.Progress(
+                "[progress.description]{task.description}",
+                progress.BarColumn(),
+                progress.TaskProgressColumn(),
+                progress.DownloadColumn(),
+                progress.TransferSpeedColumn(),
+                progress.TimeRemainingColumn(),
+                console=None,
+            )
+            task = progress_bar.add_task(f"Downloading {self.name()}", total=total_size)
+            for data in response.iter_content(block_size):
+                progress_bar.update(task, advance=len(data))
+                progress_tree.label = progress_bar.get_renderable()
+                hasher.update(data)
+                outfile.write(data)
 
         outfile.close()
         # We compute extract the hash and check it is the same as the one it was
@@ -220,15 +290,20 @@ class ExtractZip(BaseDerivation):
             # Calculate total uncompressed size
             total_size = sum(file_info.file_size for file_info in file_list)
 
-            with tqdm(
-                total=total_size,
-                unit="B",
-                unit_scale=True,
-                desc=f"extracting {self.name()}",
-            ) as progress_bar:
-                for file_info in file_list:
-                    zip_ref.extract(file_info, dst)
-                    progress_bar.update(file_info.file_size)
+            progress_bar = progress.Progress(
+                "[progress.description]{task.description}",
+                progress.BarColumn(),
+                progress.TaskProgressColumn(),
+                progress.DownloadColumn(),
+                progress.TransferSpeedColumn(),
+                progress.TimeRemainingColumn(),
+            )
+            task = progress_bar.add_task(f"Extracting {self.name()}", total=total_size)
+            progress_tree = current_progress_tree.get()
+            for file_info in file_list:
+                zip_ref.extract(file_info, dst)
+                progress_bar.update(task, advance=file_info.file_size)
+                progress_tree.label = progress_bar.get_renderable()
 
 
 @dataclass
@@ -238,11 +313,9 @@ class ExtractTarball(BaseDerivation):
     def name(self) -> str:
         return self.input.name().removesuffix(".tar.gz")
 
-    def build(self, dst: Path, *deps):
-        (p,) = deps
-
+    def build(self, dst: Path, deps):
         # Extract to specific directory
-        with tarfile.open(p, "r:gz") as tar:
+        with tarfile.open(deps["input"], "r:gz") as tar:
             tar.extractall(path=dst)
 
 
@@ -277,13 +350,16 @@ class Symlink(Derivation):
 
     """
 
+    _name: str
+
     destination: Path
 
-    def __init__(self, destination: Path) -> None:
+    def __init__(self, _name: str, destination: Path) -> None:
+        self._name = _name
         self.destination = destination.resolve()
 
     def name(self) -> str:
-        return self.destination.name
+        return self._name
 
     def dependencies(self) -> dict[str, Derivation]:
         return {}
@@ -305,21 +381,156 @@ class Symlink(Derivation):
         dst.symlink_to(self.destination)
 
 
-def build(store_path: Path, step: Derivation) -> Path:
-    output_name = step.name()
-    h = step.hash()
-    loc = store_path / (h.hex() + "-" + output_name)
+def hash_directory_tree(hasher: Hasher, dir: Path):
+    # Get all files and sort them for deterministic ordering
+    file_paths = []
+    for root, dirs, files in os.walk(dir):
+        # Sort directories and files for consistent ordering
+        dirs.sort()
+        files.sort()
+        for file in files:
+            file_paths.append(os.path.join(root, file))
 
-    if loc.exists():
-        return loc
+    # Sort all file paths to ensure deterministic order
+    file_paths.sort()
 
-    loc.parent.mkdir(exist_ok=True)
+    # Hash each file's content
+    for file_path in file_paths:
+        # Include the relative path in the hash for structure integrity
+        rel_path = os.path.relpath(file_path, dir)
+        hasher.update(rel_path.encode("utf-8"))
 
-    deps = {}
-    for name, dep in step.dependencies().items():
-        deps[name] = build(store_path, dep)
+        # Hash the file content
+        with open(file_path, "rb") as f:
+            while chunk := f.read(8192):
+                hasher.update(chunk)
 
-    logger.info(f"Building {output_name}")
-    step.build(loc, deps)
 
-    return loc
+class GitRemoteProgress(git.RemoteProgress):
+    """Stolen from https://stackoverflow.com/a/71285627"""
+
+    OP_CODES = [
+        "BEGIN",
+        "CHECKING_OUT",
+        "COMPRESSING",
+        "COUNTING",
+        "END",
+        "FINDING_SOURCES",
+        "RECEIVING",
+        "RESOLVING",
+        "WRITING",
+    ]
+    OP_CODE_MAP = {
+        getattr(git.RemoteProgress, _op_code): _op_code for _op_code in OP_CODES
+    }
+
+    progressbar: progress.Progress
+    tree: Tree
+
+    def __init__(self, tree: Tree) -> None:
+        super().__init__()
+        self.tree = tree
+        self.progressbar = progress.Progress(
+            progress.SpinnerColumn(),
+            # *progress.Progress.get_default_columns(),
+            progress.TextColumn("[progress.description]{task.description}"),
+            progress.BarColumn(),
+            progress.TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            "eta",
+            progress.TimeRemainingColumn(),
+            progress.TextColumn("{task.fields[message]}"),
+            transient=False,
+        )
+        self.active_task = None
+
+    def __del__(self) -> None:
+        # logger.info("Destroying bar...")
+        # self.progressbar.stop()
+        pass
+
+    @classmethod
+    def get_curr_op(cls, op_code: int) -> str:
+        """Get OP name from OP code."""
+        # Remove BEGIN- and END-flag and get op name
+        op_code_masked = op_code & cls.OP_MASK
+        return cls.OP_CODE_MAP.get(op_code_masked, "?").title()
+
+    def update(
+        self,
+        op_code: int,
+        cur_count: str | float,
+        max_count: str | float | None = None,
+        message: str | None = "",
+    ) -> None:
+        # Start new bar on each BEGIN-flag
+        if op_code & self.BEGIN:
+            self.curr_op = self.get_curr_op(op_code)
+            # logger.info("Next: %s", self.curr_op)
+            self.active_task = self.progressbar.add_task(
+                description=self.curr_op,
+                total=max_count,
+                message=message,
+            )
+
+        self.progressbar.update(
+            task_id=self.active_task,
+            completed=cur_count,
+            message=message,
+        )
+        self.tree.label = self.progressbar.get_renderable()
+
+        # End progress monitoring on each END-flag
+        if op_code & self.END:
+            # logger.info("Done: %s", self.curr_op)
+            self.progressbar.update(
+                task_id=self.active_task,
+                message=f"[bright_black]{message}",
+            )
+
+
+@dataclass
+class GitClone(Derivation):
+    filename: str
+    url: str
+    commit: str
+    expected_hash: bytes
+    hasher: Hasher = field(default_factory=hashlib.sha256)
+
+    def dependencies(self) -> dict[str, Derivation]:
+        return {}
+
+    def name(self) -> str:
+        return self.filename
+
+    def salt(self) -> bytes:
+        return "git-download".encode("utf-8")
+
+    def hash(self) -> bytes:
+        return self.expected_hash
+
+    def build(self, dst: Path, *_):
+        with tempfile.TemporaryDirectory() as tempdir:
+            tempdir_path = Path(tempdir)
+
+            progress_tree = current_progress_tree.get()
+            repo = git.Repo.clone_from(
+                self.url, tempdir_path, progress=GitRemoteProgress(progress_tree)
+            )
+            correct_commit = repo.create_head("correct_commit", self.commit)
+            repo.head.reference = correct_commit
+            assert not repo.head.is_detached
+            # Reset the index and working tree to match the pointed-to commit.
+            repo.head.reset(index=True, working_tree=True)
+
+            repo.close()
+
+            shutil.rmtree(tempdir_path / ".git")
+
+            hash_directory_tree(self.hasher, tempdir_path)
+            h = self.hasher.digest()
+            if h != self.expected_hash:
+                raise Exception(
+                    f"Hash of git repo {self.name()} is wrong. Expected: {self.expected_hash.hex()}, actual: {h.hex()} (computed using {self.hasher})"
+                )
+
+            shutil.move(tempdir_path, dst)
