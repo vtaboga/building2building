@@ -5,13 +5,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 from building2building.env import STORE_PATH
-from building2building.store import (
-    Derivation,
-    DownloadFile,
-    ExtractZip,
-    build,
-    default_hash,
-)
+from building2building.store import Derivation, DownloadFile, ExtractZip, realize
 from shapely.geometry import Point
 
 logger = logging.getLogger(__name__)
@@ -21,7 +15,6 @@ def county_boundaries() -> Derivation:
     url = "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_county_500k.zip"
 
     return ExtractZip(
-        "county_borders",
         DownloadFile(
             "county_borders.zip",
             url,

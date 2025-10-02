@@ -9,19 +9,21 @@ import logging
 import os
 import platform
 import sys
+import sysconfig
 from contextvars import ContextVar
 from functools import cache
 from importlib.util import find_spec
 from pathlib import Path
-from typing import TypeVar
+from typing import Literal, get_args
 
 from building2building.store import (
-    Child,
+    ChildFile,
     Derivation,
     DownloadFile,
     ExtractTarball,
-    Symlink,
-    build,
+    LocalSymlink,
+    Realizable,
+    realize,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,12 +41,16 @@ def get_cache_dir():
         return Path.home() / ".building2building"  # Fallback
 
 
-def energyplus_path() -> Derivation:
-    if p := os.getenv("ENERGYPLUS_PATH"):
-        path = Path(p).resolve()
-        return Symlink(path)
-    else:
-        return Child(
+STORE_PATH: ContextVar[Path] = ContextVar("STORE_PATH")
+STORE_PATH.set(get_cache_dir())
+
+
+Platform = Literal["linux-x86_64"]
+Version = Literal["24.1.0", "24.2.0", "25.1.0"]
+
+binaries: dict[Platform, dict[Version, Derivation]] = {
+    "linux-x86_64": {
+        "24.1.0": ChildFile(
             ExtractTarball(
                 DownloadFile(
                     "energyplus-24.1.0.tar.gz",
@@ -55,13 +61,47 @@ def energyplus_path() -> Derivation:
                 )
             ),
             "EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu20.04-x86_64",
-        )
+        ),
+        "24.2.0": ChildFile(
+            ExtractTarball(
+                DownloadFile(
+                    "energyplus-24.2.0.tar.gz",
+                    "https://github.com/NREL/EnergyPlus/releases/download/v24.2.0a/EnergyPlus-24.2.0-94a887817b-Linux-Ubuntu22.04-x86_64.tar.gz",
+                    bytes.fromhex(
+                        "7b90fb1d6b1e58875217eedbc745e8c6d1476321d6fa4ca1d5833414770096cd"
+                    ),
+                )
+            ),
+            "TODO",
+        ),
+        "25.1.0": ChildFile(
+            ExtractTarball(
+                DownloadFile(
+                    "energyplus-25.1.0",
+                    "https://github.com/NREL/EnergyPlus/releases/download/v25.1.0/EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu24.04-x86_64.tar.gz",
+                    bytes.fromhex(
+                        "db90fb1d6b1e58875217eedbc745e8c6d1476321d6fa4ca1d5833414770096cd"
+                    ),
+                )
+            )
+        ),
+    },
+}
 
 
-STORE_PATH: ContextVar[Path] = ContextVar("STORE_PATH")
-STORE_PATH.set(get_cache_dir())
+def energyplus_path(version: Version = "25.1.0") -> Realizable:
+    current_platform = sysconfig.get_platform()
+    assert current_platform in get_args(Platform)
+    platform: Platform = current_platform  # type: ignore
+
+    if p := os.getenv("ENERGYPLUS_PATH"):
+        path = Path(p).resolve()
+        return LocalSymlink("energyplus-path", path)
+    else:
+        return binaries[platform][version]
 
 
 def setup_energyplus_path():
-    ep = build(STORE_PATH.get(), energyplus_path())
+    ep = realize(STORE_PATH.get(), energyplus_path())
+
     sys.path.append(str(ep))

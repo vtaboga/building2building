@@ -7,12 +7,14 @@ import duckdb
 from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import create_complete_pipeline
 from building2building.store import (
-    BaseDerivation,
+    OUTPUT,
+    Constant,
     Derivation,
     DownloadFile,
     ExtractZip,
-    Symlink,
-    build,
+    Rename,
+    derivation,
+    realize,
 )
 from building2building.types import BaseRewardConfig, BuildingConfig
 from pandas import DataFrame
@@ -20,7 +22,6 @@ from pandas import DataFrame
 
 def ASHRAE901_all() -> Derivation:
     return ExtractZip(
-        "all_buildings",
         DownloadFile(
             "ASHRAE901_all.zip",
             "https://www.energycodes.gov/sites/default/files/2023-10/ASHRAE901_all.zip",
@@ -31,74 +32,64 @@ def ASHRAE901_all() -> Derivation:
     )
 
 
-@dataclass
-class IndexBuildings(BaseDerivation):
-    input: Derivation
+@derivation("idf_index.parquet")
+def index_buildings(input: Path):
+    dst = OUTPUT.get()
+    directory = input
+    records = []
 
-    def name(self):
-        return "idf_index.parquet"
+    pattern = re.compile(r"^ASHRAE901_([^_]+)_STD(\d{4})_([^.]+)\.idf$")
 
-    def build(self, dst: Path, deps: dict[str, Path]):
-        directory = deps["input"]
-        records = []
+    # Get all .idf files in the directory
+    directory_path = Path(directory)
+    for file_path in directory_path.glob("*.idf"):
+        filename = file_path.name
+        match = pattern.match(filename)
 
-        pattern = re.compile(r"^ASHRAE901_([^_]+)_STD(\d{4})_([^.]+)\.idf$")
+        if match:
+            building_type = match.group(1)
+            year = match.group(2)
+            place = match.group(3)
 
-        # Get all .idf files in the directory
-        directory_path = Path(directory)
-        for file_path in directory_path.glob("*.idf"):
-            filename = file_path.name
-            match = pattern.match(filename)
+            records.append((building_type, int(year), place, str(file_path)))
 
-            if match:
-                building_type = match.group(1)
-                year = match.group(2)
-                place = match.group(3)
+    # Sort by building type, then year, then place for consistent ordering
+    records.sort(key=lambda x: (x[0], x[1], x[2]))
 
-                records.append((building_type, int(year), place, str(file_path)))
-
-        # Sort by building type, then year, then place for consistent ordering
-        records.sort(key=lambda x: (x[0], x[1], x[2]))
-
-        df = DataFrame(records, columns=["building_type", "year", "place", "path"])
-        df.to_parquet(str(dst))
+    df = DataFrame(records, columns=["building_type", "year", "place", "path"])
+    df.to_parquet(str(dst))
 
 
-@dataclass
-class IndexWeathers(BaseDerivation):
-    input: Derivation
+@derivation("epw_index.parquet")
+def index_weathers(input: Path):
+    dst = OUTPUT.get()
+    directory = input
+    records = []
 
-    def name(self):
-        return "epw_index.parquet"
+    pattern = re.compile(r"^USA_([^.]+)_([^.]+).*$")
 
-    def build(self, dst: Path, deps: dict[str, Path]):
-        directory = deps["input"]
-        records = []
+    # Get all .idf files in the directory
+    for file_path in directory.glob("*.epw"):
+        filename = file_path.name
+        match = pattern.match(filename)
 
-        pattern = re.compile(r"^USA_([^.]+)_([^.]+).*$")
+        if match:
+            state = match.group(1)
+            county = match.group(2)
 
-        # Get all .idf files in the directory
-        for file_path in directory.glob("*.epw"):
-            filename = file_path.name
-            match = pattern.match(filename)
+            records.append((state, county, str(file_path)))
 
-            if match:
-                state = match.group(1)
-                county = match.group(2)
+    # Sort by building type, then year, then place for consistent ordering
+    records.sort(key=lambda x: (x[0], x[1], x[2]))
 
-                records.append((state, county, str(file_path)))
-
-        # Sort by building type, then year, then place for consistent ordering
-        records.sort(key=lambda x: (x[0], x[1], x[2]))
-
-        df = DataFrame(records, columns=["state", "county", "path"])
-        df.to_parquet(str(dst))
+    df = DataFrame(records, columns=["state", "county", "path"])
+    df.to_parquet(str(dst))
 
 
 def search_buildings(
     building_type: str | None = None, year: int | None = None, place: str | None = None
 ) -> DataFrame:
-    idf_index = build(STORE_PATH.get(), IndexBuildings(ASHRAE901_all()))
+    idf_index = realize(STORE_PATH.get(), index_buildings(ASHRAE901_all()))
     db = duckdb.from_parquet(str(idf_index))
 
     expr = db
@@ -120,26 +111,23 @@ def search_buildings(
 
     df = expr.to_df()
 
+    ep = energyplus_path()
+
     def trans(path):
-        return create_complete_pipeline(
-            Symlink(Path(path)),
-            energyplus_path(),
-            transitions=[
-                "22.1.0-to-22.2.0",
-                "22.2.0-to-23.1.0",
-                "23.1.0-to-23.2.0",
-                "23.2.0-to-24.1.0",
-            ],
+        return lambda: create_complete_pipeline(
+            Constant(path),
+            ep,
+            src_version="22.1.0",
         )
 
-    return df.assign(derivation=df["path"].apply(trans))
+    return df.assign(derivation_thunk=df["path"].apply(trans))
 
 
 def search_weathers(
     state: str | None = None,
     county: str | None = None,
 ) -> DataFrame:
-    epw_index = build(STORE_PATH.get(), IndexWeathers(ASHRAE901_all()))
+    epw_index = realize(STORE_PATH.get(), index_weathers(ASHRAE901_all()))
     db = duckdb.from_parquet(str(epw_index))
     expr = db
     if state is not None:
@@ -154,12 +142,12 @@ def search_weathers(
 
     df = expr.to_df()
 
-    return df.assign(derivation=df["path"].apply(lambda path: Symlink(Path(path))))
+    return df.assign(derivation=df["path"].apply(Constant))
 
 
 def search_config() -> BuildingConfig:
-    b = build(STORE_PATH.get(), search_buildings().iloc[0].derivation)
-    w = build(STORE_PATH.get(), search_weathers().iloc[0].derivation)
+    b = realize(STORE_PATH.get(), search_buildings().iloc[0].derivation_thunk())
+    w = realize(STORE_PATH.get(), search_weathers().iloc[0].derivation)
 
     return BuildingConfig(
         path_to_building=b,

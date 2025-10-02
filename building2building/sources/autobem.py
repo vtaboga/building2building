@@ -12,12 +12,13 @@ from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import create_complete_pipeline
 from building2building.sources.geo import get_counties_from_coords_batch
 from building2building.store import (
-    BaseDerivation,
-    Child,
+    OUTPUT,
+    ChildFile,
     Derivation,
     DownloadFile,
     ExtractZip,
-    build,
+    derivation,
+    realize,
 )
 from building2building.types import BaseRewardConfig, BuildingConfig
 
@@ -170,80 +171,60 @@ def metadata_csv(state: StateCode) -> Derivation:
     return DownloadFile(f"{state}.csv", metadata_url, hash, hashlib.md5())
 
 
-@dataclass
-class MetadataKeepCounty(BaseDerivation):
-    metadata: Derivation
-    idf_files: Derivation
-    county: str
+@derivation("metadata-for-county.parquet")
+def MetadataKeepCounty(
+    metadata: Path,
+    idf_files: Path,
+    county: str,
+):
+    dst = OUTPUT.get()
 
-    def name(self) -> str:
-        return "metadata-for-" + self.county + ".parquet"
+    def exists(id: int) -> bool:
+        building_path = idf_files / f"{id}.idf"
 
-    def build(self, dst: Path, deps):
-        def exists(id: int) -> bool:
-            building_path = deps["idf_files"] / f"{id}.idf"
+        return building_path.exists()
 
-            return building_path.exists()
+    ids = [
+        row.ID
+        for row in duckdb.from_parquet(str(metadata))
+        .filter(duckdb.ColumnExpression("County") == duckdb.ConstantExpression(county))
+        .select(duckdb.ColumnExpression("Id"))
+        .to_df()
+        .itertuples()
+    ]
+    existing_ids = list(filter(exists, ids))
 
-        ids = [
-            row.ID
-            for row in duckdb.from_parquet(str(deps["metadata"]))
-            .filter(
-                duckdb.ColumnExpression("County")
-                == duckdb.ConstantExpression(self.county)
-            )
-            .select(duckdb.ColumnExpression("Id"))
-            .to_df()
-            .itertuples()
-        ]
-        existing_ids = list(filter(exists, ids))
-
-        # Read the parquet file as a relation first
-        relation = duckdb.read_parquet(str(deps["metadata"]))
-        # Then use SQL on that relation
-        ids_str = ",".join(map(str, existing_ids))
-        result = relation.filter(f"Id IN ({ids_str})")
-        result.to_parquet(str(dst))
+    # Read the parquet file as a relation first
+    relation = duckdb.read_parquet(str(metadata))
+    # Then use SQL on that relation
+    ids_str = ",".join(map(str, existing_ids))
+    result = relation.filter(f"Id IN ({ids_str})")
+    result.to_parquet(str(dst))
 
 
-@dataclass
-class CsvToParquet(BaseDerivation):
-    csv: Derivation
+@derivation("metadata.parquet")
+def MetadataComputeCounty(
+    metadata: Path,
+):
+    dst = OUTPUT.get()
+    # Read the CSV file
+    df = pd.read_csv(metadata)
 
-    def name(self) -> str:
-        return self.csv.name().replace(".csv", ".parquet")
+    # Split the Centroid column into latitude and longitude
+    df[["Latitude", "Longitude"]] = df["Centroid"].str.split("/", expand=True)
 
-    def build(self, dst: Path, *deps):
-        (csv,) = deps
-        duckdb.from_csv_auto(csv).to_parquet(str(dst))
+    # Convert to float
+    df["Latitude"] = df["Latitude"].astype(float)
+    df["Longitude"] = df["Longitude"].astype(float)
 
+    coords_list = list(zip(df["Latitude"], df["Longitude"]))
+    counties = get_counties_from_coords_batch(coords_list)
 
-@dataclass
-class MetadataComputeCounty(BaseDerivation):
-    metadata: Derivation
+    # Add counties to dataframe
+    df["County"] = counties
 
-    def name(self) -> str:
-        return self.metadata.name().replace(".csv", ".parquet")
-
-    def build(self, dst: Path, deps):
-        # Read the CSV file
-        df = pd.read_csv(deps["metadata"])
-
-        # Split the Centroid column into latitude and longitude
-        df[["Latitude", "Longitude"]] = df["Centroid"].str.split("/", expand=True)
-
-        # Convert to float
-        df["Latitude"] = df["Latitude"].astype(float)
-        df["Longitude"] = df["Longitude"].astype(float)
-
-        coords_list = list(zip(df["Latitude"], df["Longitude"]))
-        counties = get_counties_from_coords_batch(coords_list)
-
-        # Add counties to dataframe
-        df["County"] = counties
-
-        # Save the updated CSV file
-        df.to_parquet(dst)
+    # Save the updated CSV file
+    df.to_parquet(dst)
 
 
 @dataclass
@@ -309,9 +290,16 @@ def search_building_config(
     height: float | None = None,
     eplus_output_dir: Path = Path("eplus_out"),
 ) -> BuildingConfig:
-    extracted = state_counties_extracted()[state][county]
+    county_extracted_map = state_counties_extracted()[state]
 
-    metadata_path = build(
+    if county not in county_extracted_map:
+        raise Exception(
+            f"invalid county. valid choices: {list(county_extracted_map.keys())}"
+        )
+
+    extracted = county_extracted_map[county]
+
+    metadata_path = realize(
         STORE_PATH.get(),
         MetadataKeepCounty(
             MetadataComputeCounty(metadata_csv(state)), extracted, county
@@ -329,7 +317,7 @@ def search_building_config(
         height=height,
     )
 
-    weather_table = build(STORE_PATH.get(), nrel.weather_table())
+    weather_table = realize(STORE_PATH.get(), nrel.weather_table())
 
     weather_df = duckdb.from_parquet(str(weather_table)).to_df()
 
@@ -348,10 +336,10 @@ def search_building_config(
 
     b = matching_buildings.iloc[0]
 
-    building_path = build(
+    building_path = realize(
         STORE_PATH.get(),
         create_complete_pipeline(
-            Child(extracted, f"{building_id}.idf"), energyplus_path()
+            ChildFile(extracted, f"{building_id}.idf"), energyplus_path()
         ),
     )
 
