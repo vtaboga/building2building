@@ -69,6 +69,11 @@ def realize(store_path: Path, realizable: Realizable) -> Any:
             try:
                 logger.info(f"building {realizable.name}")
                 realizable.builder(realized_deps)
+                if not output_path.exists():
+                    raise Exception(
+                        f"derivation {realizable.name} didn't product an output"
+                    )
+
             finally:
                 OUTPUT.reset(token_output)
             return output_path

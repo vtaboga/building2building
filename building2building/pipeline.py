@@ -72,7 +72,9 @@ def upgrade_idf(input: Path, transition_exe: Path, from_idd: Path, to_idd: Path)
             logger.warning(f"Transition errors: {result.stderr}")
 
         if not temp_idf_out.exists():
-            raise Exception(f"{temp_idf_out} does not exist")
+            raise Exception(
+                f"failed to upgrade idf file from {from_idd.name} to {to_idd.name}"
+            )
 
         shutil.copy(temp_idf_out, dst)
 
@@ -99,10 +101,14 @@ def ConvertIDF(input: Derivation, converter: Derivation) -> Derivation:
             )
 
             if result.stderr:
-                logger.info(f"Conversion warnings: {result.stderr}")
+                print(result.stderr)
+                # logger.info(f"Conversion warnings: {result.stderr}")
             if result.stdout:
-                logger.info(f"Conversion output: {result.stdout}")
+                print(result.stdout)
+                # logger.info(f"Conversion output: {result.stdout}")
 
+            if not temp_epjson_path.exists():
+                raise Exception("failed to convert idf to json")
             shutil.copy(temp_epjson_path, dst)
 
     return inner(input, converter)
@@ -429,6 +435,14 @@ def upgrade(
     # Chain upgrades
     current = input_file
     current_version = src_version
+
+    # Ensure the given src_version is even a valid version at all
+    valid_versions = set(upgraders.src_version) | set(upgraders.dst_version)
+
+    if src_version not in valid_versions:
+        raise Exception(
+            f"src_version ({src_version}) is not valid. valid versions: {valid_versions}"
+        )
 
     while True:
         possible_upgraders = upgraders[upgraders.src_version == current_version]

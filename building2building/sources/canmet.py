@@ -1,8 +1,10 @@
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import duckdb
+import pandas
 import pandas as pd
 from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import create_complete_pipeline
@@ -68,9 +70,29 @@ def process(path: Path) -> Derivation:
     )
 
 
+def search_buildings(**query) -> DataFrame:
+    ep = energyplus_path()
+
+    db_path = realize(STORE_PATH.get(), housing_archetypes_database())
+    db = duckdb.read_parquet(str(db_path)).select(duckdb.StarExpression())
+
+    for k, v in query.items():
+        db = db.filter(duckdb.ColumnExpression(k) == duckdb.ConstantExpression(v))
+
+    df = db.to_df()
+
+    def trans(path: str):
+        return lambda: create_complete_pipeline(
+            Constant(Path(path)),
+            ep,
+            src_version="24.2.0",
+        )
+
+    return df.assign(derivation_thunk=df["filepath"].apply(trans))
+
+
 # def search_config() -> BuildingConfig:
 #     b = realize(STORE_PATH.get(), search_buildings().iloc[0].derivation_thunk())
-
 #     return BuildingConfig(
 #         path_to_building=b,
 #         path_to_weather=w,
@@ -79,3 +101,12 @@ def process(path: Path) -> Derivation:
 #         eplus_output_dir=Path(tempfile.mkdtemp()),
 #         warmup_phases=3,
 #     )
+
+
+logging.basicConfig(level=logging.DEBUG)
+
+
+def test():
+    realize(
+        STORE_PATH.get(), search_buildings(region="QUEBEC").iloc[0].derivation_thunk()
+    )

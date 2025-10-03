@@ -59,7 +59,7 @@ def fast_county_lookup(lat_lon_pairs, counties_gdf):
 
 def get_counties_from_coords_batch(coords_list: list[tuple[float, float]]) -> list[str]:
     """From a list of (latitude, longitude) pairs, compute the list of"""
-    data_dir = build(STORE_PATH.get(), county_boundaries())
+    data_dir = realize(STORE_PATH.get(), county_boundaries())
     counties = load_county_boundaries(data_dir)
     counties.sindex  # create an index to accelerate inclusion calculations
     results = fast_county_lookup(coords_list, counties)

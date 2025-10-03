@@ -115,7 +115,7 @@ def search_buildings(
 
     def trans(path):
         return lambda: create_complete_pipeline(
-            Constant(path),
+            Constant(Path(path)),
             ep,
             src_version="22.1.0",
         )

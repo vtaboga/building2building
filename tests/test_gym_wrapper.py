@@ -1,5 +1,6 @@
 import glob
 import json
+import logging
 import os
 import shutil
 import sys
@@ -14,18 +15,20 @@ from building2building.simulator.action_spaces import (
     DualSetpoint,
     get_controllable_setpoints,
 )
-from building2building.store import InputFile, build
+from building2building.store import LocalFile, realize
 from building2building.types import BaseRewardConfig, BuildingConfig
 from minergym.ontology import Ontology
+
+logging.basicConfig(level=logging.DEBUG)
 
 here = Path(__file__).parent.resolve()
 
 
 @pytest.fixture
 def weather_file():
-    return build(
+    return realize(
         STORE_PATH.get(),
-        InputFile(
+        LocalFile(
             here / "data/USA_VT_Bennington-Morse.State.AP.726166_TMYx.2004-2018.epw",
         ),
     )
@@ -33,11 +36,14 @@ def weather_file():
 
 @pytest.fixture
 def building_epjson():
-    x = InputFile(
+    x = LocalFile(
         here / "data/1002000371360.idf",
     )
 
-    return build(STORE_PATH.get(), create_complete_pipeline(x, energyplus_path()))
+    return realize(
+        STORE_PATH.get(),
+        create_complete_pipeline(x, energyplus_path(), src_version="9.4.0"),
+    )
 
 
 @pytest.fixture
@@ -53,6 +59,7 @@ def building_config(building_epjson, weather_file):
         BaseRewardConfig(1000),
         1.0,
         Path("eplus_output"),
+        3,
     )
 
 
@@ -86,6 +93,7 @@ def test_gym_environment_creation(building_epjson, weather_file):
         BaseRewardConfig(1000),
         1.0,
         Path("help"),
+        3,
     )
 
     env = gym.make("EnergyPlus-v0", building_config=config)

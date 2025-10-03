@@ -72,7 +72,7 @@ binaries: dict[Platform, dict[Version, Derivation]] = {
                     ),
                 )
             ),
-            "TODO",
+            "EnergyPlus-24.2.0-94a887817b-Linux-Ubuntu22.04-x86_64",
         ),
         "25.1.0": ChildFile(
             ExtractTarball(
@@ -83,7 +83,8 @@ binaries: dict[Platform, dict[Version, Derivation]] = {
                         "faee846457ce450e8b2434e918cf70b551c4f59bea2b282711a498a6c878495a",
                     ),
                 )
-            )
+            ),
+            "EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu24.04-x86_64",
         ),
     },
 }

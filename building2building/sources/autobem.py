@@ -97,7 +97,7 @@ def manifest() -> Derivation:
 
 
 def state_metadata_hashes() -> dict[StateCode, bytes]:
-    filename = build(STORE_PATH.get(), manifest())
+    filename = realize(STORE_PATH.get(), manifest())
 
     md5_hashes = {}
     with open(filename, "r") as f:
@@ -111,7 +111,7 @@ def state_metadata_hashes() -> dict[StateCode, bytes]:
 
 
 def state_counties_hashes() -> dict[StateCode, dict[str, bytes]]:
-    filename = build(STORE_PATH.get(), manifest())
+    filename = realize(STORE_PATH.get(), manifest())
 
     md5_hashes: dict[StateCode, dict[str, bytes]] = {}
     with open(filename, "r") as f:
@@ -143,7 +143,7 @@ def state_counties_zips() -> dict[StateCode, dict[str, Derivation]]:
                 f"{state}_{underscore(county)}_IDF.zip",
                 base_url + f"{state}_{underscore(county)}_IDF.zip",
                 hash,
-                hasher=hashlib.md5(),
+                hasher_factory=hashlib.md5,
             )
             for county, hash in county_hash.items()
         }
@@ -154,10 +154,7 @@ def state_counties_zips() -> dict[StateCode, dict[str, Derivation]]:
 def state_counties_extracted() -> dict[StateCode, dict[str, Derivation]]:
     zips = state_counties_zips()
     return {
-        state: {
-            county: ExtractZip(f"{state}_{county}", step)
-            for county, step in county_hash.items()
-        }
+        state: {county: ExtractZip(step) for county, step in county_hash.items()}
         for state, county_hash in zips.items()
     }
 
@@ -168,7 +165,7 @@ def metadata_csv(state: StateCode) -> Derivation:
 
     metadata_url = f"https://tier2.ess-dive.lbl.gov/doi-10-15485-2283980/data/MAv1_csvs/{state}.csv"
 
-    return DownloadFile(f"{state}.csv", metadata_url, hash, hashlib.md5())
+    return DownloadFile(f"{state}.csv", metadata_url, hash, hashlib.md5)
 
 
 @derivation("metadata-for-county.parquet")
@@ -280,7 +277,7 @@ def search_metadata(
     return expr.to_df()
 
 
-def search_building_config(
+def search_config(
     state: StateCode,
     county: str,
     building_id: int | None = None,
@@ -339,7 +336,9 @@ def search_building_config(
     building_path = realize(
         STORE_PATH.get(),
         create_complete_pipeline(
-            ChildFile(extracted, f"{building_id}.idf"), energyplus_path()
+            ChildFile(extracted, f"{building_id}.idf"),
+            energyplus_path(),
+            src_version="9.4.0",
         ),
     )
 
