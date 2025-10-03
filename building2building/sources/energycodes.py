@@ -145,9 +145,32 @@ def search_weathers(
     return df.assign(derivation=df["path"].apply(Constant))
 
 
-def search_config() -> BuildingConfig:
-    b = realize(STORE_PATH.get(), search_buildings().iloc[0].derivation_thunk())
-    w = realize(STORE_PATH.get(), search_weathers().iloc[0].derivation)
+def search_config(
+    building_type: str | None = None,
+    year: int | None = None,
+    place: str | None = None,
+    state: str | None = None,
+    county: str | None = None,
+) -> BuildingConfig:
+    b = realize(
+        STORE_PATH.get(),
+        search_buildings(
+            building_type=building_type,
+            year=year,
+            place=place,
+        )
+        .iloc[0]
+        .derivation_thunk(),
+    )
+    w = realize(
+        STORE_PATH.get(),
+        search_weathers(
+            state=state,
+            county=county,
+        )
+        .iloc[0]
+        .derivation,
+    )
 
     return BuildingConfig(
         path_to_building=b,
