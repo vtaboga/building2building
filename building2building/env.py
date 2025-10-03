@@ -68,7 +68,7 @@ binaries: dict[Platform, dict[Version, Derivation]] = {
                     "energyplus-24.2.0.tar.gz",
                     "https://github.com/NREL/EnergyPlus/releases/download/v24.2.0a/EnergyPlus-24.2.0-94a887817b-Linux-Ubuntu22.04-x86_64.tar.gz",
                     bytes.fromhex(
-                        "7b90fb1d6b1e58875217eedbc745e8c6d1476321d6fa4ca1d5833414770096cd"
+                        "f1404a264f6483b1e4c9c6f37d174974a39a9c6cd2282acc2110f48e60755e30",
                     ),
                 )
             ),
@@ -80,7 +80,7 @@ binaries: dict[Platform, dict[Version, Derivation]] = {
                     "energyplus-25.1.0",
                     "https://github.com/NREL/EnergyPlus/releases/download/v25.1.0/EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu24.04-x86_64.tar.gz",
                     bytes.fromhex(
-                        "db90fb1d6b1e58875217eedbc745e8c6d1476321d6fa4ca1d5833414770096cd"
+                        "faee846457ce450e8b2434e918cf70b551c4f59bea2b282711a498a6c878495a",
                     ),
                 )
             )
