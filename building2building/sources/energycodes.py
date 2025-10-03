@@ -142,7 +142,10 @@ def search_weathers(
 
     df = expr.to_df()
 
-    return df.assign(derivation=df["path"].apply(Constant))
+    def trans(path: str):
+        return lambda: Constant(Path(path))
+
+    return df.assign(derivation_thunk=df["path"].apply(trans))
 
 
 def search_config(
@@ -169,7 +172,7 @@ def search_config(
             county=county,
         )
         .iloc[0]
-        .derivation,
+        .derivation_thunk(),
     )
 
     return BuildingConfig(
