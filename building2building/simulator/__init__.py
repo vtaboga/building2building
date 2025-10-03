@@ -169,13 +169,16 @@ def create_simulator_dict(building_config: BuildingConfig) -> gym.Env:
         action_transform.domain(),
         verbose=False,
         log_dir=eplus_output_dir,
+        warmup_phases=building_config.warmup_phases,
     )
 
-    if building_config.reward_config == "barrier":
+    if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
-            building_config.reward_config.area, setpoints, building_config.energy_weight
+            building_config.reward_config.area,
+            setpoints,
+            building_config.energy_weight,
         )
-    elif building_config.reward_config == "base":
+    elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
             building_config.reward_config.area, setpoints, building_config.energy_weight
         )
