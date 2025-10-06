@@ -14,6 +14,7 @@ from building2building.sources.geo import get_counties_from_coords_batch
 from building2building.store import (
     OUTPUT,
     ChildFile,
+    Constant,
     Derivation,
     DownloadFile,
     ExtractZip,
@@ -224,26 +225,33 @@ def MetadataComputeCounty(
     df.to_parquet(dst)
 
 
-@dataclass
-class BuildingMetadata:
-    building_type: str
-    num_floors: int
-    area: float
-    height: float
-
-    coord: tuple[float, float]
-
-
-def search_metadata(
-    metadata_path: Path,
-    county: str | None = None,
+def search_buildings(
+    state: StateCode,
+    county: str,
     building_id: int | None = None,
     building_type: str | None = None,
     area: float | None = None,
     num_floors: int | None = None,
     height: float | None = None,
-    n_buildings: int = 1,
 ) -> pd.DataFrame:
+    county_extracted_map = state_counties_extracted()[state]
+
+    if county not in county_extracted_map:
+        raise Exception(
+            f"invalid county. valid choices: {list(county_extracted_map.keys())}"
+        )
+
+    extracted = county_extracted_map[county]
+
+    metadata_path = realize(
+        STORE_PATH.get(),
+        MetadataKeepCounty(
+            MetadataComputeCounty(metadata_csv(state)), extracted, county
+        ),
+    )
+
+    # We query the database
+
     conn = duckdb.from_parquet(str(metadata_path))
     expr = conn.select(duckdb.StarExpression())
 
@@ -272,9 +280,20 @@ def search_metadata(
     if height is not None:
         expr = expr.order(f"ABS(Height - {height})")
 
-    expr = expr.limit(n_buildings)
+    df = expr.to_df()
 
-    return expr.to_df()
+    ep = energyplus_path()
+
+    # We define the pipeline for all the files
+
+    def trans(building_id):
+        return lambda: create_complete_pipeline(
+            ChildFile(extracted, f"{building_id}.idf"),
+            ep,
+            src_version="9.4.0",
+        )
+
+    return df.assign(derivation_thunk=df["ID"].apply(trans))
 
 
 def search_config(
@@ -287,32 +306,16 @@ def search_config(
     height: float | None = None,
     eplus_output_dir: Path = Path("eplus_out"),
 ) -> BuildingConfig:
-    county_extracted_map = state_counties_extracted()[state]
-
-    if county not in county_extracted_map:
-        raise Exception(
-            f"invalid county. valid choices: {list(county_extracted_map.keys())}"
-        )
-
-    extracted = county_extracted_map[county]
-
-    metadata_path = realize(
-        STORE_PATH.get(),
-        MetadataKeepCounty(
-            MetadataComputeCounty(metadata_csv(state)), extracted, county
-        ),
-    )
-
-    matching_buildings = search_metadata(
-        metadata_path,
+    buildings = search_buildings(
+        state,
         county,
         building_id=building_id,
-        n_buildings=1,
         building_type=building_type,
         area=area,
         num_floors=num_floors,
         height=height,
     )
+    matching_buildings = buildings.iloc[[0]]
 
     weather_table = realize(STORE_PATH.get(), nrel.weather_table())
 
@@ -334,12 +337,7 @@ def search_config(
     b = matching_buildings.iloc[0]
 
     building_path = realize(
-        STORE_PATH.get(),
-        create_complete_pipeline(
-            ChildFile(extracted, f"{building_id}.idf"),
-            energyplus_path(),
-            src_version="9.4.0",
-        ),
+        STORE_PATH.get(), matching_buildings.iloc[0].derivation_thunk()
     )
 
     return BuildingConfig(
