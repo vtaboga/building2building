@@ -29,7 +29,7 @@ from building2building.store import (
 logger = logging.getLogger(__name__)
 
 
-def get_cache_dir():
+def get_cache_dir() -> Path:
     if os.name == "nt":  # Windows
         return Path(os.environ.get("LOCALAPPDATA", "~")) / "building2building"
     elif os.name == "posix":  # Linux/macOS
@@ -41,8 +41,16 @@ def get_cache_dir():
         return Path.home() / ".building2building"  # Fallback
 
 
+def store_path() -> Path:
+    if p := os.getenv("STORE_PATH"):
+        path = Path(p).resolve()
+        return path
+    else:
+        return get_cache_dir()
+
+
 STORE_PATH: ContextVar[Path] = ContextVar("STORE_PATH")
-STORE_PATH.set(get_cache_dir())
+STORE_PATH.set(store_path())
 
 
 Platform = Literal["linux-x86_64"]
