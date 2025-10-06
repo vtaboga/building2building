@@ -1,17 +1,17 @@
 import logging
 import urllib.parse
 from dataclasses import dataclass
-from typing import Any, Callable, Union
 
 import minergym.ontology as ontology
 import numpy as np
-from gymnasium.spaces import Box, Space
+from gymnasium.spaces import Box, Dict
 from minergym.simulation import ActuatorHole
 from rdflib.term import Node
 
 from .transform_utils import (
     Transform,
     TransformConcat,
+    TransformDictSpace,
     TransformList,
     TransformListToArray,
     TransformListToArrayShift,
@@ -52,9 +52,9 @@ class SingleHeatingOrCooling:
     cooling_schedule: str
 
 
-ThermostatSetpoint = Union[
-    DualSetpoint, SingleHeating, SingleCooling, SingleHeatingOrCooling
-]
+ThermostatSetpoint = (
+    DualSetpoint | SingleHeating | SingleCooling | SingleHeatingOrCooling
+)
 
 
 def get_controllable_setpoints(
@@ -337,3 +337,13 @@ def many_thermostats_transform(
     return TransformConcat(
         TransformList([single_thermostat_transform(sp) for sp in setpoints])
     )
+
+
+def many_thermostats_transform_dict(
+    setpoints: list[ThermostatSetpoint],
+) -> Transform[dict, Dict]:
+    d: dict[str, Transform[list, Box]] = {}
+    for sp in setpoints:
+        name = sp.name
+        d[name] = single_thermostat_transform(sp)
+    return TransformDictSpace(d)

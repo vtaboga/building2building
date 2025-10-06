@@ -1,3 +1,4 @@
+import itertools
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,7 @@ from minergym.simulation import EnergyPlusSimulation
 from building2building.simulator.action_spaces import (
     get_controllable_setpoints,
     many_thermostats_transform,
+    many_thermostats_transform_dict,
 )
 from building2building.simulator.observation_spaces import (
     dict_observation_info,
@@ -91,7 +93,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     # Then the action side stuff
     setpoints = get_controllable_setpoints(ont)
 
-    thermostat_list = [elem for list in setpoints.values() for elem in list]
+    thermostat_list = list(itertools.chain(*setpoints.values()))
 
     action_transform = many_thermostats_transform(thermostat_list)
 
@@ -160,9 +162,9 @@ def create_simulator_dict(building_config: BuildingConfig) -> gym.Env:
     # Then the action side stuff
     setpoints = get_controllable_setpoints(ont)
 
-    thermostat_list = [elem for list in setpoints.values() for elem in list]
+    thermostat_list = list(itertools.chain(*setpoints.values()))
 
-    action_transform = many_thermostats_transform(thermostat_list)
+    action_transform = many_thermostats_transform_dict(thermostat_list)
 
     make_energyplus = MakeEnergyPlus(
         building_config.path_to_building,
