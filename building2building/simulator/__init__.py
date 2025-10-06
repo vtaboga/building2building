@@ -109,11 +109,13 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         reward_function = BarrierReward(
             building_config.reward_config.area,
             setpoints,
-            building_config.energy_weight,
+            building_config.reward_config.energy_weight,
         )
     elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
-            building_config.reward_config.area, setpoints, building_config.energy_weight
+            building_config.reward_config.area,
+            setpoints,
+            building_config.reward_config.energy_weight,
         )
     else:
         raise ValueError(f"Invalid reward type: {building_config.reward_config}")
@@ -176,16 +178,18 @@ def create_simulator_dict(building_config: BuildingConfig) -> gym.Env:
         reward_function = BarrierReward(
             building_config.reward_config.area,
             setpoints,
-            building_config.energy_weight,
+            building_config.reward_config.energy_weight,
         )
     elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
-            building_config.reward_config.area, setpoints, building_config.energy_weight
+            building_config.reward_config.area,
+            setpoints,
+            building_config.reward_config.energy_weight,
         )
     else:
         raise ValueError(f"Invalid reward type: {building_config.reward_config}")
 
-    # Finally, we compute the data necessary to fillin the metadata
+    # Finally, we compute the data necessary to fill in the metadata
     controlled_zones = list(setpoints.keys())
     all_zones = [z.toPython() for z in ont.zones()]
     uncontrolled_zones = [zone for zone in all_zones if zone not in controlled_zones]

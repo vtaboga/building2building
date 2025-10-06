@@ -178,8 +178,7 @@ def search_config(
     return BuildingConfig(
         path_to_building=b,
         path_to_weather=w,
-        reward_config=BaseRewardConfig(1000.0),
-        energy_weight=1.0,
+        reward_config=BaseRewardConfig(1000.0, 1.0),
         eplus_output_dir=Path(tempfile.mkdtemp()),
         warmup_phases=3,
     )

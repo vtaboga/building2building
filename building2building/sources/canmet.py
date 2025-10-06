@@ -89,24 +89,3 @@ def search_buildings(**query) -> DataFrame:
         )
 
     return df.assign(derivation_thunk=df["filepath"].apply(trans))
-
-
-# def search_config() -> BuildingConfig:
-#     b = realize(STORE_PATH.get(), search_buildings().iloc[0].derivation_thunk())
-#     return BuildingConfig(
-#         path_to_building=b,
-#         path_to_weather=w,
-#         reward_config=BaseRewardConfig(1000.0),
-#         energy_weight=1.0,
-#         eplus_output_dir=Path(tempfile.mkdtemp()),
-#         warmup_phases=3,
-#     )
-
-
-logging.basicConfig(level=logging.DEBUG)
-
-
-def test():
-    realize(
-        STORE_PATH.get(), search_buildings(region="QUEBEC").iloc[0].derivation_thunk()
-    )
