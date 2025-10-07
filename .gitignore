@@ -1,6 +1,7 @@
 /.env/
 .env
-/.venv/
+.venv
+.venv/
 /.conda/
 /.idea/
 /.vscode/
@@ -21,3 +22,5 @@ configs/energyplus_simulator.json
 notebooks/
 OfflineRL-Kit/
 jobs/
+eplus_out/
+uv.lock
