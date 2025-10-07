@@ -229,9 +229,16 @@ def derivation(name: str | Callable):
 def DownloadFile(
     filename: str,
     url: str,
-    expected_hash: bytes | None,
+    hash: bytes | None,
     hasher_factory=hashlib.sha256,
 ) -> Derivation:
+    if hash is not None:
+        derivation_hash = hash
+    else:
+        h = hashlib.sha256()
+        h.update(url.encode("utf-8"))
+        derivation_hash = h.digest()
+
     def builder(_):
         out = OUTPUT.get()
 
@@ -265,15 +272,13 @@ def DownloadFile(
 
             outfile.close()
             h = hasher.digest()
-            if expected_hash is not None and expected_hash != h:
+            if hash is not None and hash != h:
                 raise Exception(
-                    f"Hash of download {filename} is wrong. Expected: {expected_hash.hex()}, actual: {h.hex()} (computed using {hasher})"
+                    f"Hash of download {filename} is wrong. Expected: {hash.hex()}, actual: {h.hex()} (computed using {hasher})"
                 )
             shutil.move(outfile.name, out)
 
-    # Deterministic derivation identity even if expected_hash is None
-    der_hash = compute_hash("DownloadFile", (filename, url, expected_hash), {})
-    return Derivation(filename, der_hash, [], builder)
+    return Derivation(filename, derivation_hash, [], builder)
 
 
 def ExtractTarball(input_der: Derivation):
@@ -288,20 +293,17 @@ def ExtractTarball(input_der: Derivation):
 
 
 def ExtractZip(input_der: Derivation):
-    # Support both .zip and .tar.gz 
-    @derivation(lambda _input: input_der.name.removesuffix(".tar.gz").removesuffix(".zip"))
+    @derivation(input_der.name.removesuffix(".tar.gz"))
     def inner(input: Path):
         dst = OUTPUT.get()
+
         dst.mkdir()
 
-        if tarfile.is_tarfile(input):
-            with tarfile.open(input, "r:gz") as tar:
-                tar.extractall(path=dst)
-        elif zipfile.is_zipfile(input):
-            with zipfile.ZipFile(input, "r") as zip_ref:
-                zip_ref.extractall(dst)
-        else:
-            raise ValueError(f"Unsupported archive format: {input}")
+        with zipfile.ZipFile(input, "r") as zip_ref:
+            file_list = zip_ref.infolist()
+
+            for file_info in file_list:
+                zip_ref.extract(file_info, dst)
 
     return inner(input_der)
 
