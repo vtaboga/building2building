@@ -23,6 +23,9 @@ from building2building.types import BaseRewardConfig, BuildingConfig
 from duckdb import DuckDBPyConnection
 from pandas import DataFrame
 
+import building2building.sources.oneclimate as oneclimate
+import building2building.sources.geo as geo
+
 
 def housing_archetypes() -> Derivation:
     return GitClone(
@@ -89,3 +92,43 @@ def search_buildings(**query) -> DataFrame:
         )
 
     return df.assign(derivation_thunk=df["filepath"].apply(trans))
+
+
+def search_config(province: str=None, city: str=None, eplus_output_dir: Path = Path("eplus_out"),) -> BuildingConfig:
+
+
+    buildings = search_buildings(
+        province=province,
+        location=city
+    )
+    matching_buildings = buildings.iloc[[0]]
+
+
+    weather = oneclimate.weather_table(province=province, city=city)
+    weather_table_path = realize(STORE_PATH.get(), weather)
+    weather_df = duckdb.from_parquet(str(weather_table_path)).to_df()
+
+    # Select best matching EPW: prefer CWEC2020, then TMYx, then TMY
+    def score(fname: str) -> tuple[int, int, int]:
+        f = fname.lower()
+        return (
+            1 if "cwec2020" in f else 0,
+            1 if "tmyx" in f else 0,
+            1 if "tmy" in f else 0,
+        )
+
+    best_row = max(weather_df.itertuples(index=False), key=lambda r: score(r.filename))
+    weather_file_path = Path(best_row.filepath)
+
+    building_path = realize(
+        STORE_PATH.get(), matching_buildings.iloc[0].derivation_thunk()
+    )
+
+    return BuildingConfig(
+        path_to_building=building_path,
+        path_to_weather=weather_file_path,
+        reward_config=BaseRewardConfig(1000, 1.0),  # TODO: handle floor area in reward
+        eplus_output_dir=eplus_output_dir,
+        # Empirically, this works for this dataset.
+        warmup_phases=1,  # TODO: handle warmup
+    )
