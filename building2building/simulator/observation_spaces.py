@@ -216,10 +216,12 @@ def dict_observation_info(ont: Ontology) -> Transform:
             "energy": TransformDictSpace(
                 {
                     "natural_gas": TransformScalarToArray(
-                        MeterHole("NaturalGas:HVAC"), 0.0, float("inf")
+                        FunctionHole(DynamicMeter(["NaturalGas:HVAC"])),
+                        0.0,
+                        float("inf"),
                     ),
                     "electricity": TransformScalarToArray(
-                        MeterHole("Electricity:HVAC"),
+                        FunctionHole(DynamicMeter(["Electricity:HVAC"])),
                         0.0,
                         float("inf"),
                     ),
