@@ -14,7 +14,7 @@ from contextvars import ContextVar
 from functools import cache
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 
 from building2building.store import (
     ChildFile,
@@ -54,35 +54,12 @@ STORE_PATH.set(store_path())
 
 
 Platform = Literal["linux-x86_64"]
-Version = Literal["24.1.0", "24.2.0", "25.1.0"]
+GlibcVersion = Literal["2.35", "2.38"]
 
-binaries: dict[Platform, dict[Version, Derivation]] = {
+
+binaries: dict[Platform, dict[GlibcVersion, Derivation]] = {
     "linux-x86_64": {
-        "24.1.0": ChildFile(
-            ExtractTarball(
-                DownloadFile(
-                    "energyplus-24.1.0.tar.gz",
-                    "https://github.com/NREL/EnergyPlus/releases/download/v24.1.0/EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu20.04-x86_64.tar.gz",
-                    bytes.fromhex(
-                        "7b90fb1d6b1e58875217eedbc745e8c6d1476321d6fa4ca1d5833414770096cc"
-                    ),
-                )
-            ),
-            "EnergyPlus-24.1.0-9d7789a3ac-Linux-Ubuntu20.04-x86_64",
-        ),
-        "24.2.0": ChildFile(
-            ExtractTarball(
-                DownloadFile(
-                    "energyplus-24.2.0.tar.gz",
-                    "https://github.com/NREL/EnergyPlus/releases/download/v24.2.0a/EnergyPlus-24.2.0-94a887817b-Linux-Ubuntu22.04-x86_64.tar.gz",
-                    bytes.fromhex(
-                        "f1404a264f6483b1e4c9c6f37d174974a39a9c6cd2282acc2110f48e60755e30",
-                    ),
-                )
-            ),
-            "EnergyPlus-24.2.0-94a887817b-Linux-Ubuntu22.04-x86_64",
-        ),
-        "25.1.0": ChildFile(
+        "2.38": ChildFile(
             ExtractTarball(
                 DownloadFile(
                     "energyplus-25.1.0",
@@ -94,20 +71,36 @@ binaries: dict[Platform, dict[Version, Derivation]] = {
             ),
             "EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu24.04-x86_64",
         ),
+        "2.35": ChildFile(
+            ExtractTarball(
+                DownloadFile(
+                    "energyplus-25.1.0",
+                    "https://github.com/NREL/EnergyPlus/releases/download/v25.1.0/EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu22.04-x86_64.tar.gz",
+                    bytes.fromhex(
+                        "bb12f522f8b5a6144f68f19c637d3790e2d1c948a7cb3ebeda479fd0e8a33f7e"
+                    ),
+                )
+            ),
+            "EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu22.04-x86_64",
+        ),
     },
 }
 
 
-def energyplus_path(version: Version = "25.1.0") -> Realizable:
-    current_platform = sysconfig.get_platform()
+def energyplus_path() -> Realizable:
+    current_platform: Platform = sysconfig.get_platform()  # type: ignore
     assert current_platform in get_args(Platform)
-    platform: Platform = current_platform  # type: ignore
 
     if p := os.getenv("ENERGYPLUS_PATH"):
         path = Path(p).resolve()
         return LocalSymlink("energyplus-path", path)
     else:
-        return binaries[platform][version]
+        glibc_version: GlibcVersion = platform.libc_ver()[1]  # type: ignore
+        assert glibc_version in get_args(GlibcVersion), (
+            f"glibc version not supported: {glibc_version}"
+        )
+
+        return binaries[current_platform][glibc_version]
 
 
 def setup_energyplus_path():
