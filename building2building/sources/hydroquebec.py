@@ -3,7 +3,7 @@ from pathlib import Path
 
 import duckdb
 from building2building.env import STORE_PATH, energyplus_path
-from building2building.pipeline import create_complete_pipeline
+from building2building.pipeline import create_complete_pipeline, link_in_schedule
 from building2building.store import (
     OUTPUT,
     Constant,
@@ -39,9 +39,18 @@ def table_index():
                 lambda name: str(root / "weather" / name)
             )
         )
+
         df = df.assign(
             idf_path=[
-                str(root / "IDFs" / f"building_{i}.idf") for i in range(1, len(df) + 1)
+                str(root / "IDFsAndSchedules" / str(i) / "in.idf")
+                for i in range(1, len(df) + 1)
+            ]
+        )
+
+        df = df.assign(
+            schedule_path=[
+                str(root / "IDFsAndSchedules" / str(i) / "in.schedules.csv")
+                for i in range(1, len(df) + 1)
             ]
         )
 
@@ -84,7 +93,13 @@ def search_config(eplus_output_dir=Path("eplus_out")) -> BuildingConfig:
     row = buildings.iloc[0]
 
     epw = Path(row.epw_path)
-    epjson = realize(STORE_PATH.get(), row.derivation_thunk())
+    derivation = link_in_schedule(row.derivation_thunk(), Path(row.schedule_path))
+    epjson = realize(STORE_PATH.get(), derivation)
+
     return BuildingConfig(
-        epjson, epw, BaseRewardConfig(1000.0, 1.0), eplus_output_dir, warmup_phases=10
+        epjson,
+        epw,
+        BaseRewardConfig(1000.0, 1.0),
+        eplus_output_dir,
+        warmup_phases=1,
     )
