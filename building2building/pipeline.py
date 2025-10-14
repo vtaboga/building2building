@@ -3,6 +3,7 @@
 import contextlib
 import json
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -27,6 +28,21 @@ from building2building.store import (
 
 logger = logging.getLogger(__name__)
 
+
+@contextlib.contextmanager
+def chdir(path: Path):
+    """
+    Context manager to temporarily change the current working directory.
+    Reimplementation of contextlib.chdir for Python < 3.11.
+    """
+    old_cwd = Path.cwd()
+    try:
+        os.chdir(path)
+        yield
+    finally:
+        os.chdir(old_cwd)
+
+
 Transition: TypeAlias = Literal[
     "9.4.0-to-9.5.0",
     "9.5.0-to-9.6.0",
@@ -42,7 +58,7 @@ Transition: TypeAlias = Literal[
 def upgrade_idf(input: Path, transition_exe: Path, from_idd: Path, to_idd: Path):
     dst = OUTPUT.get()
     with tempfile.TemporaryDirectory() as tempdir:
-        with contextlib.chdir(tempdir):
+        with chdir(Path(tempdir)):
             Path(from_idd.name).symlink_to(from_idd)
             Path(to_idd.name).symlink_to(to_idd)
             shutil.copy(input, "in.idf")
