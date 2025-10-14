@@ -57,33 +57,23 @@ Platform = Literal["linux-x86_64"]
 GlibcVersion = Literal["2.35", "2.38"]
 
 
-binaries: dict[Platform, dict[GlibcVersion, Derivation]] = {
-    "linux-x86_64": {
-        "2.38": ChildFile(
-            ExtractTarball(
-                DownloadFile(
-                    "energyplus-25.1.0",
-                    "https://github.com/NREL/EnergyPlus/releases/download/v25.1.0/EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu24.04-x86_64.tar.gz",
-                    bytes.fromhex(
-                        "faee846457ce450e8b2434e918cf70b551c4f59bea2b282711a498a6c878495a",
-                    ),
-                )
-            ),
-            "EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu24.04-x86_64",
+# Note to future selves: under linux, the main constraint on the binary we use
+# is the distribution's glibc version. Because glibc is backwards-compatible, it
+# is advantageous to pick the binary compiled for the distribution with the
+# oldest glibc (in our case, ubuntu 22).
+binaries: dict[Platform, Derivation] = {
+    "linux-x86_64": ChildFile(
+        ExtractTarball(
+            DownloadFile(
+                "energyplus-25.1.0",
+                "https://github.com/NREL/EnergyPlus/releases/download/v25.1.0/EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu22.04-x86_64.tar.gz",
+                bytes.fromhex(
+                    "bb12f522f8b5a6144f68f19c637d3790e2d1c948a7cb3ebeda479fd0e8a33f7e"
+                ),
+            )
         ),
-        "2.35": ChildFile(
-            ExtractTarball(
-                DownloadFile(
-                    "energyplus-25.1.0",
-                    "https://github.com/NREL/EnergyPlus/releases/download/v25.1.0/EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu22.04-x86_64.tar.gz",
-                    bytes.fromhex(
-                        "bb12f522f8b5a6144f68f19c637d3790e2d1c948a7cb3ebeda479fd0e8a33f7e"
-                    ),
-                )
-            ),
-            "EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu22.04-x86_64",
-        ),
-    },
+        "EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu22.04-x86_64",
+    )
 }
 
 
@@ -95,12 +85,7 @@ def energyplus_path() -> Realizable:
         path = Path(p).resolve()
         return LocalSymlink("energyplus-path", path)
     else:
-        glibc_version: GlibcVersion = platform.libc_ver()[1]  # type: ignore
-        assert glibc_version in get_args(GlibcVersion), (
-            f"glibc version not supported: {glibc_version}"
-        )
-
-        return binaries[current_platform][glibc_version]
+        return binaries[current_platform]
 
 
 def setup_energyplus_path():
