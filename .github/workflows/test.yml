@@ -26,12 +26,8 @@ jobs:
     - name: Install test dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r test-requirements.txt
-        PYTHONPATH=$PWD pip install -e . --no-deps
+        PYTHONPATH=$PWD pip install -e .
         
-    - name: Run specific tests
+    - name: Run all tests
       run: |
-        pytest tests/test_idf_search.py::TestSearchMetadata \
-              tests/test_idf_search.py::TestMetadataLoading \
-              tests/test_idf_search.py::TestSearchIDF \
-              tests/test_gym_wrapper.py::TestRDFParsing::test_get_controllable_setpoints -v 
+        pytest tests
