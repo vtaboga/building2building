@@ -95,39 +95,36 @@ def upgrade_idf(input: Path, transition_exe: Path, from_idd: Path, to_idd: Path)
         shutil.copy(temp_idf_out, dst)
 
 
-def ConvertIDF(input: Derivation, converter: Derivation) -> Derivation:
-    @derivation(Path(input.name).with_suffix(".epJSON").name)
-    def inner(input: Path, converter: Path):
-        dst = OUTPUT.get()
+@derivation("building.epjson")
+def ConvertIDF(input: Path, converter: Path):
+    dst = OUTPUT.get()
 
-        with tempfile.TemporaryDirectory() as temp:
-            temp_path = Path(temp)
-            temp_idf_path = temp_path / "in.idf"
-            temp_epjson_path = temp_idf_path.with_suffix(".epJSON")
+    with tempfile.TemporaryDirectory() as temp:
+        temp_path = Path(temp)
+        temp_idf_path = temp_path / "in.idf"
+        temp_epjson_path = temp_idf_path.with_suffix(".epJSON")
 
-            shutil.copy(input, temp_idf_path)
+        shutil.copy(input, temp_idf_path)
 
-            result = subprocess.run(
-                [str(converter), str(temp_idf_path)],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                cwd=temp,
-            )
+        result = subprocess.run(
+            [str(converter), str(temp_idf_path)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=temp,
+        )
 
-            if result.stderr:
-                print(result.stderr)
-                # logger.info(f"Conversion warnings: {result.stderr}")
-            if result.stdout:
-                print(result.stdout)
-                # logger.info(f"Conversion output: {result.stdout}")
+        if result.stderr:
+            print(result.stderr)
+            # logger.info(f"Conversion warnings: {result.stderr}")
+        if result.stdout:
+            print(result.stdout)
+            # logger.info(f"Conversion output: {result.stdout}")
 
-            if not temp_epjson_path.exists():
-                raise Exception("failed to convert idf to json")
-            shutil.copy(temp_epjson_path, dst)
-
-    return inner(input, converter)
+        if not temp_epjson_path.exists():
+            raise Exception("failed to convert idf to json")
+        shutil.copy(temp_epjson_path, dst)
 
 
 @derivation("with-meters")
@@ -502,3 +499,16 @@ def create_complete_pipeline(
     # current = glue_surfaces(current)
 
     return current
+
+
+@derivation("linked.epjson")
+def link_in_schedule(epjson_file: Path, csv_file: Path):
+    dst = OUTPUT.get()
+    with open(epjson_file, "r") as f:
+        epjson = json.load(f)
+
+    for k, v in epjson["Schedule:File"].items():
+        v["file_name"] = str(csv_file)
+
+    with open(dst, "w") as f:
+        json.dump(epjson, f, indent=4)

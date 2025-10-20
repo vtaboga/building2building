@@ -145,7 +145,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     return gymenv
 
 
-def create_simulator_dict(building_config: BuildingConfig) -> gym.Env:
+def create_simulator_dict(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     if not isinstance(building_config, BuildingConfig):
         # If the type constraints are satisfied, it should be unreachable, but
         # this function is called through gymnasium.make, which doesn't
