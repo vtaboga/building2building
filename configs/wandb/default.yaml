@@ -1,0 +1,5 @@
+# @package _global_
+# Weights & Biases configuration
+project: "building2building"
+entity: null
+tags: [] 

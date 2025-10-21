@@ -23,4 +23,5 @@ notebooks/
 OfflineRL-Kit/
 jobs/
 eplus_out/
+outputs/
 uv.lock
