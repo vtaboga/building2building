@@ -33,6 +33,12 @@ def get_cache_dir() -> Path:
     if os.name == "nt":  # Windows
         return Path(os.environ.get("LOCALAPPDATA", "~")) / "building2building"
     elif os.name == "posix":  # Linux/macOS
+        # Prefer  scratch if any
+        for var in ("SCRATCH"):
+            val = os.environ.get(var)
+            if val:
+                return Path(val) / "building2building"
+        # Otherwise, use standard cache locations
         if "XDG_CACHE_HOME" in os.environ:
             return Path(os.environ["XDG_CACHE_HOME"]) / "building2building"
         else:
