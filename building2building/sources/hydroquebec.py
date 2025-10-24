@@ -4,6 +4,7 @@ import json
 import subprocess
 import tempfile
 import logging
+import re 
 
 import duckdb
 from building2building.env import STORE_PATH, energyplus_path
@@ -73,50 +74,114 @@ def search_weathers() -> DataFrame:
     return duckdb.from_parquet(str(index)).to_df()
 
 
-def search_buildings() -> DataFrame:
+def search_buildings(config: dict | None = None, n: int = 2) -> DataFrame:
+    """
+    - If config is None: return full dataset.
+    - If config is provided: filter by string keys (exact, case-insensitive),
+      then find the n closest matches by lexicographic distance using the
+      numeric keys IN THE ORDER they appear in `config`.
+    """
+
     index = realize(STORE_PATH.get(), table_index())
-
-    db = duckdb.from_parquet(str(index))
-
-    df = db.to_df()
-
     ep = energyplus_path()
 
     def trans(idf_path):
         return lambda: create_complete_pipeline(
-            Constant(Path(idf_path)),
-            ep,
-            src_version="24.2.0",
+            Constant(Path(idf_path)), ep, src_version="24.2.0"
         )
 
+    if not config:
+        df = duckdb.from_parquet(str(index)).to_df()
+        return df.assign(derivation_thunk=df.idf_path.apply(trans))
+
+    # Preserve insertion order from `config`
+    string_filters: list[tuple[str, str]] = []
+    numeric_order: list[tuple[str, float]] = []
+    for k, v in config.items():
+        if isinstance(v, str):
+            string_filters.append((k, v))
+        elif isinstance(v, (int, float)):
+            numeric_order.append((k, float(v)))
+
+    # WHERE for string filters
+    where_sql = " AND ".join([f'lower("{k}") = lower(?)' for k, _ in string_filters]) or "TRUE"
+
+    if numeric_order:
+        # Build distance columns d1, d2, ... in the SAME order as provided
+        dist_cols = []
+        for i, (k, _) in enumerate(numeric_order, start=1):
+            dist_cols.append(
+                f'CASE WHEN "{k}" IS NULL THEN 1e12 ELSE ABS(CAST("{k}" AS DOUBLE) - ?) END AS d{i}'
+            )
+        dist_select = ",\n          ".join(dist_cols)
+        order_by = ", ".join([f"d{i}" for i in range(1, len(numeric_order) + 1)])
+
+        sql = f"""
+        WITH s AS (
+          SELECT * FROM read_parquet(?)
+          WHERE {where_sql}
+        )
+        SELECT
+          s.*,
+          {dist_select}
+        FROM s
+        ORDER BY {order_by}
+        LIMIT ?
+        """
+        params: list[object] = [str(index)]
+        params += [v for _, v in string_filters]     # string placeholders
+        params += [v for _, v in numeric_order]      # numeric targets (for d1, d2, ...)
+        params.append(int(n))
+    else:
+        # No numeric keys: just filter by strings and take first n
+        sql = f"""
+        SELECT * FROM read_parquet(?)
+        WHERE {where_sql}
+        LIMIT ?
+        """
+        params = [str(index)]
+        params += [v for _, v in string_filters]
+        params.append(int(n))
+
+    con = duckdb.connect()
+    df = con.execute(sql, params).df()
     df = df.assign(derivation_thunk=df.idf_path.apply(trans))
 
     return df
+        
 
 
-def search_config(eplus_output_dir=Path("eplus_out")) -> BuildingConfig:
-    buildings = search_buildings()
+def search_building_configs(config: dict | None = None, n: int = 2, eplus_output_dir: Path = Path("eplus_out")) -> list[BuildingConfig]:
+    """
+    Return a BuildingConfig per selected building, using each row's weather_path.
+    """
+    rows = search_buildings(config, n)
+    configs: list[BuildingConfig] = []
+    for _, row in rows.iterrows():
+        epw = Path(row.epw_path)  # use the weather file for THIS building
+        derivation = link_in_schedule(row.derivation_thunk(), Path(row.schedule_path))
+        epjson = realize(STORE_PATH.get(), derivation)
 
-    row = buildings.iloc[0]
+        area, warmup_days = _ensure_metrics_cached(epjson, epw)
+        area = area if area is not None else 1.0
+        warmup_phases = warmup_days if warmup_days is not None else 1
 
-    epw = Path(row.epw_path)
-    derivation = link_in_schedule(row.derivation_thunk(), Path(row.schedule_path))
-    epjson = realize(STORE_PATH.get(), derivation)
+        configs.append(
+            BuildingConfig(
+                path_to_building=epjson,
+                path_to_weather=epw,
+                reward_config=BaseRewardConfig(area, 1.0),
+                eplus_output_dir=eplus_output_dir,
+                warmup_phases=1,  # keep consistent with existing search_config
+            )
+        )
 
-    # Compute and cache area and warmup days the first time we see this (building, weather)
-    area, warmup_days = _ensure_metrics_cached(epjson, epw)
-    area = area if area is not None else 1.0
-    warmup_phases = max(1, int(warmup_days)) if warmup_days is not None else 1
+    if not configs:
+        raise ValueError("No building matched the provided configuration.")
 
-    logger.info("Using building area: %.2f m², warmup phases: %d", area, warmup_phases)
+    logger.info(f"Found {len(configs)} building configs matching {config}")
 
-    return BuildingConfig(
-        path_to_building=epjson,
-        path_to_weather=epw,
-        reward_config=BaseRewardConfig(area, 1.0),
-        eplus_output_dir=eplus_output_dir,
-        warmup_phases=1  #  The number of warmup phases fethed above triggers an error
-    )
+    return configs
 
 
 def _metrics_cache_path() -> Path:
