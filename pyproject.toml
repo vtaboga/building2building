@@ -22,6 +22,7 @@ dependencies = [
     "pyarrow>=20.0.0",
     "rich>=14.1.0",
     "gitpython>=3.1.45",
+    "bs4",
 ]
 
 [project.optional-dependencies]
