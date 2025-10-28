@@ -131,15 +131,16 @@ def search_configs(
 
         metrics_path = realize(STORE_PATH.get(), eplustbl(ep_path, derivation, epw))
         area = get_net_conditioned_area(metrics_path)
-        warmup_phases = get_warmup_days(metrics_path)
+        # warmup_phases = get_warmup_days(metrics_path)
 
         configs.append(
             BuildingConfig(
                 path_to_building=epjson,
                 path_to_weather=epw,
-                reward_config=BaseRewardConfig(area, 1.0),
+                reward_config=BaseRewardConfig(1.0),
                 eplus_output_dir=eplus_output_dir,
                 warmup_phases=1,  # keep consistent with existing search_config
+                area=area,
             )
         )
 
