@@ -5,13 +5,11 @@ from typing import Union
 
 @dataclass
 class BaseRewardConfig:
-    area: float
     energy_weight: float
 
 
 @dataclass
 class BarrierRewardConfig:
-    area: float
     energy_weight: float
 
 
@@ -25,3 +23,4 @@ class BuildingConfig:
     reward_config: RewardConfig
     eplus_output_dir: Path
     warmup_phases: int
+    area: float

@@ -58,6 +58,16 @@ class StateHandle:
 
 
 @dataclass
+class DivideBy:
+    child: Callable[[c_void_p], Any]
+    by: float
+
+    def __call__(self, state: c_void_p) -> float:
+        sub = self.child(state)
+        return sub / self.by
+
+
+@dataclass
 class DynamicMeter:
     """Return the value of the first present meter in its candidate list, or
     zero.
@@ -89,7 +99,7 @@ class DynamicMeter:
                 return 0.0
 
 
-def flat_observation_info(ont: Ontology) -> ObservationInfo:
+def flat_observation_info(ont: Ontology, *, area: float) -> ObservationInfo:
     """Create the observation transform with codomain a box with appropriate
     bounds for each variable type.
 
@@ -143,12 +153,12 @@ def flat_observation_info(ont: Ontology) -> ObservationInfo:
         "energy": {
             "natural_gas": (
                 "energy_gas",
-                FunctionHole(DynamicMeter(["NaturalGas:HVAC"])),
+                FunctionHole(DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area)),
                 (0.0, float("inf")),
             ),
             "electricity": (
                 "energy_electricity",
-                FunctionHole(DynamicMeter(["Electricity:HVAC"])),
+                FunctionHole(DivideBy(DynamicMeter(["Electricity:HVAC"]), area)),
                 (0.0, float("inf")),
             ),
         },
@@ -171,7 +181,7 @@ def flat_observation_info(ont: Ontology) -> ObservationInfo:
     )
 
 
-def dict_observation_info(ont: Ontology) -> Transform:
+def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
     return TransformDictSpace(
         {
             "temperature": TransformDictSpace(
@@ -216,12 +226,14 @@ def dict_observation_info(ont: Ontology) -> Transform:
             "energy": TransformDictSpace(
                 {
                     "natural_gas": TransformScalarToArray(
-                        FunctionHole(DynamicMeter(["NaturalGas:HVAC"])),
+                        FunctionHole(DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area)),
                         0.0,
                         float("inf"),
                     ),
                     "electricity": TransformScalarToArray(
-                        FunctionHole(DynamicMeter(["Electricity:HVAC"])),
+                        FunctionHole(
+                            DivideBy(DynamicMeter(["Electricity:HVAC"]), area)
+                        ),
                         0.0,
                         float("inf"),
                     ),

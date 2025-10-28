@@ -23,6 +23,7 @@ dependencies = [
     "rich>=14.1.0",
     "gitpython>=3.1.45",
     "bs4",
+    "lxml>=6.0.2",
 ]
 
 [project.optional-dependencies]
