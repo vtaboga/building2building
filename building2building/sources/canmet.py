@@ -122,8 +122,9 @@ def search_config(
     return BuildingConfig(
         path_to_building=building_path,
         path_to_weather=weather_path,
-        reward_config=BaseRewardConfig(1000, 1.0),  # TODO: handle floor area in reward
+        reward_config=BaseRewardConfig(1.0),  # TODO: handle floor area in reward
         eplus_output_dir=eplus_output_dir,
         # Empirically, this works for this dataset.
         warmup_phases=1,  # TODO: handle warmup
+        area=1000.0,
     )

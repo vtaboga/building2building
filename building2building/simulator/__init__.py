@@ -90,7 +90,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     ont = Ontology.from_json(building_config.path_to_building)
 
     # We compute the observation side stuff
-    obs_info = flat_observation_info(ont)
+    obs_info = flat_observation_info(ont, area=building_config.area)
 
     # Then the action side stuff
     setpoints = get_controllable_setpoints(ont)
@@ -111,6 +111,9 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
+            building_config.area,
+            setpoints,
+            building_config.reward_config.energy_weight,
             area=building_config.reward_config.area,
             setpoints=setpoints,
             energy_weight=building_config.reward_config.energy_weight,
@@ -165,7 +168,7 @@ def create_simulator_dict(building_config: BuildingConfig) -> EnergyPlusEnvironm
     ont = Ontology.from_json(building_config.path_to_building)
 
     # We compute the observation side stuff
-    obs_info = dict_observation_info(ont)
+    obs_info = dict_observation_info(ont, area=building_config.area)
 
     # Then the action side stuff
     setpoints = get_controllable_setpoints(ont)
@@ -186,13 +189,13 @@ def create_simulator_dict(building_config: BuildingConfig) -> EnergyPlusEnvironm
 
     if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
-            building_config.reward_config.area,
+            building_config.area,
             setpoints,
             building_config.reward_config.energy_weight,
         )
     elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
-            building_config.reward_config.area,
+            building_config.area,
             setpoints,
             building_config.reward_config.energy_weight,
         )
