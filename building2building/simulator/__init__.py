@@ -22,8 +22,10 @@ from building2building.simulator.observation_spaces import (
 from building2building.simulator.rewards import (
     BarrierReward,
     BaseReward,
+    DeadbandReward
 )
 from building2building.types import (
+    DeadbandRewardConfig,
     BarrierRewardConfig,
     BaseRewardConfig,
     BuildingConfig,
@@ -109,15 +111,21 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
-            building_config.reward_config.area,
-            setpoints,
-            building_config.reward_config.energy_weight,
+            area=building_config.reward_config.area,
+            setpoints=setpoints,
+            energy_weight=building_config.reward_config.energy_weight,
         )
     elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
-            building_config.reward_config.area,
-            setpoints,
-            building_config.reward_config.energy_weight,
+            area=building_config.reward_config.area,
+            setpoints=setpoints,
+            energy_weight=building_config.reward_config.energy_weight,
+        )
+    elif isinstance(building_config.reward_config, DeadbandRewardConfig):
+        reward_function = DeadbandReward(
+            area=building_config.reward_config.area,
+            setpoints=setpoints,
+            energy_weight=building_config.reward_config.energy_weight,
         )
     else:
         raise ValueError(f"Invalid reward type: {building_config.reward_config}")

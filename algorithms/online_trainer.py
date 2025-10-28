@@ -5,19 +5,31 @@ from omegaconf import OmegaConf
 from wandb.integration.sb3 import WandbCallback
 
 from algorithms.utils import make_dummy_vec_env, make_env
+from algorithms.test import test_policy
+from building2building.simulator.wrappers import NormalizeObservation
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, CallbackList
 
 
 def _make_envs(config: OmegaConf, output_dir: Path):
+
+    norm_obs = OmegaConf.select(config, "env.normalize_obs")
+
+    def wrapper_fn(env):
+        if norm_obs:
+            env = NormalizeObservation(env)
+        return env
+
     num_envs = config.training.get('num_train_envs')
     train_env = make_vec_env(
         make_env,
         n_envs=int(num_envs),
         env_kwargs={'eplus_output_dir': str(output_dir / "train_eplus_outputs")},
+        wrapper_class=wrapper_fn,  
     )
     eval_env = make_dummy_vec_env(
-        eplus_output_dir=str(output_dir / "eval_eplus_outputs")
+        eplus_output_dir=str(output_dir / "eval_eplus_outputs"),
+        wrapper_fn=wrapper_fn,  
     )
     return train_env, eval_env
 
@@ -32,6 +44,7 @@ def _make_callbacks(config: OmegaConf, eval_env, model_dir: Path, log_dir: Path)
         eval_env,
         log_path=str(log_dir),
         eval_freq=config.training.get('eval_freq'),
+        best_model_save_path=str(model_dir),
         n_eval_episodes=config.training.get('eval_episodes'),
         deterministic=True,
     )
@@ -71,6 +84,20 @@ def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
     return model
 
 
+def _load_best_model(config: OmegaConf, model_dir: Path):
+    """Load the best saved SB3 model if available, else return None."""
+    algo_name = config.policy.get("algorithm")
+    best_path = model_dir / "best_model.zip"
+    if not best_path.exists() or not algo_name:
+        return None
+    try:
+        module = importlib.import_module(f"stable_baselines3.{algo_name}.{algo_name}")
+        algo_cls = getattr(module, algo_name.upper())
+        return algo_cls.load(str(best_path))
+    except Exception:
+        return None
+
+
 def online_trainer(config: OmegaConf, output_dir: Path, wandb_run):
     # Prepare IO dirs
     model_dir = output_dir / "models"
@@ -95,4 +122,13 @@ def online_trainer(config: OmegaConf, output_dir: Path, wandb_run):
 
     if wandb_run is not None:
         wandb_run.finish()
+
+    # Test the saved/best policy for a few episodes
+    test_cfg = config
+    # ensure a default if not present (test.yaml sets this normally)
+    if not hasattr(test_cfg, "n_episodes"):
+        OmegaConf.set_struct(test_cfg, False)
+        test_cfg.n_episodes = 1
+    policy_model = _load_best_model(config, model_dir) or model
+    test_policy(test_cfg, policy_model, output_dir)
 

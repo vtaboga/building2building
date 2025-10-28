@@ -24,7 +24,7 @@ from building2building.store import (
     derivation,
     realize,
 )
-from building2building.types import BaseRewardConfig, BuildingConfig
+from building2building.types import DeadbandRewardConfig, BuildingConfig
 from pandas import DataFrame
 from pandas.core.frame import itertools
 

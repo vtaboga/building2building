@@ -119,3 +119,53 @@ class BarrierReward:
         return barrier_reward_function(
             obs, self.area, self.setpoints, self.energy_weight
         )
+
+
+def deadband_reward_function(
+    obs,
+    area: float,
+    setpoints: dict[str, list[ThermostatSetpoint]] | None = None,
+    energy_weight=1.0,
+    return_components: bool = False,
+) -> float:
+
+    # Energy consumption penalty (in Wh/floor area)
+    energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
+    energy_penalty = energy_penalty / 3600.0 / area
+
+
+    # Comfort: temperature error for controlled zones
+    temp_error = 0
+    target_temp = 21.0  # Target temperature in °C We might want to read a schedule here instead
+    dT = 0.5 # Deadband in °C
+
+    controlled_zones = list(setpoints.keys())
+
+    for zone in controlled_zones:
+        current_temp = obs["temperature"][zone]
+        temp_error += np.max([0, np.abs(current_temp - target_temp) - dT])
+    
+    if controlled_zones:
+        temp_error = temp_error / len(controlled_zones)
+
+    comfort_penalty = temp_error
+
+    total_reward = -(comfort_penalty + energy_weight * energy_penalty)
+
+    if return_components:
+        return total_reward, comfort_penalty, energy_penalty
+    return total_reward
+
+@dataclass
+class DeadbandReward:
+    area: float
+    setpoints: dict[str, list[ThermostatSetpoint]]
+    energy_weight: float
+
+    def __call__(self, obs):
+        return deadband_reward_function(
+            obs=obs,
+            area=self.area,
+            setpoints=self.setpoints,
+            energy_weight=self.energy_weight
+        )

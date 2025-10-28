@@ -14,8 +14,13 @@ class BarrierRewardConfig:
     area: float
     energy_weight: float
 
+@dataclass
+class DeadbandRewardConfig:
+    area: float
+    energy_weight: float
 
-RewardConfig = Union[BaseRewardConfig, BarrierRewardConfig]
+
+RewardConfig = Union[DeadbandRewardConfig, BaseRewardConfig, BarrierRewardConfig]
 
 
 @dataclass

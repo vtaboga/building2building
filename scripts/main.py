@@ -6,7 +6,7 @@ from omegaconf import OmegaConf
 from algorithms.online_trainer import online_trainer
 
 
-@hydra.main(config_path="configs", config_name="base")
+@hydra.main(config_path="../configs", config_name="base")
 def main(cfg):
 
 	wandb_run = wandb.init(
@@ -25,3 +25,4 @@ if __name__ == "__main__":
 	main()
 
 
+# TODO: normalize obs

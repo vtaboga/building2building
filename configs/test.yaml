@@ -1,0 +1,5 @@
+defaults:
+  - policy: constant
+  - reward: deadband
+
+n_episodes: 1

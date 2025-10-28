@@ -5,5 +5,7 @@ defaults:
   - training: default
   - policy: sac
 
+normalize_obs: true
+
 
 

@@ -7,29 +7,21 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 def make_env(eplus_output_dir: str):
-    
-    eplus_output_dir = Path(eplus_output_dir) / str(uuid.uuid4())  # EnerguPlus needs a unique output dir
+    # EnergyPlus needs a unique output dir for each run
+    eplus_output_dir = Path(eplus_output_dir) / str(uuid.uuid4())
     config = hydroquebec.search_config(eplus_output_dir=str(eplus_output_dir))
     env = create_simulator(config)
     return env
 
 
-def make_dummy_vec_env(eplus_output_dir: str):
+def make_dummy_vec_env(eplus_output_dir: str, seed: int | None = None, wrapper_fn=None):
+    """Create a single-env DummyVecEnv with an optional wrapper_fn applied."""
+    def _thunk():
+        # seed is accepted for API compatibility but not used here
+        env = make_env(eplus_output_dir=eplus_output_dir)
+        env = Monitor(env)
+        if wrapper_fn is not None:
+            env = wrapper_fn(env)
+        return env
+    return DummyVecEnv([_thunk])
 
-    def thunk():
-        return Monitor(make_env(eplus_output_dir))
-
-    return DummyVecEnv([thunk])
-
-
-def test_policy(model, env, n_episodes: int = 1):
-    """Test a trained policy."""
-    for episode in range(n_episodes):
-        obs = env.reset()
-        done = False
-        total_reward = 0.0
-        while not done:
-            action, _states = model.predict(obs, deterministic=True)
-            obs, reward, done, info = env.step(action)
-            total_reward += reward
-        print(f"Episode {episode + 1}: Total Reward: {total_reward}")
