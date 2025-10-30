@@ -111,9 +111,6 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
-            building_config.area,
-            setpoints,
-            building_config.reward_config.energy_weight,
             area=building_config.reward_config.area,
             setpoints=setpoints,
             energy_weight=building_config.reward_config.energy_weight,
