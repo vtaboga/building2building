@@ -111,21 +111,23 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
-            area=building_config.reward_config.area,
+            area=building_config.area,
             setpoints=setpoints,
             energy_weight=building_config.reward_config.energy_weight,
         )
     elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
-            area=building_config.reward_config.area,
+            area=building_config.area,
             setpoints=setpoints,
             energy_weight=building_config.reward_config.energy_weight,
         )
     elif isinstance(building_config.reward_config, DeadbandRewardConfig):
         reward_function = DeadbandReward(
-            area=building_config.reward_config.area,
+            area=building_config.area,
             setpoints=setpoints,
             energy_weight=building_config.reward_config.energy_weight,
+            target_temp=building_config.reward_config.target_temp,
+            dT=building_config.reward_config.dT,
         )
     else:
         raise ValueError(f"Invalid reward type: {building_config.reward_config}")
@@ -195,6 +197,14 @@ def create_simulator_dict(building_config: BuildingConfig) -> EnergyPlusEnvironm
             building_config.area,
             setpoints,
             building_config.reward_config.energy_weight,
+        )
+    elif isinstance(building_config.reward_config, DeadbandRewardConfig):
+        reward_function = DeadbandReward(
+            area=building_config.area,
+            setpoints=setpoints,
+            energy_weight=building_config.reward_config.energy_weight,
+            target_temp=building_config.reward_config.target_temp,
+            dT=building_config.reward_config.dT,
         )
     else:
         raise ValueError(f"Invalid reward type: {building_config.reward_config}")

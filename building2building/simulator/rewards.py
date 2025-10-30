@@ -126,19 +126,18 @@ def deadband_reward_function(
     area: float,
     setpoints: dict[str, list[ThermostatSetpoint]] | None = None,
     energy_weight=1.0,
-    return_components: bool = False,
+    target_temp: float = 21.0,
+    dT: float = 0.5,
+    return_components: bool = False
 ) -> float:
 
     # Energy consumption penalty (in Wh/floor area)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
     energy_penalty = energy_penalty / 3600.0 / area
 
-
     # Comfort: temperature error for controlled zones
     temp_error = 0
-    target_temp = 21.0  # Target temperature in °C We might want to read a schedule here instead
-    dT = 0.5 # Deadband in °C
-
+    
     controlled_zones = list(setpoints.keys())
 
     for zone in controlled_zones:
@@ -161,11 +160,15 @@ class DeadbandReward:
     area: float
     setpoints: dict[str, list[ThermostatSetpoint]]
     energy_weight: float
+    target_temp: float
+    dT: float
 
     def __call__(self, obs):
         return deadband_reward_function(
             obs=obs,
             area=self.area,
             setpoints=self.setpoints,
-            energy_weight=self.energy_weight
+            energy_weight=self.energy_weight,
+            target_temp=self.target_temp,
+            dT=self.dT
         )

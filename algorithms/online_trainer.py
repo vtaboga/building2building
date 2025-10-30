@@ -24,10 +24,11 @@ def _make_envs(config: OmegaConf, output_dir: Path):
     train_env = make_vec_env(
         make_env,
         n_envs=int(num_envs),
-        env_kwargs={'eplus_output_dir': str(output_dir / "train_eplus_outputs")},
+        env_kwargs={'config': config,'eplus_output_dir': str(output_dir / "train_eplus_outputs")},
         wrapper_class=wrapper_fn,  
     )
     eval_env = make_dummy_vec_env(
+        config=config,
         eplus_output_dir=str(output_dir / "eval_eplus_outputs"),
         wrapper_fn=wrapper_fn,  
     )

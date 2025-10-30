@@ -109,8 +109,8 @@ def flat_observation_info(ont: Ontology, *, area: float) -> ObservationInfo:
     -    - Outdoor Air Relative Humidity [0%, 100%]
     -    - Current Time of Day [0, 24]
     -    - Day of Year [1, 366]
-    -    - HVAC Electricity Consumption [0, inf]
-    -    - HVAC Natural Gas Consumption [0, inf]
+    -    - HVAC Electricity Consumption [0, 50]  Wh / m2 / 15min timestep
+    -    - HVAC Natural Gas Consumption [0, 50]  Wh / m2 / 15min timestep
 
     """
 
@@ -154,12 +154,12 @@ def flat_observation_info(ont: Ontology, *, area: float) -> ObservationInfo:
             "natural_gas": (
                 "energy_gas",
                 FunctionHole(DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area)),
-                (0.0, float("inf")),
+                (0.0, 50.0),
             ),
             "electricity": (
                 "energy_electricity",
                 FunctionHole(DivideBy(DynamicMeter(["Electricity:HVAC"]), area)),
-                (0.0, float("inf")),
+                (0.0, 50.0),
             ),
         },
     }
@@ -228,14 +228,14 @@ def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
                     "natural_gas": TransformScalarToArray(
                         FunctionHole(DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area)),
                         0.0,
-                        float("inf"),
+                        50.0,
                     ),
                     "electricity": TransformScalarToArray(
                         FunctionHole(
                             DivideBy(DynamicMeter(["Electricity:HVAC"]), area)
                         ),
                         0.0,
-                        float("inf"),
+                        50.0,
                     ),
                 }
             ),

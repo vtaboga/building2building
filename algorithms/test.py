@@ -72,8 +72,13 @@ def test_policy(config, policy_model, output_dir: Path):
     """Run policy for n episodes, logging obs, actions, and reward to CSV."""
 
     test_dir = output_dir / "test"
-    env = make_env(test_dir)
-    env = NormalizeObservation(env)
+    # Build a single env with a dedicated EnergyPlus output dir
+    env = make_env(config=config, eplus_output_dir=str(test_dir / "eplus_outputs"))
+    norm_obs = OmegaConf.select(config, "env.normalize_obs")
+    if norm_obs is None:
+        norm_obs = config.get("normalize_obs", False)
+    if norm_obs:
+        env = NormalizeObservation(env)
 
     # Column names
     obs_names = _get_names(env, "observation", env.observation_space, "obs")

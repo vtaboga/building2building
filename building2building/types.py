@@ -16,6 +16,8 @@ class BarrierRewardConfig:
 class DeadbandRewardConfig:
     area: float
     energy_weight: float
+    target_temp: float
+    dT: float
 
 
 RewardConfig = Union[DeadbandRewardConfig, BaseRewardConfig, BarrierRewardConfig]

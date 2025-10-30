@@ -24,9 +24,14 @@ from building2building.store import (
     derivation,
     realize,
 )
-from building2building.types import DeadbandRewardConfig, BuildingConfig
+from building2building.types import (
+    DeadbandRewardConfig,
+    BaseRewardConfig,
+    BarrierRewardConfig,
+    BuildingConfig,
+)
 from pandas import DataFrame
-from pandas.core.frame import itertools
+import itertools
 
 logger = logging.getLogger(__name__)
 
@@ -115,11 +120,8 @@ def search_configs(
     """
     Return a BuildingConfig per selected building, using each row's weather_path.
     """
-    if config is None:
-        config_nn = {}
-    else:
-        config_nn = config
-
+    cfg = config or {}
+    config_nn = cfg.get("bldg", {})
     ep_path = energyplus_path()
 
     rows = search_buildings(**config_nn)
@@ -133,11 +135,41 @@ def search_configs(
         area = get_net_conditioned_area(metrics_path)
         # warmup_phases = get_warmup_days(metrics_path)
 
+        reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
+        reward_type = reward_section.get("reward_type")
+
+        # Sensible defaults if reward is not configured
+        if reward_type is None:
+            reward_type = "DeadbandRewardConfig"
+
+        if reward_type == "DeadbandRewardConfig":
+            energy_weight = reward_section.get("energy_weight", 0.1)
+            target_temp = reward_section.get("target_temp", 21.0)
+            dT = reward_section.get("dT", 0.5)
+            reward_config = DeadbandRewardConfig(
+                area=area,
+                energy_weight=energy_weight,
+                target_temp=target_temp,
+                dT=dT,
+            )
+        elif reward_type == "BaseRewardConfig":
+            energy_weight = reward_section.get("energy_weight", 1.0)
+            reward_config = BaseRewardConfig(
+                energy_weight=energy_weight,
+            )
+        elif reward_type == "BarrierRewardConfig":
+            energy_weight = reward_section.get("energy_weight", 1.0)
+            reward_config = BarrierRewardConfig(
+                energy_weight=energy_weight,
+            )
+        else:
+            raise ValueError(f"Unknown reward type: {reward_type}")
+
         configs.append(
             BuildingConfig(
                 path_to_building=epjson,
                 path_to_weather=epw,
-                reward_config=BaseRewardConfig(1.0),
+                reward_config=reward_config,
                 eplus_output_dir=eplus_output_dir,
                 warmup_phases=1,  # keep consistent with existing search_config
                 area=area,
