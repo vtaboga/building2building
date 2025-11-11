@@ -74,9 +74,8 @@ def test_policy(config, policy_model, output_dir: Path):
     test_dir = output_dir / "test"
     # Build a single env with a dedicated EnergyPlus output dir
     env = make_env(config=config, eplus_output_dir=str(test_dir / "eplus_outputs"))
-    norm_obs = OmegaConf.select(config, "env.normalize_obs")
-    if norm_obs is None:
-        norm_obs = config.get("normalize_obs", False)
+    # Require explicit env.normalize_obs
+    norm_obs = config.env.normalize_obs
     if norm_obs:
         env = NormalizeObservation(env)
 

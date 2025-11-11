@@ -4,8 +4,14 @@ defaults:
   - wandb: default
   - training: default
   - policy: sac
+  - reward: deadband
 
-normalize_obs: true
+env:
+  normalize_obs: true
+
+n_episodes: 1
+
+seed: 42
 
 
 

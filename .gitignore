@@ -25,3 +25,5 @@ jobs/
 eplus_out/
 outputs/
 uv.lock
+multirun/
+jobs_logs/

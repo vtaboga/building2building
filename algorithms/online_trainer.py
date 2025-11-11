@@ -3,50 +3,53 @@ import inspect
 from pathlib import Path
 from omegaconf import OmegaConf
 from wandb.integration.sb3 import WandbCallback
+import wandb
 
 from algorithms.utils import make_dummy_vec_env, make_env
 from algorithms.test import test_policy
 from building2building.simulator.wrappers import NormalizeObservation
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, CallbackList
+from stable_baselines3.common.utils import set_random_seed
 
 
 def _make_envs(config: OmegaConf, output_dir: Path):
 
-    norm_obs = OmegaConf.select(config, "env.normalize_obs")
+    # Read required config without providing defaults; raise if missing
+    norm_obs = config.env.normalize_obs  # expect under env
 
     def wrapper_fn(env):
         if norm_obs:
             env = NormalizeObservation(env)
         return env
 
-    num_envs = config.training.get('num_train_envs')
+    num_envs = int(config.training.num_train_envs)
     train_env = make_vec_env(
         make_env,
-        n_envs=int(num_envs),
+        n_envs=num_envs,
         env_kwargs={'config': config,'eplus_output_dir': str(output_dir / "train_eplus_outputs")},
-        wrapper_class=wrapper_fn,  
+        wrapper_class=wrapper_fn,
     )
     eval_env = make_dummy_vec_env(
         config=config,
         eplus_output_dir=str(output_dir / "eval_eplus_outputs"),
-        wrapper_fn=wrapper_fn,  
+        wrapper_fn=wrapper_fn,
     )
     return train_env, eval_env
 
 
 def _make_callbacks(config: OmegaConf, eval_env, model_dir: Path, log_dir: Path):
     wandb_cb = WandbCallback(
-        gradient_save_freq=config.training.get('cb_gradient_save_freq'),
+        gradient_save_freq=config.training.cb_gradient_save_freq,
         model_save_path=str(model_dir),
         verbose=2,
     )
     eval_cb = EvalCallback(
         eval_env,
         log_path=str(log_dir),
-        eval_freq=config.training.get('eval_freq'),
+        eval_freq=config.training.eval_freq,
         best_model_save_path=str(model_dir),
-        n_eval_episodes=config.training.get('eval_episodes'),
+        n_eval_episodes=config.training.eval_episodes,
         deterministic=True,
     )
     return CallbackList([eval_cb, wandb_cb])
@@ -56,7 +59,7 @@ def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
     """Build a Stable Baselines 3 model based on the config."""
 
     params = OmegaConf.to_container(config.policy, resolve=True)
-    algo_name = config.policy.get("algorithm")
+    algo_name = config.policy.algorithm
 
     if not algo_name:
         raise ValueError("The key algorithm in policy config is missing.")
@@ -78,7 +81,7 @@ def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
     kwargs = {k: v for k, v in params.items() if k in valid_params}
 
     kwargs['tensorboard_log'] = str(tb_dir)
-    policy = config.policy.get('policy_type')
+    policy = config.policy.policy_type
 
     model = algo_cls(policy, train_env, **kwargs)
 
@@ -87,7 +90,7 @@ def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
 
 def _load_best_model(config: OmegaConf, model_dir: Path):
     """Load the best saved SB3 model if available, else return None."""
-    algo_name = config.policy.get("algorithm")
+    algo_name = config.policy.algorithm
     best_path = model_dir / "best_model.zip"
     if not best_path.exists() or not algo_name:
         return None
@@ -99,7 +102,17 @@ def _load_best_model(config: OmegaConf, model_dir: Path):
         return None
 
 
-def online_trainer(config: OmegaConf, output_dir: Path, wandb_run):
+def online_trainer(config: OmegaConf, output_dir: Path):
+
+    wandb_run = wandb.init(
+        project=config.wandb.project,
+		entity=config.wandb.entity,
+        config=OmegaConf.to_container(config, resolve=True),
+		sync_tensorboard=True,
+        dir=str(output_dir)
+    )
+
+
     # Prepare IO dirs
     model_dir = output_dir / "models"
     log_dir = output_dir / "logs"
@@ -107,6 +120,9 @@ def online_trainer(config: OmegaConf, output_dir: Path, wandb_run):
     model_dir.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
     tb_dir.mkdir(parents=True, exist_ok=True)
+
+    # Set random seed
+    set_random_seed(config.seed)
 
     # Envs and callbacks
     train_env, eval_env = _make_envs(config, output_dir)
@@ -117,7 +133,7 @@ def online_trainer(config: OmegaConf, output_dir: Path, wandb_run):
 
     # Train
     model.learn(
-        total_timesteps=int(config.training.get('total_timesteps')),
+        total_timesteps=int(config.training.total_timesteps),
         callback=[callbacks],
     )
 
@@ -126,10 +142,6 @@ def online_trainer(config: OmegaConf, output_dir: Path, wandb_run):
 
     # Test the saved/best policy for a few episodes
     test_cfg = config
-    # ensure a default if not present (test.yaml sets this normally)
-    if not hasattr(test_cfg, "n_episodes"):
-        OmegaConf.set_struct(test_cfg, False)
-        test_cfg.n_episodes = 1
     policy_model = _load_best_model(config, model_dir) or model
     test_policy(test_cfg, policy_model, output_dir)
 
