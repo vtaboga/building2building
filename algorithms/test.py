@@ -93,6 +93,8 @@ def test_policy(config, policy_model, output_dir: Path):
         done = False
         rows: List[List[float]] = []
 
+        s = 0
+
         while not done:
             action, _states = policy_model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info  = env.step(action)
@@ -104,6 +106,10 @@ def test_policy(config, policy_model, output_dir: Path):
             total_reward += float(reward)
 
             done = bool(terminated or truncated)
+            s += 1
+
+            if done:
+                print(f"done at step {s}")
 
         csv_path = test_dir / f"policy_episode_{ep + 1}.csv"
         with csv_path.open("w", newline="") as f:

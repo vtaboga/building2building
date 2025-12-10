@@ -1,5 +1,9 @@
 from pathlib import Path
 import uuid
+from typing import Iterable
+
+import pandas as pd
+import wandb
 from building2building.simulator import create_simulator
 from building2building.sources import hydroquebec
 from stable_baselines3.common.monitor import Monitor
@@ -28,4 +32,86 @@ def make_dummy_vec_env(config, eplus_output_dir: str, seed: int | None = None, w
             env = wrapper_fn(env)
         return env
     return DummyVecEnv([_thunk])
+
+
+def _log_line_series(df: pd.DataFrame):
+    """Log one W&B line chart per column under 'Test Graphs/' averaged by 4.
+
+    Assumes dataset length is a fixed multiple of 4 and data are numeric.
+    """
+    if df is None or df.empty or df.shape[1] == 0:
+        return
+
+    n = len(df)
+
+    for col in df.columns:
+        series = pd.to_numeric(df[col], errors="coerce").to_numpy()
+        # Average each 4 consecutive elements (n is multiple of 4)
+        y = series.reshape(-1, 4).mean(axis=1)
+        xs = list(range(0, n//4))
+        table = wandb.Table(columns=["timestep", "value"])
+        for i, t in enumerate(xs):
+            table.add_data(int(t), float(y[i]))
+        chart = wandb.plot.line(
+            table,
+            x="timestep",
+            y="value",
+            title=str(col),
+        )
+        wandb.log({f"Test Graphs/{col}": chart})
+
+
+def log_test_graphs_wandb(test_csv: str | Path):
+    """Log 4 quick-look graphs to Weights & Biases from a test CSV.
+
+    Graphs:
+      1) Zone air temperatures + outdoor temperature
+      2) Actions
+      3) Energy gas and electricity
+      4) Reward
+
+    X-axis is simulation timestep (row index).
+    """
+
+    csv_path = Path(test_csv)
+    df = pd.read_csv(csv_path)
+    cols = list(df.columns)
+
+    # Case-insensitive lookup map
+    lower_map = {c.lower(): c for c in cols}
+
+    # Outdoor and zone air temperatures
+    temperature_cols = [c for c in cols if c.lower().startswith("zone air temperature")]
+    outdoor_col =  lower_map.get("outdoor_temperature")
+    if outdoor_col:
+        temperature_cols.append(outdoor_col)
+    if temperature_cols:
+        _log_line_series(df[temperature_cols])
+
+    # Actions
+    action_cols = [c for c in cols if c.lower().startswith("action")]
+    if action_cols:
+        _log_line_series(df[action_cols])
+
+    # Energy consumption
+    energy_candidates = [lower_map.get("energy_electricity"), lower_map.get("energy_gas")]
+    energy_cols = [c for c in energy_candidates if c]
+    
+    if energy_cols:
+        _log_line_series(df[energy_cols])
+
+    # Reward
+    reward_col = lower_map.get("reward")
+    if reward_col:
+        _log_line_series(df[[reward_col]])
+
+
+def log_test_dir_graphs_wandb(test_dir: str | Path):
+    """Convenience: log graphs for each policy_episode_*.csv in a directory."""
+
+    tdir = Path(test_dir)
+    files = sorted(tdir.glob("policy_episode_*.csv"))
+    for csv_path in files:
+        log_test_graphs_wandb(csv_path)
+
 

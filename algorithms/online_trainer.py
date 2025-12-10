@@ -5,7 +5,7 @@ from omegaconf import OmegaConf
 from wandb.integration.sb3 import WandbCallback
 import wandb
 
-from algorithms.utils import make_dummy_vec_env, make_env
+from algorithms.utils import make_dummy_vec_env, make_env, log_test_dir_graphs_wandb
 from algorithms.test import test_policy
 from building2building.simulator.wrappers import NormalizeObservation
 from stable_baselines3.common.env_util import make_vec_env
@@ -137,11 +137,14 @@ def online_trainer(config: OmegaConf, output_dir: Path):
         callback=[callbacks],
     )
 
-    if wandb_run is not None:
-        wandb_run.finish()
-
     # Test the saved/best policy for a few episodes
     test_cfg = config
     policy_model = _load_best_model(config, model_dir) or model
     test_policy(test_cfg, policy_model, output_dir)
+
+    log_test_dir_graphs_wandb(output_dir / "test")
+
+
+    if wandb_run is not None:
+        wandb_run.finish()
 
