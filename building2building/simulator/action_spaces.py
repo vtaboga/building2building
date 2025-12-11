@@ -21,6 +21,17 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class HVACActuator:
+    """Represents a controllable HVAC actuator in EnergyPlus."""
+    name: str
+    actuator_type: str  # Component type (e.g., "Ideal Loads Air System")
+    control_type: str   # Control variable (e.g., "Air Mass Flow Rate")
+    actuated_component: str  # Component name in the model
+    min_value: float = 0.0
+    max_value: float = float('inf')
+
+
+@dataclass(frozen=True)
 class DualSetpoint:
     name: str
     heating_actuator: str
@@ -347,3 +358,191 @@ def many_thermostats_transform_dict(
         name = sp.name
         d[name] = single_thermostat_transform(sp)
     return TransformDictSpace(d)
+
+
+def get_hvac_actuators(ont: ontology.Ontology) -> dict[str, list[HVACActuator]]:
+    """
+    Extracts controllable HVAC actuators from an EnergyPlus building ontology.
+    
+    These actuators control the sensible heating/cooling output to zones, which is
+    the actual heat transfer that maintains zone temperatures at the setpoints.
+    
+    The function identifies several types of HVAC equipment:
+    1. Ideal Loads Air Systems - Direct control of sensible heating/cooling rates
+    2. ZoneHVAC equipment (fan coils, baseboards, unit heaters, etc.)
+    3. AirLoopHVAC equipment (central air systems with coils)
+    4. Plant equipment (boilers, chillers) that serve zones
+    
+    Args:
+        ont: EnergyPlus building ontology
+        
+    Returns:
+        Dictionary mapping zone names to lists of HVACActuator objects
+        
+    Note:
+        The actuators returned here operate at a lower level than thermostat 
+        setpoints. While setpoints define target temperatures, these actuators 
+        control the actual equipment that delivers heating/cooling to meet those 
+        targets.
+    """
+    zone_actuators: dict[str, list[HVACActuator]] = {}
+    
+    # Initialize with all zones
+    zones = [str(zone) for zone in ont.zones()]
+    for zone in zones:
+        zone_actuators[zone] = []
+    
+    logger.info("Searching for HVAC actuators in the building model...")
+    
+    # 1. Check for Ideal Loads Air Systems (ZoneHVAC:IdealLoadsAirSystem)
+    # These provide direct control over sensible heating/cooling rates
+    ideal_loads_query = """
+    SELECT ?name ?zone
+    WHERE {
+        ?name a "ZoneHVAC:IdealLoadsAirSystem" .
+        ?name idf:zone_name ?zone .
+    }
+    """
+    
+    logger.debug("Querying for Ideal Loads Air Systems...")
+    for row in ont.rdf.query(ideal_loads_query):
+        component_name = str(row.name)
+        zone_name = str(row.zone)
+        
+        if zone_name in zone_actuators:
+            # Ideal loads can control heating and cooling rates directly
+            zone_actuators[zone_name].append(
+                HVACActuator(
+                    name=f"{component_name}_heating",
+                    actuator_type="Ideal Loads Air System",
+                    control_type="Air Mass Flow Rate",
+                    actuated_component=component_name,
+                    min_value=0.0,
+                    max_value=100.0  # kg/s, should be determined from design
+                )
+            )
+            logger.debug(f"Found Ideal Loads system in zone {zone_name}")
+    
+    # 2. Check for ZoneHVAC equipment types
+    # Common zone equipment that can be controlled
+    zone_hvac_types = [
+        "ZoneHVAC:FourPipeFanCoil",
+        "ZoneHVAC:PackagedTerminalAirConditioner", 
+        "ZoneHVAC:PackagedTerminalHeatPump",
+        "ZoneHVAC:WaterToAirHeatPump",
+        "ZoneHVAC:Baseboard:Convective:Electric",
+        "ZoneHVAC:Baseboard:Convective:Water",
+        "ZoneHVAC:Baseboard:RadiantConvective:Electric",
+        "ZoneHVAC:Baseboard:RadiantConvective:Water",
+        "ZoneHVAC:UnitHeater",
+        "ZoneHVAC:UnitVentilator",
+    ]
+    
+    for hvac_type in zone_hvac_types:
+        zone_hvac_query = f"""
+        SELECT ?name ?zone
+        WHERE {{
+            ?name a "{hvac_type}" .
+            ?name idf:availability_schedule_name ?schedule .
+        }}
+        """
+        
+        # Try to find zone association (property names vary by equipment type)
+        zone_property_names = [
+            "idf:zone_name",
+            "idf:zone_supply_air_node_name", 
+            "idf:air_inlet_node_name",
+        ]
+        
+        for row in ont.rdf.query(zone_hvac_query):
+            component_name = str(row.name)
+            
+            # Try to find which zone this equipment serves
+            for prop in zone_property_names:
+                zone_query = f"""
+                SELECT ?zone
+                WHERE {{
+                    ?comp {prop} ?zone .
+                }}
+                """
+                zone_results = list(ont.rdf.query(zone_query, 
+                                                   initBindings={"comp": row.name}))
+                if zone_results:
+                    zone_name = str(zone_results[0].zone)
+                    if zone_name in zone_actuators:
+                        zone_actuators[zone_name].append(
+                            HVACActuator(
+                                name=component_name,
+                                actuator_type=hvac_type,
+                                control_type="Availability Status",
+                                actuated_component=component_name,
+                                min_value=0.0,  # Off
+                                max_value=1.0,  # On
+                            )
+                        )
+                        logger.debug(f"Found {hvac_type} in zone {zone_name}")
+                    break
+    
+    # 3. Check for Coils (heating and cooling)
+    # Coils are the primary components that add/remove heat
+    coil_types = [
+        ("Coil:Heating:Electric", "Electric Heating Coil Power"),
+        ("Coil:Heating:Fuel", "Heating Coil Power"),
+        ("Coil:Heating:Water", "Water Mass Flow Rate"),
+        ("Coil:Heating:Steam", "Steam Mass Flow Rate"),
+        ("Coil:Cooling:Water", "Water Mass Flow Rate"),
+        ("Coil:Cooling:Water:DetailedGeometry", "Water Mass Flow Rate"),
+        ("Coil:Cooling:DX:SingleSpeed", "Coil Speed Level"),
+        ("Coil:Cooling:DX:TwoSpeed", "Coil Speed Level"),
+        ("Coil:Cooling:DX:MultiSpeed", "Coil Speed Level"),
+        ("Coil:Heating:DX:SingleSpeed", "Coil Speed Level"),
+    ]
+    
+    for coil_type, control_type in coil_types:
+        coil_query = f"""
+        SELECT ?name
+        WHERE {{
+            ?name a "{coil_type}" .
+        }}
+        """
+        
+        for row in ont.rdf.query(coil_query):
+            component_name = str(row.name)
+            
+            # Coils are typically part of air loops or zone equipment
+            # We would need to trace connections to find which zones they serve
+            # For now, we log them as available actuators
+            logger.debug(f"Found {coil_type}: {component_name}")
+            
+            # Note: Without zone association, we can't add these to zone_actuators
+            # A more sophisticated implementation would trace the air loop topology
+    
+    # 4. Check for AirLoopHVAC systems
+    # These are central systems that serve multiple zones
+    airloop_query = """
+    SELECT ?name
+    WHERE {
+        ?name a "AirLoopHVAC" .
+    }
+    """
+    
+    for row in ont.rdf.query(airloop_query):
+        airloop_name = str(row.name)
+        logger.debug(f"Found AirLoopHVAC: {airloop_name}")
+        
+        # To properly handle air loops, we would need to:
+        # 1. Find the supply side equipment (fans, coils)
+        # 2. Trace connections to zone terminals
+        # 3. Associate actuators with served zones
+        # This requires more complex topology analysis
+    
+    # Log summary
+    total_actuators = sum(len(acts) for acts in zone_actuators.values())
+    zones_with_actuators = [z for z, acts in zone_actuators.items() if acts]
+    zones_without_actuators = [z for z, acts in zone_actuators.items() if not acts]
+    
+    logger.info(f"Found {total_actuators} HVAC actuators across {len(zones_with_actuators)} zones")
+    if zones_without_actuators:
+        logger.warning(f"No HVAC actuators found for zones: {zones_without_actuators}")
+    
+    return zone_actuators
