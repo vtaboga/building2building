@@ -11,7 +11,9 @@ from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import (
     create_complete_pipeline,
     eplustbl,
+    eddfile,
     get_net_conditioned_area,
+    get_hvac_actuators,
     get_warmup_days,
     link_in_schedule,
 )
@@ -135,6 +137,10 @@ def search_configs(
         area = get_net_conditioned_area(metrics_path)
         # warmup_phases = get_warmup_days(metrics_path)
 
+        # Search actuators
+        ems_file = realize(STORE_PATH.get(), eddfile(ep_path, derivation, epw))
+        hvac_actuators = get_hvac_actuators(ems_file)
+
         reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
         reward_type = reward_section.get("reward_type")
 
@@ -170,6 +176,7 @@ def search_configs(
                 path_to_building=epjson,
                 path_to_weather=epw,
                 reward_config=reward_config,
+                hvac_actuators=hvac_actuators,
                 eplus_output_dir=eplus_output_dir,
                 warmup_phases=1,  # keep consistent with existing search_config
                 area=area,

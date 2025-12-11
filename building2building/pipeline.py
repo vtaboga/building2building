@@ -207,6 +207,46 @@ def AddOutdoorAirMeters(input: Path):
         json.dump(epjson, f, indent=4)
 
 
+@derivation("with-edd-output")
+def AddEDDOutput(input: Path):
+    """Ensure Output:EnergyManagementSystem is configured to generate .edd file."""
+    dst = OUTPUT.get()
+
+    with open(input, "r") as f:
+        epjson = json.load(f)
+
+    # Check if Output:EnergyManagementSystem already exists
+    if "Output:EnergyManagementSystem" not in epjson:
+        epjson["Output:EnergyManagementSystem"] = {}
+    
+    # Check if we already have an EDD output configured properly
+    has_edd_output = False
+    for key, obj in epjson["Output:EnergyManagementSystem"].items():
+        current_val = obj.get("actuator_availability_dictionary_reporting", "None")
+        if current_val != "Verbose":
+            obj["actuator_availability_dictionary_reporting"] = "Verbose"  # Update to verbose to output meters
+            logger.info(f"Updated existing Output:EnergyManagementSystem '{key}' to Verbose reporting")
+        has_edd_output = True
+        break 
+    
+    # Add it if not present 
+    if not has_edd_output:
+        edd_key = "Output:EnergyManagementSystem 1"
+        suffix = 1
+        while edd_key in epjson["Output:EnergyManagementSystem"]:
+            suffix += 1
+            edd_key = f"Output:EnergyManagementSystem {suffix}"
+        
+        epjson["Output:EnergyManagementSystem"][edd_key] = {
+            "actuator_availability_dictionary_reporting": "Verbose",
+            "internal_variable_availability_dictionary_reporting": "Verbose",
+            "ems_runtime_language_debug_output_level": "None"
+        }
+        logger.info("Added Output:EnergyManagementSystem for .edd file generation")
+
+    with open(dst, "w") as f:
+        json.dump(epjson, f, indent=4)
+
 @derivation("timestep")
 def ModifyTimestep(
     input: Path,
@@ -388,6 +428,10 @@ def add_outdoor_air_meters(epjson_in: Derivation) -> Derivation:
     """Add outdoor air monitoring to epJSON."""
     return AddOutdoorAirMeters(epjson_in)
 
+def add_edd_output(epjson_in: Derivation) -> Derivation:
+    """Add EMS output to generate .edd file."""
+    return AddEDDOutput(epjson_in)
+
 
 def modify_timestep(epjson_in: Derivation, timesteps_per_hour: int = 4) -> Derivation:
     """Modify simulation timestep."""
@@ -490,6 +534,7 @@ def create_complete_pipeline(
     # Add meters and monitoring
     current = add_hvac_meters(current)
     current = add_outdoor_air_meters(current)
+    current = add_edd_output(current)
 
     # Configure simulation
     current = modify_timestep(current, timesteps_per_hour=4)
@@ -517,10 +562,9 @@ def link_in_schedule(epjson_file: Path, csv_file: Path):
         json.dump(epjson, f, indent=4)
 
 
-@derivation("eplustbl.htm")
-def eplustbl(ep_path: Path, epjson: Path, epw: Path):
-    """Run an uncontrolled trajectory and save the eplustbl.htm file which
-    contains many useful metrics."""
+@derivation("simulation-outputs")
+def run_simulation(ep_path: Path, epjson: Path, eps: Path):
+    """Run an EnergyPlus simulation and save the output files."""
     out = OUTPUT.get()
 
     tmp = Path(tempfile.mkdtemp())
@@ -529,14 +573,35 @@ def eplustbl(ep_path: Path, epjson: Path, epw: Path):
         "-d",
         str(tmp),
         "-w",
-        str(epw),
+        str(eps),
         "-x",
         str(epjson),
     ]
 
     subprocess.run(cmd, check=True)
 
-    shutil.copy(tmp / "eplustbl.htm", out)
+    htm_file = tmp / "eplustbl.htm"
+    edd_file = tmp / "eplusout.edd"
+
+    if not htm_file.exists():
+        raise Exception("EnergyPlus simulation did not produce eplustbl.htm")
+    if not edd_file.exists():
+        raise Exception("EnergyPlus simulation did not produce eplusout.edd")
+    
+    shutil.copy(htm_file, out / "eplustbl.htm")
+    shutil.copy(edd_file, out / "eplusout.edd")
+
+
+def eplustbl(ep_path: Path, epjson: Path, epw: Path) -> Derivation:
+    """Get the eplustbl.htm file from a simulation"""
+    sim = run_simulation(ep_path, epjson, epw)
+    return ChildFile(sim, "eplustbl.htm")
+
+
+def eddfile(ep_path: Path, epjson: Path, epw: Path) -> Derivation:
+    """Get the eplusout.edd file from a simulation"""
+    sim = run_simulation(ep_path, epjson, epw)
+    return ChildFile(sim, "eplusout.edd")
 
 
 def get_net_conditioned_area(html_path: Path) -> float:
@@ -636,3 +701,103 @@ def get_warmup_days(html_path: Path) -> float:
         raise Exception("could not read warmup days")
     warmup_days = float(series.iloc[0])
     return warmup_days
+
+
+def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
+    """Extract HVAC-related actuator names from an EnergyPlus .edd file.
+    
+    Searches for actuators related to:
+    - Coil speed control (heating/cooling coils)
+    - Fan air mass flow rate control
+    - UnitarySystem air flow rate controls
+    - AirTerminal mass flow rate controls
+    
+    Returns:
+        List of dictionaries containing actuator information for get_actuator_handle().
+        Each dictionary has keys: 'component_name', 'component_type', 'control_type', 'units'
+    """
+    
+    hvac_actuators = []
+    
+    # Read the .edd file
+    with open(edd_path, "r", encoding="utf-8", errors="ignore") as f:
+        lines = f.readlines()
+    
+    # Keywords to identify HVAC actuators (case-insensitive search)
+    hvac_keywords = [
+        # Coil and speed controls
+        "Coil Speed Control",
+        # Fan controls
+        "Fan,Fan Air Mass Flow Rate",
+        "Fan Air Mass Flow Rate",
+        # UnitarySystem air flow controls
+        "UnitarySystem,Autosized Supply Air Flow Rate",
+        # AirTerminal controls
+        "AirTerminal",
+        # Exclude schedules and other non-direct controls
+    ]
+    
+    # Lines to exclude (schedules, not direct HVAC equipment controls)
+    exclude_keywords = [
+        "Schedule:Year",
+        "Schedule:File",
+        "Schedule:Compact",
+        "Schedule:Constant",
+        "ElectricEquipment",
+        "OtherEquipment",
+        "Surface,",
+        "Weather Data",
+        "Material,",
+        "People,",
+        "Lights,",
+        "Zone,",
+        "System Node Setpoint",
+        "Plant Component",
+        "Autosized",
+    ]
+    
+    for line in lines:
+        line_stripped = line.strip()
+        
+        # Skip comments and empty lines
+        if not line_stripped or line_stripped.startswith("!"):
+            continue
+        
+        # Check if line contains HVAC-related keywords
+        line_lower = line_stripped.lower()
+        
+        # First check if line should be excluded
+        should_exclude = any(excl.lower() in line_lower for excl in exclude_keywords)
+        if should_exclude:
+            continue
+        
+        # Check if line contains any HVAC keywords
+        is_hvac = any(keyword.lower() in line_lower for keyword in hvac_keywords)
+        
+        # Also check for specific component types that are HVAC-related
+        if not is_hvac:
+            # Additional patterns for HVAC equipment
+            if "unitarysystem," in line_lower:
+                is_hvac = True
+            elif "airterminal:" in line_lower:
+                is_hvac = True
+            elif ("fan," in line_lower and "mass flow" in line_lower):
+                is_hvac = True
+            elif "coil" in line_lower and ("speed" in line_lower or "stage" in line_lower):
+                is_hvac = True
+        
+        if is_hvac:
+            # Parse the actuator line
+            # Format: EnergyManagementSystem:Actuator Available,<Component Name>,<Component Type>,<Control Type>,<Units>
+            parts = line_stripped.split(",", maxsplit=4)
+            
+            if len(parts) >= 5:
+                actuator_dict = {
+                    "component_name": parts[1].strip(),
+                    "component_type": parts[2].strip(),
+                    "control_type": parts[3].strip(),
+                    "units": parts[4].strip(),
+                }
+                hvac_actuators.append(actuator_dict)
+    
+    return hvac_actuators

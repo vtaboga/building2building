@@ -28,6 +28,7 @@ class BuildingConfig:
     path_to_building: Path
     path_to_weather: Path
     reward_config: RewardConfig
+    hvac_actuators: list[dict[str, str]]
     eplus_output_dir: Path
     warmup_phases: int
     area: float
