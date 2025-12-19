@@ -1,0 +1,18 @@
+target_temp_c: 21.0
+deadband_c: 0.5
+
+# Heuristic actuator levels (tune per building/system)
+fan_mass_flow_kg_s: 1.0
+terminal_mass_flow_kg_s: 1.0
+# Coil speed values: integer part selects speed level, fractional part is speed ratio.
+# Avoid exact integers (e.g., 1.0 -> ratio 0.0) which can effectively turn the coil off.
+coil_speed_heat: 1.5
+coil_speed_cool: 1.5
+supplemental_stage_heat: 0.0
+
+# AirLoopHVAC availability override:
+# 0=NoAction, 1=ForceOff, 2=CycleOn, 3=CycleOnZoneFansOnly
+availability_on: 2.0
+availability_off: 1.0
+
+

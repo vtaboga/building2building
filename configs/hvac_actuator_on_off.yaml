@@ -1,0 +1,14 @@
+defaults:
+  - base
+  - _self_
+  - bldg: single_family
+  - override /policy: hvac_actuator_on_off
+
+env:
+  normalize_obs: false
+  control_mode: hvac_actuators
+  max_steps: 20000
+
+n_episodes: 1
+
+

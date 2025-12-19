@@ -584,6 +584,8 @@ def create_complete_pipeline(
     input_file: Derivation,
     energyplus_path: Realizable,
     src_version: str,
+    *,
+    include_setpoint_control: bool = True,
 ) -> Derivation:
     """Create a complete processing pipeline from raw IDF to ready-to-go epJSON."""
 
@@ -600,7 +602,8 @@ def create_complete_pipeline(
 
     # Configure simulation
     current = modify_timestep(current, timesteps_per_hour=4)
-    current = add_setpoint_control(current)
+    if include_setpoint_control:
+        current = add_setpoint_control(current)
 
     # Make the name useful
     current = Rename("building.epjson", current)
@@ -772,10 +775,11 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
     """Extract HVAC-related actuator names from an EnergyPlus .edd file.
     
     Searches for actuators related to:
-    - Coil speed control (heating/cooling coils)
+    - Coil speed/stage control (heating/cooling coils and unitary systems)
     - Fan air mass flow rate control
     - UnitarySystem air flow rate controls
     - AirTerminal mass flow rate controls
+    - AirLoopHVAC availability status override (force system on/off)
     
     Returns:
         List of dictionaries containing actuator information for get_actuator_handle().
@@ -794,6 +798,8 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
         "Fan Air Mass Flow Rate",
         # UnitarySystem air flow controls
         "UnitarySystem,Autosized Supply Air Flow Rate",
+        # Air loop availability override (ForceOff / CycleOn / CycleOnZoneFansOnly)
+        "AirLoopHVAC,Availability Status",
     ]
     
     # Lines to exclude (schedules, not direct HVAC equipment controls)
@@ -843,6 +849,8 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
             elif ("fan," in line_lower and "mass flow" in line_lower):
                 is_hvac = True
             elif "coil" in line_lower and ("speed" in line_lower or "stage" in line_lower):
+                is_hvac = True
+            elif "airloophvac," in line_lower and "availability status" in line_lower:
                 is_hvac = True
         
         if is_hvac:
