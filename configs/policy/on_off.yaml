@@ -1,0 +1,6 @@
+target_temp_c: 21.0
+deadband_c: 0.5
+q_heat_w: 6000.0
+q_cool_w: 6000.0
+
+

@@ -1,0 +1,12 @@
+defaults:
+  - base
+  - _self_
+  - override /policy: on_off
+
+env:
+  normalize_obs: false
+  hvac_control_mode: sensible_load_continuous
+
+n_episodes: 1
+
+

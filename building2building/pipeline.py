@@ -247,6 +247,55 @@ def AddEDDOutput(input: Path):
     with open(dst, "w") as f:
         json.dump(epjson, f, indent=4)
 
+
+@derivation("with-tabular-output")
+def AddTabularOutput(input: Path):
+    """Ensure OutputControl:Files and OutputControl:Table:Style are configured to generate eplustbl.htm."""
+    dst = OUTPUT.get()
+
+    with open(input, "r") as f:
+        epjson = json.load(f)
+
+    # Ensure OutputControl:Files exists and has output_tabular enabled
+    if "OutputControl:Files" not in epjson:
+        epjson["OutputControl:Files"] = {}
+    
+    # Find or create OutputControl:Files entry
+    files_key = None
+    for key in epjson["OutputControl:Files"].keys():
+        files_key = key
+        break
+    
+    if files_key is None:
+        files_key = "OutputControl:Files 1"
+        epjson["OutputControl:Files"][files_key] = {}
+    
+    # Ensure output_tabular is set to "Yes"
+    epjson["OutputControl:Files"][files_key]["output_tabular"] = "Yes"
+    logger.info(f"Ensured OutputControl:Files '{files_key}' has output_tabular enabled")
+
+    # Ensure OutputControl:Table:Style exists and is set to HTML
+    if "OutputControl:Table:Style" not in epjson:
+        epjson["OutputControl:Table:Style"] = {}
+    
+    # Find or create OutputControl:Table:Style entry
+    style_key = None
+    for key in epjson["OutputControl:Table:Style"].keys():
+        style_key = key
+        break
+    
+    if style_key is None:
+        style_key = "OutputControl:Table:Style 1"
+        epjson["OutputControl:Table:Style"][style_key] = {}
+    
+    # Ensure column_separator is set to "HTML"
+    epjson["OutputControl:Table:Style"][style_key]["column_separator"] = "HTML"
+    logger.info(f"Ensured OutputControl:Table:Style '{style_key}' is set to HTML format")
+
+    with open(dst, "w") as f:
+        json.dump(epjson, f, indent=4)
+
+
 @derivation("timestep")
 def ModifyTimestep(
     input: Path,
@@ -331,12 +380,12 @@ def AddSetpointControl(
 
             if cooling_schedule_name not in epjson["Schedule:Compact"]:
                 epjson["Schedule:Compact"][cooling_schedule_name] = (
-                    create_schedule_compact(25.0)
+                    create_schedule_compact(40.0)  # Default to extreme value to allow for low level control
                 )
 
             if heating_schedule_name not in epjson["Schedule:Compact"]:
                 epjson["Schedule:Compact"][heating_schedule_name] = (
-                    create_schedule_compact(20.0)
+                    create_schedule_compact(10.0)  # Default to extreme value to allow for low level control
                 )
 
         elif control_type == "ThermostatSetpoint:SingleHeating":
@@ -347,7 +396,7 @@ def AddSetpointControl(
 
             if heating_schedule_name not in epjson["Schedule:Compact"]:
                 epjson["Schedule:Compact"][heating_schedule_name] = (
-                    create_schedule_compact(20.0)
+                    create_schedule_compact(10.0)  # Default to extreme value to allow for low level control
                 )
 
         elif control_type == "ThermostatSetpoint:SingleCooling":
@@ -358,19 +407,26 @@ def AddSetpointControl(
 
             if cooling_schedule_name not in epjson["Schedule:Compact"]:
                 epjson["Schedule:Compact"][cooling_schedule_name] = (
-                    create_schedule_compact(25.0)
+                    create_schedule_compact(40.0)  # Default to extreme value to allow for low level control
                 )
 
         elif control_type == "ThermostatSetpoint:SingleHeatingOrCooling":
-            setpoint_schedule_name = f"{setpoint_name} Setpoint"
-            epjson["ThermostatSetpoint:SingleHeatingOrCooling"][setpoint_name][
-                "setpoint_temperature_schedule_name"
-            ] = setpoint_schedule_name
+            
+            raise NotImplementedError(
+                "ThermostatSetpoint:SingleHeatingOrCooling not supported yet"
+            )
+        
+            # remove supported for now to avoid problems with low level control
+        
+            # setpoint_schedule_name = f"{setpoint_name} Setpoint"
+            # epjson["ThermostatSetpoint:SingleHeatingOrCooling"][setpoint_name][
+            #     "setpoint_temperature_schedule_name"
+            # ] = setpoint_schedule_name
 
-            if setpoint_schedule_name not in epjson["Schedule:Compact"]:
-                epjson["Schedule:Compact"][setpoint_schedule_name] = (
-                    create_schedule_compact(22.5)
-                )
+            # if setpoint_schedule_name not in epjson["Schedule:Compact"]:
+            #     epjson["Schedule:Compact"][setpoint_schedule_name] = (
+            #         create_schedule_compact(22.5)
+            #     )
 
     with open(dst, "w") as f:
         json.dump(epjson, f, indent=4)
@@ -431,6 +487,11 @@ def add_outdoor_air_meters(epjson_in: Derivation) -> Derivation:
 def add_edd_output(epjson_in: Derivation) -> Derivation:
     """Add EMS output to generate .edd file."""
     return AddEDDOutput(epjson_in)
+
+
+def add_tabular_output(epjson_in: Derivation) -> Derivation:
+    """Add tabular output configuration to generate eplustbl.htm file."""
+    return AddTabularOutput(epjson_in)
 
 
 def modify_timestep(epjson_in: Derivation, timesteps_per_hour: int = 4) -> Derivation:
@@ -535,6 +596,7 @@ def create_complete_pipeline(
     current = add_hvac_meters(current)
     current = add_outdoor_air_meters(current)
     current = add_edd_output(current)
+    current = add_tabular_output(current)
 
     # Configure simulation
     current = modify_timestep(current, timesteps_per_hour=4)
@@ -587,6 +649,9 @@ def run_simulation(ep_path: Path, epjson: Path, eps: Path):
         raise Exception("EnergyPlus simulation did not produce eplustbl.htm")
     if not edd_file.exists():
         raise Exception("EnergyPlus simulation did not produce eplusout.edd")
+    
+    # Ensure output directory exists
+    out.mkdir(parents=True, exist_ok=True)
     
     shutil.copy(htm_file, out / "eplustbl.htm")
     shutil.copy(edd_file, out / "eplusout.edd")
@@ -725,16 +790,10 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
     
     # Keywords to identify HVAC actuators (case-insensitive search)
     hvac_keywords = [
-        # Coil and speed controls
         "Coil Speed Control",
-        # Fan controls
-        "Fan,Fan Air Mass Flow Rate",
         "Fan Air Mass Flow Rate",
         # UnitarySystem air flow controls
         "UnitarySystem,Autosized Supply Air Flow Rate",
-        # AirTerminal controls
-        "AirTerminal",
-        # Exclude schedules and other non-direct controls
     ]
     
     # Lines to exclude (schedules, not direct HVAC equipment controls)

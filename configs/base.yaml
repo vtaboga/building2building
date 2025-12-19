@@ -3,7 +3,7 @@ defaults:
   - _self_
   - wandb: default
   - training: default
-  - policy: sac
+  - policy: constant
   - reward: deadband
 
 env:
