@@ -7,6 +7,7 @@ import numpy as np
 from gymnasium.spaces import Box, Dict
 from minergym.simulation import ActuatorHole
 from rdflib.term import Node
+from typing import Sequence
 
 from .transform_utils import (
     Transform,
@@ -55,6 +56,74 @@ class SingleHeatingOrCooling:
 ThermostatSetpoint = (
     DualSetpoint | SingleHeating | SingleCooling | SingleHeatingOrCooling
 )
+
+
+def _hvac_actuator_bounds(actuator: dict[str, str]) -> tuple[float, float]:
+    """
+    Heuristic bounds for common HVAC actuators.
+
+    EnergyPlus does not expose actuator ranges through the API, and the set of
+    available actuators depends on the HVAC system template. We therefore use
+    conservative, finite bounds suitable for RL action spaces.
+    """
+    component_type = actuator.get("component_type", "").lower()
+    control_type = actuator.get("control_type", "").lower()
+    units = actuator.get("units", "").lower()
+
+    # AirLoopHVAC availability override: 0=NoAction, 1=ForceOff, 2=CycleOn, 3=CycleOnZoneFansOnly
+    if "airloophvac" in component_type and "availability status" in control_type:
+        return 0.0, 3.0
+
+    # Fan air mass flow rate actuator (kg/s)
+    if "fan air mass flow rate" in control_type or ("fan" in component_type and "kg/s" in units):
+        # Conservative default; users can scale in policy if they want more range.
+        return 0.0, 5.0
+
+    # Coil speed/stage control for unitary systems often expects a "speed value"
+    # where integer part selects speed level and fractional part is a speed ratio.
+    if "coil speed control" in component_type or "coil speed" in control_type:
+        return 0.0, 4.0
+
+    # Fallback: normalized 0..1 control.
+    return 0.0, 1.0
+
+
+def hvac_actuators_transform(
+    hvac_actuators: Sequence[dict[str, str]],
+) -> Transform[list, Box]:
+    """
+    Build an action transform from a list of `.edd`-parsed actuator descriptors.
+
+    Each element in `hvac_actuators` must contain:
+    - component_name
+    - component_type
+    - control_type
+    - units
+    """
+    holes: list[ActuatorHole] = []
+    lows: list[float] = []
+    highs: list[float] = []
+
+    for a in hvac_actuators:
+        if not isinstance(a, dict):
+            raise TypeError(f"Expected actuator dict, got {type(a)}")
+
+        missing = [k for k in ("component_name", "component_type", "control_type", "units") if k not in a]
+        if missing:
+            raise ValueError(f"Actuator dict missing keys: {missing}. Got: {a}")
+
+        holes.append(ActuatorHole(a["component_type"], a["control_type"], a["component_name"]))
+        lo, hi = _hvac_actuator_bounds(a)
+        lows.append(lo)
+        highs.append(hi)
+
+    if not holes:
+        raise ValueError("hvac_actuators is empty; cannot build HVAC actuator action space")
+
+    return TransformListToArray(
+        holes,
+        Box(low=np.asarray(lows, dtype=float), high=np.asarray(highs, dtype=float)),
+    )
 
 
 def get_controllable_setpoints(
