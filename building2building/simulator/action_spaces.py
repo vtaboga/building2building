@@ -70,18 +70,33 @@ def _hvac_actuator_bounds(actuator: dict[str, str]) -> tuple[float, float]:
     control_type = actuator.get("control_type", "").lower()
     units = actuator.get("units", "").lower()
 
-    # AirLoopHVAC availability override: 0=NoAction, 1=ForceOff, 2=CycleOn, 3=CycleOnZoneFansOnly
+    # AirLoopHVAC availability override.
+    #
+    # Values are discrete-like: 0=NoAction, 1=ForceOff, 2=CycleOn, 3=CycleOnZoneFansOnly.
+    # In practice, allowing 0.0 (NoAction) can lead to unstable native behavior when
+    # the controller relies on an explicit override; we therefore restrict the
+    # range to [1, 3] by default.
     if "airloophvac" in component_type and "availability status" in control_type:
-        return 0.0, 3.0
+        return 1.0, 3.0
 
     # Fan air mass flow rate actuator (kg/s)
     if "fan air mass flow rate" in control_type or ("fan" in component_type and "kg/s" in units):
-        # Conservative default; users can scale in policy if they want more range.
-        return 0.0, 5.0
+        # Avoid exactly 0.0 which can create degenerate HVAC states in some models.
+        return 0.1, 5.0
+
+    # Terminal unit air mass flow rate (kg/s). Many unitary systems become unstable
+    # (or hit native bugs) if airflow is set to exactly 0.
+    if "airterminal:" in component_type and control_type == "mass flow rate":
+        return 0.1, 1.0
 
     # Coil speed/stage control for unitary systems often expects a "speed value"
     # where integer part selects speed level and fractional part is a speed ratio.
+    #
+    # Empirically, the "DX Coil Speed Value" behaves like 1..N (not 0..N); allowing
+    # 0.0 can trigger crashes in the EnergyPlus runtime via the Python API.
     if "coil speed control" in component_type or "coil speed" in control_type:
+        if "dx coil speed value" in control_type:
+            return 1.0, 4.0
         return 0.0, 4.0
 
     # Fallback: normalized 0..1 control.
