@@ -1,5 +1,6 @@
 import importlib
 import inspect
+import logging
 from pathlib import Path
 from omegaconf import OmegaConf
 from wandb.integration.sb3 import WandbCallback
@@ -11,6 +12,9 @@ from building2building.simulator.wrappers import NormalizeObservation
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, CallbackList
 from stable_baselines3.common.utils import set_random_seed
+
+
+logger = logging.getLogger(__name__)
 
 
 def _make_envs(config: OmegaConf, output_dir: Path):
@@ -104,13 +108,26 @@ def _load_best_model(config: OmegaConf, model_dir: Path):
 
 def online_trainer(config: OmegaConf, output_dir: Path):
 
+    # Stable reference to the repository root (avoid relying on Hydra's runtime cwd).
+    # File is at: <repo_root>/algorithms/online_trainer.py
+    repo_root = Path(__file__).resolve().parents[1]
+
     wandb_run = wandb.init(
         project=config.wandb.project,
 		entity=config.wandb.entity,
         config=OmegaConf.to_container(config, resolve=True),
 		sync_tensorboard=True,
-        dir=str(output_dir)
+        dir=str(output_dir),
+        save_code=True,
     )
+
+    # Ensure the run is explicitly associated with this code checkout in W&B,
+    # even if Hydra changes the runtime working directory.
+    if wandb_run is not None:
+        try:
+            wandb_run.log_code(root=str(repo_root))
+        except Exception as e:
+            logger.warning("wandb log_code failed: %s", e)
 
 
     # Prepare IO dirs
