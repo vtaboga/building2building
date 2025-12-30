@@ -99,6 +99,12 @@ def _hvac_actuator_bounds(actuator: dict[str, str]) -> tuple[float, float]:
             return 1.0, 4.0
         return 0.0, 4.0
 
+    # Unitary HVAC load request actuators (W). Positive=sensible heating request,
+    # negative=sensible cooling request.
+    if "unitary hvac" in component_type and "load request" in control_type and "w" in units:
+        # Heuristic bounds; should be large enough for typical single-zone residential systems.
+        return -20000.0, 20000.0
+
     # Fallback: normalized 0..1 control.
     return 0.0, 1.0
 

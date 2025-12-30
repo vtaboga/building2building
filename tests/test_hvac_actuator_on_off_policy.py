@@ -57,6 +57,8 @@ def test_hvac_actuator_on_off_policy_tracks_setpoint_and_uses_hvac_actuators() -
     deadband = 0.5
     n_steps = 60
     tail = 20
+    q_heat = 6000.0
+    q_cool = 6000.0
 
     with tempfile.TemporaryDirectory() as tmpdir:
         out_dir = Path(tmpdir)
@@ -87,6 +89,8 @@ def test_hvac_actuator_on_off_policy_tracks_setpoint_and_uses_hvac_actuators() -
             coil_speed_heat=0.0,
             coil_speed_cool=0.0,
             supplemental_stage_heat=0.0,
+            q_heat_w=0.0,
+            q_cool_w=0.0,
             availability_on=1.0,
             availability_off=1.0,
         )
@@ -101,6 +105,8 @@ def test_hvac_actuator_on_off_policy_tracks_setpoint_and_uses_hvac_actuators() -
             coil_speed_heat=1.0,
             coil_speed_cool=1.0,
             supplemental_stage_heat=0.0,
+            q_heat_w=q_heat,
+            q_cool_w=q_cool,
         )
         temps_ctl = _rollout_mean_zone_temp(env, policy, n_steps=n_steps)
 

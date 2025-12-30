@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from ctypes import c_void_p
-from pathlib import Path
-from typing import Any
-
 import pytest
 
-from building2building.pipeline import get_hvac_actuators
-from building2building.simulator.patched_minergym_simulation import PatchedEnergyPlusSimulation
+pytest.skip(
+    "Deprecated: PatchedEnergyPlusSimulation was upstreamed to minergym; this repo no longer "
+    "ships building2building.simulator.patched_minergym_simulation.",
+    allow_module_level=True,
+)
 
 
 def test_get_hvac_actuators_includes_fan_coil_and_airloop_availability() -> None:

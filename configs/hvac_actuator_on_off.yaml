@@ -7,8 +7,19 @@ defaults:
 env:
   normalize_obs: false
   control_mode: hvac_actuators
-  hvac_action_space: box
-  max_steps: 20000
+  # IMPORTANT:
+  # Do NOT rewrite thermostat setpoint schedules to extreme values (10C/40C) when using
+  # HVAC component actuators (fan/coil/availability). Those actuators typically cannot
+  # create heating/cooling demand by themselves; EnergyPlus still uses the thermostat
+  # setpoints to decide whether heating/cooling is needed.
+  #
+  # Keeping the building's original thermostat schedules allows the policy to control
+  # conditioning by forcing the HVAC on/off via actuators while the thermostat provides
+  # the demand signal.
+  include_setpoint_control: false
+  hvac_action_space: multidiscrete
+  n_bins_continuous: 21
+  max_steps: 30000
 
 n_episodes: 1
 

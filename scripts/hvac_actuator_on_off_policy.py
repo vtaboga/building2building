@@ -10,10 +10,12 @@ from typing import Any
 import hydra
 import numpy as np
 import pandas as pd
+from gymnasium.spaces import MultiDiscrete
 from omegaconf import OmegaConf
 
 from algorithms.baselines import HVACActuatorOnOffPolicy
 from algorithms.utils import make_env
+from building2building.simulator.action_spaces import hvac_actuators_multidiscrete_transform
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +115,8 @@ def main(cfg) -> None:
         coil_speed_heat=float(cfg.policy.coil_speed_heat),
         coil_speed_cool=float(cfg.policy.coil_speed_cool),
         supplemental_stage_heat=float(cfg.policy.supplemental_stage_heat),
+        q_heat_w=float(getattr(cfg.policy, "q_heat_w", 0.0)),
+        q_cool_w=float(getattr(cfg.policy, "q_cool_w", 0.0)),
         availability_on=float(cfg.policy.availability_on),
         availability_off=float(cfg.policy.availability_off),
     )
@@ -130,10 +134,26 @@ def main(cfg) -> None:
         step = 0
 
         while not done and step < max_steps:
-            action, _ = policy.predict(obs, deterministic=True)
-            obs2, reward, terminated, truncated, _info = env.step(
-                np.asarray(action, dtype=float)
-            )
+            # Policy outputs float actuator commands (physical units).
+            action_cmd, _ = policy.predict(obs, deterministic=True)
+
+            # Env may be configured with a MultiDiscrete action space; if so, convert
+            # float commands -> discrete indices using the same discretization logic.
+            step_action = action_cmd
+            if isinstance(env.action_space, MultiDiscrete):
+                hvac_actuators = env.metadata.get("hvac_actuators", [])
+                if not isinstance(hvac_actuators, list) or not hvac_actuators:
+                    raise RuntimeError(
+                        "Expected env.metadata['hvac_actuators'] to be a non-empty list "
+                        "when using MultiDiscrete HVAC actuator control."
+                    )
+                n_bins_continuous = int(getattr(cfg.env, "n_bins_continuous", 21))
+                md = hvac_actuators_multidiscrete_transform(
+                    hvac_actuators, n_bins_continuous=n_bins_continuous
+                )
+                step_action = md(action_cmd)
+
+            obs2, reward, terminated, truncated, _info = env.step(step_action)
 
             row: dict[str, float] = {
                 "episode": float(ep),
@@ -146,7 +166,8 @@ def main(cfg) -> None:
                 if i < len(obs_arr):
                     row[f"obs::{name}"] = float(obs_arr[i])
 
-            act_arr = np.asarray(action, dtype=float).reshape(-1)
+            # Log the *commanded actuator values* (not discrete indices) for readability.
+            act_arr = np.asarray(action_cmd, dtype=float).reshape(-1)
             for i, name in enumerate(act_names):
                 if i < len(act_arr):
                     row[f"act::{name}"] = float(act_arr[i])

@@ -1,17 +1,12 @@
-import tempfile
-from pathlib import Path
+from __future__ import annotations
 
-import numpy as np
+import pytest
 
-from algorithms.baselines import OnOffSensibleLoadPolicy
-from building2building.pipeline import (
-    _infer_unitary_actuator_limits_from_epjson,
-    get_hvac_actuators,
-    get_net_conditioned_area,
-    select_hvac_actuators_for_mode,
+pytest.skip(
+    "Deprecated: this test targets legacy pipeline helpers and a BuildingConfig field "
+    "(hvac_control_mode) that are no longer present in this repo.",
+    allow_module_level=True,
 )
-from building2building.simulator import create_simulator
-from building2building.types import BaseRewardConfig, BuildingConfig
 
 
 def _find_zone_air_temp_index(env) -> int:

@@ -10,6 +10,12 @@ coil_speed_heat: 1.5
 coil_speed_cool: 1.5
 supplemental_stage_heat: 0.0
 
+# Optional: if the building exposes `Unitary HVAC :: Sensible Load Request [W]` in the EDD,
+# these values force heating/cooling demand directly (bypassing thermostat setpoints).
+# Set to 0 to disable.
+q_heat_w: 6000.0
+q_cool_w: 6000.0
+
 # AirLoopHVAC availability override:
 # 0=NoAction, 1=ForceOff, 2=CycleOn, 3=CycleOnZoneFansOnly
 availability_on: 2.0

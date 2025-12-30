@@ -778,6 +778,7 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
     - Coil speed/stage control (heating/cooling coils and unitary systems)
     - Fan air mass flow rate control
     - UnitarySystem air flow rate controls
+    - Unitary HVAC load request actuators (sensible/moisture), if present
     - AirTerminal mass flow rate controls
     - AirLoopHVAC availability status override (force system on/off)
     
@@ -798,6 +799,9 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
         "Fan Air Mass Flow Rate",
         # UnitarySystem air flow controls
         "UnitarySystem,Autosized Supply Air Flow Rate",
+        # Direct demand override for some unitary systems
+        "Unitary HVAC,Sensible Load Request",
+        "Unitary HVAC,Moisture Load Request",
         # Air loop availability override (ForceOff / CycleOn / CycleOnZoneFansOnly)
         "AirLoopHVAC,Availability Status",
     ]

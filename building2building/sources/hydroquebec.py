@@ -154,16 +154,30 @@ def search_configs(
 
     env_cfg = cfg.get("env", {}) if isinstance(cfg, dict) else {}
 
-    # Backward-compatible: if user provides hvac_control_mode (older configs),
-    # interpret that as wanting direct HVAC actuator control.
+    # Control mode must be explicitly configured; do not silently fall back.
     if env_cfg.get("hvac_control_mode") is not None and "control_mode" not in env_cfg:
-        control_mode = "hvac_actuators"
-    else:
-        control_mode = env_cfg.get("control_mode", "thermostat_setpoints")
+        raise ValueError(
+            "env.control_mode must be explicitly set (no defaults). "
+            "Found legacy key env.hvac_control_mode; please migrate to env.control_mode "
+            "with one of: 'thermostat_setpoints', 'hvac_actuators'."
+        )
+    if "control_mode" not in env_cfg:
+        raise ValueError(
+            "env.control_mode must be explicitly set (no defaults). "
+            "Choose one of: 'thermostat_setpoints', 'hvac_actuators'."
+        )
+    control_mode = env_cfg.get("control_mode")
+    if not isinstance(control_mode, str):
+        raise TypeError("env.control_mode must be a string")
     if control_mode not in ("thermostat_setpoints", "hvac_actuators"):
         raise ValueError(
             "env.control_mode must be one of: 'thermostat_setpoints', 'hvac_actuators'. "
             f"Got: {control_mode}"
+        )
+    if control_mode == "thermostat_setpoints":
+        raise ValueError(
+            "env.control_mode='thermostat_setpoints' is deprecated and must not be used. "
+            "Use env.control_mode='hvac_actuators'."
         )
 
     hvac_action_space = env_cfg.get("hvac_action_space", "box")
@@ -215,11 +229,35 @@ def search_configs(
                 keep.append(a)
                 continue
 
+            # Direct load request (bypasses thermostat demand for supported unitary systems)
+            if ct == "Unitary HVAC" and ctrl in ("Sensible Load Request", "Moisture Load Request"):
+                keep.append(a)
+                continue
+
         return keep
 
-    # If we intend to control HVAC components directly, avoid rewriting thermostat
-    # schedules in the pipeline (it can force HVAC off for some models).
-    include_setpoint_control = control_mode == "thermostat_setpoints"
+    # Optional override: allow scripts/configs to force setpoint control rewrite.
+    include_setpoint_control_cfg = env_cfg.get("include_setpoint_control")
+    if include_setpoint_control_cfg is not None and not isinstance(
+        include_setpoint_control_cfg, bool
+    ):
+        raise TypeError("env.include_setpoint_control must be a bool if provided")
+
+    if include_setpoint_control_cfg is None:
+        # Default behavior: if we intend to control HVAC components directly, avoid
+        # rewriting thermostat schedules in the pipeline (it can force HVAC off for
+        # some models).
+        include_setpoint_control = control_mode == "thermostat_setpoints"
+    else:
+        include_setpoint_control = include_setpoint_control_cfg
+
+    if control_mode == "hvac_actuators" and include_setpoint_control:
+        raise ValueError(
+            "env.include_setpoint_control must be false when env.control_mode='hvac_actuators'. "
+            "The pipeline's setpoint rewrite sets extreme thermostat schedules (10C heating / "
+            "40C cooling), which suppresses heating/cooling demand for most conditions and "
+            "makes HVAC actuator commands appear ineffective."
+        )
 
     rows = search_buildings(
         **config_nn, include_setpoint_control=include_setpoint_control

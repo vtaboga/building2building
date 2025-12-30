@@ -84,17 +84,23 @@ class HVACActuatorOnOffPolicy(Policy):
     coil_speed_heat: float = 1.0
     coil_speed_cool: float = 1.0
     supplemental_stage_heat: float = 0.0
+    # Optional: if the model exposes a Unitary HVAC "Sensible Load Request" actuator,
+    # we can force heating/cooling demand directly (bypassing thermostat setpoints).
+    q_heat_w: float = 0.0
+    q_cool_w: float = 0.0
     availability_on: float = 2.0  # CycleOn
     availability_off: float = 1.0  # ForceOff
     last_mode: str = "off"
 
     # Filled by `from_env_metadata`
+    n_actions: int = 0
     zone_temp_indices: tuple[int, ...] = ()
     idx_airloop_availability: Optional[int] = None
     idx_fan_mass_flow: Optional[int] = None
     idx_terminal_mass_flow: Optional[int] = None
     idx_coil_speed_value: Optional[int] = None
     idx_supplemental_stage: Optional[int] = None
+    idx_unitary_sensible_load_request: Optional[int] = None
 
     @staticmethod
     def _find_zone_temp_indices(observation_names: Sequence[str]) -> tuple[int, ...]:
@@ -125,6 +131,8 @@ class HVACActuatorOnOffPolicy(Policy):
         coil_speed_heat: float = 1.0,
         coil_speed_cool: float = 1.0,
         supplemental_stage_heat: float = 0.0,
+        q_heat_w: float = 0.0,
+        q_cool_w: float = 0.0,
         availability_on: float = 2.0,
         availability_off: float = 1.0,
     ) -> "HVACActuatorOnOffPolicy":
@@ -137,6 +145,7 @@ class HVACActuatorOnOffPolicy(Policy):
             raise TypeError("env.metadata['action_names'] must be a list[str]")
 
         zone_idxs = cls._find_zone_temp_indices(obs_names_raw)
+        n_actions = len(act_names_raw)
 
         def has_component(component: str, control: str):
             c = component.lower()
@@ -167,6 +176,9 @@ class HVACActuatorOnOffPolicy(Policy):
             act_names_raw,
             has_component("Coil Speed Control", "Unitary System Supplemental Coil Stage Level"),
         )
+        idx_load = cls._find_actuator_index(
+            act_names_raw, has_component("Unitary HVAC", "Sensible Load Request")
+        )
 
         return cls(
             target_temp_c=target_temp_c,
@@ -176,14 +188,18 @@ class HVACActuatorOnOffPolicy(Policy):
             coil_speed_heat=coil_speed_heat,
             coil_speed_cool=coil_speed_cool,
             supplemental_stage_heat=supplemental_stage_heat,
+            q_heat_w=q_heat_w,
+            q_cool_w=q_cool_w,
             availability_on=availability_on,
             availability_off=availability_off,
+            n_actions=n_actions,
             zone_temp_indices=zone_idxs,
             idx_airloop_availability=idx_airloop,
             idx_fan_mass_flow=idx_fan,
             idx_terminal_mass_flow=idx_terminal,
             idx_coil_speed_value=idx_speed,
             idx_supplemental_stage=idx_supp,
+            idx_unitary_sensible_load_request=idx_load,
         )
 
     def _mean_zone_temp(self, observation: Any) -> float:
@@ -193,21 +209,13 @@ class HVACActuatorOnOffPolicy(Policy):
 
     def predict(self, observation: Any, deterministic: bool = True):
         tz = self._mean_zone_temp(observation)
-        n_act = max(
-            (i for i in [
-                self.idx_airloop_availability,
-                self.idx_fan_mass_flow,
-                self.idx_terminal_mass_flow,
-                self.idx_coil_speed_value,
-                self.idx_supplemental_stage,
-            ] if i is not None),
-            default=-1,
-        ) + 1
+        if self.n_actions <= 0:
+            raise RuntimeError(
+                "Policy is not configured with n_actions (action_names missing?). "
+                "Use HVACActuatorOnOffPolicy.from_env_metadata()."
+            )
 
-        if n_act <= 0:
-            raise RuntimeError("Policy is not configured with actuator indices (action_names missing?)")
-
-        act = np.zeros((n_act,), dtype=float)
+        act = np.zeros((int(self.n_actions),), dtype=float)
 
         def set_if(idx: Optional[int], value: float) -> None:
             if idx is None:
@@ -221,6 +229,8 @@ class HVACActuatorOnOffPolicy(Policy):
             set_if(self.idx_terminal_mass_flow, self.terminal_mass_flow_kg_s)
             set_if(self.idx_coil_speed_value, self.coil_speed_heat)
             set_if(self.idx_supplemental_stage, self.supplemental_stage_heat)
+            if self.q_heat_w > 0.0:
+                set_if(self.idx_unitary_sensible_load_request, float(self.q_heat_w))
         elif tz > self.target_temp_c + self.deadband_c:
             object.__setattr__(self, "last_mode", "cool")
             set_if(self.idx_airloop_availability, self.availability_on)
@@ -228,6 +238,8 @@ class HVACActuatorOnOffPolicy(Policy):
             set_if(self.idx_terminal_mass_flow, self.terminal_mass_flow_kg_s)
             set_if(self.idx_coil_speed_value, self.coil_speed_cool)
             set_if(self.idx_supplemental_stage, 0.0)
+            if self.q_cool_w > 0.0:
+                set_if(self.idx_unitary_sensible_load_request, -float(self.q_cool_w))
         else:
             object.__setattr__(self, "last_mode", "off")
             set_if(self.idx_airloop_availability, self.availability_off)
@@ -235,5 +247,7 @@ class HVACActuatorOnOffPolicy(Policy):
             set_if(self.idx_terminal_mass_flow, 0.0)
             set_if(self.idx_coil_speed_value, 0.0)
             set_if(self.idx_supplemental_stage, 0.0)
+            # If we are overriding load request, explicitly clear it to 0W.
+            set_if(self.idx_unitary_sensible_load_request, 0.0)
 
         return act, None
