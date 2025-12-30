@@ -68,16 +68,28 @@ def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
     if not algo_name:
         raise ValueError("The key algorithm in policy config is missing.")
 
-    try:
-        # Load the policy class from stable_baselines3 according to the name
-        module_name = f"stable_baselines3.{algo_name}"
-        module = importlib.import_module(f"{module_name}.{algo_name}")
-        algo_cls = getattr(module, algo_name.upper())  
+    # Resolve algorithm class from SB3 or SB3-Contrib (e.g. TRPO).
+    algo_upper = str(algo_name).upper()
+    module = None
+    algo_cls = None
 
-    except ModuleNotFoundError as e:
-        raise ValueError(f"Algorithm module '{module_name}' not found in stable baselines 3.") from e
-    except AttributeError as e:
-        raise ValueError(f"Algorithm class '{algo_name}' not found in module '{module_name}'.") from e
+    for base_pkg in ("stable_baselines3", "sb3_contrib"):
+        try:
+            module = importlib.import_module(f"{base_pkg}.{algo_name}.{algo_name}")
+            algo_cls = getattr(module, algo_upper)
+            break
+        except ModuleNotFoundError:
+            continue
+        except AttributeError:
+            continue
+
+    if algo_cls is None:
+        raise ValueError(
+            f"Algorithm '{algo_name}' not found. "
+            "Expected it to exist as "
+            f"stable_baselines3.{algo_name}.{algo_name}.{algo_upper} "
+            f"or sb3_contrib.{algo_name}.{algo_name}.{algo_upper}."
+        )
 
     # pass only valid arguments
     sig = inspect.signature(algo_cls.__init__)
@@ -98,12 +110,15 @@ def _load_best_model(config: OmegaConf, model_dir: Path):
     best_path = model_dir / "best_model.zip"
     if not best_path.exists() or not algo_name:
         return None
-    try:
-        module = importlib.import_module(f"stable_baselines3.{algo_name}.{algo_name}")
-        algo_cls = getattr(module, algo_name.upper())
-        return algo_cls.load(str(best_path))
-    except Exception:
-        return None
+    algo_upper = str(algo_name).upper()
+    for base_pkg in ("stable_baselines3", "sb3_contrib"):
+        try:
+            module = importlib.import_module(f"{base_pkg}.{algo_name}.{algo_name}")
+            algo_cls = getattr(module, algo_upper)
+            return algo_cls.load(str(best_path))
+        except Exception:
+            continue
+    return None
 
 
 def online_trainer(config: OmegaConf, output_dir: Path):

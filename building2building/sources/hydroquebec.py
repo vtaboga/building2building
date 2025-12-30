@@ -166,6 +166,16 @@ def search_configs(
             f"Got: {control_mode}"
         )
 
+    hvac_action_space = env_cfg.get("hvac_action_space", "box")
+    if hvac_action_space not in ("box", "multidiscrete"):
+        raise ValueError(
+            "env.hvac_action_space must be one of: 'box', 'multidiscrete'. "
+            f"Got: {hvac_action_space}"
+        )
+    n_bins_continuous = int(env_cfg.get("n_bins_continuous", 21))
+    if n_bins_continuous <= 1:
+        raise ValueError("env.n_bins_continuous must be >= 2")
+
     def _filter_for_hvac_component_control(
         actuators: list[dict[str, str]],
     ) -> list[dict[str, str]]:
@@ -269,6 +279,8 @@ def search_configs(
                 eplus_output_dir=eplus_output_dir,
                 warmup_phases=1,  # keep consistent with existing search_config
                 area=area,
+                hvac_action_space=hvac_action_space,
+                n_bins_continuous=n_bins_continuous,
             )
         )
 

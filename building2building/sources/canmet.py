@@ -127,4 +127,5 @@ def search_config(
         # Empirically, this works for this dataset.
         warmup_phases=1,  # TODO: handle warmup
         area=1000.0,
+        hvac_actuators=[],
     )

@@ -1,0 +1,11 @@
+algorithm: "trpo"
+policy_type: "MlpPolicy"
+device: "cpu"
+
+# Reasonable defaults; adjust as needed.
+gamma: 0.99
+n_steps: 2048
+verbose: 1
+
+
+

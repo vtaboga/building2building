@@ -1,5 +1,6 @@
 algorithm: "ppo"
 policy_type: "MlpPolicy"
+device: "cpu"  # Set cpu if no cnn
 n_steps: 2048
 batch_size: 64
 gamma: 0.99

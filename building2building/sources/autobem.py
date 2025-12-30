@@ -348,4 +348,5 @@ def search_config(
         # Empirically, this works for this dataset.
         warmup_phases=5,
         area=b.Area,
+        hvac_actuators=[],
     )

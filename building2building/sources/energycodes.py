@@ -182,4 +182,5 @@ def search_config(
         eplus_output_dir=Path(tempfile.mkdtemp()),
         warmup_phases=3,
         area=1000.0,
+        hvac_actuators=[],
     )

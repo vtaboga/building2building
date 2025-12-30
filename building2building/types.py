@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Union
+from typing import Literal, Union
 
 
 @dataclass
@@ -28,7 +28,9 @@ class BuildingConfig:
     path_to_building: Path
     path_to_weather: Path
     reward_config: RewardConfig
-    hvac_actuators: list[dict[str, str]]
     eplus_output_dir: Path
     warmup_phases: int
     area: float
+    hvac_actuators: list[dict[str, str]] = field(default_factory=list)
+    hvac_action_space: Literal["box", "multidiscrete"] = "box"
+    n_bins_continuous: int = 21
