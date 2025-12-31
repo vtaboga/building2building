@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import minergym.ontology as ontology
 import numpy as np
-from gymnasium.spaces import Box, Dict, MultiDiscrete
+from gymnasium.spaces import Box, Dict
 from minergym.simulation import ActuatorHole
 from rdflib.term import Node
 from typing import Sequence
@@ -66,7 +66,7 @@ def _hvac_actuator_bounds(actuator: dict[str, str]) -> tuple[float, float]:
     available actuators depends on the HVAC system template. We therefore use
     conservative, finite bounds suitable for RL action spaces.
     """
-    # If bounds were inferred from sizing outputs, honor them.
+    # If bounds were inferred from sizing outputs.
     lo_any = actuator.get("lower_bound")
     hi_any = actuator.get("upper_bound")
     if isinstance(lo_any, (int, float)) and isinstance(hi_any, (int, float)):
@@ -157,112 +157,6 @@ def hvac_actuators_transform(
         holes,
         Box(low=np.asarray(lows, dtype=float), high=np.asarray(highs, dtype=float)),
     )
-
-
-def discretize_interval(low: float, high: float, n_bins: int) -> np.ndarray:
-    """
-    Discretize [low, high] into `n_bins` evenly-spaced values (inclusive).
-    """
-    if n_bins <= 1:
-        raise ValueError("n_bins must be >= 2")
-    if not np.isfinite(low) or not np.isfinite(high):
-        raise ValueError("low/high must be finite")
-    if high <= low:
-        raise ValueError("high must be > low")
-    return np.linspace(float(low), float(high), num=int(n_bins), dtype=float)
-
-
-@dataclass(frozen=True)
-class TransformActuatorsMultiDiscrete(Transform[list, MultiDiscrete]):
-    """
-    Transform between:
-    - domain: list[ActuatorHole] (EnergyPlus/minergym actuator template)
-    - codomain: MultiDiscrete action vector (agent-facing)
-
-    The reverse() direction maps discrete indices to float actuator commands.
-    """
-
-    holes: list[ActuatorHole]
-    values: list[np.ndarray]
-
-    def domain(self) -> list[ActuatorHole]:
-        return self.holes
-
-    def codomain(self) -> MultiDiscrete:
-        nvec = np.asarray([len(v) for v in self.values], dtype=np.int64)
-        return MultiDiscrete(nvec)
-
-    def __call__(self, obj) -> np.ndarray:
-        # Map float actuator commands -> nearest discrete index per dim.
-        x = np.asarray(obj, dtype=float).reshape(-1)
-        if x.shape[0] != len(self.values):
-            raise ValueError(f"Expected {len(self.values)} values, got {x.shape[0]}")
-        idxs: list[int] = []
-        for xi, vals in zip(x.tolist(), self.values):
-            j = int(np.argmin(np.abs(vals - float(xi))))
-            idxs.append(j)
-        return np.asarray(idxs, dtype=np.int64)
-
-    def reverse(self, obj) -> list[float]:
-        a = np.asarray(obj, dtype=np.int64).reshape(-1)
-        if a.shape[0] != len(self.values):
-            raise ValueError(f"Expected {len(self.values)} dims, got {a.shape[0]}")
-        out: list[float] = []
-        for i, (ai, vals) in enumerate(zip(a.tolist(), self.values)):
-            j = int(ai)
-            if j < 0 or j >= len(vals):
-                raise ValueError(f"Invalid discrete action at index {i}: {j} not in [0, {len(vals) - 1}]")
-            out.append(float(vals[j]))
-        return out
-
-
-def hvac_actuators_multidiscrete_transform(
-    hvac_actuators: Sequence[dict[str, str]],
-    *,
-    n_bins_continuous: int = 21,
-) -> Transform[list, MultiDiscrete]:
-    """
-    Build a MultiDiscrete action transform for HVAC actuators.
-
-    Discrete-like actuators (availability, coil speed, stage) are represented
-    with integer-valued categories.
-    Continuous-like actuators are discretized into `n_bins_continuous` bins over
-    their heuristic bounds.
-    """
-    holes: list[ActuatorHole] = []
-    values: list[np.ndarray] = []
-
-    for a in hvac_actuators:
-        if not isinstance(a, dict):
-            raise TypeError(f"Expected actuator dict, got {type(a)}")
-
-        missing = [k for k in ("component_name", "component_type", "control_type", "units") if k not in a]
-        if missing:
-            raise ValueError(f"Actuator dict missing keys: {missing}. Got: {a}")
-
-        component_type = a["component_type"]
-        control_type = a["control_type"]
-
-        holes.append(ActuatorHole(component_type, control_type, a["component_name"]))
-        lo, hi = _hvac_actuator_bounds(a)
-
-        ct = component_type.lower()
-        ctrl = control_type.lower()
-
-        if ct == "airloophvac" and ctrl == "availability status":
-            values.append(np.asarray([1.0, 2.0, 3.0], dtype=float))
-        elif ct == "coil speed control" and "dx coil speed value" in ctrl:
-            values.append(np.asarray([1.0, 2.0, 3.0, 4.0], dtype=float))
-        elif ct == "coil speed control" and "supplemental coil stage level" in ctrl:
-            # Stage-like; allow 0..N
-            values.append(np.arange(int(lo), int(hi) + 1, dtype=float))
-        else:
-            values.append(discretize_interval(lo, hi, n_bins_continuous))
-
-    if not holes:
-        raise ValueError("hvac_actuators is empty; cannot build MultiDiscrete action space")
-
-    return TransformActuatorsMultiDiscrete(holes=holes, values=values)
 
 
 def get_controllable_setpoints(

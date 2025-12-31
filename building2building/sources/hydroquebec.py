@@ -90,7 +90,7 @@ def search_weathers() -> DataFrame:
     return duckdb.from_parquet(str(index)).to_df()
 
 
-def search_buildings(*, include_setpoint_control: bool = True, **query) -> DataFrame:
+def search_buildings(**query) -> DataFrame:
     index = realize(STORE_PATH.get(), table_index())
     ep = energyplus_path()
 
@@ -100,7 +100,6 @@ def search_buildings(*, include_setpoint_control: bool = True, **query) -> DataF
                 Constant(Path(idf_path)),
                 ep,
                 src_version="24.2.0",
-                include_setpoint_control=include_setpoint_control,
             ),
             Path(schedule_path),
         )
@@ -153,72 +152,7 @@ def search_configs(
         config_nn = config_nn["bldg"]
     ep_path = energyplus_path()
 
-    env_cfg = cfg.get("env", {}) if isinstance(cfg, dict) else {}
-    control_mode = env_cfg["control_mode"]
-
-    # --- Action space configuration ---
-    hvac_action_space = env_cfg.get("hvac_action_space", "multidiscrete")
-    if hvac_action_space not in ("box", "multidiscrete"):
-        raise ValueError(
-            "env.hvac_action_space must be one of: 'box', 'multidiscrete'. "
-            f"Got: {hvac_action_space}"
-        )
-    n_bins_continuous = int(env_cfg.get("n_bins_continuous"))
-    if n_bins_continuous <= 1 or n_bins_continuous is None:
-        raise ValueError("env.n_bins_continuous must be >= 2")
-
-    def _filter_for_hvac_component_control(
-        actuators: list[dict[str, str]],
-    ) -> list[dict[str, str]]:
-        """
-        Keep only the small set of actuators we actively command for direct HVAC control.
-
-        Important: `hvac_actuators_transform()` will *set every actuator we include*.
-        Including "multiplier" style actuators (e.g., frost multipliers) and leaving
-        them at the default (0.0) can unintentionally zero out heating/cooling output.
-        """
-
-        keep: list[dict[str, str]] = []
-        for a in actuators:
-            ct = a.get("component_type", "")
-            ctrl = a.get("control_type", "")
-
-            # Air loop availability override (force system on)
-            if ct == "AirLoopHVAC" and ctrl == "Availability Status":
-                keep.append(a)
-                continue
-
-            # Fan air mass flow override
-            if ct == "Fan" and ctrl == "Fan Air Mass Flow Rate":
-                keep.append(a)
-                continue
-
-            # Terminal mass flow override (deliver air to zone)
-            if ct.startswith("AirTerminal:") and ctrl == "Mass Flow Rate":
-                keep.append(a)
-                continue
-
-            # Unitary coil speed + supplemental stage control
-            if ct == "Coil Speed Control" and ctrl in (
-                "Unitary System DX Coil Speed Value",
-                "Unitary System Supplemental Coil Stage Level",
-            ):
-                keep.append(a)
-                continue
-
-            # Direct load request (bypasses thermostat demand for supported unitary systems)
-            if ct == "Unitary HVAC" and ctrl in ("Sensible Load Request", "Moisture Load Request"):
-                keep.append(a)
-                continue
-
-        return keep
-
-    # For direct sensible-load control, we *do not* rewrite thermostat setpoint schedules
-    # to extreme values (10C/40C). Those setpoints are used by EnergyPlus to compute
-    # zone predicted/remaining loads; extreme setpoints can eliminate the load signal and
-    # keep unitary coils off.
-    include_setpoint_control = control_mode not in ("hvac_actuators", "sensible_load")
-    rows = search_buildings(**config_nn, include_setpoint_control=include_setpoint_control)
+    rows = search_buildings(**config_nn)
     
     configs: list[BuildingConfig] = []
     for _, row in itertools.islice(rows.iterrows(), n):
@@ -238,29 +172,21 @@ def search_configs(
                 inferred_bounds: dict[str, dict[str, float]] = json.load(f)
         except Exception:
             inferred_bounds = {}
-        if control_mode == "hvac_actuators":
-            actuators = get_hvac_actuators(ems_file)
-            actuators = _filter_for_hvac_component_control(actuators)
-        elif control_mode == "sensible_load":
-            # For sensible-load control we primarily use:
-            # - Unitary HVAC :: Sensible Load Request
-            #
-            # Many of our unitary systems are wrapped in an AirLoopHVAC that can still
-            # be turned off by availability logic; include the AirLoopHVAC availability
-            # actuator when present so policies can force CycleOn (2.0).
-            actuators = get_sensible_load_actuators(ems_file)
-            hvac_actuators = get_hvac_actuators(ems_file)
-            availability = [
-                a
-                for a in hvac_actuators
-                if a.get("component_type") == "AirLoopHVAC"
-                and a.get("control_type") == "Availability Status"
-            ]
-            zone_setpoints = get_zone_temperature_control_actuators(ems_file)
-            # Prepend availability so action_names are stable/readable.
-            actuators = zone_setpoints + availability + actuators
-        else:
-            raise ValueError(f"Unknown control mode: {control_mode}")
+
+        # Action space is composed of zone temperature control setpoints, airloop availability, and sensible load request
+        # availability and setpoints are only used to ensure HVAC availability. 
+        # Sensible load is the only actuator that is used to control the zones temperature.
+        actuators = get_sensible_load_actuators(ems_file)
+        hvac_actuators = get_hvac_actuators(ems_file)
+        availability = [
+            a
+            for a in hvac_actuators
+            if a.get("component_type") == "AirLoopHVAC"
+            and a.get("control_type") == "Availability Status"
+        ]
+        zone_setpoints = get_zone_temperature_control_actuators(ems_file)
+        # Prepend availability so action_names are stable/readable.
+        actuators = zone_setpoints + availability + actuators
 
         # Attach inferred bounds (if available) to each actuator dict so action space
         # construction can use the autosized ranges instead of heuristics.
@@ -308,9 +234,7 @@ def search_configs(
                 hvac_actuators=actuators,
                 eplus_output_dir=eplus_output_dir,
                 warmup_phases=1,  # keep consistent with existing search_config
-                area=area,
-                hvac_action_space=hvac_action_space,
-                n_bins_continuous=n_bins_continuous,
+                area=area
             )
         )
 

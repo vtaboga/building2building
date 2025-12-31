@@ -9,9 +9,6 @@ defaults:
 
 env:
   normalize_obs: true
-  hvac_action_space: box
-  n_bins_continuous: 21
-  control_mode: sensible_load
 
 n_episodes: 1
 

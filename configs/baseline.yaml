@@ -1,0 +1,11 @@
+defaults:
+  - _self_
+  - bldg: single_family
+  - policy: on_off
+  - reward: deadband
+
+env:
+  normalize_obs: false
+  max_steps: 30000
+
+n_episodes: 1

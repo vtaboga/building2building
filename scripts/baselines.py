@@ -10,7 +10,6 @@ from typing import Any
 import hydra
 import numpy as np
 import pandas as pd
-from gymnasium.spaces import MultiDiscrete
 from omegaconf import OmegaConf
 
 from algorithms.baselines import (
@@ -19,7 +18,6 @@ from algorithms.baselines import (
     TrimAndRespondSensibleLoadPolicy,
 )
 from algorithms.utils import make_env
-from building2building.simulator.action_spaces import hvac_actuators_multidiscrete_transform
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +115,7 @@ def _plot_timeseries(
     return True
 
 
-@hydra.main(version_base=None, config_path="../configs", config_name="hvac_actuator_on_off")
+@hydra.main(version_base=None, config_path="../configs", config_name="baseline")
 def main(cfg) -> None:
     logger.info(OmegaConf.to_yaml(cfg))
 
@@ -149,76 +147,55 @@ def main(cfg) -> None:
     except Exception as e:
         logger.warning(f"Could not print action bounds: {e}")
 
-    control_mode = str(getattr(cfg.env, "control_mode", "")).strip()
-    if control_mode == "sensible_load":
-        temp_idx = _find_first_zone_air_temp_index(obs_names)
-        # Select sensible-load policy implementation based on which parameters are
-        # present in the loaded policy config.
-        if hasattr(cfg.policy, "kp") and hasattr(cfg.policy, "ki") and hasattr(cfg.policy, "kd"):
-            base_policy = PIDSensibleLoadPolicy(
-                target_temp_c=float(cfg.policy.target_temp_c),
-                deadband_c=float(cfg.policy.deadband_c),
-                temp_obs_index=int(temp_idx),
-                kp=float(cfg.policy.kp),
-                ki=float(cfg.policy.ki),
-                kd=float(cfg.policy.kd),
-                q_heat_max_w=float(getattr(cfg.policy, "q_heat_max_w", 20000.0)),
-                q_cool_max_w=float(getattr(cfg.policy, "q_cool_max_w", 20000.0)),
-                dt_s=float(getattr(cfg.policy, "dt_s", 1.0)),
-                integral_min=float(getattr(cfg.policy, "integral_min", -100000.0)),
-                integral_max=float(getattr(cfg.policy, "integral_max", 100000.0)),
-            )
-        elif hasattr(cfg.policy, "respond_step_w") and hasattr(cfg.policy, "trim_step_w"):
-            base_policy = TrimAndRespondSensibleLoadPolicy(
-                target_temp_c=float(cfg.policy.target_temp_c),
-                deadband_c=float(cfg.policy.deadband_c),
-                temp_obs_index=int(temp_idx),
-                respond_step_w=float(cfg.policy.respond_step_w),
-                trim_step_w=float(cfg.policy.trim_step_w),
-                q_heat_max_w=float(getattr(cfg.policy, "q_heat_max_w", 20000.0)),
-                q_cool_max_w=float(getattr(cfg.policy, "q_cool_max_w", 20000.0)),
-            )
-        else:
-            # Default: simple on/off controller (existing behavior)
-            base_policy = OnOffSensibleLoadPolicy(
-                target_temp_c=float(cfg.policy.target_temp_c),
-                deadband_c=float(cfg.policy.deadband_c),
-                q_heat_w=float(getattr(cfg.policy, "q_heat_w", 15000.0)),
-                q_cool_w=float(getattr(cfg.policy, "q_cool_w", 15000.0)),
-                temp_obs_index=int(temp_idx),
-            )
-        idx_load = _find_action_index(act_names, "Unitary HVAC", "Sensible Load Request")
-        if idx_load is None:
-            raise RuntimeError(
-                "control_mode=sensible_load requires an action named "
-                "'Unitary HVAC::Sensible Load Request::<component>'"
-            )
-        idx_avail = _find_action_index(act_names, "AirLoopHVAC", "Availability Status")
-        idx_heat_sp = _find_action_index(act_names, "Zone Temperature Control", "Heating Setpoint")
-        idx_cool_sp = _find_action_index(act_names, "Zone Temperature Control", "Cooling Setpoint")
-    elif control_mode == "hvac_actuators":
-        policy = HVACActuatorOnOffPolicy.from_env_metadata(
-            env_metadata=env.metadata,  # type: ignore[arg-type]
+
+    if cfg.policy.type == "pid":
+        base_policy = PIDSensibleLoadPolicy(
             target_temp_c=float(cfg.policy.target_temp_c),
             deadband_c=float(cfg.policy.deadband_c),
-            fan_mass_flow_kg_s=float(cfg.policy.fan_mass_flow_kg_s),
-            terminal_mass_flow_kg_s=float(cfg.policy.terminal_mass_flow_kg_s),
-            coil_speed_heat=float(cfg.policy.coil_speed_heat),
-            coil_speed_cool=float(cfg.policy.coil_speed_cool),
-            supplemental_stage_heat=float(cfg.policy.supplemental_stage_heat),
-            q_heat_w=float(getattr(cfg.policy, "q_heat_w", 0.0)),
-            q_cool_w=float(getattr(cfg.policy, "q_cool_w", 0.0)),
-            availability_on=float(cfg.policy.availability_on),
-            availability_off=float(cfg.policy.availability_off),
+            temp_obs_index=int(temp_idx),
+            kp=float(cfg.policy.kp),
+            ki=float(cfg.policy.ki),
+            kd=float(cfg.policy.kd),
+            q_heat_max_w=float(getattr(cfg.policy, "q_heat_max_w", 20000.0)),
+            q_cool_max_w=float(getattr(cfg.policy, "q_cool_max_w", 20000.0)),
+            dt_s=float(getattr(cfg.policy, "dt_s", 1.0)),
+            integral_min=float(getattr(cfg.policy, "integral_min", -100000.0)),
+            integral_max=float(getattr(cfg.policy, "integral_max", 100000.0)),
+        )
+    elif cfg.policy.type == "trim_and_respond":
+        base_policy = TrimAndRespondSensibleLoadPolicy(
+            target_temp_c=float(cfg.policy.target_temp_c),
+            deadband_c=float(cfg.policy.deadband_c),
+            temp_obs_index=int(temp_idx),
+            respond_step_w=float(cfg.policy.respond_step_w),
+            trim_step_w=float(cfg.policy.trim_step_w),
+            q_heat_max_w=float(getattr(cfg.policy, "q_heat_max_w", 20000.0)),
+            q_cool_max_w=float(getattr(cfg.policy, "q_cool_max_w", 20000.0)),
+        )
+    elif cfg.policy.type == "on_off":
+        # Default: simple on/off controller (existing behavior)
+        base_policy = OnOffSensibleLoadPolicy(
+            target_temp_c=float(cfg.policy.target_temp_c),
+            deadband_c=float(cfg.policy.deadband_c),
+            q_heat_w=float(getattr(cfg.policy, "q_heat_w")),
+            q_cool_w=float(getattr(cfg.policy, "q_cool_w")),
+            temp_obs_index=tz_idx,
         )
     else:
-        raise ValueError(
-            "env.control_mode must be one of: 'sensible_load', 'hvac_actuators'. "
-            f"Got: {control_mode!r}"
+        raise ValueError(f"Unknown policy: {cfg.policy.policy}")
+    idx_load = _find_action_index(act_names, "Unitary HVAC", "Sensible Load Request")
+    if idx_load is None:
+        raise RuntimeError(
+            "control_mode=sensible_load requires an action named "
+            "'Unitary HVAC::Sensible Load Request::<component>'"
         )
+    idx_avail = _find_action_index(act_names, "AirLoopHVAC", "Availability Status")
+    idx_heat_sp = _find_action_index(act_names, "Zone Temperature Control", "Heating Setpoint")
+    idx_cool_sp = _find_action_index(act_names, "Zone Temperature Control", "Cooling Setpoint")
 
-    max_steps = int(getattr(cfg.env, "max_steps", 2000))
-    n_episodes = int(getattr(cfg, "n_episodes", 1))
+
+    max_steps = int(getattr(cfg.env, "max_steps"))
+    n_episodes = int(getattr(cfg, "n_episodes"))
     target = float(cfg.policy.target_temp_c)
     deadband = float(cfg.policy.deadband_c)
 
@@ -230,55 +207,36 @@ def main(cfg) -> None:
         step = 0
 
         while not done and step < max_steps:
-            # Policy outputs float actuator commands (physical units).
-            if control_mode == "sensible_load":
-                # Build a full action vector (may include AirLoopHVAC availability).
-                load_cmd, _ = base_policy.predict(obs, deterministic=True)
-                tz = float(np.asarray(obs, dtype=float).reshape(-1)[temp_idx])
-                action_cmd = np.zeros((len(act_names),), dtype=float)
-                action_cmd[idx_load] = float(np.asarray(load_cmd, dtype=float).reshape(-1)[0])
-                if idx_avail is not None:
-                    # Force CycleOn to keep the HVAC system available while using load request.
-                    action_cmd[idx_avail] = float(getattr(cfg.policy, "availability_on", 2.0))
-                # Ensure the thermostat logic does not block the equipment manager from
-                # evaluating heating/cooling operation. We set a *very small* call by
-                # nudging setpoints around the current zone temperature.
-                #
-                # This is not used as a "temperature controller"; the magnitude is still
-                # commanded via the sensible-load request. It's only a mode-enabler.
-                q = float(action_cmd[idx_load])
-                if idx_heat_sp is not None and idx_cool_sp is not None:
-                    if q > 0.0:
-                        # Heating call: ask for slightly more than current temp.
-                        action_cmd[idx_heat_sp] = tz + 0.5
-                        action_cmd[idx_cool_sp] = tz + 100.0
-                    elif q < 0.0:
-                        # Cooling call: ask for slightly less than current temp.
-                        action_cmd[idx_heat_sp] = tz - 100.0
-                        action_cmd[idx_cool_sp] = tz - 0.5
-                    else:
-                        # No load: wide deadband.
-                        action_cmd[idx_heat_sp] = tz - 100.0
-                        action_cmd[idx_cool_sp] = tz + 100.0
-            else:
-                action_cmd, _ = policy.predict(obs, deterministic=True)
+            # Build a full action vector (may include AirLoopHVAC availability).
+            load_cmd, _ = base_policy.predict(obs, deterministic=True)
+            tz = float(np.asarray(obs, dtype=float).reshape(-1)[temp_idx])
+            action_cmd = np.zeros((len(act_names),), dtype=float)
+            action_cmd[idx_load] = float(np.asarray(load_cmd, dtype=float).reshape(-1)[0])
+            if idx_avail is not None:
+                # Force CycleOn to keep the HVAC system available while using load request.
+                action_cmd[idx_avail] = float(getattr(cfg.policy, "availability_on", 2.0))
+            # Ensure the thermostat logic does not block the equipment manager from
+            # evaluating heating/cooling operation. We set a *very small* call by
+            # nudging setpoints around the current zone temperature.
+            #
+            # This is not used as a "temperature controller"; the magnitude is still
+            # commanded via the sensible-load request. It's only a mode-enabler.
+            q = float(action_cmd[idx_load])
+            if idx_heat_sp is not None and idx_cool_sp is not None:
+                if q > 0.0:
+                    # Heating call: ask for slightly more than current temp.
+                    action_cmd[idx_heat_sp] = tz + 0.5
+                    action_cmd[idx_cool_sp] = tz + 100.0
+                elif q < 0.0:
+                    # Cooling call: ask for slightly less than current temp.
+                    action_cmd[idx_heat_sp] = tz - 100.0
+                    action_cmd[idx_cool_sp] = tz - 0.5
+                else:
+                    # No load: wide deadband.
+                    action_cmd[idx_heat_sp] = tz - 100.0
+                    action_cmd[idx_cool_sp] = tz + 100.0
 
-            # Env may be configured with a MultiDiscrete action space; if so, convert
-            # float commands -> discrete indices using the same discretization logic.
             step_action = action_cmd
-            if isinstance(env.action_space, MultiDiscrete):
-                hvac_actuators = env.metadata.get("hvac_actuators", [])
-                if not isinstance(hvac_actuators, list) or not hvac_actuators:
-                    raise RuntimeError(
-                        "Expected env.metadata['hvac_actuators'] to be a non-empty list "
-                        "when using MultiDiscrete HVAC actuator control."
-                    )
-                n_bins_continuous = int(getattr(cfg.env, "n_bins_continuous", 21))
-                md = hvac_actuators_multidiscrete_transform(
-                    hvac_actuators, n_bins_continuous=n_bins_continuous
-                )
-                step_action = md(action_cmd)
-
             obs2, reward, terminated, truncated, _info = env.step(step_action)
 
             row: dict[str, float] = {
@@ -304,12 +262,7 @@ def main(cfg) -> None:
             done = bool(terminated or truncated)
             step += 1
 
-        last_mode = (
-            getattr(base_policy, "last_mode", "n/a")
-            if control_mode == "sensible_load"
-            else getattr(policy, "last_mode", "n/a")
-        )
-        logger.info(f"episode={ep} steps={step} last_mode={last_mode} saved_rows={len(all_rows)}")
+        logger.info(f"episode={ep} steps={step} saved_rows={len(all_rows)}")
 
     df = pd.DataFrame(all_rows)
     df.to_csv(paths.csv_path, index=False)

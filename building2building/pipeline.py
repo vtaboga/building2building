@@ -640,10 +640,8 @@ def upgrade(
 def create_complete_pipeline(
     input_file: Derivation,
     energyplus_path: Realizable,
-    src_version: str,
-    *,
-    include_setpoint_control: bool = True,
-) -> Derivation:
+    src_version: str
+    ) -> Derivation:
     """Create a complete processing pipeline from raw IDF to ready-to-go epJSON."""
 
     current = upgrade(input_file, energyplus_path, src_version)
@@ -660,15 +658,11 @@ def create_complete_pipeline(
 
     # Configure simulation
     current = modify_timestep(current, timesteps_per_hour=4)
-    if include_setpoint_control:
-        current = add_setpoint_control(current)
+    current = add_setpoint_control(current)  # add controllable setpoints for hvac availability
 
     current = add_edd_output(current)
     # Make the name useful
     current = Rename("building.epjson", current)
-
-    # # Final processing
-    # current = glue_surfaces(current)
 
     return current
 

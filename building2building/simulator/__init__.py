@@ -13,7 +13,6 @@ from minergym.simulation import EnergyPlusSimulation
 from building2building.simulator.action_spaces import (
     get_controllable_setpoints,
     hvac_actuators_transform,
-    hvac_actuators_multidiscrete_transform,
     many_thermostats_transform,
     many_thermostats_transform_dict,
 )
@@ -97,13 +96,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     # Then the action side stuff
     setpoints = get_controllable_setpoints(ont)
 
-    if building_config.hvac_action_space == "multidiscrete":
-        action_transform = hvac_actuators_multidiscrete_transform(
-            building_config.hvac_actuators,
-            n_bins_continuous=int(building_config.n_bins_continuous),
-        )
-    else:
-        action_transform = hvac_actuators_transform(building_config.hvac_actuators)
+    action_transform = hvac_actuators_transform(building_config.hvac_actuators)
     action_names = [
         f"{a['component_type']}::{a['control_type']}::{a['component_name']}"
         for a in building_config.hvac_actuators
