@@ -1,0 +1,28 @@
+#
+# PID controller for the "Unitary HVAC :: Sensible Load Request" actuator [W].
+#
+# Sign convention:
+# - positive = heating request
+# - negative = cooling request
+#
+
+target_temp_c: 21.0
+deadband_c: 0.5
+
+# PID gains for error e = target - Tz
+kp: 1500.0
+ki: 0.0
+kd: 0.0
+
+# Output saturation (W)
+q_heat_max_w: 20000.0
+q_cool_max_w: 20000.0
+
+# Control interval (seconds). If unknown, keep at 1.0 and retune gains.
+dt_s: 1.0
+
+# Anti-windup clamp on integral of error (C*s)
+integral_min: -100000.0
+integral_max: 100000.0
+
+

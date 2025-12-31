@@ -66,188 +66,134 @@ class OnOffSensibleLoadPolicy(Policy):
         return np.asarray([0.0], dtype=float), None
 
 
-@dataclass(frozen=True)
-class HVACActuatorOnOffPolicy(Policy):
+@dataclass(slots=True)
+class PIDSensibleLoadPolicy(Policy):
     """
-    On/off control using HVAC component actuators (fan/coil/airloop availability).
+    PID controller for a 1D action space: "Unitary HVAC :: Sensible Load Request" [W].
 
-    This policy is designed for the action space created by
-    `building2building.simulator.action_spaces.hvac_actuators_transform`, where
-    `env.metadata['action_names']` aligns 1:1 with the action vector indices.
+    Sign convention:
+    - Positive output requests heating
+    - Negative output requests cooling
+
+    Notes:
+    - This policy assumes the observation contains a zone air temperature at `temp_obs_index`.
+    - `dt_s` is the control interval in seconds. If you're stepping at fixed timestep,
+      leave it constant. If unknown, leaving it at 1.0 still yields a stable controller
+      after retuning gains.
     """
 
     target_temp_c: float
     deadband_c: float
-    # Actuator command levels (heuristic defaults; tweak per-building)
-    fan_mass_flow_kg_s: float = 1.0
-    terminal_mass_flow_kg_s: float = 1.0
-    coil_speed_heat: float = 1.0
-    coil_speed_cool: float = 1.0
-    supplemental_stage_heat: float = 0.0
-    # Optional: if the model exposes a Unitary HVAC "Sensible Load Request" actuator,
-    # we can force heating/cooling demand directly (bypassing thermostat setpoints).
-    q_heat_w: float = 0.0
-    q_cool_w: float = 0.0
-    availability_on: float = 2.0  # CycleOn
-    availability_off: float = 1.0  # ForceOff
+    temp_obs_index: int
+
+    # PID gains on error e = target - tz
+    kp: float
+    ki: float
+    kd: float
+
+    # Output saturation (Watts)
+    q_heat_max_w: float
+    q_cool_max_w: float
+
+    # Control interval
+    dt_s: float = 1.0
+
+    # Anti-windup: clamp integral of error (in C*s)
+    integral_min: float = -1e6
+    integral_max: float = 1e6
+
+    # State
+    integral: float = 0.0
+    prev_error: float | None = None
     last_mode: str = "off"
 
-    # Filled by `from_env_metadata`
-    n_actions: int = 0
-    zone_temp_indices: tuple[int, ...] = ()
-    idx_airloop_availability: Optional[int] = None
-    idx_fan_mass_flow: Optional[int] = None
-    idx_terminal_mass_flow: Optional[int] = None
-    idx_coil_speed_value: Optional[int] = None
-    idx_supplemental_stage: Optional[int] = None
-    idx_unitary_sensible_load_request: Optional[int] = None
-
-    @staticmethod
-    def _find_zone_temp_indices(observation_names: Sequence[str]) -> tuple[int, ...]:
-        idxs: list[int] = []
-        for i, name in enumerate(observation_names):
-            if "zone air temperature" in str(name).lower():
-                idxs.append(i)
-        if not idxs:
-            raise ValueError("Could not find any 'Zone Air Temperature' entries in observation_names")
-        return tuple(idxs)
-
-    @staticmethod
-    def _find_actuator_index(action_names: Sequence[str], predicate) -> Optional[int]:
-        for i, nm in enumerate(action_names):
-            if predicate(str(nm)):
-                return i
-        return None
-
-    @classmethod
-    def from_env_metadata(
-        cls,
-        *,
-        env_metadata: dict[str, Any],
-        target_temp_c: float,
-        deadband_c: float,
-        fan_mass_flow_kg_s: float = 1.0,
-        terminal_mass_flow_kg_s: float = 1.0,
-        coil_speed_heat: float = 1.0,
-        coil_speed_cool: float = 1.0,
-        supplemental_stage_heat: float = 0.0,
-        q_heat_w: float = 0.0,
-        q_cool_w: float = 0.0,
-        availability_on: float = 2.0,
-        availability_off: float = 1.0,
-    ) -> "HVACActuatorOnOffPolicy":
-        obs_names_raw = env_metadata.get("observation_names")
-        act_names_raw = env_metadata.get("action_names")
-
-        if not isinstance(obs_names_raw, list) or not all(isinstance(x, str) for x in obs_names_raw):
-            raise TypeError("env.metadata['observation_names'] must be a list[str]")
-        if not isinstance(act_names_raw, list) or not all(isinstance(x, str) for x in act_names_raw):
-            raise TypeError("env.metadata['action_names'] must be a list[str]")
-
-        zone_idxs = cls._find_zone_temp_indices(obs_names_raw)
-        n_actions = len(act_names_raw)
-
-        def has_component(component: str, control: str):
-            c = component.lower()
-            k = control.lower()
-
-            def _pred(nm: str) -> bool:
-                parts = nm.split("::")
-                if len(parts) < 2:
-                    return False
-                return parts[0].strip().lower() == c and parts[1].strip().lower() == k
-
-            return _pred
-
-        idx_airloop = cls._find_actuator_index(
-            act_names_raw, has_component("AirLoopHVAC", "Availability Status")
-        )
-        idx_fan = cls._find_actuator_index(
-            act_names_raw, has_component("Fan", "Fan Air Mass Flow Rate")
-        )
-        idx_terminal = cls._find_actuator_index(
-            act_names_raw,
-            has_component("AirTerminal:SingleDuct:ConstantVolume:NoReheat", "Mass Flow Rate"),
-        )
-        idx_speed = cls._find_actuator_index(
-            act_names_raw, has_component("Coil Speed Control", "Unitary System DX Coil Speed Value")
-        )
-        idx_supp = cls._find_actuator_index(
-            act_names_raw,
-            has_component("Coil Speed Control", "Unitary System Supplemental Coil Stage Level"),
-        )
-        idx_load = cls._find_actuator_index(
-            act_names_raw, has_component("Unitary HVAC", "Sensible Load Request")
-        )
-
-        return cls(
-            target_temp_c=target_temp_c,
-            deadband_c=deadband_c,
-            fan_mass_flow_kg_s=fan_mass_flow_kg_s,
-            terminal_mass_flow_kg_s=terminal_mass_flow_kg_s,
-            coil_speed_heat=coil_speed_heat,
-            coil_speed_cool=coil_speed_cool,
-            supplemental_stage_heat=supplemental_stage_heat,
-            q_heat_w=q_heat_w,
-            q_cool_w=q_cool_w,
-            availability_on=availability_on,
-            availability_off=availability_off,
-            n_actions=n_actions,
-            zone_temp_indices=zone_idxs,
-            idx_airloop_availability=idx_airloop,
-            idx_fan_mass_flow=idx_fan,
-            idx_terminal_mass_flow=idx_terminal,
-            idx_coil_speed_value=idx_speed,
-            idx_supplemental_stage=idx_supp,
-            idx_unitary_sensible_load_request=idx_load,
-        )
-
-    def _mean_zone_temp(self, observation: Any) -> float:
+    def predict(self, observation: Any, deterministic: bool = True):
         obs = np.asarray(observation, dtype=float).reshape(-1)
-        temps = [float(obs[i]) for i in self.zone_temp_indices]
-        return float(np.mean(np.asarray(temps, dtype=float)))
+        tz = float(obs[self.temp_obs_index])
+        error = float(self.target_temp_c - tz)
+
+        # Deadband: explicitly off. Also bleed integral slowly to avoid latch-up.
+        if abs(error) <= float(self.deadband_c):
+            self.integral *= 0.9
+            object.__setattr__(self, "last_mode", "off")
+            object.__setattr__(self, "prev_error", error)
+            return np.asarray([0.0], dtype=float), None
+
+        dt = float(self.dt_s)
+        if dt <= 0:
+            raise ValueError("dt_s must be > 0")
+
+        # Integrate error
+        self.integral = float(self.integral + error * dt)
+        self.integral = float(np.clip(self.integral, self.integral_min, self.integral_max))
+
+        # Derivative
+        if self.prev_error is None:
+            d_error = 0.0
+        else:
+            d_error = float((error - self.prev_error) / dt)
+
+        u = float(self.kp * error + self.ki * self.integral + self.kd * d_error)
+
+        # Saturate to physically meaningful ranges.
+        u = float(np.clip(u, -abs(self.q_cool_max_w), abs(self.q_heat_max_w)))
+
+        object.__setattr__(self, "prev_error", error)
+        object.__setattr__(self, "last_mode", "heat" if u > 0 else "cool")
+        return np.asarray([u], dtype=float), None
+
+
+@dataclass(slots=True)
+class TrimAndRespondSensibleLoadPolicy(Policy):
+    """
+    Trim-and-Respond controller for a sensible load request actuator.
+
+    Control idea:
+    - Maintain an internal "current load request" (W).
+    - If temperature is outside deadband, "respond" by stepping load up/down.
+    - If temperature is inside deadband, "trim" the load back toward zero.
+
+    This is often easier to tune than PID for systems with long time constants.
+    """
+
+    target_temp_c: float
+    deadband_c: float
+    temp_obs_index: int
+
+    # Step sizes (W) for response and trim
+    respond_step_w: float
+    trim_step_w: float
+
+    # Output saturation (W)
+    q_heat_max_w: float
+    q_cool_max_w: float
+
+    # State
+    current_load_w: float = 0.0
+    last_mode: str = "off"
 
     def predict(self, observation: Any, deterministic: bool = True):
-        tz = self._mean_zone_temp(observation)
-        if self.n_actions <= 0:
-            raise RuntimeError(
-                "Policy is not configured with n_actions (action_names missing?). "
-                "Use HVACActuatorOnOffPolicy.from_env_metadata()."
-            )
+        obs = np.asarray(observation, dtype=float).reshape(-1)
+        tz = float(obs[self.temp_obs_index])
+        err = float(self.target_temp_c - tz)
 
-        act = np.zeros((int(self.n_actions),), dtype=float)
+        if abs(err) <= float(self.deadband_c):
+            # Trim toward 0
+            if self.current_load_w > 0.0:
+                self.current_load_w = max(0.0, self.current_load_w - float(self.trim_step_w))
+            elif self.current_load_w < 0.0:
+                self.current_load_w = min(0.0, self.current_load_w + float(self.trim_step_w))
+            object.__setattr__(self, "last_mode", "off" if self.current_load_w == 0.0 else self.last_mode)
+            return np.asarray([float(self.current_load_w)], dtype=float), None
 
-        def set_if(idx: Optional[int], value: float) -> None:
-            if idx is None:
-                return
-            act[idx] = float(value)
-
-        if tz < self.target_temp_c - self.deadband_c:
+        # Respond: step in the direction of the error
+        if err > 0.0:
+            self.current_load_w = float(self.current_load_w + float(self.respond_step_w))
+            self.current_load_w = float(min(self.current_load_w, abs(self.q_heat_max_w)))
             object.__setattr__(self, "last_mode", "heat")
-            set_if(self.idx_airloop_availability, self.availability_on)
-            set_if(self.idx_fan_mass_flow, self.fan_mass_flow_kg_s)
-            set_if(self.idx_terminal_mass_flow, self.terminal_mass_flow_kg_s)
-            set_if(self.idx_coil_speed_value, self.coil_speed_heat)
-            set_if(self.idx_supplemental_stage, self.supplemental_stage_heat)
-            if self.q_heat_w > 0.0:
-                set_if(self.idx_unitary_sensible_load_request, float(self.q_heat_w))
-        elif tz > self.target_temp_c + self.deadband_c:
-            object.__setattr__(self, "last_mode", "cool")
-            set_if(self.idx_airloop_availability, self.availability_on)
-            set_if(self.idx_fan_mass_flow, self.fan_mass_flow_kg_s)
-            set_if(self.idx_terminal_mass_flow, self.terminal_mass_flow_kg_s)
-            set_if(self.idx_coil_speed_value, self.coil_speed_cool)
-            set_if(self.idx_supplemental_stage, 0.0)
-            if self.q_cool_w > 0.0:
-                set_if(self.idx_unitary_sensible_load_request, -float(self.q_cool_w))
         else:
-            object.__setattr__(self, "last_mode", "off")
-            set_if(self.idx_airloop_availability, self.availability_off)
-            set_if(self.idx_fan_mass_flow, 0.0)
-            set_if(self.idx_terminal_mass_flow, 0.0)
-            set_if(self.idx_coil_speed_value, 0.0)
-            set_if(self.idx_supplemental_stage, 0.0)
-            # If we are overriding load request, explicitly clear it to 0W.
-            set_if(self.idx_unitary_sensible_load_request, 0.0)
+            self.current_load_w = float(self.current_load_w - float(self.respond_step_w))
+            self.current_load_w = float(max(self.current_load_w, -abs(self.q_cool_max_w)))
+            object.__setattr__(self, "last_mode", "cool")
 
-        return act, None
+        return np.asarray([float(self.current_load_w)], dtype=float), None

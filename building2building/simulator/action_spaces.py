@@ -66,6 +66,15 @@ def _hvac_actuator_bounds(actuator: dict[str, str]) -> tuple[float, float]:
     available actuators depends on the HVAC system template. We therefore use
     conservative, finite bounds suitable for RL action spaces.
     """
+    # If bounds were inferred from sizing outputs, honor them.
+    lo_any = actuator.get("lower_bound")
+    hi_any = actuator.get("upper_bound")
+    if isinstance(lo_any, (int, float)) and isinstance(hi_any, (int, float)):
+        lo = float(lo_any)
+        hi = float(hi_any)
+        if np.isfinite(lo) and np.isfinite(hi) and hi > lo:
+            return lo, hi
+
     component_type = actuator.get("component_type", "").lower()
     control_type = actuator.get("control_type", "").lower()
     units = actuator.get("units", "").lower()

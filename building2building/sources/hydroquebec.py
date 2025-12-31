@@ -9,6 +9,7 @@ import duckdb
 from building2building import pipeline
 from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import (
+    actuator_bounds_file,
     create_complete_pipeline,
     eplustbl,
     eddfile,
@@ -231,6 +232,12 @@ def search_configs(
 
         # Search actuators
         ems_file = realize(STORE_PATH.get(), eddfile(ep_path, derivation, epw))
+        bounds_file = realize(STORE_PATH.get(), actuator_bounds_file(ep_path, derivation, epw))
+        try:
+            with open(bounds_file, "r", encoding="utf-8") as f:
+                inferred_bounds: dict[str, dict[str, float]] = json.load(f)
+        except Exception:
+            inferred_bounds = {}
         if control_mode == "hvac_actuators":
             actuators = get_hvac_actuators(ems_file)
             actuators = _filter_for_hvac_component_control(actuators)
@@ -254,6 +261,18 @@ def search_configs(
             actuators = zone_setpoints + availability + actuators
         else:
             raise ValueError(f"Unknown control mode: {control_mode}")
+
+        # Attach inferred bounds (if available) to each actuator dict so action space
+        # construction can use the autosized ranges instead of heuristics.
+        for a in actuators:
+            key = f"{a.get('component_type')}::{a.get('control_type')}::{a.get('component_name')}"
+            b = inferred_bounds.get(key)
+            if isinstance(b, dict):
+                lo = b.get("lower_bound")
+                hi = b.get("upper_bound")
+                if isinstance(lo, (int, float)) and isinstance(hi, (int, float)):
+                    a["lower_bound"] = float(lo)
+                    a["upper_bound"] = float(hi)
 
         reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
         reward_type = reward_section.get("reward_type")

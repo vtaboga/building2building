@@ -13,7 +13,11 @@ import pandas as pd
 from gymnasium.spaces import MultiDiscrete
 from omegaconf import OmegaConf
 
-from algorithms.baselines import HVACActuatorOnOffPolicy, OnOffSensibleLoadPolicy
+from algorithms.baselines import (
+    OnOffSensibleLoadPolicy,
+    PIDSensibleLoadPolicy,
+    TrimAndRespondSensibleLoadPolicy,
+)
 from algorithms.utils import make_env
 from building2building.simulator.action_spaces import hvac_actuators_multidiscrete_transform
 
@@ -130,16 +134,59 @@ def main(cfg) -> None:
     obs_names = _require_env_metadata_list_str(env, "observation_names")
     act_names = _require_env_metadata_list_str(env, "action_names")
 
+    # Print action bounds early for debugging (especially inferred bounds from sizing outputs).
+    try:
+        if hasattr(env, "action_space") and hasattr(env.action_space, "low") and hasattr(
+            env.action_space, "high"
+        ):
+            lows = np.asarray(env.action_space.low, dtype=float).reshape(-1)
+            highs = np.asarray(env.action_space.high, dtype=float).reshape(-1)
+            print("\n=== Action bounds (low/high) ===", flush=True)
+            for i, name in enumerate(act_names):
+                if i < len(lows) and i < len(highs):
+                    print(f"{i:3d} {name}: [{lows[i]:.3f}, {highs[i]:.3f}]", flush=True)
+            print("=== End action bounds ===\n", flush=True)
+    except Exception as e:
+        logger.warning(f"Could not print action bounds: {e}")
+
     control_mode = str(getattr(cfg.env, "control_mode", "")).strip()
     if control_mode == "sensible_load":
         temp_idx = _find_first_zone_air_temp_index(obs_names)
-        base_policy = OnOffSensibleLoadPolicy(
-            target_temp_c=float(cfg.policy.target_temp_c),
-            deadband_c=float(cfg.policy.deadband_c),
-            q_heat_w=float(getattr(cfg.policy, "q_heat_w", 15000.0)),
-            q_cool_w=float(getattr(cfg.policy, "q_cool_w", 15000.0)),
-            temp_obs_index=int(temp_idx),
-        )
+        # Select sensible-load policy implementation based on which parameters are
+        # present in the loaded policy config.
+        if hasattr(cfg.policy, "kp") and hasattr(cfg.policy, "ki") and hasattr(cfg.policy, "kd"):
+            base_policy = PIDSensibleLoadPolicy(
+                target_temp_c=float(cfg.policy.target_temp_c),
+                deadband_c=float(cfg.policy.deadband_c),
+                temp_obs_index=int(temp_idx),
+                kp=float(cfg.policy.kp),
+                ki=float(cfg.policy.ki),
+                kd=float(cfg.policy.kd),
+                q_heat_max_w=float(getattr(cfg.policy, "q_heat_max_w", 20000.0)),
+                q_cool_max_w=float(getattr(cfg.policy, "q_cool_max_w", 20000.0)),
+                dt_s=float(getattr(cfg.policy, "dt_s", 1.0)),
+                integral_min=float(getattr(cfg.policy, "integral_min", -100000.0)),
+                integral_max=float(getattr(cfg.policy, "integral_max", 100000.0)),
+            )
+        elif hasattr(cfg.policy, "respond_step_w") and hasattr(cfg.policy, "trim_step_w"):
+            base_policy = TrimAndRespondSensibleLoadPolicy(
+                target_temp_c=float(cfg.policy.target_temp_c),
+                deadband_c=float(cfg.policy.deadband_c),
+                temp_obs_index=int(temp_idx),
+                respond_step_w=float(cfg.policy.respond_step_w),
+                trim_step_w=float(cfg.policy.trim_step_w),
+                q_heat_max_w=float(getattr(cfg.policy, "q_heat_max_w", 20000.0)),
+                q_cool_max_w=float(getattr(cfg.policy, "q_cool_max_w", 20000.0)),
+            )
+        else:
+            # Default: simple on/off controller (existing behavior)
+            base_policy = OnOffSensibleLoadPolicy(
+                target_temp_c=float(cfg.policy.target_temp_c),
+                deadband_c=float(cfg.policy.deadband_c),
+                q_heat_w=float(getattr(cfg.policy, "q_heat_w", 15000.0)),
+                q_cool_w=float(getattr(cfg.policy, "q_cool_w", 15000.0)),
+                temp_obs_index=int(temp_idx),
+            )
         idx_load = _find_action_index(act_names, "Unitary HVAC", "Sensible Load Request")
         if idx_load is None:
             raise RuntimeError(

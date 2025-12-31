@@ -16,6 +16,7 @@ from typing import Literal, TypeAlias
 import pandas as pd
 from bs4 import BeautifulSoup
 from pandas import DataFrame
+import sqlite3
 
 from building2building.env import STORE_PATH
 from building2building.store import (
@@ -202,6 +203,62 @@ def AddOutdoorAirMeters(input: Path):
                 "reporting_frequency": "Timestep",
             }
             logger.info(f"Added output variable: {var_name}")
+
+    with open(dst, "w") as f:
+        json.dump(epjson, f, indent=4)
+
+
+@derivation("sensible-load-outputs")
+def AddSensibleLoadOutputs(input: Path):
+    """
+    Ensure we request time-series outputs needed to infer sensible-load actuator bounds.
+
+    We rely on the EnergyPlus SQLite output (eplusout.sql) produced by the dummy simulation.
+    These Output:Variable entries are what populate the ReportData tables.
+    """
+    dst = OUTPUT.get()
+    with open(input, "r") as f:
+        epjson = json.load(f)
+
+    desired = [
+        # Per-unitary system delivered sensible output (positive numbers; separate vars)
+        "Unitary System Sensible Heating Rate",
+        "Unitary System Sensible Cooling Rate",
+        # Fallback zone-level delivered sensible output
+        "Zone Air System Sensible Heating Rate",
+        "Zone Air System Sensible Cooling Rate",
+    ]
+
+    if "Output:Variable" not in epjson:
+        epjson["Output:Variable"] = {}
+
+    # Track existing (variable_name, key_value, reporting_frequency)
+    existing: set[tuple[str, str, str]] = set()
+    for _k, obj in epjson["Output:Variable"].items():
+        if not isinstance(obj, dict):
+            continue
+        vn = str(obj.get("variable_name", "")).strip()
+        kv = str(obj.get("key_value", "")).strip()
+        rf = str(obj.get("reporting_frequency", "")).strip()
+        if vn and kv and rf:
+            existing.add((vn, kv, rf))
+
+    # Insert missing variables as timestep outputs, for all keys ("*")
+    for vn in desired:
+        triple = (vn, "*", "Timestep")
+        if triple in existing:
+            continue
+        base_key = f"Output:Variable {vn}"
+        key = base_key
+        suffix = 1
+        while key in epjson["Output:Variable"]:
+            suffix += 1
+            key = f"{base_key} {suffix}"
+        epjson["Output:Variable"][key] = {
+            "key_value": "*",
+            "variable_name": vn,
+            "reporting_frequency": "Timestep",
+        }
 
     with open(dst, "w") as f:
         json.dump(epjson, f, indent=4)
@@ -597,16 +654,14 @@ def create_complete_pipeline(
     # Add meters and monitoring
     current = add_hvac_meters(current)
     current = add_outdoor_air_meters(current)
+    current = AddSensibleLoadOutputs(current)
     current = add_edd_output(current)
     current = add_tabular_output(current)
 
     # Configure simulation
     current = modify_timestep(current, timesteps_per_hour=4)
-    current = add_setpoint_control(current)
-    # if include_setpoint_control:
-    #     current = add_setpoint_control(current)
-    # else:
-    #     current = remove_setpoint_control(current)
+    if include_setpoint_control:
+        current = add_setpoint_control(current)
 
     current = add_edd_output(current)
     # Make the name useful
@@ -651,17 +706,25 @@ def run_simulation(ep_path: Path, epjson: Path, eps: Path):
 
     htm_file = tmp / "eplustbl.htm"
     edd_file = tmp / "eplusout.edd"
+    eio_file = tmp / "eplusout.eio"
+    sql_file = tmp / "eplusout.sql"
 
     if not htm_file.exists():
         raise Exception("EnergyPlus simulation did not produce eplustbl.htm")
     if not edd_file.exists():
         raise Exception("EnergyPlus simulation did not produce eplusout.edd")
+    if not eio_file.exists():
+        raise Exception("EnergyPlus simulation did not produce eplusout.eio")
+    if not sql_file.exists():
+        raise Exception("EnergyPlus simulation did not produce eplusout.sql")
     
     # Ensure output directory exists
     out.mkdir(parents=True, exist_ok=True)
     
     shutil.copy(htm_file, out / "eplustbl.htm")
     shutil.copy(edd_file, out / "eplusout.edd")
+    shutil.copy(eio_file, out / "eplusout.eio")
+    shutil.copy(sql_file, out / "eplusout.sql")
 
 
 def eplustbl(ep_path: Path, epjson: Path, epw: Path) -> Derivation:
@@ -674,6 +737,177 @@ def eddfile(ep_path: Path, epjson: Path, epw: Path) -> Derivation:
     """Get the eplusout.edd file from a simulation"""
     sim = run_simulation(ep_path, epjson, epw)
     return ChildFile(sim, "eplusout.edd")
+
+
+def eiofile(ep_path: Path, epjson: Path, epw: Path) -> Derivation:
+    """Get the eplusout.eio file from a simulation"""
+    sim = run_simulation(ep_path, epjson, epw)
+    return ChildFile(sim, "eplusout.eio")
+
+
+def _parse_float_cell(x: str) -> float | None:
+    s = str(x).strip()
+    if not s or s.lower() in ("&nbsp;", "unknown"):
+        return None
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+
+def infer_actuator_bounds_from_eplustbl(
+    *,
+    eplustbl_path: Path,
+) -> dict[str, dict[str, float]]:
+    """
+    Infer actuator bounds from EnergyPlus tabular outputs (eplustbl.htm).
+
+    Returns a mapping:
+      action_name -> {"lower_bound": float, "upper_bound": float}
+
+    Where action_name is formatted as:
+      "{component_type}::{control_type}::{component_name}"
+    """
+    with open(eplustbl_path, "r", encoding="utf-8", errors="ignore") as f:
+        html = f.read()
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Locate Component Sizing Summary / AirLoopHVAC:UnitarySystem table
+    unitary_table = None
+    for b in soup.find_all("b"):
+        if b.get_text(strip=True).lower() == "airloophvac:unitarysystem":
+            unitary_table = b.find_next("table")
+            break
+
+    bounds: dict[str, dict[str, float]] = {}
+    if unitary_table is not None:
+        # Use the first row as header; EnergyPlus tables often have a blank first header cell.
+        df = pd.read_html(StringIO(str(unitary_table)), header=0)[0]
+        df.columns = [str(c).strip() for c in df.columns]
+        name_col = str(df.columns[0])
+
+        # Identify columns with nominal capacities (W)
+        # This matches the fixture naming: "User-Specified Nominal Cooling Capacity [W]"
+        cool_cols = [c for c in df.columns if "nominal cooling capacity" in str(c).lower()]
+        heat_cols = [c for c in df.columns if "nominal heating capacity" in str(c).lower()]
+        if cool_cols and heat_cols:
+            cool_col = cool_cols[0]
+            heat_col = heat_cols[0]
+            for _, row in df.iterrows():
+                comp_name = str(row[name_col]).strip()
+                cool = _parse_float_cell(row.get(cool_col, ""))
+                heat = _parse_float_cell(row.get(heat_col, ""))
+                if cool is None or heat is None:
+                    continue
+                action = f"Unitary HVAC::Sensible Load Request::{comp_name}"
+                bounds[action] = {
+                    "lower_bound": -abs(float(cool)),
+                    "upper_bound": abs(float(heat)),
+                }
+
+    # Fixed bounds for availability status and zone setpoint actuators:
+    # These are not autosized; keep them broad/known-safe.
+    # (We set these here so the bounds can be attached consistently from the same artifact.)
+    for b in soup.find_all("b"):
+        # No-op; this loop intentionally left to keep parsing single-pass if extended later.
+        break
+
+    return bounds
+
+
+@derivation("actuator_bounds.json")
+def ActuatorBounds(sim_outputs: Path):
+    """
+    Create actuator bounds inferred from sizing outputs produced by a dummy simulation.
+
+    Reads:
+    - sim_outputs/eplustbl.htm
+
+    Writes:
+    - actuator_bounds.json
+    """
+    dst = OUTPUT.get()
+    # Prefer time-series maxima from the SQLite output (actual delivered heating/cooling).
+    # Fall back to sizing tables if needed.
+    sql_path = sim_outputs / "eplusout.sql"
+    bounds = infer_actuator_bounds_from_sql(sql_path=sql_path)
+    if not bounds:
+        eplustbl_path = sim_outputs / "eplustbl.htm"
+        bounds = infer_actuator_bounds_from_eplustbl(eplustbl_path=eplustbl_path)
+    with open(dst, "w", encoding="utf-8") as f:
+        json.dump(bounds, f, indent=2, sort_keys=True)
+
+
+def actuator_bounds_file(ep_path: Path, epjson: Path, epw: Path) -> Derivation:
+    """Infer actuator bounds (from sizing outputs) for a given building+weather."""
+    sim = run_simulation(ep_path, epjson, epw)
+    return ActuatorBounds(sim)
+
+
+def infer_actuator_bounds_from_sql(*, sql_path: Path) -> dict[str, dict[str, float]]:
+    """
+    Infer actuator bounds from an EnergyPlus SQLite output by taking maxima over the run.
+
+    Specifically:
+    - For each Unitary HVAC "Sensible Load Request" actuator (keyed by unitary system name),
+      we set:
+        lower_bound = -max(Unitary System Sensible Cooling Rate)   [W]
+        upper_bound = +max(Unitary System Sensible Heating Rate)   [W]
+
+    The output keys match action_names:
+      "{component_type}::{control_type}::{component_name}"
+    """
+    if not sql_path.exists():
+        return {}
+
+    con = sqlite3.connect(str(sql_path))
+    cur = con.cursor()
+
+    # Compute max rates per KeyValue for the two variables.
+    # NOTE: EnergyPlus stores separate variables for heating vs cooling.
+    cur.execute(
+        """
+        SELECT d.KeyValue, d.Name, MAX(r.Value) AS vmax
+        FROM ReportDataDictionary d
+        JOIN ReportData r
+          ON r.ReportDataDictionaryIndex = d.ReportDataDictionaryIndex
+        WHERE d.Name IN (
+            'Unitary System Sensible Heating Rate',
+            'Unitary System Sensible Cooling Rate'
+        )
+        GROUP BY d.KeyValue, d.Name
+        """
+    )
+    rows = cur.fetchall()
+    con.close()
+
+    # Map KeyValue -> maxima
+    heat_max: dict[str, float] = {}
+    cool_max: dict[str, float] = {}
+    for key, name, vmax in rows:
+        if key is None or vmax is None:
+            continue
+        k = str(key).strip()
+        v = float(vmax)
+        if name == "Unitary System Sensible Heating Rate":
+            heat_max[k] = max(heat_max.get(k, 0.0), v)
+        elif name == "Unitary System Sensible Cooling Rate":
+            cool_max[k] = max(cool_max.get(k, 0.0), v)
+
+    bounds: dict[str, dict[str, float]] = {}
+    for k in set(heat_max.keys()) | set(cool_max.keys()):
+        h = float(heat_max.get(k, 0.0))
+        c = float(cool_max.get(k, 0.0))
+        # Only add if we actually saw non-trivial values.
+        if h <= 0.0 and c <= 0.0:
+            continue
+        action = f"Unitary HVAC::Sensible Load Request::{k}"
+        bounds[action] = {
+            "lower_bound": -abs(c),
+            "upper_bound": abs(h),
+        }
+
+    return bounds
 
 
 def get_net_conditioned_area(html_path: Path) -> float:
