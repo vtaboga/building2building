@@ -1,8 +1,21 @@
+from __future__ import annotations
+
+import json
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from pathlib import Path
+from typing import Any
 
 import numpy as np
+
+import pandas as pd
+from hydra.core.hydra_config import HydraConfig
+from omegaconf import DictConfig, OmegaConf
+
+from algorithms.utils import make_env, plot_timeseries
+
+logger = logging.getLogger(__name__)
 
 
 class Policy(ABC):
@@ -197,3 +210,272 @@ class TrimAndRespondSensibleLoadPolicy(Policy):
             object.__setattr__(self, "last_mode", "cool")
 
         return np.asarray([float(self.current_load_w)], dtype=float), None
+
+
+@dataclass(frozen=True)
+class RolloutPaths:
+    out_dir: Path
+    csv_path: Path
+    npz_path: Path
+    config_path: Path
+    plot_temperature_path: Path
+    plot_energy_path: Path
+    plot_actuators_path: Path
+
+
+def make_rollout_paths(run_dir: Path) -> RolloutPaths:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return RolloutPaths(
+        out_dir=run_dir,
+        csv_path=run_dir / "rollout.csv",
+        npz_path=run_dir / "rollout.npz",
+        config_path=run_dir / "config_resolved.json",
+        plot_temperature_path=run_dir / "temperature.png",
+        plot_energy_path=run_dir / "energy.png",
+        plot_actuators_path=run_dir / "actuators.png",
+    )
+
+
+def require_env_metadata_list_str(env: Any, key: str) -> list[str]:
+    if not hasattr(env, "metadata") or not isinstance(env.metadata, dict):
+        raise RuntimeError("env.metadata missing")
+    raw = env.metadata.get(key)
+    if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
+        raise RuntimeError(f"env.metadata['{key}'] must be a list[str]")
+    return raw
+
+
+def find_first_zone_air_temp_index(observation_names: list[str]) -> int:
+    for i, name in enumerate(observation_names):
+        if str(name).lower().startswith("zone air temperature"):
+            return int(i)
+    for i, name in enumerate(observation_names):
+        if "zone air temperature" in str(name).lower():
+            return int(i)
+    raise RuntimeError("Could not find a 'Zone Air Temperature' entry in observation_names")
+
+
+def find_action_index(action_names: list[str], component_type: str, control_type: str) -> int | None:
+    ct = component_type.strip().lower()
+    ctrl = control_type.strip().lower()
+    for i, name in enumerate(action_names):
+        parts = str(name).split("::")
+        if len(parts) < 2:
+            continue
+        if parts[0].strip().lower() == ct and parts[1].strip().lower() == ctrl:
+            return int(i)
+    return None
+
+
+def _make_policy(cfg: DictConfig, *, temp_obs_index: int) -> Policy:
+    policy_type = str(getattr(cfg.policy, "type"))
+    if policy_type == "pid":
+        return PIDSensibleLoadPolicy(
+            target_temp_c=float(cfg.policy.target_temp_c),
+            deadband_c=float(cfg.policy.deadband_c),
+            temp_obs_index=int(temp_obs_index),
+            kp=float(cfg.policy.kp),
+            ki=float(cfg.policy.ki),
+            kd=float(cfg.policy.kd),
+            q_heat_max_w=float(getattr(cfg.policy, "q_heat_max_w", 20000.0)),
+            q_cool_max_w=float(getattr(cfg.policy, "q_cool_max_w", 20000.0)),
+            dt_s=float(getattr(cfg.policy, "dt_s", 1.0)),
+            integral_min=float(getattr(cfg.policy, "integral_min", -100000.0)),
+            integral_max=float(getattr(cfg.policy, "integral_max", 100000.0)),
+        )
+    if policy_type == "trim_and_respond":
+        return TrimAndRespondSensibleLoadPolicy(
+            target_temp_c=float(cfg.policy.target_temp_c),
+            deadband_c=float(cfg.policy.deadband_c),
+            temp_obs_index=int(temp_obs_index),
+            respond_step_w=float(cfg.policy.respond_step_w),
+            trim_step_w=float(cfg.policy.trim_step_w),
+            q_heat_max_w=float(getattr(cfg.policy, "q_heat_max_w", 20000.0)),
+            q_cool_max_w=float(getattr(cfg.policy, "q_cool_max_w", 20000.0)),
+        )
+    if policy_type == "on_off":
+        return OnOffSensibleLoadPolicy(
+            target_temp_c=float(cfg.policy.target_temp_c),
+            deadband_c=float(cfg.policy.deadband_c),
+            q_heat_w=float(getattr(cfg.policy, "q_heat_w")),
+            q_cool_w=float(getattr(cfg.policy, "q_cool_w")),
+            temp_obs_index=int(temp_obs_index),
+        )
+    raise ValueError(f"Unknown policy.type: {policy_type}")
+
+
+def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> RolloutPaths:
+    """
+    Run a baseline rollout using Hydra config `configs/baseline.yaml`.
+
+    Expected to be launched under Hydra, so by default `run_dir` is `Path.cwd()`.
+    """
+    if run_dir is None:
+        if HydraConfig.initialized():
+            run_dir = Path(HydraConfig.get().runtime.output_dir)
+        else:
+            run_dir = Path.cwd()
+    paths = make_rollout_paths(run_dir)
+
+    with paths.config_path.open("w", encoding="utf-8") as f:
+        json.dump(OmegaConf.to_container(cfg, resolve=True), f, indent=2)
+
+    eplus_output_dir = run_dir / "eplus_outputs"
+    env = make_env(config=cfg, eplus_output_dir=str(eplus_output_dir))
+    try:
+        obs_names = require_env_metadata_list_str(env, "observation_names")
+        act_names = require_env_metadata_list_str(env, "action_names")
+
+        # Print action bounds early for debugging (especially inferred bounds from sizing outputs).
+        try:
+            if hasattr(env, "action_space") and hasattr(env.action_space, "low") and hasattr(
+                env.action_space, "high"
+            ):
+                lows = np.asarray(env.action_space.low, dtype=float).reshape(-1)
+                highs = np.asarray(env.action_space.high, dtype=float).reshape(-1)
+                print("\n=== Action bounds (low/high) ===", flush=True)
+                for i, name in enumerate(act_names):
+                    if i < len(lows) and i < len(highs):
+                        print(f"{i:3d} {name}: [{lows[i]:.3f}, {highs[i]:.3f}]", flush=True)
+                print("=== End action bounds ===\n", flush=True)
+        except Exception as e:
+            logger.warning(f"Could not print action bounds: {e}")
+
+        temp_idx = find_first_zone_air_temp_index(obs_names)
+        policy = _make_policy(cfg, temp_obs_index=temp_idx)
+
+        idx_load = find_action_index(act_names, "Unitary HVAC", "Sensible Load Request")
+        if idx_load is None:
+            raise RuntimeError(
+                "control_mode=sensible_load requires an action named "
+                "'Unitary HVAC::Sensible Load Request::<component>'"
+            )
+        idx_avail = find_action_index(act_names, "AirLoopHVAC", "Availability Status")
+        idx_heat_sp = find_action_index(act_names, "Zone Temperature Control", "Heating Setpoint")
+        idx_cool_sp = find_action_index(act_names, "Zone Temperature Control", "Cooling Setpoint")
+
+        max_steps = int(getattr(cfg.env, "max_steps"))
+        n_episodes = int(getattr(cfg, "n_episodes"))
+        target = float(cfg.policy.target_temp_c)
+        deadband = float(cfg.policy.deadband_c)
+
+        all_rows: list[dict[str, float]] = []
+
+        for ep in range(n_episodes):
+            obs, _info = env.reset()
+            done = False
+            step = 0
+
+            while not done and step < max_steps:
+                load_cmd, _ = policy.predict(obs, deterministic=True)
+                tz = float(np.asarray(obs, dtype=float).reshape(-1)[temp_idx])
+
+                action_cmd = np.zeros((len(act_names),), dtype=float)
+                action_cmd[idx_load] = float(np.asarray(load_cmd, dtype=float).reshape(-1)[0])
+
+                if idx_avail is not None:
+                    # Force CycleOn to keep the HVAC system available while using load request.
+                    action_cmd[idx_avail] = float(getattr(cfg.policy, "availability_on", 2.0))
+
+                # Thermostat mode-enabler: nudge setpoints around current zone temp.
+                q = float(action_cmd[idx_load])
+                if idx_heat_sp is not None and idx_cool_sp is not None:
+                    if q > 0.0:
+                        action_cmd[idx_heat_sp] = tz + 0.5
+                        action_cmd[idx_cool_sp] = tz + 100.0
+                    elif q < 0.0:
+                        action_cmd[idx_heat_sp] = tz - 100.0
+                        action_cmd[idx_cool_sp] = tz - 0.5
+                    else:
+                        action_cmd[idx_heat_sp] = tz - 100.0
+                        action_cmd[idx_cool_sp] = tz + 100.0
+
+                obs2, reward, terminated, truncated, _info = env.step(action_cmd)
+
+                row: dict[str, float] = {
+                    "episode": float(ep),
+                    "step": float(step),
+                    "reward": float(reward),
+                }
+
+                obs_arr = np.asarray(obs2, dtype=float).reshape(-1)
+                for i, name in enumerate(obs_names):
+                    if i < len(obs_arr):
+                        row[f"obs::{name}"] = float(obs_arr[i])
+
+                act_arr = np.asarray(action_cmd, dtype=float).reshape(-1)
+                for i, name in enumerate(act_names):
+                    if i < len(act_arr):
+                        row[f"act::{name}"] = float(act_arr[i])
+
+                all_rows.append(row)
+
+                obs = obs2
+                done = bool(terminated or truncated)
+                step += 1
+
+            logger.info(f"episode={ep} steps={step} saved_rows={len(all_rows)}")
+
+        df = pd.DataFrame(all_rows)
+        df.to_csv(paths.csv_path, index=False)
+
+        obs_cols = [c for c in df.columns if c.startswith("obs::")]
+        act_cols = [c for c in df.columns if c.startswith("act::")]
+        np.savez_compressed(
+            paths.npz_path,
+            episode=df["episode"].to_numpy(dtype=np.int32),
+            step=df["step"].to_numpy(dtype=np.int32),
+            reward=df["reward"].to_numpy(dtype=float),
+            obs_names=np.asarray(obs_cols, dtype=object),
+            act_names=np.asarray(act_cols, dtype=object),
+            obs=df[obs_cols].to_numpy(dtype=float) if obs_cols else np.zeros((len(df), 0)),
+            act=df[act_cols].to_numpy(dtype=float) if act_cols else np.zeros((len(df), 0)),
+        )
+
+        zone_temp_cols = [c for c in obs_cols if "zone air temperature" in c.lower()]
+        outdoor_temp_cols = [c for c in obs_cols if c.lower().endswith("outdoor_temperature")]
+        temp_cols = zone_temp_cols + outdoor_temp_cols
+        plot_timeseries(
+            df=df,
+            x="step",
+            y_cols=temp_cols[:25],
+            out_path=paths.plot_temperature_path,
+            title=f"Zone Temperatures (target={target:.1f}C deadband=±{deadband:.1f}C)",
+            ylabel="Temperature [C]",
+            hlines=[
+                (target, "target"),
+                (target - deadband, "target-deadband"),
+                (target + deadband, "target+deadband"),
+            ],
+        )
+
+        energy_cols = [c for c in obs_cols if c.lower().endswith("energy_electricity")] + [
+            c for c in obs_cols if c.lower().endswith("energy_gas")
+        ]
+        plot_timeseries(
+            df=df,
+            x="step",
+            y_cols=energy_cols,
+            out_path=paths.plot_energy_path,
+            title="HVAC Energy (per-area, per-timestep)",
+            ylabel="Wh / m2 / timestep",
+        )
+
+        plot_timeseries(
+            df=df,
+            x="step",
+            y_cols=act_cols[:25],
+            out_path=paths.plot_actuators_path,
+            title="HVAC Actuator Commands",
+            ylabel="Actuator value (varies by actuator)",
+        )
+
+        logger.info(f"Saved raw rollout CSV: {paths.csv_path}")
+        logger.info(f"Saved raw rollout NPZ: {paths.npz_path}")
+        logger.info(f"Saved plots under: {paths.out_dir}")
+        return paths
+    finally:
+        try:
+            env.close()
+        except Exception:
+            pass

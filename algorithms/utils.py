@@ -1,5 +1,8 @@
-from pathlib import Path
+from __future__ import annotations
+
+import logging
 import uuid
+from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
@@ -8,6 +11,8 @@ from building2building.simulator import create_simulator
 from building2building.sources import hydroquebec
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
+
+logger = logging.getLogger(__name__)
 
 
 def make_env(config, eplus_output_dir: str):
@@ -32,6 +37,46 @@ def make_dummy_vec_env(config, eplus_output_dir: str, seed: int | None = None, w
             env = wrapper_fn(env)
         return env
     return DummyVecEnv([_thunk])
+
+
+def plot_timeseries(
+    *,
+    df: pd.DataFrame,
+    x: str,
+    y_cols: list[str],
+    out_path: Path,
+    title: str,
+    ylabel: str,
+    hlines: list[tuple[float, str]] | None = None,
+) -> bool:
+    """
+    Best-effort matplotlib timeseries plot.
+
+    Returns False when matplotlib is unavailable.
+    """
+    try:
+        import matplotlib.pyplot as plt  # type: ignore
+    except Exception as e:
+        logger.warning(f"matplotlib not available; skipping plot {out_path.name}: {e}")
+        return False
+
+    plt.figure(figsize=(12, 5))
+    for c in y_cols:
+        if c in df.columns:
+            plt.plot(df[x].to_numpy(), df[c].to_numpy(), label=c, linewidth=1.2)
+    if hlines:
+        for y, lbl in hlines:
+            plt.axhline(y=y, linestyle="--", linewidth=1.0, label=lbl)
+    plt.title(title)
+    plt.xlabel(x)
+    plt.ylabel(ylabel)
+    plt.grid(True, alpha=0.2)
+    if len(y_cols) <= 12:
+        plt.legend(loc="best", fontsize=8)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=160)
+    plt.close()
+    return True
 
 
 def _log_line_series(df: pd.DataFrame):

@@ -6,6 +6,7 @@
 # - negative = cooling request
 #
 
+type: pid
 target_temp_c: 21.0
 deadband_c: 0.5
 

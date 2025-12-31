@@ -4,8 +4,12 @@ defaults:
   - policy: on_off
   - reward: deadband
 
+hydra:
+  run:
+    dir: outputs/${policy.type}/${now:%H-%M-%S}
+
 env:
   normalize_obs: false
-  max_steps: 30000
+  max_steps: 35040
 
 n_episodes: 1
