@@ -106,6 +106,9 @@ def _hvac_actuator_bounds(actuator: dict[str, str]) -> tuple[float, float]:
         return -20000.0, 20000.0
 
     # Fallback: normalized 0..1 control.
+    if "zone temperature control" in component_type and "setpoint" in control_type:
+        # Wide enough to cover typical setpoints and "mode forcing" values.
+        return -50.0, 50.0
     return 0.0, 1.0
 
 

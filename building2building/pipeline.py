@@ -602,9 +602,13 @@ def create_complete_pipeline(
 
     # Configure simulation
     current = modify_timestep(current, timesteps_per_hour=4)
-    if include_setpoint_control:
-        current = add_setpoint_control(current)
+    current = add_setpoint_control(current)
+    # if include_setpoint_control:
+    #     current = add_setpoint_control(current)
+    # else:
+    #     current = remove_setpoint_control(current)
 
+    current = add_edd_output(current)
     # Make the name useful
     current = Rename("building.epjson", current)
 
@@ -872,3 +876,99 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
                 hvac_actuators.append(actuator_dict)
     
     return hvac_actuators
+
+
+def get_sensible_load_actuators(edd_path: Path) -> list[dict[str, str]]:
+    """
+    Extract actuators that request *sensible load* from HVAC equipment.
+
+    In EnergyPlus EMS, some HVAC systems expose actuators with a control type such as
+    "Sensible Load Request" (typically under component type "Unitary HVAC"), where
+    the actuated value is in Watts.
+
+    This function scans the EnergyPlus `.edd` actuator availability dictionary and
+    returns only the actuator descriptors relevant to sensible-load requests.
+
+    Args:
+        edd_path: Path to an EnergyPlus `eplusout.edd` file.
+
+    Returns:
+        List of dictionaries containing actuator information for
+        `get_actuator_handle()`. Each dictionary has keys:
+        'component_name', 'component_type', 'control_type', 'units'.
+    """
+    sensible_load_actuators: list[dict[str, str]] = []
+
+    with open(edd_path, "r", encoding="utf-8", errors="ignore") as f:
+        lines = f.readlines()
+
+    for line in lines:
+        line_stripped = line.strip()
+        if not line_stripped or line_stripped.startswith("!"):
+            continue
+
+        # Typical `.edd` line format:
+        # EnergyManagementSystem:Actuator Available,<Component Name>,<Component Type>,<Control Type>,<Units>
+        #
+        # We conservatively match on the control type substring to support variations
+        # in component type naming (e.g., templates).
+        if "sensible load request" not in line_stripped.lower():
+            continue
+
+        parts = line_stripped.split(",", maxsplit=4)
+        if len(parts) < 5:
+            continue
+
+        sensible_load_actuators.append(
+            {
+                "component_name": parts[1].strip(),
+                "component_type": parts[2].strip(),
+                "control_type": parts[3].strip(),
+                "units": parts[4].strip(),
+            }
+        )
+
+    return sensible_load_actuators
+
+
+def get_zone_temperature_control_actuators(edd_path: Path) -> list[dict[str, str]]:
+    """
+    Extract Zone Temperature Control actuators (EMS overrides of thermostat setpoints).
+
+    This is useful when we want to "force" EnergyPlus into heating/cooling mode without
+    relying on the building's thermostat schedules.
+
+    Args:
+        edd_path: Path to an EnergyPlus `eplusout.edd` file.
+
+    Returns:
+        List of actuator descriptors for `get_actuator_handle()` with keys:
+        'component_name', 'component_type', 'control_type', 'units'.
+    """
+    out: list[dict[str, str]] = []
+
+    with open(edd_path, "r", encoding="utf-8", errors="ignore") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("!"):
+                continue
+            if "zone temperature control" not in line.lower():
+                continue
+            # Typical `.edd` line format:
+            # EnergyManagementSystem:Actuator Available,<Component Name>,<Component Type>,<Control Type>,<Units>
+            parts = line.split(",", maxsplit=4)
+            if len(parts) < 5:
+                continue
+            control_type = parts[3].strip()
+            if control_type not in ("Heating Setpoint", "Cooling Setpoint"):
+                continue
+            out.append(
+                {
+                    "component_name": parts[1].strip(),
+                    "component_type": parts[2].strip(),
+                    "control_type": control_type,
+                    "units": parts[4].strip(),
+                }
+            )
+
+    return out

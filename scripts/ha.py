@@ -13,7 +13,7 @@ import pandas as pd
 from gymnasium.spaces import MultiDiscrete
 from omegaconf import OmegaConf
 
-from algorithms.baselines import HVACActuatorOnOffPolicy
+from algorithms.baselines import HVACActuatorOnOffPolicy, OnOffSensibleLoadPolicy
 from algorithms.utils import make_env
 from building2building.simulator.action_spaces import hvac_actuators_multidiscrete_transform
 
@@ -32,7 +32,7 @@ class RolloutPaths:
 
 
 def _make_rollout_paths(base_dir: Path) -> RolloutPaths:
-    out_dir = base_dir / "hvac_actuator_on_off_rollout"
+    out_dir = base_dir / "ha_rollout"
     out_dir.mkdir(parents=True, exist_ok=True)
     return RolloutPaths(
         out_dir=out_dir,
@@ -52,6 +52,30 @@ def _require_env_metadata_list_str(env, key: str) -> list[str]:
     if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
         raise RuntimeError(f"env.metadata['{key}'] must be a list[str]")
     return raw
+
+
+def _find_first_zone_air_temp_index(observation_names: list[str]) -> int:
+    for i, name in enumerate(observation_names):
+        if str(name).lower().startswith("zone air temperature"):
+            return int(i)
+    for i, name in enumerate(observation_names):
+        if "zone air temperature" in str(name).lower():
+            return int(i)
+    raise RuntimeError("Could not find a 'Zone Air Temperature' entry in observation_names")
+
+
+def _find_action_index(
+    action_names: list[str], component_type: str, control_type: str
+) -> int | None:
+    ct = component_type.strip().lower()
+    ctrl = control_type.strip().lower()
+    for i, name in enumerate(action_names):
+        parts = str(name).split("::")
+        if len(parts) < 2:
+            continue
+        if parts[0].strip().lower() == ct and parts[1].strip().lower() == ctrl:
+            return int(i)
+    return None
 
 
 def _plot_timeseries(
@@ -106,20 +130,45 @@ def main(cfg) -> None:
     obs_names = _require_env_metadata_list_str(env, "observation_names")
     act_names = _require_env_metadata_list_str(env, "action_names")
 
-    policy = HVACActuatorOnOffPolicy.from_env_metadata(
-        env_metadata=env.metadata,  # type: ignore[arg-type]
-        target_temp_c=float(cfg.policy.target_temp_c),
-        deadband_c=float(cfg.policy.deadband_c),
-        fan_mass_flow_kg_s=float(cfg.policy.fan_mass_flow_kg_s),
-        terminal_mass_flow_kg_s=float(cfg.policy.terminal_mass_flow_kg_s),
-        coil_speed_heat=float(cfg.policy.coil_speed_heat),
-        coil_speed_cool=float(cfg.policy.coil_speed_cool),
-        supplemental_stage_heat=float(cfg.policy.supplemental_stage_heat),
-        q_heat_w=float(getattr(cfg.policy, "q_heat_w", 0.0)),
-        q_cool_w=float(getattr(cfg.policy, "q_cool_w", 0.0)),
-        availability_on=float(cfg.policy.availability_on),
-        availability_off=float(cfg.policy.availability_off),
-    )
+    control_mode = str(getattr(cfg.env, "control_mode", "")).strip()
+    if control_mode == "sensible_load":
+        temp_idx = _find_first_zone_air_temp_index(obs_names)
+        base_policy = OnOffSensibleLoadPolicy(
+            target_temp_c=float(cfg.policy.target_temp_c),
+            deadband_c=float(cfg.policy.deadband_c),
+            q_heat_w=float(getattr(cfg.policy, "q_heat_w", 15000.0)),
+            q_cool_w=float(getattr(cfg.policy, "q_cool_w", 15000.0)),
+            temp_obs_index=int(temp_idx),
+        )
+        idx_load = _find_action_index(act_names, "Unitary HVAC", "Sensible Load Request")
+        if idx_load is None:
+            raise RuntimeError(
+                "control_mode=sensible_load requires an action named "
+                "'Unitary HVAC::Sensible Load Request::<component>'"
+            )
+        idx_avail = _find_action_index(act_names, "AirLoopHVAC", "Availability Status")
+        idx_heat_sp = _find_action_index(act_names, "Zone Temperature Control", "Heating Setpoint")
+        idx_cool_sp = _find_action_index(act_names, "Zone Temperature Control", "Cooling Setpoint")
+    elif control_mode == "hvac_actuators":
+        policy = HVACActuatorOnOffPolicy.from_env_metadata(
+            env_metadata=env.metadata,  # type: ignore[arg-type]
+            target_temp_c=float(cfg.policy.target_temp_c),
+            deadband_c=float(cfg.policy.deadband_c),
+            fan_mass_flow_kg_s=float(cfg.policy.fan_mass_flow_kg_s),
+            terminal_mass_flow_kg_s=float(cfg.policy.terminal_mass_flow_kg_s),
+            coil_speed_heat=float(cfg.policy.coil_speed_heat),
+            coil_speed_cool=float(cfg.policy.coil_speed_cool),
+            supplemental_stage_heat=float(cfg.policy.supplemental_stage_heat),
+            q_heat_w=float(getattr(cfg.policy, "q_heat_w", 0.0)),
+            q_cool_w=float(getattr(cfg.policy, "q_cool_w", 0.0)),
+            availability_on=float(cfg.policy.availability_on),
+            availability_off=float(cfg.policy.availability_off),
+        )
+    else:
+        raise ValueError(
+            "env.control_mode must be one of: 'sensible_load', 'hvac_actuators'. "
+            f"Got: {control_mode!r}"
+        )
 
     max_steps = int(getattr(cfg.env, "max_steps", 2000))
     n_episodes = int(getattr(cfg, "n_episodes", 1))
@@ -135,7 +184,37 @@ def main(cfg) -> None:
 
         while not done and step < max_steps:
             # Policy outputs float actuator commands (physical units).
-            action_cmd, _ = policy.predict(obs, deterministic=True)
+            if control_mode == "sensible_load":
+                # Build a full action vector (may include AirLoopHVAC availability).
+                load_cmd, _ = base_policy.predict(obs, deterministic=True)
+                tz = float(np.asarray(obs, dtype=float).reshape(-1)[temp_idx])
+                action_cmd = np.zeros((len(act_names),), dtype=float)
+                action_cmd[idx_load] = float(np.asarray(load_cmd, dtype=float).reshape(-1)[0])
+                if idx_avail is not None:
+                    # Force CycleOn to keep the HVAC system available while using load request.
+                    action_cmd[idx_avail] = float(getattr(cfg.policy, "availability_on", 2.0))
+                # Ensure the thermostat logic does not block the equipment manager from
+                # evaluating heating/cooling operation. We set a *very small* call by
+                # nudging setpoints around the current zone temperature.
+                #
+                # This is not used as a "temperature controller"; the magnitude is still
+                # commanded via the sensible-load request. It's only a mode-enabler.
+                q = float(action_cmd[idx_load])
+                if idx_heat_sp is not None and idx_cool_sp is not None:
+                    if q > 0.0:
+                        # Heating call: ask for slightly more than current temp.
+                        action_cmd[idx_heat_sp] = tz + 0.5
+                        action_cmd[idx_cool_sp] = tz + 100.0
+                    elif q < 0.0:
+                        # Cooling call: ask for slightly less than current temp.
+                        action_cmd[idx_heat_sp] = tz - 100.0
+                        action_cmd[idx_cool_sp] = tz - 0.5
+                    else:
+                        # No load: wide deadband.
+                        action_cmd[idx_heat_sp] = tz - 100.0
+                        action_cmd[idx_cool_sp] = tz + 100.0
+            else:
+                action_cmd, _ = policy.predict(obs, deterministic=True)
 
             # Env may be configured with a MultiDiscrete action space; if so, convert
             # float commands -> discrete indices using the same discretization logic.
@@ -178,10 +257,12 @@ def main(cfg) -> None:
             done = bool(terminated or truncated)
             step += 1
 
-        logger.info(
-            f"episode={ep} steps={step} last_mode={policy.last_mode} "
-            f"saved_rows={len(all_rows)}"
+        last_mode = (
+            getattr(base_policy, "last_mode", "n/a")
+            if control_mode == "sensible_load"
+            else getattr(policy, "last_mode", "n/a")
         )
+        logger.info(f"episode={ep} steps={step} last_mode={last_mode} saved_rows={len(all_rows)}")
 
     df = pd.DataFrame(all_rows)
     df.to_csv(paths.csv_path, index=False)

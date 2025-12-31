@@ -5,7 +5,7 @@ defaults:
 
 env:
   normalize_obs: false
-  hvac_control_mode: sensible_load_continuous
+  control_mode: sensible_load
 
 n_episodes: 1
 
