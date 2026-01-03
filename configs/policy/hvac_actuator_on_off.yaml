@@ -15,5 +15,10 @@ supplemental_stage_heat: 0.0
 availability_on: 2.0
 availability_off: 1.0
 
-q_heat_w: 15000.0
-q_cool_w: 15000.0
+# Sensible-load request magnitude as fraction of inferred actuator bounds.
+q_heat_pct: 0.5
+q_cool_pct: 0.5
+
+# Back-compat (deprecated): absolute watts. If provided, will be converted using inferred bounds.
+# q_heat_w: 15000.0
+# q_cool_w: 15000.0

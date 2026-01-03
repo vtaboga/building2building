@@ -11,7 +11,7 @@ from algorithms import baselines
 from building2building.pipeline import get_hvac_actuators, get_net_conditioned_area, get_sensible_load_actuators
 from building2building.simulator import create_simulator
 from building2building.types import BaseRewardConfig, BuildingConfig
-
+from algorithms.baselines import SensibleLoadBounds
 
 def _compute_rollout_metrics(npz_path: Path) -> tuple[float, float]:
     data = np.load(npz_path, allow_pickle=True)
@@ -125,3 +125,39 @@ def test_sensible_load_control(monkeypatch: pytest.MonkeyPatch) -> None:
             assert not np.isclose(energies[i], energies[j], atol=100), f"Expected energy to differ: {energies=}"
 
 
+def test_sensible_load_bounds_roundtrip_asymmetric() -> None:
+    b = SensibleLoadBounds(low_w=-100.0, high_w=200.0)
+
+    # Heating: percent is relative to [0, high_w]
+    assert b.w_to_pct(100.0) == pytest.approx(0.5)
+    assert b.pct_to_w(0.5) == pytest.approx(100.0)
+
+    # Cooling: percent is relative to [low_w, 0]
+    assert b.w_to_pct(-50.0) == pytest.approx(-0.5)
+    assert b.pct_to_w(-0.5) == pytest.approx(-50.0)
+
+    # Roundtrip random values (allow for clipping)
+    rng = np.random.default_rng(0)
+    for q in rng.uniform(-120.0, 240.0, size=100):
+        pct = b.w_to_pct(float(q))
+        q2 = b.pct_to_w(float(pct))
+        assert -100.0 <= q2 <= 200.0
+        if -100.0 <= q <= 200.0:
+            assert q2 == pytest.approx(q)
+
+
+def test_sensible_load_bounds_validates_signs() -> None:
+    with pytest.raises(ValueError):
+        SensibleLoadBounds(low_w=-100.0, high_w=-1.0)
+    with pytest.raises(ValueError):
+        SensibleLoadBounds(low_w=1.0, high_w=100.0)
+
+
+def test_sensible_load_bounds_handles_no_cooling_side() -> None:
+    b = SensibleLoadBounds(low_w=0.0, high_w=200.0)
+    # Cooling requests map to 0 because cooling capacity is absent.
+    assert b.w_to_pct(-50.0) == pytest.approx(0.0)
+    assert b.pct_to_w(-1.0) == pytest.approx(0.0)
+    # Heating works as usual.
+    assert b.w_to_pct(100.0) == pytest.approx(0.5)
+    assert b.pct_to_w(0.5) == pytest.approx(100.0)

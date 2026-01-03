@@ -810,7 +810,7 @@ def infer_actuator_bounds_from_eplustbl(
 
 
 @derivation("actuator_bounds.json")
-def ActuatorBounds(sim_outputs: Path):
+def ActuatorBounds(sim_outputs: Path, *, _version: int):
     """
     Create actuator bounds inferred from sizing outputs produced by a dummy simulation.
 
@@ -821,13 +821,32 @@ def ActuatorBounds(sim_outputs: Path):
     - actuator_bounds.json
     """
     dst = OUTPUT.get()
-    # Prefer time-series maxima from the SQLite output (actual delivered heating/cooling).
-    # Fall back to sizing tables if needed.
+    # Prefer time-series maxima from the SQLite output (actual delivered heating/cooling),
+    # but fill any missing/zero side (heating or cooling) from sizing tables.
     sql_path = sim_outputs / "eplusout.sql"
-    bounds = infer_actuator_bounds_from_sql(sql_path=sql_path)
-    if not bounds:
-        eplustbl_path = sim_outputs / "eplustbl.htm"
-        bounds = infer_actuator_bounds_from_eplustbl(eplustbl_path=eplustbl_path)
+    bounds_sql = infer_actuator_bounds_from_sql(sql_path=sql_path)
+
+    eplustbl_path = sim_outputs / "eplustbl.htm"
+    bounds_tbl = infer_actuator_bounds_from_eplustbl(eplustbl_path=eplustbl_path)
+
+    # Merge, preserving SQL where informative, but backfilling missing sides from tables.
+    bounds: dict[str, dict[str, float]] = dict(bounds_sql)
+    eps = 1e-6
+    for key, bt in bounds_tbl.items():
+        if key not in bounds:
+            bounds[key] = bt
+            continue
+        bs = bounds[key]
+        lo_s = float(bs.get("lower_bound", 0.0))
+        hi_s = float(bs.get("upper_bound", 0.0))
+        lo_t = float(bt.get("lower_bound", 0.0))
+        hi_t = float(bt.get("upper_bound", 0.0))
+        # If SQL cooling never triggered (lo ~ 0), but table indicates a cooling capacity, use it.
+        if abs(lo_s) <= eps and abs(lo_t) > eps:
+            bs["lower_bound"] = lo_t
+        # If SQL heating never triggered (hi ~ 0), but table indicates a heating capacity, use it.
+        if abs(hi_s) <= eps and abs(hi_t) > eps:
+            bs["upper_bound"] = hi_t
     with open(dst, "w", encoding="utf-8") as f:
         json.dump(bounds, f, indent=2, sort_keys=True)
 
@@ -835,7 +854,9 @@ def ActuatorBounds(sim_outputs: Path):
 def actuator_bounds_file(ep_path: Path, epjson: Path, epw: Path) -> Derivation:
     """Infer actuator bounds (from sizing outputs) for a given building+weather."""
     sim = run_simulation(ep_path, epjson, epw)
-    return ActuatorBounds(sim)
+    # NOTE: Derivation hashes in this project do not include function source code;
+    # bumping _version forces recomputation when the inference/merge logic changes.
+    return ActuatorBounds(sim, _version=2)
 
 
 def infer_actuator_bounds_from_sql(*, sql_path: Path) -> dict[str, dict[str, float]]:

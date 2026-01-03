@@ -6,7 +6,7 @@ defaults:
 
 hydra:
   run:
-    dir: outputs/${policy.type}/${now:%H-%M-%S}
+    dir: outputs/${policy.type}/${now:%d-%m-%Y}/${now:%H-%M-%S}
 
 env:
   normalize_obs: false
