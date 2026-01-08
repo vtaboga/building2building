@@ -330,6 +330,46 @@ def find_first_zone_air_temp_index(observation_names: list[str]) -> int:
     raise RuntimeError("Could not find a 'Zone Air Temperature' entry in observation_names")
 
 
+def find_controlled_zone_air_temp_index(
+    observation_names: list[str],
+    *,
+    controlled_zones: list[str] | None,
+) -> int:
+    """
+    Prefer a Zone Air Temperature observation that corresponds to a controlled zone.
+
+    This avoids accidentally controlling a temperature from an uncontrolled zone
+    (e.g., garage) when the HVAC does not serve that zone.
+    """
+    if not controlled_zones:
+        return find_first_zone_air_temp_index(observation_names)
+
+    controlled = {str(z).strip().lower() for z in controlled_zones if str(z).strip()}
+    if not controlled:
+        return find_first_zone_air_temp_index(observation_names)
+
+    prefix = "zone air temperature"
+    for i, name in enumerate(observation_names):
+        s = str(name).strip()
+        sl = s.lower()
+        if not sl.startswith(prefix):
+            continue
+        zone_part = sl[len(prefix) :].strip()
+        if zone_part in controlled:
+            return int(i)
+
+    # Fallback: best-effort substring match (for ontologies that decorate zone names).
+    for i, name in enumerate(observation_names):
+        sl = str(name).strip().lower()
+        if not sl.startswith(prefix):
+            continue
+        zone_part = sl[len(prefix) :].strip()
+        if any(z in zone_part or zone_part in z for z in controlled):
+            return int(i)
+
+    return find_first_zone_air_temp_index(observation_names)
+
+
 def find_action_index(action_names: list[str], component_type: str, control_type: str) -> int | None:
     ct = component_type.strip().lower()
     ctrl = control_type.strip().lower()
@@ -340,6 +380,39 @@ def find_action_index(action_names: list[str], component_type: str, control_type
         if parts[0].strip().lower() == ct and parts[1].strip().lower() == ctrl:
             return int(i)
     return None
+
+
+def find_action_indices(
+    action_names: list[str],
+    *,
+    component_type_prefix: str | None = None,
+    control_type: str | None = None,
+    component_name_contains: str | None = None,
+) -> list[int]:
+    """
+    Find all indices in `action_names` that match simple filters on the triplet
+    "{component_type}::{control_type}::{component_name}".
+    """
+    out: list[int] = []
+    ct_prefix = component_type_prefix.strip().lower() if component_type_prefix else None
+    ctrl = control_type.strip().lower() if control_type else None
+    name_sub = component_name_contains.strip().lower() if component_name_contains else None
+
+    for i, name in enumerate(action_names):
+        parts = str(name).split("::")
+        if len(parts) < 3:
+            continue
+        ct = parts[0].strip().lower()
+        c = parts[1].strip().lower()
+        cn = parts[2].strip().lower()
+        if ct_prefix is not None and not ct.startswith(ct_prefix):
+            continue
+        if ctrl is not None and c != ctrl:
+            continue
+        if name_sub is not None and name_sub not in cn:
+            continue
+        out.append(i)
+    return out
 
 
 def _make_policy(cfg: DictConfig, *, temp_obs_index: int, bounds: SensibleLoadBounds) -> Policy:
@@ -418,10 +491,10 @@ def _make_policy(cfg: DictConfig, *, temp_obs_index: int, bounds: SensibleLoadBo
 
 def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> RolloutPaths:
     """
-    Run a baseline rollout using Hydra config `configs/baseline.yaml`.
-
+    rollout a simulation with a baseline policy
     Expected to be launched under Hydra, so by default `run_dir` is `Path.cwd()`.
     """
+
     if run_dir is None:
         if HydraConfig.initialized():
             run_dir = Path(HydraConfig.get().runtime.output_dir)
@@ -438,7 +511,7 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
         obs_names = require_env_metadata_list_str(env, "observation_names")
         act_names = require_env_metadata_list_str(env, "action_names")
 
-        # Print action bounds early for debugging (especially inferred bounds from sizing outputs).
+        # Print action bounds for debugging.
         try:
             if hasattr(env, "action_space") and hasattr(env.action_space, "low") and hasattr(
                 env.action_space, "high"
@@ -454,25 +527,52 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
             logger.warning(f"Could not print action bounds: {e}")
 
         idx_load = find_action_index(act_names, "Unitary HVAC", "Sensible Load Request")
-        if idx_load is None:
-            raise RuntimeError(
-                "control_mode=sensible_load requires an action named "
-                "'Unitary HVAC::Sensible Load Request::<component>'"
-            )
-        if not hasattr(env, "action_space") or not hasattr(env.action_space, "low") or not hasattr(
-            env.action_space, "high"
-        ):
-            raise RuntimeError("env.action_space.low/high is required for action normalization")
-        lows = np.asarray(env.action_space.low, dtype=float).reshape(-1)
-        highs = np.asarray(env.action_space.high, dtype=float).reshape(-1)
-        if idx_load >= len(lows) or idx_load >= len(highs):
-            raise RuntimeError("idx_load out of bounds for env.action_space.low/high")
-        load_bounds = SensibleLoadBounds(low_w=float(lows[idx_load]), high_w=float(highs[idx_load]))
+        print(f"idx_load: {idx_load}")
 
-        temp_idx = find_first_zone_air_temp_index(obs_names)
-        policy = _make_policy(cfg, temp_obs_index=temp_idx, bounds=load_bounds)
+        if idx_load is None and find_action_index(act_names, "Zone Temperature Control", "Heating Setpoint") is None:
+            raise RuntimeError(
+                "Baseline controller requires either a 'Unitary HVAC::Sensible Load Request::<component>' "
+                "actuator or at least one Zone Temperature Control setpoint actuator."
+            )
+
+        load_bounds: SensibleLoadBounds | None = None
+        policy: Policy | None = None
+        if idx_load is not None:
+            if not hasattr(env, "action_space") or not hasattr(env.action_space, "low") or not hasattr(
+                env.action_space, "high"
+            ):
+                raise RuntimeError("env.action_space.low/high is required for action normalization")
+            lows = np.asarray(env.action_space.low, dtype=float).reshape(-1)
+            highs = np.asarray(env.action_space.high, dtype=float).reshape(-1)
+            if idx_load >= len(lows) or idx_load >= len(highs):
+                raise RuntimeError("idx_load out of bounds for env.action_space.low/high")
+            load_bounds = SensibleLoadBounds(
+                low_w=float(lows[idx_load]),
+                high_w=float(highs[idx_load]),
+            )
+
+            controlled_zones = None
+            try:
+                controlled_zones = require_env_metadata_list_str(env, "controlled_zones")
+            except Exception:
+                controlled_zones = None
+            temp_idx = find_controlled_zone_air_temp_index(
+                obs_names, controlled_zones=controlled_zones
+            )
+            policy = _make_policy(cfg, temp_obs_index=temp_idx, bounds=load_bounds)
+        else:
+            # Baseboard-only mode: select a controlled-zone temperature for thermostat logic.
+            controlled_zones = None
+            try:
+                controlled_zones = require_env_metadata_list_str(env, "controlled_zones")
+            except Exception:
+                controlled_zones = None
+            temp_idx = find_controlled_zone_air_temp_index(
+                obs_names, controlled_zones=controlled_zones
+            )
 
         idx_avail = find_action_index(act_names, "AirLoopHVAC", "Availability Status")
+
         idx_heat_sp = find_action_index(act_names, "Zone Temperature Control", "Heating Setpoint")
         idx_cool_sp = find_action_index(act_names, "Zone Temperature Control", "Cooling Setpoint")
 
@@ -489,29 +589,55 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
             step = 0
 
             while not done and step < max_steps:
-                load_pct_cmd, _ = policy.predict(obs, deterministic=True)
                 tz = float(np.asarray(obs, dtype=float).reshape(-1)[temp_idx])
+                target = float(cfg.policy.target_temp_c)
+                deadband = float(cfg.policy.deadband_c)
+
+                forced_mode = getattr(cfg.policy, "forced_mode", None)
+                if forced_mode is not None:
+                    forced_mode = str(forced_mode).strip().lower()
+
+                # Determine requested mode:
+                # - if forced, use that
+                # - else if we have a sensible-load actuator, use the policy output (pct sign)
+                # - else use a simple heat/cool/off thermostat based on target+deadband
+                load_pct = 0.0
+                if forced_mode in ("heat", "cool", "off"):
+                    mode = forced_mode
+                elif policy is not None:
+                    load_pct_cmd, _ = policy.predict(obs, deterministic=True)
+                    load_pct = float(np.asarray(load_pct_cmd, dtype=float).reshape(-1)[0])
+                    mode = "heat" if load_pct > 0.0 else ("cool" if load_pct < 0.0 else "off")
+                else:
+                    if tz < target - deadband:
+                        mode = "heat"
+                    elif tz > target + deadband:
+                        mode = "cool"
+                    else:
+                        mode = "off"
 
                 action_cmd = np.zeros((len(act_names),), dtype=float)
-                load_pct = float(np.asarray(load_pct_cmd, dtype=float).reshape(-1)[0])
-                action_cmd[idx_load] = float(load_bounds.pct_to_w(load_pct))
+                if idx_load is not None and load_bounds is not None:
+                    action_cmd[idx_load] = float(load_bounds.pct_to_w(load_pct))
 
                 if idx_avail is not None:
                     # Force CycleOn to keep the HVAC system available while using load request.
                     action_cmd[idx_avail] = float(getattr(cfg.policy, "availability_on", 2.0))
 
-                # Thermostat mode-enabler: nudge setpoints around current zone temp.
-                q = float(action_cmd[idx_load])
+                # Zone setpoint actuators: actions are interpreted as ΔT from current zone air temp
+                # (via SetpointDeltaActionWrapper in create_simulator).
+                #
+                # Therefore here we emit *deltas*, not absolute temperatures.
                 if idx_heat_sp is not None and idx_cool_sp is not None:
-                    if q > 0.0:
-                        action_cmd[idx_heat_sp] = tz + 0.5
-                        action_cmd[idx_cool_sp] = tz + 100.0
-                    elif q < 0.0:
-                        action_cmd[idx_heat_sp] = tz - 100.0
-                        action_cmd[idx_cool_sp] = tz - 0.5
+                    if mode == "heat":
+                        action_cmd[idx_heat_sp] = 0.5
+                        action_cmd[idx_cool_sp] = 30.0
+                    elif mode == "cool":
+                        action_cmd[idx_heat_sp] = -30.0
+                        action_cmd[idx_cool_sp] = -0.5
                     else:
-                        action_cmd[idx_heat_sp] = tz - 100.0
-                        action_cmd[idx_cool_sp] = tz + 100.0
+                        action_cmd[idx_heat_sp] = -30.0
+                        action_cmd[idx_cool_sp] = 30.0
 
                 obs2, reward, terminated, truncated, _info = env.step(action_cmd)
 
@@ -531,7 +657,8 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
                     if i < len(act_arr):
                         row[f"act::{name}"] = float(act_arr[i])
                 # Also log normalized sensible load request (pct) for easier interpretation.
-                row[f"act_pct::{act_names[idx_load]}"] = float(load_pct)
+                if idx_load is not None:
+                    row[f"act_pct::{act_names[idx_load]}"] = float(load_pct)
 
                 all_rows.append(row)
 

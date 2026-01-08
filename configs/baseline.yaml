@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - bldg: single_family
+  - bldg: baseboard_unitary_cooling
   - policy: on_off
   - reward: deadband
 

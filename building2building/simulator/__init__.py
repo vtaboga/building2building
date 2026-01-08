@@ -33,6 +33,7 @@ from building2building.types import (
 )
 
 from .transform_utils import TransformInverse
+from .wrappers import SetpointDeltaActionWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +159,8 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         "hvac_actuators": building_config.hvac_actuators,
     }
 
-    return gymenv
+    # Interpret setpoint actions as deltas from current zone temperature.
+    return SetpointDeltaActionWrapper(gymenv)
 
 
 def create_simulator_dict(building_config: BuildingConfig) -> EnergyPlusEnvironment:

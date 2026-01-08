@@ -173,20 +173,32 @@ def search_configs(
         except Exception:
             inferred_bounds = {}
 
-        # Action space is composed of zone temperature control setpoints, airloop availability, and sensible load request
-        # availability and setpoints are only used to ensure HVAC availability. 
-        # Sensible load is the only actuator that is used to control the zones temperature.
-        actuators = get_sensible_load_actuators(ems_file)
         hvac_actuators = get_hvac_actuators(ems_file)
-        availability = [
+
+        zone_setpoints = get_zone_temperature_control_actuators(ems_file)
+
+        # Always use stable ordering and deduplicate.
+        seen: set[str] = set()
+        actuators: list[dict[str, str]] = []
+
+        # Select relevant actuators
+        sensible = get_sensible_load_actuators(ems_file)
+        airloop_availability = [
             a
             for a in hvac_actuators
             if a.get("component_type") == "AirLoopHVAC"
             and a.get("control_type") == "Availability Status"
         ]
-        zone_setpoints = get_zone_temperature_control_actuators(ems_file)
-        # Prepend availability so action_names are stable/readable.
-        actuators = zone_setpoints + availability + actuators
+        candidates = zone_setpoints + airloop_availability + sensible
+
+        for a in candidates:
+            if not isinstance(a, dict):
+                continue
+            k = f"{a.get('component_type')}::{a.get('control_type')}::{a.get('component_name')}"
+            if k in seen:
+                continue
+            seen.add(k)
+            actuators.append(a)
 
         # Attach inferred bounds (if available) to each actuator dict so action space
         # construction can use the autosized ranges instead of heuristics.
@@ -201,6 +213,8 @@ def search_configs(
                     a["upper_bound"] = float(hi)
 
         reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
+        if not isinstance(reward_section, dict):
+            reward_section = {}
         reward_type = reward_section.get("reward_type")
 
         if reward_type == "DeadbandRewardConfig":
@@ -223,6 +237,9 @@ def search_configs(
             reward_config = BarrierRewardConfig(
                 energy_weight=energy_weight,
             )
+        elif reward_type is None:
+            # Back-compat / convenience: allow callers to omit reward config entirely.
+            reward_config = BaseRewardConfig(energy_weight=0.0)
         else:
             raise ValueError(f"Unknown reward type: {reward_type}")
 

@@ -11,7 +11,7 @@ import tempfile
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Literal, TypeAlias
+from typing import Any, Literal, TypeAlias
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -211,9 +211,9 @@ def AddOutdoorAirMeters(input: Path):
 @derivation("sensible-load-outputs")
 def AddSensibleLoadOutputs(input: Path):
     """
+    For dummy simulation.
     Ensure we request time-series outputs needed to infer sensible-load actuator bounds.
-
-    We rely on the EnergyPlus SQLite output (eplusout.sql) produced by the dummy simulation.
+    We rely on the EnergyPlus SQLite output (eplusout.sql).
     These Output:Variable entries are what populate the ReportData tables.
     """
     dst = OUTPUT.get()
@@ -266,7 +266,10 @@ def AddSensibleLoadOutputs(input: Path):
 
 @derivation("with-edd-output")
 def AddEDDOutput(input: Path):
-    """Ensure Output:EnergyManagementSystem is configured to generate .edd file."""
+    """
+    For dummy simulation.
+    Ensure Output:EnergyManagementSystem is configured to generate .edd file.
+    """
     dst = OUTPUT.get()
 
     with open(input, "r") as f:
@@ -307,7 +310,10 @@ def AddEDDOutput(input: Path):
 
 @derivation("with-tabular-output")
 def AddTabularOutput(input: Path):
-    """Ensure OutputControl:Files and OutputControl:Table:Style are configured to generate eplustbl.htm."""
+    """
+    For dummy simulation.
+    Ensure OutputControl:Files and OutputControl:Table:Style are configured to generate eplustbl.htm.
+    """
     dst = OUTPUT.get()
 
     with open(input, "r") as f:
@@ -351,6 +357,96 @@ def AddTabularOutput(input: Path):
 
     with open(dst, "w") as f:
         json.dump(epjson, f, indent=4)
+
+
+def _ensure_unique_object_name(existing: dict[str, Any], base: str) -> str:
+    """
+    Generate a unique key for an epJSON object map (e.g. Schedule:Constant),
+    given a desired base name.
+    """
+    name = base
+    if name not in existing:
+        return name
+    suffix = 2
+    while f"{base} {suffix}" in existing:
+        suffix += 1
+    return f"{base} {suffix}"
+
+
+def _resolve_onoff_schedule_type_limits_name(epjson: dict[str, Any]) -> str:
+    """
+    Return a ScheduleTypeLimits name suitable for a 0/1 availability schedule.
+    Creates one if none exist.
+    """
+    stl = epjson.setdefault("ScheduleTypeLimits", {})
+    if not isinstance(stl, dict):
+        raise TypeError("epjson['ScheduleTypeLimits'] must be a dict if present")
+
+    for preferred in ("OnOff", "OnOff 1", "On-Off", "On/Off"):
+        if preferred in stl:
+            return preferred
+
+    for k in stl.keys():
+        if "onoff" in str(k).replace(" ", "").lower():
+            return str(k)
+
+    if stl:
+        return str(next(iter(stl.keys())))
+
+    # Create a minimal discrete availability type limit.
+    name = "B2B OnOff"
+    stl[name] = {
+        "lower_limit_value": 0,
+        "upper_limit_value": 1,
+        "numeric_type": "Discrete",
+        "unit_type": "Availability",
+    }
+    return name
+
+
+@derivation("baseboard-availability-control")
+def AddBaseboardAvailabilityControl(input: Path) -> Path:
+    """
+    If the model contains ZoneHVAC:Baseboard:Convective:Electric, make each baseboard's
+    Availability Schedule uniquely controllable via EMS by assigning it a dedicated
+    Schedule:Constant (default=1).
+    """
+    dst = OUTPUT.get()
+
+    with open(input, "r", encoding="utf-8") as f:
+        epjson: dict[str, Any] = json.load(f)
+
+    baseboards = epjson.get("ZoneHVAC:Baseboard:Convective:Electric", {})
+    if not isinstance(baseboards, dict) or not baseboards:
+        with open(dst, "w", encoding="utf-8") as f:
+            json.dump(epjson, f, indent=4)
+        return dst
+
+    stl_name = _resolve_onoff_schedule_type_limits_name(epjson)
+    sched_const = epjson.setdefault("Schedule:Constant", {})
+    if not isinstance(sched_const, dict):
+        raise TypeError("epjson['Schedule:Constant'] must be a dict if present")
+
+    for bb_name, bb_obj_any in baseboards.items():
+        if not isinstance(bb_obj_any, dict):
+            continue
+
+        base_sched_name = f"B2B Baseboard Availability {bb_name}"
+        sched_name = _ensure_unique_object_name(sched_const, base_sched_name)
+
+        if sched_name not in sched_const:
+            sched_const[sched_name] = {
+                "hourly_value": 1,
+                "schedule_type_limits_name": stl_name,
+            }
+
+        bb_obj_any["availability_schedule_name"] = sched_name
+
+    with open(dst, "w", encoding="utf-8") as f:
+        json.dump(epjson, f, indent=4)
+    return dst
+
+
 
 
 @derivation("timestep")
@@ -682,7 +778,10 @@ def link_in_schedule(epjson_file: Path, csv_file: Path):
 
 @derivation("simulation-outputs")
 def run_simulation(ep_path: Path, epjson: Path, eps: Path):
-    """Run an EnergyPlus simulation and save the output files."""
+    """
+    Run an EnergyPlus simulation and save the output files.
+    Use to run a dummy simulation
+    """
     out = OUTPUT.get()
 
     tmp = Path(tempfile.mkdtemp())
@@ -720,6 +819,9 @@ def run_simulation(ep_path: Path, epjson: Path, eps: Path):
     shutil.copy(eio_file, out / "eplusout.eio")
     shutil.copy(sql_file, out / "eplusout.sql")
 
+###########################################################
+# Analyse dummy simulation outputs
+###########################################################
 
 def eplustbl(ep_path: Path, epjson: Path, epw: Path) -> Derivation:
     """Get the eplustbl.htm file from a simulation"""
@@ -1034,6 +1136,7 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
     - Unitary HVAC load request actuators (sensible/moisture), if present
     - AirTerminal mass flow rate controls
     - AirLoopHVAC availability status override (force system on/off)
+    - ZoneHVAC equipment actuators (e.g., PTAC, window AC, baseboards, etc.)
     
     Returns:
         List of dictionaries containing actuator information for get_actuator_handle().
@@ -1057,6 +1160,8 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
         "Unitary HVAC,Moisture Load Request",
         # Air loop availability override (ForceOff / CycleOn / CycleOnZoneFansOnly)
         "AirLoopHVAC,Availability Status",
+        # Zone equipment (cooling/heating terminals)
+        "ZoneHVAC:",
     ]
     
     # Lines to exclude (schedules, not direct HVAC equipment controls)
@@ -1108,6 +1213,8 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
             elif "coil" in line_lower and ("speed" in line_lower or "stage" in line_lower):
                 is_hvac = True
             elif "airloophvac," in line_lower and "availability status" in line_lower:
+                is_hvac = True
+            elif "zonehvac:" in line_lower:
                 is_hvac = True
         
         if is_hvac:
@@ -1178,6 +1285,59 @@ def get_sensible_load_actuators(edd_path: Path) -> list[dict[str, str]]:
         )
 
     return sensible_load_actuators
+
+
+def get_schedule_value_actuators(edd_path: Path) -> list[dict[str, str]]:
+    """
+    Extract schedule value actuators from an EnergyPlus `.edd` file.
+
+    These actuators are typically of the form:
+      EnergyManagementSystem:Actuator Available,<Schedule Name>,Schedule:*,Schedule Value,[ ]
+    """
+    out: list[dict[str, str]] = []
+    with open(edd_path, "r", encoding="utf-8", errors="ignore") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("!"):
+                continue
+            if "energymanagementsystem:actuator available" not in line.lower():
+                continue
+            if "schedule value" not in line.lower():
+                continue
+
+            parts = line.split(",", maxsplit=4)
+            if len(parts) < 5:
+                continue
+            component_type = parts[2].strip()
+            if not component_type.lower().startswith("schedule:"):
+                continue
+
+            out.append(
+                {
+                    "component_name": parts[1].strip(),
+                    "component_type": component_type,
+                    "control_type": parts[3].strip(),
+                    "units": parts[4].strip(),
+                }
+            )
+    return out
+
+
+def get_baseboard_availability_schedule_names(epjson: dict[str, Any]) -> list[str]:
+    """
+    Return availability schedule names used by ZoneHVAC:Baseboard:Convective:Electric objects.
+    """
+    baseboards = epjson.get("ZoneHVAC:Baseboard:Convective:Electric", {})
+    if not isinstance(baseboards, dict):
+        return []
+    names: list[str] = []
+    for _bb_name, bb_obj_any in baseboards.items():
+        if not isinstance(bb_obj_any, dict):
+            continue
+        sched = bb_obj_any.get("availability_schedule_name")
+        if isinstance(sched, str) and sched.strip():
+            names.append(sched.strip())
+    return names
 
 
 def get_zone_temperature_control_actuators(edd_path: Path) -> list[dict[str, str]]:

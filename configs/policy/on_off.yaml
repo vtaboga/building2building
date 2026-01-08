@@ -9,5 +9,3 @@ q_cool_pct: 0.8
 # Back-compat (deprecated): absolute watts. If provided, will be converted using inferred bounds.
 # q_heat_w: 1000.0
 # q_cool_w: 1000.0
-
-
