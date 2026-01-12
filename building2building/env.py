@@ -34,7 +34,7 @@ def get_cache_dir() -> Path:
         return Path(os.environ.get("LOCALAPPDATA", "~")) / "building2building"
     elif os.name == "posix":  # Linux/macOS
         # Prefer  scratch if any
-        for var in ("SCRATCH"):
+        for var in "SCRATCH":
             val = os.environ.get(var)
             if val:
                 return Path(val) / "building2building"
@@ -59,9 +59,7 @@ STORE_PATH: ContextVar[Path] = ContextVar("STORE_PATH")
 STORE_PATH.set(store_path())
 
 
-Platform = Literal["linux-x86_64"]
-GlibcVersion = Literal["2.35", "2.38"]
-
+Platform = Literal["linux-x86_64", "macosx-15.6-arm64"]
 
 # Note to future selves: under linux, the main constraint on the binary we use
 # is the distribution's glibc version. Because glibc is backwards-compatible, it
@@ -79,18 +77,30 @@ binaries: dict[Platform, Derivation] = {
             )
         ),
         "EnergyPlus-25.1.0-68a4a7c774-Linux-Ubuntu22.04-x86_64",
-    )
+    ),
+    "macosx-15.6-arm64": ChildFile(
+        ExtractTarball(
+            DownloadFile(
+                "energyplus-25.1.0",
+                "https://github.com/NREL/EnergyPlus/releases/download/v25.1.0/EnergyPlus-25.1.0-68a4a7c774-Darwin-macOS13-arm64.tar.gz",
+                bytes.fromhex(
+                    "fdd54d1450cbefbd572f4c2f3e3230b50af912d889333af2c8fd679a5ad9f088"
+                ),
+            )
+        ),
+        "EnergyPlus-25.1.0-68a4a7c774-Darwin-macOS13-arm64",
+    ),
 }
 
 
 def energyplus_path() -> Realizable:
-    current_platform: Platform = sysconfig.get_platform()  # type: ignore
-    assert current_platform in get_args(Platform)
-
     if p := os.getenv("ENERGYPLUS_PATH"):
         path = Path(p).resolve()
         return LocalSymlink("energyplus-path", path)
     else:
+        current_platform: Platform = sysconfig.get_platform()  # type: ignore
+        assert current_platform in get_args(Platform)
+
         return binaries[current_platform]
 
 
