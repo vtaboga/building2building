@@ -9,16 +9,6 @@ defaults:
 
 env:
   normalize_obs: true
-  # Which action space to use:
-  # - thermostat_setpoints: control zone heating/cooling setpoint schedules
-  # - hvac_actuators: control HVAC actuators parsed from EnergyPlus .edd
-  control_mode: hvac_actuators
-  # For hvac_actuators control mode, choose the agent-facing action space:
-  # - box: continuous Box (floats)
-  # - multidiscrete: MultiDiscrete (integer categories), with continuous dims binned
-  hvac_action_space: box
-  # Number of bins for each continuous actuator dimension when using MultiDiscrete.
-  n_bins_continuous: 21
 
 n_episodes: 1
 

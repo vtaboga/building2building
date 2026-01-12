@@ -27,6 +27,7 @@ outputs/
 uv.lock
 multirun/
 jobs_logs/
+docs/ 
 
 # temporary
 simulator/patched_minergym_simulation.py

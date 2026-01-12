@@ -31,6 +31,4 @@ class BuildingConfig:
     eplus_output_dir: Path
     warmup_phases: int
     area: float
-    hvac_actuators: list[dict[str, str]] = field(default_factory=list)
-    hvac_action_space: Literal["box", "multidiscrete"] = "box"
-    n_bins_continuous: int = 21
+    hvac_actuators: list[dict[str, str]]

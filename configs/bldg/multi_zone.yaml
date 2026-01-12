@@ -1,0 +1,4 @@
+bldg:
+  geometry_unit_type: "apartment unit"
+  geometry_building_num_units: 3
+  year_built: 2015

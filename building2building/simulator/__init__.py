@@ -13,7 +13,6 @@ from minergym.simulation import EnergyPlusSimulation
 from building2building.simulator.action_spaces import (
     get_controllable_setpoints,
     hvac_actuators_transform,
-    hvac_actuators_multidiscrete_transform,
     many_thermostats_transform,
     many_thermostats_transform_dict,
 )
@@ -34,6 +33,7 @@ from building2building.types import (
 )
 
 from .transform_utils import TransformInverse
+from .wrappers import SetpointDeltaActionWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -97,22 +97,12 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     # Then the action side stuff
     setpoints = get_controllable_setpoints(ont)
 
-    if building_config.hvac_actuators:
-        if building_config.hvac_action_space == "multidiscrete":
-            action_transform = hvac_actuators_multidiscrete_transform(
-                building_config.hvac_actuators,
-                n_bins_continuous=int(building_config.n_bins_continuous),
-            )
-        else:
-            action_transform = hvac_actuators_transform(building_config.hvac_actuators)
-        action_names = [
-            f"{a['component_type']}::{a['control_type']}::{a['component_name']}"
-            for a in building_config.hvac_actuators
-        ]
-    else:
-        thermostat_list = list(itertools.chain(*setpoints.values()))
-        action_transform = many_thermostats_transform(thermostat_list)
-        action_names = []
+    action_transform = hvac_actuators_transform(building_config.hvac_actuators)
+    action_names = [
+        f"{a['component_type']}::{a['control_type']}::{a['component_name']}"
+        for a in building_config.hvac_actuators
+    ]
+
 
     make_energyplus = MakeEnergyPlus(
         building_config.path_to_building,
@@ -169,7 +159,8 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         "hvac_actuators": building_config.hvac_actuators,
     }
 
-    return gymenv
+    # Interpret setpoint actions as deltas from current zone temperature.
+    return SetpointDeltaActionWrapper(gymenv)
 
 
 def create_simulator_dict(building_config: BuildingConfig) -> EnergyPlusEnvironment:

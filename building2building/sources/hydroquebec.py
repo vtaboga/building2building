@@ -9,11 +9,14 @@ import duckdb
 from building2building import pipeline
 from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import (
+    actuator_bounds_file,
     create_complete_pipeline,
     eplustbl,
     eddfile,
     get_net_conditioned_area,
     get_hvac_actuators,
+    get_sensible_load_actuators,
+    get_zone_temperature_control_actuators,
     get_warmup_days,
     link_in_schedule,
 )
@@ -91,15 +94,12 @@ def search_buildings(**query) -> DataFrame:
     index = realize(STORE_PATH.get(), table_index())
     ep = energyplus_path()
 
-    include_setpoint_control = bool(query.pop("include_setpoint_control", True))
-
     def trans(idf_path, schedule_path):
         return lambda: link_in_schedule(
             create_complete_pipeline(
                 Constant(Path(idf_path)),
                 ep,
                 src_version="24.2.0",
-                include_setpoint_control=include_setpoint_control,
             ),
             Path(schedule_path),
         )
@@ -152,116 +152,8 @@ def search_configs(
         config_nn = config_nn["bldg"]
     ep_path = energyplus_path()
 
-    env_cfg = cfg.get("env", {}) if isinstance(cfg, dict) else {}
-
-    # Control mode must be explicitly configured; do not silently fall back.
-    if env_cfg.get("hvac_control_mode") is not None and "control_mode" not in env_cfg:
-        raise ValueError(
-            "env.control_mode must be explicitly set (no defaults). "
-            "Found legacy key env.hvac_control_mode; please migrate to env.control_mode "
-            "with one of: 'thermostat_setpoints', 'hvac_actuators'."
-        )
-    if "control_mode" not in env_cfg:
-        raise ValueError(
-            "env.control_mode must be explicitly set (no defaults). "
-            "Choose one of: 'thermostat_setpoints', 'hvac_actuators'."
-        )
-    control_mode = env_cfg.get("control_mode")
-    if not isinstance(control_mode, str):
-        raise TypeError("env.control_mode must be a string")
-    if control_mode not in ("thermostat_setpoints", "hvac_actuators"):
-        raise ValueError(
-            "env.control_mode must be one of: 'thermostat_setpoints', 'hvac_actuators'. "
-            f"Got: {control_mode}"
-        )
-    if control_mode == "thermostat_setpoints":
-        raise ValueError(
-            "env.control_mode='thermostat_setpoints' is deprecated and must not be used. "
-            "Use env.control_mode='hvac_actuators'."
-        )
-
-    hvac_action_space = env_cfg.get("hvac_action_space", "box")
-    if hvac_action_space not in ("box", "multidiscrete"):
-        raise ValueError(
-            "env.hvac_action_space must be one of: 'box', 'multidiscrete'. "
-            f"Got: {hvac_action_space}"
-        )
-    n_bins_continuous = int(env_cfg.get("n_bins_continuous", 21))
-    if n_bins_continuous <= 1:
-        raise ValueError("env.n_bins_continuous must be >= 2")
-
-    def _filter_for_hvac_component_control(
-        actuators: list[dict[str, str]],
-    ) -> list[dict[str, str]]:
-        """
-        Keep only the small set of actuators we actively command for direct HVAC control.
-
-        Important: `hvac_actuators_transform()` will *set every actuator we include*.
-        Including "multiplier" style actuators (e.g., frost multipliers) and leaving
-        them at the default (0.0) can unintentionally zero out heating/cooling output.
-        """
-
-        keep: list[dict[str, str]] = []
-        for a in actuators:
-            ct = a.get("component_type", "")
-            ctrl = a.get("control_type", "")
-
-            # Air loop availability override (force system on)
-            if ct == "AirLoopHVAC" and ctrl == "Availability Status":
-                keep.append(a)
-                continue
-
-            # Fan air mass flow override
-            if ct == "Fan" and ctrl == "Fan Air Mass Flow Rate":
-                keep.append(a)
-                continue
-
-            # Terminal mass flow override (deliver air to zone)
-            if ct.startswith("AirTerminal:") and ctrl == "Mass Flow Rate":
-                keep.append(a)
-                continue
-
-            # Unitary coil speed + supplemental stage control
-            if ct == "Coil Speed Control" and ctrl in (
-                "Unitary System DX Coil Speed Value",
-                "Unitary System Supplemental Coil Stage Level",
-            ):
-                keep.append(a)
-                continue
-
-            # Direct load request (bypasses thermostat demand for supported unitary systems)
-            if ct == "Unitary HVAC" and ctrl in ("Sensible Load Request", "Moisture Load Request"):
-                keep.append(a)
-                continue
-
-        return keep
-
-    # Optional override: allow scripts/configs to force setpoint control rewrite.
-    include_setpoint_control_cfg = env_cfg.get("include_setpoint_control")
-    if include_setpoint_control_cfg is not None and not isinstance(
-        include_setpoint_control_cfg, bool
-    ):
-        raise TypeError("env.include_setpoint_control must be a bool if provided")
-
-    if include_setpoint_control_cfg is None:
-        # Default behavior: if we intend to control HVAC components directly, avoid
-        # rewriting thermostat schedules in the pipeline (it can force HVAC off for
-        # some models).
-        include_setpoint_control = control_mode == "thermostat_setpoints"
-    else:
-        include_setpoint_control = include_setpoint_control_cfg
-
-    if control_mode == "hvac_actuators" and include_setpoint_control:
-        raise ValueError(
-            "env.include_setpoint_control must be false when env.control_mode='hvac_actuators'. "
-            "The pipeline's setpoint rewrite sets extreme thermostat schedules (10C heating / "
-            "40C cooling), which suppresses heating/cooling demand for most conditions and "
-            "makes HVAC actuator commands appear ineffective."
-        )
-
-    rows = search_buildings(
-        **config_nn, include_setpoint_control=include_setpoint_control
-    )
+    rows = search_buildings(**config_nn)
+    
     configs: list[BuildingConfig] = []
     for _, row in itertools.islice(rows.iterrows(), n):
         epw = Path(row.epw_path)  # use the weather file for THIS building
@@ -274,21 +166,61 @@ def search_configs(
 
         # Search actuators
         ems_file = realize(STORE_PATH.get(), eddfile(ep_path, derivation, epw))
+        bounds_file = realize(STORE_PATH.get(), actuator_bounds_file(ep_path, derivation, epw))
+        try:
+            with open(bounds_file, "r", encoding="utf-8") as f:
+                inferred_bounds: dict[str, dict[str, float]] = json.load(f)
+        except Exception:
+            inferred_bounds = {}
+
         hvac_actuators = get_hvac_actuators(ems_file)
-        if control_mode == "hvac_actuators":
-            hvac_actuators = _filter_for_hvac_component_control(hvac_actuators)
+
+        zone_setpoints = get_zone_temperature_control_actuators(ems_file)
+
+        # Always use stable ordering and deduplicate.
+        seen: set[str] = set()
+        actuators: list[dict[str, str]] = []
+
+        # Select relevant actuators
+        sensible = get_sensible_load_actuators(ems_file)
+        airloop_availability = [
+            a
+            for a in hvac_actuators
+            if a.get("component_type") == "AirLoopHVAC"
+            and a.get("control_type") == "Availability Status"
+        ]
+        candidates = zone_setpoints + airloop_availability + sensible
+
+        for a in candidates:
+            if not isinstance(a, dict):
+                continue
+            k = f"{a.get('component_type')}::{a.get('control_type')}::{a.get('component_name')}"
+            if k in seen:
+                continue
+            seen.add(k)
+            actuators.append(a)
+
+        # Attach inferred bounds (if available) to each actuator dict so action space
+        # construction can use the autosized ranges instead of heuristics.
+        for a in actuators:
+            key = f"{a.get('component_type')}::{a.get('control_type')}::{a.get('component_name')}"
+            b = inferred_bounds.get(key)
+            if isinstance(b, dict):
+                lo = b.get("lower_bound")
+                hi = b.get("upper_bound")
+                if isinstance(lo, (int, float)) and isinstance(hi, (int, float)):
+                    a["lower_bound"] = float(lo)
+                    a["upper_bound"] = float(hi)
 
         reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
+        if not isinstance(reward_section, dict):
+            reward_section = {}
         reward_type = reward_section.get("reward_type")
 
-        # Sensible defaults if reward is not configured
-        if reward_type is None:
-            reward_type = "DeadbandRewardConfig"
-
         if reward_type == "DeadbandRewardConfig":
-            energy_weight = reward_section.get("energy_weight", 0.1)
-            target_temp = reward_section.get("target_temp", 21.0)
-            dT = reward_section.get("dT", 0.5)
+            energy_weight = reward_section.get("energy_weight")
+            target_temp = reward_section.get("target_temp")
+            dT = reward_section.get("dT")
             reward_config = DeadbandRewardConfig(
                 area=area,
                 energy_weight=energy_weight,
@@ -296,15 +228,18 @@ def search_configs(
                 dT=dT,
             )
         elif reward_type == "BaseRewardConfig":
-            energy_weight = reward_section.get("energy_weight", 1.0)
+            energy_weight = reward_section.get("energy_weight")
             reward_config = BaseRewardConfig(
                 energy_weight=energy_weight,
             )
         elif reward_type == "BarrierRewardConfig":
-            energy_weight = reward_section.get("energy_weight", 1.0)
+            energy_weight = reward_section.get("energy_weight")
             reward_config = BarrierRewardConfig(
                 energy_weight=energy_weight,
             )
+        elif reward_type is None:
+            # Back-compat / convenience: allow callers to omit reward config entirely.
+            reward_config = BaseRewardConfig(energy_weight=0.0)
         else:
             raise ValueError(f"Unknown reward type: {reward_type}")
 
@@ -313,12 +248,10 @@ def search_configs(
                 path_to_building=epjson,
                 path_to_weather=epw,
                 reward_config=reward_config,
-                hvac_actuators=hvac_actuators,
+                hvac_actuators=actuators,
                 eplus_output_dir=eplus_output_dir,
                 warmup_phases=1,  # keep consistent with existing search_config
-                area=area,
-                hvac_action_space=hvac_action_space,
-                n_bins_continuous=n_bins_continuous,
+                area=area
             )
         )
 
