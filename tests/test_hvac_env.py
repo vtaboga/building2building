@@ -6,7 +6,7 @@ import numpy as np
 
 from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import (
-    get_hvac_actuators,
+    get_airflow_and_coil_node_setpoint_actuators,
     get_net_conditioned_area,
 )
 from building2building.simulator import create_simulator
@@ -30,9 +30,9 @@ def test_create_gym_env_with_hvac_actuators():
     assert edd_path.exists(), f"EDD file not found: {edd_path}"
     assert htm_path.exists(), f"HTML file not found: {htm_path}"
     
-    # Get HVAC actuators from .edd file
-    hvac_actuators = get_hvac_actuators(edd_path)
-    print(f"\nFound {len(hvac_actuators)} HVAC actuators:")
+    # Get the target HVAC actuators from .edd file (fan airflow + coil node setpoints + availability)
+    hvac_actuators = get_airflow_and_coil_node_setpoint_actuators(edd_path)
+    print(f"\nFound {len(hvac_actuators)} airflow/setpoint HVAC actuators:")
     for i, actuator in enumerate(hvac_actuators, 1):
         print(f"{i}. {actuator['component_name']} ({actuator['component_type']})")
     

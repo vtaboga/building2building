@@ -1,7 +1,7 @@
 defaults:
   - _self_
-  - bldg: baseboard_unitary_cooling
-  - policy: on_off
+  - bldg: single_family
+  - policy: fan_coil_constant
   - reward: deadband
 
 hydra:

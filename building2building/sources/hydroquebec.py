@@ -9,13 +9,17 @@ import duckdb
 from building2building import pipeline
 from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import (
-    actuator_bounds_file,
     create_complete_pipeline,
+    create_control_pipeline,
+    create_discovery_pipeline,
     eplustbl,
     eddfile,
+    get_b2b_scheduled_node_setpoint_actuators,
+    get_b2b_scheduled_setpoint_schedule_names,
+    get_unitary_air_outlet_node_names,
     get_net_conditioned_area,
+    get_airflow_and_coil_node_setpoint_actuators,
     get_hvac_actuators,
-    get_sensible_load_actuators,
     get_zone_temperature_control_actuators,
     get_warmup_days,
     link_in_schedule,
@@ -39,6 +43,40 @@ from pandas import DataFrame
 import itertools
 
 logger = logging.getLogger(__name__)
+
+
+def _build_discovery_derivation(
+    idf_path: str,
+    schedule_path: str,
+    ep: Derivation,
+) -> Derivation:
+    """
+    Build the epJSON used for dummy discovery simulations (.edd / eplustbl).
+
+    This must keep thermostat/load control intact.
+    """
+    return link_in_schedule(
+        create_discovery_pipeline(
+            Constant(Path(idf_path)),
+            ep,
+            src_version="24.2.0",
+        ),
+        Path(schedule_path),
+    )
+
+
+def _build_control_derivation(
+    idf_path: str,
+    schedule_path: str,
+    ep: Derivation,
+) -> Derivation:
+    """
+    Build the epJSON used for training/control runs.
+
+    This applies setpoint control to unitary systems (airflow + node setpoints).
+    """
+    discovery = _build_discovery_derivation(idf_path, schedule_path, ep)
+    return create_control_pipeline(discovery)
 
 
 def extracted() -> Derivation:
@@ -95,14 +133,7 @@ def search_buildings(**query) -> DataFrame:
     ep = energyplus_path()
 
     def trans(idf_path, schedule_path):
-        return lambda: link_in_schedule(
-            create_complete_pipeline(
-                Constant(Path(idf_path)),
-                ep,
-                src_version="24.2.0",
-            ),
-            Path(schedule_path),
-        )
+        return lambda: _build_control_derivation(str(idf_path), str(schedule_path), ep)
 
     db = duckdb.from_parquet(str(index))
 
@@ -160,57 +191,56 @@ def search_configs(
         derivation = row.derivation_thunk()
         epjson = realize(STORE_PATH.get(), derivation)
 
-        metrics_path = realize(STORE_PATH.get(), eplustbl(ep_path, derivation, epw))
+        # Dummy/discovery simulation must use the load-controlled model, not the
+        # control-ready (SetPoint) one.
+        discovery_derivation = _build_discovery_derivation(
+            str(row.idf_path),
+            str(row.schedule_path),
+            ep_path,
+        )
+
+        metrics_path = realize(
+            STORE_PATH.get(), eplustbl(ep_path, discovery_derivation, epw)
+        )
         area = get_net_conditioned_area(metrics_path)
         # warmup_phases = get_warmup_days(metrics_path)
 
         # Search actuators
-        ems_file = realize(STORE_PATH.get(), eddfile(ep_path, derivation, epw))
-        bounds_file = realize(STORE_PATH.get(), actuator_bounds_file(ep_path, derivation, epw))
-        try:
-            with open(bounds_file, "r", encoding="utf-8") as f:
-                inferred_bounds: dict[str, dict[str, float]] = json.load(f)
-        except Exception:
-            inferred_bounds = {}
+        ems_file = realize(
+            STORE_PATH.get(), eddfile(ep_path, discovery_derivation, epw)
+        )
+        # Control mode: fan airflow rate + (scheduled) node temperature setpoints + availability.
+        #
+        # We drive node setpoints via SetpointManager:Scheduled + Schedule:Constant schedules
+        # (and actuate the schedule values), because directly actuating System Node Setpoints
+        # can be overwritten by setpoint managers later in the timestep.
+        epjson_data = json.loads(Path(epjson).read_text(encoding="utf-8"))
 
-        hvac_actuators = get_hvac_actuators(ems_file)
+        schedules = get_b2b_scheduled_setpoint_schedule_names(epjson_data)
+        schedule_actuators = get_b2b_scheduled_node_setpoint_actuators(
+            ems_file, schedule_names=schedules
+        )
 
-        zone_setpoints = get_zone_temperature_control_actuators(ems_file)
-
-        # Always use stable ordering and deduplicate.
-        seen: set[str] = set()
-        actuators: list[dict[str, str]] = []
-
-        # Select relevant actuators
-        sensible = get_sensible_load_actuators(ems_file)
-        airloop_availability = [
+        # Still include fan airflow and airloop availability from the .edd.
+        base = get_airflow_and_coil_node_setpoint_actuators(ems_file)
+        base_filtered = [
             a
-            for a in hvac_actuators
-            if a.get("component_type") == "AirLoopHVAC"
-            and a.get("control_type") == "Availability Status"
+            for a in base
+            if (a.get("component_type") == "Fan" and a.get("control_type") == "Fan Air Mass Flow Rate")
+            or (a.get("component_type") == "AirLoopHVAC" and a.get("control_type") == "Availability Status")
         ]
-        candidates = zone_setpoints + airloop_availability + sensible
 
-        for a in candidates:
-            if not isinstance(a, dict):
-                continue
-            k = f"{a.get('component_type')}::{a.get('control_type')}::{a.get('component_name')}"
-            if k in seen:
-                continue
-            seen.add(k)
-            actuators.append(a)
-
-        # Attach inferred bounds (if available) to each actuator dict so action space
-        # construction can use the autosized ranges instead of heuristics.
-        for a in actuators:
-            key = f"{a.get('component_type')}::{a.get('control_type')}::{a.get('component_name')}"
-            b = inferred_bounds.get(key)
-            if isinstance(b, dict):
-                lo = b.get("lower_bound")
-                hi = b.get("upper_bound")
-                if isinstance(lo, (int, float)) and isinstance(hi, (int, float)):
-                    a["lower_bound"] = float(lo)
-                    a["upper_bound"] = float(hi)
+        actuators = base_filtered + schedule_actuators
+        if not actuators:
+            # Provide context to debug why a building can't be controlled with this mode.
+            hvac_all = get_hvac_actuators(ems_file)
+            raise RuntimeError(
+                "Could not find any airflow/setpoint actuators in .edd. "
+                f"Found {len(hvac_all)} other HVAC actuators; "
+                "ensure the model exposes Fan Air Mass Flow Rate, "
+                "System Node Setpoint/Temperature Setpoint for coil nodes, "
+                "and AirLoopHVAC Availability Status."
+            )
 
         reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
         if not isinstance(reward_section, dict):

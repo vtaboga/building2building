@@ -118,6 +118,11 @@ def _hvac_actuator_bounds(actuator: dict[str, str]) -> tuple[float, float]:
     if "zone temperature control" in component_type and "setpoint" in control_type:
         # Wide enough to cover typical setpoints and "mode forcing" values.
         return -50.0, 50.0
+
+    # System node setpoint temperature setpoint ([C]) used for coil control.
+    if "system node setpoint" in component_type and control_type == "temperature setpoint":
+        # Conservative absolute temperature range in Celsius.
+        return 0.0, 50.0
     return 0.0, 1.0
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,276 +15,6 @@ from omegaconf import DictConfig, OmegaConf
 from algorithms.utils import make_env, plot_timeseries
 
 logger = logging.getLogger(__name__)
-
-
-class Policy(ABC):
-    @abstractmethod
-    def predict(self, observation: Any, deterministic: bool = True) -> tuple[np.ndarray, Any]:
-        raise NotImplementedError
-
-
-class ConstantPolicy(Policy):
-    """Dummy policy that always returns the same action."""
-
-    def __init__(self, actions: Any = None):
-        self.actions: Any = actions
-
-    def set_actions(self, actions: Any) -> None:
-        print(f"setting actions: {actions}")
-        self.actions = actions
-
-    def predict(self, observation: Any, deterministic: bool = True) -> tuple[Any, None]:
-        return self.actions, None
-
-
-class ConstantSetPoints(Policy):
-    def __init__(self, heating_setpoint: float, delta_setpoint: float):
-        self.heating_setpoint = heating_setpoint
-        self.delta_setpoint = delta_setpoint
-
-    def predict(self, observation: Any, deterministic: bool = True) -> tuple[list[float], None]:
-        action = [self.heating_setpoint, self.delta_setpoint]
-        return action, None
-
-
-@dataclass(frozen=True)
-class SensibleLoadBounds:
-    """
-    Helper to convert between absolute sensible-load request [W] and normalized percent [-1, 1].
-
-    Convention:
-    - pct in [0, 1] maps to heating in [0, high_w]
-    - pct in [-1, 0) maps to cooling in [low_w, 0)
-    """
-
-    low_w: float
-    high_w: float
-
-    def __post_init__(self) -> None:
-        lo = float(self.low_w)
-        hi = float(self.high_w)
-        if not np.isfinite(lo) or not np.isfinite(hi):
-            raise ValueError(f"Non-finite load bounds: low_w={lo}, high_w={hi}")
-        # Allow one-sided or degenerate bounds (e.g. unconditioned buildings),
-        # but preserve sign convention when present.
-        if hi < 0.0:
-            raise ValueError(f"Expected non-negative heating bound (high_w), got {hi}")
-        if lo > 0.0:
-            raise ValueError(f"Expected non-positive cooling bound (low_w), got {lo}")
-
-    def w_to_pct(self, q_w: float) -> float:
-        q = float(q_w)
-        if q >= 0.0:
-            hi = float(self.high_w)
-            if hi <= 0.0:
-                return 0.0
-            return float(np.clip(q / hi, 0.0, 1.0))
-        lo = float(self.low_w)
-        if lo >= 0.0:
-            return 0.0
-        denom = abs(lo)
-        if denom <= 0.0:
-            return 0.0
-        return float(np.clip(q / denom, -1.0, 0.0))
-
-    def pct_to_w(self, pct: float) -> float:
-        p = float(np.clip(float(pct), -1.0, 1.0))
-        if p >= 0.0:
-            hi = float(self.high_w)
-            if hi <= 0.0:
-                return 0.0
-            return float(p * hi)
-        # p < 0 => negative cooling request
-        lo = float(self.low_w)
-        if lo >= 0.0:
-            return 0.0
-        return float(p * abs(lo))
-
-
-@dataclass(frozen=True)
-class OnOffSensibleLoadPolicy(Policy):
-    """
-    Simple thermostat-like on/off controller for a 1D action space:
-    "Unitary HVAC :: Sensible Load Request" expressed as normalized percent [-1, 1].
-
-    Positive = heating request, negative = cooling request, 0 = off.
-    """
-
-    target_temp_c: float
-    deadband_c: float
-    q_heat_pct: float
-    q_cool_pct: float
-    temp_obs_index: int
-    last_mode: str = "off"
-
-    def predict(self, observation: Any, deterministic: bool = True) -> tuple[np.ndarray, None]:
-        obs = np.asarray(observation, dtype=float).reshape(-1)
-        tz = float(obs[self.temp_obs_index])
-
-        if tz < self.target_temp_c - self.deadband_c:
-            object.__setattr__(self, "last_mode", "heat")
-            return np.asarray([float(self.q_heat_pct)], dtype=float), None
-        if tz > self.target_temp_c + self.deadband_c:
-            object.__setattr__(self, "last_mode", "cool")
-            return np.asarray([-abs(float(self.q_cool_pct))], dtype=float), None
-
-        object.__setattr__(self, "last_mode", "off")
-        return np.asarray([0.0], dtype=float), None
-
-
-@dataclass(slots=True)
-class PIDSensibleLoadPolicy(Policy):
-    """
-    PID controller for a 1D action space: "Unitary HVAC :: Sensible Load Request"
-    expressed as normalized percent [-1, 1] (mapped to W via inferred actuator bounds).
-
-    Sign convention:
-    - Positive output requests heating
-    - Negative output requests cooling
-
-    Notes:
-    - This policy assumes the observation contains a zone air temperature at `temp_obs_index`.
-    - `dt_s` is the control interval in seconds. If you're stepping at fixed timestep,
-      leave it constant. If unknown, leaving it at 1.0 still yields a stable controller
-      after retuning gains.
-    """
-
-    target_temp_c: float
-    deadband_c: float
-    temp_obs_index: int
-
-    # PID gains on error e = target - tz
-    kp: float
-    ki: float
-    kd: float
-
-    # Output saturation (percent in [0, 1])
-    q_heat_max_pct: float
-    q_cool_max_pct: float
-
-    # Bounds used to normalize (W <-> pct)
-    bounds: SensibleLoadBounds
-
-    # Control interval
-    dt_s: float = 1.0
-
-    # Anti-windup: clamp integral of error (in C*s)
-    integral_min: float = -1e6
-    integral_max: float = 1e6
-
-    # State
-    integral: float = 0.0
-    prev_error: float | None = None
-    last_mode: str = "off"
-
-    def predict(self, observation: Any, deterministic: bool = True) -> tuple[np.ndarray, None]:
-        obs = np.asarray(observation, dtype=float).reshape(-1)
-        tz = float(obs[self.temp_obs_index])
-        error = float(self.target_temp_c - tz)
-
-        # Deadband: explicitly off. Also bleed integral slowly to avoid latch-up.
-        if abs(error) <= float(self.deadband_c):
-            self.integral *= 0.9
-            object.__setattr__(self, "last_mode", "off")
-            object.__setattr__(self, "prev_error", error)
-            return np.asarray([0.0], dtype=float), None
-
-        dt = float(self.dt_s)
-        if dt <= 0:
-            raise ValueError("dt_s must be > 0")
-
-        # Integrate error
-        self.integral = float(self.integral + error * dt)
-        self.integral = float(np.clip(self.integral, self.integral_min, self.integral_max))
-
-        # Derivative
-        if self.prev_error is None:
-            d_error = 0.0
-        else:
-            d_error = float((error - self.prev_error) / dt)
-
-        u_w = float(self.kp * error + self.ki * self.integral + self.kd * d_error)
-        u_pct = float(self.bounds.w_to_pct(u_w))
-
-        # Saturate to requested percent caps (still within [-1, 1]).
-        u_pct = float(np.clip(u_pct, -abs(self.q_cool_max_pct), abs(self.q_heat_max_pct)))
-
-        object.__setattr__(self, "prev_error", error)
-        object.__setattr__(self, "last_mode", "heat" if u_pct > 0 else "cool")
-        return np.asarray([u_pct], dtype=float), None
-
-
-@dataclass(slots=True)
-class TrimAndRespondSensibleLoadPolicy(Policy):
-    """
-    Trim-and-Respond controller for a sensible load request actuator.
-
-    Control idea:
-    - Maintain an internal "current load request" (W).
-    - If temperature is outside deadband, "respond" by stepping load up/down.
-    - If temperature is inside deadband, "trim" the load back toward zero.
-
-    This is often easier to tune than PID for systems with long time constants.
-    """
-
-    target_temp_c: float
-    deadband_c: float
-    temp_obs_index: int
-
-    # Step sizes (percent) for response and trim
-    respond_step_pct: float
-    trim_step_pct: float
-
-    # Output saturation (percent)
-    q_heat_max_pct: float
-    q_cool_max_pct: float
-
-    # State
-    current_load_pct: float = 0.0
-    last_mode: str = "off"
-
-    def predict(self, observation: Any, deterministic: bool = True) -> tuple[np.ndarray, None]:
-        obs = np.asarray(observation, dtype=float).reshape(-1)
-        tz = float(obs[self.temp_obs_index])
-        err = float(self.target_temp_c - tz)
-
-        if abs(err) <= float(self.deadband_c):
-            # Trim toward 0
-            if self.current_load_pct > 0.0:
-                self.current_load_pct = max(
-                    0.0,
-                    float(self.current_load_pct) - abs(float(self.trim_step_pct)),
-                )
-            elif self.current_load_pct < 0.0:
-                self.current_load_pct = min(
-                    0.0,
-                    float(self.current_load_pct) + abs(float(self.trim_step_pct)),
-                )
-            object.__setattr__(
-                self,
-                "last_mode",
-                "off" if float(self.current_load_pct) == 0.0 else self.last_mode,
-            )
-            return np.asarray([float(self.current_load_pct)], dtype=float), None
-
-        # Respond: step in the direction of the error
-        if err > 0.0:
-            step_pct = abs(float(self.respond_step_pct))
-            self.current_load_pct = float(self.current_load_pct + step_pct)
-            self.current_load_pct = float(
-                min(self.current_load_pct, abs(float(self.q_heat_max_pct)))
-            )
-            object.__setattr__(self, "last_mode", "heat")
-        else:
-            step_pct = abs(float(self.respond_step_pct))
-            self.current_load_pct = float(self.current_load_pct - step_pct)
-            self.current_load_pct = float(
-                max(self.current_load_pct, -abs(float(self.q_cool_max_pct)))
-            )
-            object.__setattr__(self, "last_mode", "cool")
-
-        return np.asarray([float(self.current_load_pct)], dtype=float), None
-
 
 @dataclass(frozen=True)
 class RolloutPaths:
@@ -415,80 +144,6 @@ def find_action_indices(
     return out
 
 
-def _make_policy(cfg: DictConfig, *, temp_obs_index: int, bounds: SensibleLoadBounds) -> Policy:
-    policy_type = str(getattr(cfg.policy, "type"))
-    if policy_type == "pid":
-        # Back-compat: config gains are in W; this policy outputs pct by normalizing via bounds.
-        if hasattr(cfg.policy, "q_heat_max_pct") and hasattr(cfg.policy, "q_cool_max_pct"):
-            q_heat_max_pct = float(getattr(cfg.policy, "q_heat_max_pct"))
-            q_cool_max_pct = float(getattr(cfg.policy, "q_cool_max_pct"))
-        else:
-            q_heat_max_w = float(getattr(cfg.policy, "q_heat_max_w", 20000.0))
-            q_cool_max_w = float(getattr(cfg.policy, "q_cool_max_w", 20000.0))
-            q_heat_max_pct = float(bounds.w_to_pct(abs(q_heat_max_w)))
-            q_cool_max_pct = float(abs(bounds.w_to_pct(-abs(q_cool_max_w))))
-        return PIDSensibleLoadPolicy(
-            target_temp_c=float(cfg.policy.target_temp_c),
-            deadband_c=float(cfg.policy.deadband_c),
-            temp_obs_index=int(temp_obs_index),
-            kp=float(cfg.policy.kp),
-            ki=float(cfg.policy.ki),
-            kd=float(cfg.policy.kd),
-            q_heat_max_pct=float(q_heat_max_pct),
-            q_cool_max_pct=float(q_cool_max_pct),
-            bounds=bounds,
-            dt_s=float(getattr(cfg.policy, "dt_s", 1.0)),
-            integral_min=float(getattr(cfg.policy, "integral_min", -100000.0)),
-            integral_max=float(getattr(cfg.policy, "integral_max", 100000.0)),
-        )
-    if policy_type == "trim_and_respond":
-        # Back-compat: accept either pct (preferred) or W (converted via inferred bounds).
-        if hasattr(cfg.policy, "respond_step_pct") and hasattr(cfg.policy, "trim_step_pct"):
-            respond_step_pct = float(getattr(cfg.policy, "respond_step_pct"))
-            trim_step_pct = float(getattr(cfg.policy, "trim_step_pct"))
-        else:
-            respond_step_w = float(getattr(cfg.policy, "respond_step_w"))
-            trim_step_w = float(getattr(cfg.policy, "trim_step_w"))
-            respond_step_pct = float(abs(bounds.w_to_pct(abs(respond_step_w))))
-            trim_step_pct = float(abs(bounds.w_to_pct(abs(trim_step_w))))
-
-        if hasattr(cfg.policy, "q_heat_max_pct") and hasattr(cfg.policy, "q_cool_max_pct"):
-            q_heat_max_pct = float(getattr(cfg.policy, "q_heat_max_pct"))
-            q_cool_max_pct = float(getattr(cfg.policy, "q_cool_max_pct"))
-        else:
-            q_heat_max_w = float(getattr(cfg.policy, "q_heat_max_w", 20000.0))
-            q_cool_max_w = float(getattr(cfg.policy, "q_cool_max_w", 20000.0))
-            q_heat_max_pct = float(bounds.w_to_pct(abs(q_heat_max_w)))
-            q_cool_max_pct = float(abs(bounds.w_to_pct(-abs(q_cool_max_w))))
-        return TrimAndRespondSensibleLoadPolicy(
-            target_temp_c=float(cfg.policy.target_temp_c),
-            deadband_c=float(cfg.policy.deadband_c),
-            temp_obs_index=int(temp_obs_index),
-            respond_step_pct=float(respond_step_pct),
-            trim_step_pct=float(trim_step_pct),
-            q_heat_max_pct=float(q_heat_max_pct),
-            q_cool_max_pct=float(q_cool_max_pct),
-        )
-    if policy_type == "on_off":
-        # Back-compat: accept either pct (preferred) or W (converted via inferred bounds).
-        if hasattr(cfg.policy, "q_heat_pct") and hasattr(cfg.policy, "q_cool_pct"):
-            q_heat_pct = float(getattr(cfg.policy, "q_heat_pct"))
-            q_cool_pct = float(getattr(cfg.policy, "q_cool_pct"))
-        else:
-            q_heat_w = float(getattr(cfg.policy, "q_heat_w"))
-            q_cool_w = float(getattr(cfg.policy, "q_cool_w"))
-            q_heat_pct = float(bounds.w_to_pct(abs(q_heat_w)))
-            q_cool_pct = float(abs(bounds.w_to_pct(-abs(q_cool_w))))
-        return OnOffSensibleLoadPolicy(
-            target_temp_c=float(cfg.policy.target_temp_c),
-            deadband_c=float(cfg.policy.deadband_c),
-            q_heat_pct=float(q_heat_pct),
-            q_cool_pct=float(q_cool_pct),
-            temp_obs_index=int(temp_obs_index),
-        )
-    raise ValueError(f"Unknown policy.type: {policy_type}")
-
-
 def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> RolloutPaths:
     """
     rollout a simulation with a baseline policy
@@ -526,60 +181,124 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
         except Exception as e:
             logger.warning(f"Could not print action bounds: {e}")
 
-        idx_load = find_action_index(act_names, "Unitary HVAC", "Sensible Load Request")
-        print(f"idx_load: {idx_load}")
-
-        if idx_load is None and find_action_index(act_names, "Zone Temperature Control", "Heating Setpoint") is None:
-            raise RuntimeError(
-                "Baseline controller requires either a 'Unitary HVAC::Sensible Load Request::<component>' "
-                "actuator or at least one Zone Temperature Control setpoint actuator."
-            )
-
-        load_bounds: SensibleLoadBounds | None = None
-        policy: Policy | None = None
-        if idx_load is not None:
-            if not hasattr(env, "action_space") or not hasattr(env.action_space, "low") or not hasattr(
-                env.action_space, "high"
-            ):
-                raise RuntimeError("env.action_space.low/high is required for action normalization")
-            lows = np.asarray(env.action_space.low, dtype=float).reshape(-1)
-            highs = np.asarray(env.action_space.high, dtype=float).reshape(-1)
-            if idx_load >= len(lows) or idx_load >= len(highs):
-                raise RuntimeError("idx_load out of bounds for env.action_space.low/high")
-            load_bounds = SensibleLoadBounds(
-                low_w=float(lows[idx_load]),
-                high_w=float(highs[idx_load]),
-            )
-
+        # We still pick a representative controlled-zone temperature for plotting/debugging.
+        controlled_zones = None
+        try:
+            controlled_zones = require_env_metadata_list_str(env, "controlled_zones")
+        except Exception:
             controlled_zones = None
-            try:
-                controlled_zones = require_env_metadata_list_str(env, "controlled_zones")
-            except Exception:
-                controlled_zones = None
-            temp_idx = find_controlled_zone_air_temp_index(
-                obs_names, controlled_zones=controlled_zones
-            )
-            policy = _make_policy(cfg, temp_obs_index=temp_idx, bounds=load_bounds)
+        temp_idx = find_controlled_zone_air_temp_index(obs_names, controlled_zones=controlled_zones)
+
+        # Control mode: fan airflow rate + node temperature setpoints + availability.
+        #
+        # We support two equivalent control encodings:
+        # - Preferred (robust): Schedule:* / Schedule Value actuators for `B2B Node Temp SP ...`
+        #   schedules used by SetpointManager:Scheduled objects.
+        # - Fallback (legacy / fixtures): System Node Setpoint / Temperature Setpoint actuators.
+        idx_avail = find_action_indices(
+            act_names,
+            component_type_prefix="airloophvac",
+            control_type="availability status",
+        )
+        idx_fans = find_action_indices(
+            act_names,
+            component_type_prefix="fan",
+            control_type="fan air mass flow rate",
+        )
+        # 1) Preferred: scheduled setpoints (Schedule Value actuators)
+        idx_heat_nodes_sched = find_action_indices(
+            act_names,
+            component_type_prefix="schedule:",
+            control_type="schedule value",
+            component_name_contains="b2b node temp sp heating_coil",
+        )
+        idx_supp_nodes_sched = find_action_indices(
+            act_names,
+            component_type_prefix="schedule:",
+            control_type="schedule value",
+            component_name_contains="b2b node temp sp supplemental_coil",
+        )
+        idx_cool_nodes_sched = find_action_indices(
+            act_names,
+            component_type_prefix="schedule:",
+            control_type="schedule value",
+            component_name_contains="b2b node temp sp cooling_coil",
+        )
+        idx_outlet_nodes_sched = find_action_indices(
+            act_names,
+            component_type_prefix="schedule:",
+            control_type="schedule value",
+            component_name_contains="b2b node temp sp unitary_outlet",
+        )
+
+        # 2) Fallback: direct system node setpoint actuators (fixtures / legacy)
+        idx_heat_nodes_node = find_action_indices(
+            act_names,
+            component_type_prefix="system node setpoint",
+            control_type="temperature setpoint",
+            component_name_contains="heating coil node",
+        )
+        idx_supp_nodes_node = find_action_indices(
+            act_names,
+            component_type_prefix="system node setpoint",
+            control_type="temperature setpoint",
+            component_name_contains="supplemental coil node",
+        )
+        idx_cool_nodes_node = find_action_indices(
+            act_names,
+            component_type_prefix="system node setpoint",
+            control_type="temperature setpoint",
+            component_name_contains="cooling coil node",
+        )
+        idx_outlet_nodes_node: list[int] = []
+        idx_all_node_setpoints = find_action_indices(
+            act_names,
+            component_type_prefix="system node setpoint",
+            control_type="temperature setpoint",
+        )
+        for i in idx_all_node_setpoints:
+            name = str(act_names[int(i)]).lower()
+            if "node" in name and "coil node" not in name:
+                idx_outlet_nodes_node.append(int(i))
+
+        # Choose scheduled if present, otherwise fallback to node actuators.
+        use_scheduled = bool(
+            idx_heat_nodes_sched or idx_supp_nodes_sched or idx_cool_nodes_sched or idx_outlet_nodes_sched
+        )
+        if use_scheduled:
+            idx_heat_nodes = idx_heat_nodes_sched
+            idx_supp_nodes = idx_supp_nodes_sched
+            idx_cool_nodes = idx_cool_nodes_sched
+            idx_outlet_nodes = idx_outlet_nodes_sched
         else:
-            # Baseboard-only mode: select a controlled-zone temperature for thermostat logic.
-            controlled_zones = None
-            try:
-                controlled_zones = require_env_metadata_list_str(env, "controlled_zones")
-            except Exception:
-                controlled_zones = None
-            temp_idx = find_controlled_zone_air_temp_index(
-                obs_names, controlled_zones=controlled_zones
+            idx_heat_nodes = idx_heat_nodes_node
+            idx_supp_nodes = idx_supp_nodes_node
+            idx_cool_nodes = idx_cool_nodes_node
+            idx_outlet_nodes = idx_outlet_nodes_node
+
+        if not idx_fans or (
+            not idx_heat_nodes and not idx_supp_nodes and not idx_cool_nodes and not idx_outlet_nodes
+        ):
+            raise RuntimeError(
+                "Baseline fan/node-setpoint controller could not find required actuators in action_names. "
+                "Expected at least one Fan::Fan Air Mass Flow Rate and at least one "
+                "node temperature setpoint actuator (scheduled or direct) for a coil/outlet node.\n"
+                f"action_names={act_names}"
             )
-
-        idx_avail = find_action_index(act_names, "AirLoopHVAC", "Availability Status")
-
-        idx_heat_sp = find_action_index(act_names, "Zone Temperature Control", "Heating Setpoint")
-        idx_cool_sp = find_action_index(act_names, "Zone Temperature Control", "Cooling Setpoint")
 
         max_steps = int(getattr(cfg.env, "max_steps"))
         n_episodes = int(getattr(cfg, "n_episodes"))
-        target = float(cfg.policy.target_temp_c)
-        deadband = float(cfg.policy.deadband_c)
+        # Optional (used only for plot annotation).
+        target = float(getattr(cfg.policy, "target_temp_c", 21.0))
+        deadband = float(getattr(cfg.policy, "deadband_c", 1.0))
+
+        fan_mdot = float(getattr(cfg.policy, "fan_mass_flow_kg_s", 1.0))
+        t_heat = float(getattr(cfg.policy, "heating_coil_setpoint_c", 35.0))
+        t_supp = float(getattr(cfg.policy, "supplemental_coil_setpoint_c", 45.0))
+        t_cool = float(getattr(cfg.policy, "cooling_coil_setpoint_c", 12.0))
+        # Supply/outlet node setpoint (unitary system air outlet node).
+        t_outlet = float(getattr(cfg.policy, "outlet_node_setpoint_c", 22.0))
+        availability_on = float(getattr(cfg.policy, "availability_on", 2.0))
 
         all_rows: list[dict[str, float]] = []
 
@@ -590,54 +309,24 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
 
             while not done and step < max_steps:
                 tz = float(np.asarray(obs, dtype=float).reshape(-1)[temp_idx])
-                target = float(cfg.policy.target_temp_c)
-                deadband = float(cfg.policy.deadband_c)
-
-                forced_mode = getattr(cfg.policy, "forced_mode", None)
-                if forced_mode is not None:
-                    forced_mode = str(forced_mode).strip().lower()
-
-                # Determine requested mode:
-                # - if forced, use that
-                # - else if we have a sensible-load actuator, use the policy output (pct sign)
-                # - else use a simple heat/cool/off thermostat based on target+deadband
-                load_pct = 0.0
-                if forced_mode in ("heat", "cool", "off"):
-                    mode = forced_mode
-                elif policy is not None:
-                    load_pct_cmd, _ = policy.predict(obs, deterministic=True)
-                    load_pct = float(np.asarray(load_pct_cmd, dtype=float).reshape(-1)[0])
-                    mode = "heat" if load_pct > 0.0 else ("cool" if load_pct < 0.0 else "off")
-                else:
-                    if tz < target - deadband:
-                        mode = "heat"
-                    elif tz > target + deadband:
-                        mode = "cool"
-                    else:
-                        mode = "off"
+                # Optional (used only for plot annotation).
+                target = float(getattr(cfg.policy, "target_temp_c", target))
+                deadband = float(getattr(cfg.policy, "deadband_c", deadband))
 
                 action_cmd = np.zeros((len(act_names),), dtype=float)
-                if idx_load is not None and load_bounds is not None:
-                    action_cmd[idx_load] = float(load_bounds.pct_to_w(load_pct))
 
-                if idx_avail is not None:
-                    # Force CycleOn to keep the HVAC system available while using load request.
-                    action_cmd[idx_avail] = float(getattr(cfg.policy, "availability_on", 2.0))
-
-                # Zone setpoint actuators: actions are interpreted as ΔT from current zone air temp
-                # (via SetpointDeltaActionWrapper in create_simulator).
-                #
-                # Therefore here we emit *deltas*, not absolute temperatures.
-                if idx_heat_sp is not None and idx_cool_sp is not None:
-                    if mode == "heat":
-                        action_cmd[idx_heat_sp] = 0.5
-                        action_cmd[idx_cool_sp] = 30.0
-                    elif mode == "cool":
-                        action_cmd[idx_heat_sp] = -30.0
-                        action_cmd[idx_cool_sp] = -0.5
-                    else:
-                        action_cmd[idx_heat_sp] = -30.0
-                        action_cmd[idx_cool_sp] = 30.0
+                for idx in idx_avail:
+                    action_cmd[int(idx)] = availability_on
+                for idx in idx_fans:
+                    action_cmd[int(idx)] = fan_mdot
+                for idx in idx_heat_nodes:
+                    action_cmd[int(idx)] = t_heat
+                for idx in idx_supp_nodes:
+                    action_cmd[int(idx)] = t_supp
+                for idx in idx_cool_nodes:
+                    action_cmd[int(idx)] = t_cool
+                for idx in idx_outlet_nodes:
+                    action_cmd[int(idx)] = t_outlet
 
                 obs2, reward, terminated, truncated, _info = env.step(action_cmd)
 
@@ -656,10 +345,6 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
                 for i, name in enumerate(act_names):
                     if i < len(act_arr):
                         row[f"act::{name}"] = float(act_arr[i])
-                # Also log normalized sensible load request (pct) for easier interpretation.
-                if idx_load is not None:
-                    row[f"act_pct::{act_names[idx_load]}"] = float(load_pct)
-
                 all_rows.append(row)
 
                 obs = obs2
