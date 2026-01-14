@@ -1,0 +1,28 @@
+type: unitary_pi
+
+# Control objective
+target_temp_c: 19.0
+deadband_c: 2.0
+
+# Force HVAC system available while commanding airflow + setpoints.
+# EnergyPlus availability override values:
+# 1=ForceOff, 2=CycleOn, 3=CycleOnZoneFansOnly
+availability_on: 2.0
+
+# "Classic" node temperature setpoints [C]
+heating_coil_setpoint_c: 35.0
+supplemental_coil_setpoint_c: 35.0
+cooling_coil_setpoint_c: 12.0
+outlet_node_setpoint_c: 35.0
+
+# PI control on fan mass flow rate [kg/s]
+# Command form: fan = fan_base_kg_s + kp*(target - tz) + ki*∫(target - tz)
+fan_base_kg_s: 1.0
+kp: 0.5
+ki: 0.001
+integral_limit: 1000.0
+
+# Optional clamps (null means "use action_space bounds")
+fan_min_kg_s: null
+fan_max_kg_s: null
+

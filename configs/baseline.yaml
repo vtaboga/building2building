@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - bldg: single_family
-  - policy: fan_coil_constant
+  - policy: unitary_pi
   - reward: deadband
 
 hydra:
@@ -10,6 +10,6 @@ hydra:
 
 env:
   normalize_obs: false
-  max_steps: 35040
+  max_steps: 2880
 
 n_episodes: 1
