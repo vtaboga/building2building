@@ -3,11 +3,11 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from building2building.store import ChildFile, Derivation, OUTPUT, derivation
+from building2building.store import OUTPUT, ChildFile, Derivation, derivation
 
 
 @derivation("simulation-outputs")
-def run_simulation(ep_path: Path, epjson: Path, eps: Path):
+def run_simulation(ep_path: Path, epjson: Path, epw: Path):
     """
     Run an EnergyPlus simulation and save the output files.
     Use to run a dummy simulation
@@ -20,7 +20,7 @@ def run_simulation(ep_path: Path, epjson: Path, eps: Path):
         "-d",
         str(tmp),
         "-w",
-        str(eps),
+        str(epw),
         "-x",
         str(epjson),
     ]
