@@ -293,7 +293,7 @@ def ExtractTarball(input_der: Derivation):
 
 
 def ExtractZip(input_der: Derivation):
-    @derivation(input_der.name.removesuffix(".tar.gz"))
+    @derivation(input_der.name.removesuffix(".zip"))
     def inner(input: Path):
         dst = OUTPUT.get()
 
