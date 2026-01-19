@@ -10,7 +10,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Union
+from typing import Any, Callable, Generic, TypeVar, Union, overload
 
 import git
 import requests
@@ -40,17 +40,24 @@ class Derivation:
     builder: Callable[[list[Any]], None]
 
 
+Result = TypeVar("Result")
+
+
 @dataclass(frozen=True)
-class Expression:
+class Expression(Generic[Result]):
     hash: bytes
     dependencies: list["Realizable"]
-    builder: Callable[[list[Any]], Any]
+    builder: Callable[[list[Any]], Result]
 
 
 Realizable = Union[Derivation, Expression]
 
 
-def realize(store_path: Path, realizable: Realizable) -> Any:
+@overload
+def realize(store_path: Path, expression: Expression[Result]) -> Result: ...
+@overload
+def realize(store_path: Path, derivation: Derivation) -> Path: ...
+def realize(store_path: Path, realizable: Realizable) -> Path | Result:
     """Realize a derivation (returns Path) or expression (returns value)."""
 
     def inner(realizable: Realizable):
@@ -170,7 +177,9 @@ def _capture_dependencies_and_builder(func: Callable[..., Any], *args, **kwargs)
     return dependencies, builder
 
 
-def expression():
+def expression() -> Callable[
+    [Callable[..., Result]], Callable[..., Expression[Result]]
+]:
     """Decorator: calling the wrapped function returns an Expression node."""
 
     def decorator(func) -> Callable:
@@ -190,7 +199,9 @@ def expression():
     return decorator
 
 
-def derivation(name: str | Callable):
+def derivation(
+    name: str | Callable,
+) -> Callable[[Callable[..., None]], Callable[..., Derivation]]:
     """Decorator: calling the wrapped function returns a Derivation node.
 
     The constructed builder takes only the realized dependency values. During
@@ -204,9 +215,9 @@ def derivation(name: str | Callable):
         elif isinstance(name, Callable):
             return name(*args, **kwargs)
 
-    def decorator(func) -> Callable:
+    def decorator(func) -> Callable[..., Derivation]:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Derivation:
             dependencies, builder = _capture_dependencies_and_builder(
                 func, *args, **kwargs
             )
@@ -215,7 +226,7 @@ def derivation(name: str | Callable):
                 hash=compute_hash(func.__name__, args, kwargs),
                 dependencies=dependencies,
                 # builder returns None; output path is accessible via current_output_path
-                builder=builder,  # type: ignore[assignment]
+                builder=builder,
             )
 
         return wrapper
