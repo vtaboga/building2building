@@ -280,6 +280,42 @@ SELECT ?baseboard WHERE {
     return obj, new_actuators
 
 
+def make_fanonoff_controllable(
+    obj: dict[str, Any],
+) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+    """Find all Fan:OnOff objects and expose the availability schedule as a
+    schedule that can be controlled."""
+
+    obj = deepcopy(obj)
+
+    ont = Ontology.from_object(obj)
+
+    binary_stl = create_onoff_availability_stl(obj, name="fanonoff availability")
+
+    all_fans_query = """# -*- mode: sparql -*-
+SELECT ?fan WHERE {
+  ?fan a "Fan:OnOff" .
+}"""
+
+    new_actuators = []
+
+    for (fan,) in ont.rdf.query(all_fans_query):
+        fan_name = fan.toPython()
+        new_schedule_name = create_schedule_constant(
+            obj, binary_stl, 1, name="controllable schedule for fanonoff"
+        )
+
+        obj["Fan:OnOff"][fan_name]["availability_schedule_name"] = new_schedule_name
+
+        new_actuators.append(
+            ActuatorDescription(
+                "Schedule:Constant", "Schedule Value", new_schedule_name
+            )
+        )
+
+    return obj, new_actuators
+
+
 def make_controllable(
     input_epjson: Realizable,
 ) -> Expression[tuple[Path, list[ActuatorDescription]]]:
@@ -291,6 +327,7 @@ def make_controllable(
 
         json_obj, hvac_actuators = make_unitary_hvac_controllable(json_obj)
         json_obj, baseboard_actuators = make_baseboard_controllable(json_obj)
+        json_obj, fanonoff_actuators = make_fanonoff_controllable(json_obj)
 
         tmp_out = Path(tempfile.mkdtemp())
 
@@ -298,7 +335,7 @@ def make_controllable(
 
         json.dump(json_obj, open(tmp_out / "building.epjson", "w"), indent=4)
         json.dump(
-            unstructure(hvac_actuators + baseboard_actuators),
+            unstructure(hvac_actuators + baseboard_actuators + fanonoff_actuators),
             open(tmp_out / "actuators.json", mode="w"),
             indent=4,
         )
