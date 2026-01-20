@@ -67,3 +67,55 @@ def eiofile(ep_path: Path, epjson: Path, epw: Path) -> Derivation:
     sim = run_simulation(ep_path, epjson, epw)
     return ChildFile(sim, "eplusout.eio")
 
+
+@derivation("warmup-phases.json")
+def detect_warmup_phases(epjson: Path, epw: Path):
+    """
+    Run a minimal EnergyPlus simulation to detect the number of warmup phases.
+
+    This function runs EnergyPlus with the API and counts how many times the
+    warmup complete callback is triggered, which corresponds to the number of
+    warmup phases (typically zone sizing + system sizing + plant sizing = 3).
+
+    The result is cached by the derivation system.
+
+    Args:
+        ep_path: Path to EnergyPlus installation directory
+        epjson: Path to the building epJSON file
+        epw: Path to the weather file
+    """
+    import json
+    import tempfile
+
+    import pyenergyplus.api
+
+    out = OUTPUT.get()
+
+    warmup_count = 0
+
+    def warmup_callback(state):
+        print("warmup")
+        nonlocal warmup_count
+        warmup_count += 1
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        api = pyenergyplus.api.EnergyPlusAPI()
+        state = api.state_manager.new_state()
+
+        api.runtime.callback_after_new_environment_warmup_complete(
+            state, warmup_callback
+        )
+
+        api.runtime.run_energyplus(
+            state,
+            [
+                "-d",
+                tmpdir,
+                "-w",
+                str(epw),
+                str(epjson),
+            ],
+        )
+
+    with open(out, "w") as f:
+        json.dump(warmup_count, f)
