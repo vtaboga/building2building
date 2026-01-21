@@ -2,8 +2,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Union
 
-from building2building.pipeline.actuators import ActuatorDescription
-
 
 @dataclass
 class BaseRewardConfig:
@@ -24,6 +22,17 @@ class DeadbandRewardConfig:
 
 
 RewardConfig = Union[DeadbandRewardConfig, BaseRewardConfig, BarrierRewardConfig]
+
+
+@dataclass(frozen=True)
+class ActuatorDescription:
+    component_type: str
+    control_type: str
+    component_name: str
+    units: str
+
+    lower_bound: float
+    upper_bound: float
 
 
 @dataclass

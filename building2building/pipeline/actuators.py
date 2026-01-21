@@ -16,14 +16,7 @@ from building2building.store import (
     derivation,
     expression,
 )
-
-
-@dataclass(frozen=True)
-class ActuatorDescription:
-    component_type: str
-    control_type: str
-    component_name: str
-    units: str
+from building2building.types import ActuatorDescription
 
 
 @dataclass
@@ -50,6 +43,10 @@ def create_onoff_availability_stl(obj: dict[str, Any], *, name="OnOff") -> str:
         "unit_type": "Availability",
     }
     return name
+
+
+temp_stl_lower_bound = -100.0
+temp_stl_upper_bound = 200.0
 
 
 def create_temp_stl(obj: dict[str, Any], *, name="Temperature") -> str:
@@ -197,7 +194,7 @@ WHERE {
 
         unitary_system["control_type"] = "SetPoint"
 
-        # Set up the fan modes
+        # Set up the fan mode. It should be always on
         fan_mode_schedule_name = create_schedule_constant(
             obj,
             onoff_stl_name,
@@ -240,6 +237,8 @@ WHERE {
                     control_type="Schedule Value",
                     component_name=sched_constant_name,
                     units="Temperature",
+                    lower_bound=temp_stl_lower_bound,
+                    upper_bound=temp_stl_upper_bound,
                 )
             )
 
@@ -281,6 +280,8 @@ SELECT ?baseboard WHERE {
                 control_type="Schedule Value",
                 component_name=new_schedule_name,
                 units="Availability",
+                lower_bound=0.0,
+                upper_bound=1.0,
             )
         )
 
@@ -320,6 +321,8 @@ SELECT ?fan WHERE {
                 control_type="Schedule Value",
                 component_name=new_schedule_name,
                 units="Availability",
+                lower_bound=0.0,
+                upper_bound=1.0,
             )
         )
 
