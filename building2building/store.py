@@ -1,4 +1,5 @@
 import hashlib
+import inspect
 import logging
 import os
 import pickle
@@ -97,7 +98,9 @@ def realize(store_path: Path, realizable: Realizable) -> Path | Result:
     return inner(realizable)
 
 
-def compute_hash(name: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> bytes:
+def compute_hash(
+    func, name: str, args: tuple[Any, ...], kwargs: dict[str, Any]
+) -> bytes:
     """Compute a content hash for an expression/derivation input.
 
     - Includes the function name.
@@ -105,6 +108,11 @@ def compute_hash(name: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> by
     - For everything else, uses pickle to serialize and hash the bytes.
     """
     hasher = hashlib.blake2b(digest_size=32)
+
+    if inspect.isfunction(func):
+        hasher.update(func.__name__.encode("utf-8"))
+        hasher.update(inspect.getsource(func).encode("utf-8"))
+
     hasher.update(name.encode("utf-8"))
 
     # Positional args
@@ -189,7 +197,7 @@ def expression() -> Callable[
                 func, *args, **kwargs
             )
             return Expression(
-                hash=compute_hash(func.__name__, args, kwargs),
+                hash=compute_hash(func, "expr", args, kwargs),
                 dependencies=dependencies,
                 builder=builder,
             )
@@ -221,9 +229,11 @@ def derivation(
             dependencies, builder = _capture_dependencies_and_builder(
                 func, *args, **kwargs
             )
+
+            der_name = compute_name(args, kwargs)
             return Derivation(
-                name=compute_name(args, kwargs),
-                hash=compute_hash(func.__name__, args, kwargs),
+                name=der_name,
+                hash=compute_hash(func, der_name, args, kwargs),
                 dependencies=dependencies,
                 # builder returns None; output path is accessible via current_output_path
                 builder=builder,
