@@ -11,9 +11,9 @@ from pandas import DataFrame
 from building2building.env import STORE_PATH
 from building2building.pipeline.common import chdir
 from building2building.store import (
+    OUTPUT,
     ChildFile,
     Derivation,
-    OUTPUT,
     Realizable,
     derivation,
     expression,
@@ -148,7 +148,7 @@ def scan_upgraders(energyplus: Path) -> DataFrame:
 
 
 def upgrade(
-    input_file: Derivation, energyplus_path: Realizable, src_version: str
+    input_file: Realizable, energyplus_path: Realizable, src_version: str
 ) -> Derivation:
     # Multi-step upgrade process
 
@@ -179,4 +179,3 @@ def upgrade(
         current_version = upgrader.dst_version
 
     return current
-

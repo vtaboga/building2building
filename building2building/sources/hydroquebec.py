@@ -1,3 +1,4 @@
+import itertools
 import json
 import logging
 import subprocess
@@ -8,21 +9,14 @@ from pathlib import Path
 import duckdb
 from building2building import pipeline
 from building2building.env import STORE_PATH, energyplus_path
+
+# Extract metadata from control epJSON
 from building2building.pipeline import (
     create_complete_pipeline,
-    create_control_pipeline,
-    create_discovery_pipeline,
-    eplustbl,
-    eddfile,
-    get_b2b_scheduled_node_setpoint_actuators,
-    get_b2b_scheduled_setpoint_schedule_names,
-    get_unitary_air_outlet_node_names,
-    get_net_conditioned_area,
-    get_airflow_and_coil_node_setpoint_actuators,
-    get_hvac_actuators,
-    get_zone_temperature_control_actuators,
-    get_warmup_days,
+    extract_discovery_metadata,
     link_in_schedule,
+    make_controllable,
+    prepare_building,
 )
 from building2building.store import (
     OUTPUT,
@@ -34,49 +28,30 @@ from building2building.store import (
     realize,
 )
 from building2building.types import (
-    DeadbandRewardConfig,
-    BaseRewardConfig,
     BarrierRewardConfig,
+    BaseRewardConfig,
     BuildingConfig,
+    DeadbandRewardConfig,
 )
 from pandas import DataFrame
-import itertools
 
 logger = logging.getLogger(__name__)
 
 
-def _build_discovery_derivation(
-    idf_path: str,
-    schedule_path: str,
-    ep: Derivation,
-) -> Derivation:
+def _build_control_derivation(idf_path: Path, schedule_path: Path, ep: Derivation):
     """
-    Build the epJSON used for dummy discovery simulations (.edd / eplustbl).
+    Build control-ready epJSON from IDF (hydroquebec-specific).
 
-    This must keep thermostat/load control intact.
+    Pipeline: IDF → prepare → link schedule → make controllable
     """
-    return link_in_schedule(
-        create_discovery_pipeline(
-            Constant(Path(idf_path)),
-            ep,
-            src_version="24.2.0",
-        ),
-        Path(schedule_path),
-    )
+    # Step 1: Prepare epJSON (upgrade, convert, add meters, set timestep)
+    epjson = prepare_building(Constant(idf_path), ep, src_version="24.2.0")
 
+    # Step 2: Link schedule data (hydroquebec-specific)
+    epjson = link_in_schedule(epjson, Path(schedule_path))
 
-def _build_control_derivation(
-    idf_path: str,
-    schedule_path: str,
-    ep: Derivation,
-) -> Derivation:
-    """
-    Build the epJSON used for training/control runs.
-
-    This applies setpoint control to unitary systems (airflow + node setpoints).
-    """
-    discovery = _build_discovery_derivation(idf_path, schedule_path, ep)
-    return create_control_pipeline(discovery)
+    # Step 3: Make controllable
+    return make_controllable(epjson)
 
 
 def extracted() -> Derivation:
@@ -177,70 +152,30 @@ def search_configs(
 
     config_nn = cfg.get("bldg", {})
     # Our bldg group configs are nested like: bldg: { bldg: {...} }
-    if isinstance(config_nn, dict) and "bldg" in config_nn and isinstance(
-        config_nn["bldg"], dict
+    if (
+        isinstance(config_nn, dict)
+        and "bldg" in config_nn
+        and isinstance(config_nn["bldg"], dict)
     ):
         config_nn = config_nn["bldg"]
     ep_path = energyplus_path()
 
     rows = search_buildings(**config_nn)
-    
+
     configs: list[BuildingConfig] = []
     for _, row in itertools.islice(rows.iterrows(), n):
         epw = Path(row.epw_path)  # use the weather file for THIS building
-        derivation = row.derivation_thunk()
-        epjson = realize(STORE_PATH.get(), derivation)
 
-        # Dummy/discovery simulation must use the load-controlled model, not the
-        # control-ready (SetPoint) one.
-        discovery_derivation = _build_discovery_derivation(
-            str(row.idf_path),
-            str(row.schedule_path),
-            ep_path,
+        # Get control-ready building with actuators from make_controllable()
+        control_derivation = row.derivation_thunk()
+        epjson, actuator_descriptions = realize(STORE_PATH.get(), control_derivation)
+
+        metadata = realize(
+            STORE_PATH.get(), extract_discovery_metadata(Constant(epjson), epw)
         )
 
-        metrics_path = realize(
-            STORE_PATH.get(), eplustbl(ep_path, discovery_derivation, epw)
-        )
-        area = get_net_conditioned_area(metrics_path)
-        # warmup_phases = get_warmup_days(metrics_path)
-
-        # Search actuators
-        ems_file = realize(
-            STORE_PATH.get(), eddfile(ep_path, discovery_derivation, epw)
-        )
-        # Control mode: fan airflow rate + (scheduled) node temperature setpoints + availability.
-        #
-        # We drive node setpoints via SetpointManager:Scheduled + Schedule:Constant schedules
-        # (and actuate the schedule values), because directly actuating System Node Setpoints
-        # can be overwritten by setpoint managers later in the timestep.
-        epjson_data = json.loads(Path(epjson).read_text(encoding="utf-8"))
-
-        schedules = get_b2b_scheduled_setpoint_schedule_names(epjson_data)
-        schedule_actuators = get_b2b_scheduled_node_setpoint_actuators(
-            ems_file, schedule_names=schedules
-        )
-
-        # Still include fan airflow and airloop availability from the .edd.
-        base = get_airflow_and_coil_node_setpoint_actuators(ems_file)
-        base_filtered = [
-            a
-            for a in base
-            if (a.get("component_type") == "Fan" and a.get("control_type") == "Fan Air Mass Flow Rate")
-            or (a.get("component_type") == "AirLoopHVAC" and a.get("control_type") == "Availability Status")
-        ]
-
-        actuators = base_filtered + schedule_actuators
-        if not actuators:
-            # Provide context to debug why a building can't be controlled with this mode.
-            hvac_all = get_hvac_actuators(ems_file)
-            raise RuntimeError(
-                "Could not find any airflow/setpoint actuators in .edd. "
-                f"Found {len(hvac_all)} other HVAC actuators; "
-                "ensure the model exposes Fan Air Mass Flow Rate, "
-                "System Node Setpoint/Temperature Setpoint for coil nodes, "
-                "and AirLoopHVAC Availability Status."
-            )
+        area = metadata.net_conditioned_area
+        warmup_phases = metadata.warmup_phases
 
         reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
         if not isinstance(reward_section, dict):
@@ -278,10 +213,10 @@ def search_configs(
                 path_to_building=epjson,
                 path_to_weather=epw,
                 reward_config=reward_config,
-                hvac_actuators=actuators,
+                hvac_actuators=actuator_descriptions,
                 eplus_output_dir=eplus_output_dir,
-                warmup_phases=1,  # keep consistent with existing search_config
-                area=area
+                warmup_phases=warmup_phases,
+                area=area,
             )
         )
 

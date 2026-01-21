@@ -80,9 +80,11 @@ def detect_warmup_phases(epjson: Path, epw: Path):
     The result is cached by the derivation system.
 
     Args:
-        ep_path: Path to EnergyPlus installation directory
         epjson: Path to the building epJSON file
         epw: Path to the weather file
+
+    Note:
+        Uses pyenergyplus.api which requires setup_energyplus_path() to be called first.
     """
     import json
     import tempfile

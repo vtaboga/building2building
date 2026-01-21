@@ -89,7 +89,9 @@ def _hvac_actuator_bounds(actuator: dict[str, str]) -> tuple[float, float]:
         return 1.0, 3.0
 
     # Fan air mass flow rate actuator (kg/s)
-    if "fan air mass flow rate" in control_type or ("fan" in component_type and "kg/s" in units):
+    if "fan air mass flow rate" in control_type or (
+        "fan" in component_type and "kg/s" in units
+    ):
         # Avoid exactly 0.0 which can create degenerate HVAC states in some models.
         return 0.1, 5.0
 
@@ -110,7 +112,11 @@ def _hvac_actuator_bounds(actuator: dict[str, str]) -> tuple[float, float]:
 
     # Unitary HVAC load request actuators (W). Positive=sensible heating request,
     # negative=sensible cooling request.
-    if "unitary hvac" in component_type and "load request" in control_type and "w" in units:
+    if (
+        "unitary hvac" in component_type
+        and "load request" in control_type
+        and "w" in units
+    ):
         # Heuristic bounds; should be large enough for typical single-zone residential systems.
         return -20000.0, 20000.0
 
@@ -120,43 +126,47 @@ def _hvac_actuator_bounds(actuator: dict[str, str]) -> tuple[float, float]:
         return -50.0, 50.0
 
     # System node setpoint temperature setpoint ([C]) used for coil control.
-    if "system node setpoint" in component_type and control_type == "temperature setpoint":
+    if (
+        "system node setpoint" in component_type
+        and control_type == "temperature setpoint"
+    ):
         # Conservative absolute temperature range in Celsius.
         return 0.0, 50.0
     return 0.0, 1.0
 
 
 def hvac_actuators_transform(
-    hvac_actuators: Sequence[dict[str, str]],
+    hvac_actuators: "Sequence[ActuatorDescription]",
 ) -> Transform[list, Box]:
     """
-    Build an action transform from a list of `.edd`-parsed actuator descriptors.
-
-    Each element in `hvac_actuators` must contain:
-    - component_name
-    - component_type
-    - control_type
-    - units
+    Build an action transform from a list of ActuatorDescription instances.
     """
+    from building2building.pipeline.actuators import ActuatorDescription
+
     holes: list[ActuatorHole] = []
     lows: list[float] = []
     highs: list[float] = []
 
     for a in hvac_actuators:
-        if not isinstance(a, dict):
-            raise TypeError(f"Expected actuator dict, got {type(a)}")
+        if not isinstance(a, ActuatorDescription):
+            raise TypeError(f"Expected ActuatorDescription, got {type(a)}")
 
-        missing = [k for k in ("component_name", "component_type", "control_type", "units") if k not in a]
-        if missing:
-            raise ValueError(f"Actuator dict missing keys: {missing}. Got: {a}")
+        holes.append(ActuatorHole(a.component_type, a.control_type, a.component_name))
 
-        holes.append(ActuatorHole(a["component_type"], a["control_type"], a["component_name"]))
-        lo, hi = _hvac_actuator_bounds(a)
+        # Convert to dict for bounds calculation
+        a_dict = {
+            "component_type": a.component_type,
+            "control_type": a.control_type,
+            "units": a.units,
+        }
+        lo, hi = _hvac_actuator_bounds(a_dict)
         lows.append(lo)
         highs.append(hi)
 
     if not holes:
-        raise ValueError("hvac_actuators is empty; cannot build HVAC actuator action space")
+        raise ValueError(
+            "hvac_actuators is empty; cannot build HVAC actuator action space"
+        )
 
     return TransformListToArray(
         holes,

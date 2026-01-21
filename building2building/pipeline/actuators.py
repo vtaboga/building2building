@@ -22,7 +22,8 @@ from building2building.store import (
 class ActuatorDescription:
     component_type: str
     control_type: str
-    name: str
+    component_name: str
+    units: str
 
 
 @dataclass
@@ -235,7 +236,10 @@ WHERE {
 
             new_actuators.append(
                 ActuatorDescription(
-                    "Schedule:Constant", "Schedule Value", sched_constant_name
+                    component_type="Schedule:Constant",
+                    control_type="Schedule Value",
+                    component_name=sched_constant_name,
+                    units="Temperature",
                 )
             )
 
@@ -273,7 +277,10 @@ SELECT ?baseboard WHERE {
 
         new_actuators.append(
             ActuatorDescription(
-                "Schedule:Constant", "Schedule Value", new_schedule_name
+                component_type="Schedule:Constant",
+                control_type="Schedule Value",
+                component_name=new_schedule_name,
+                units="Availability",
             )
         )
 
@@ -309,7 +316,10 @@ SELECT ?fan WHERE {
 
         new_actuators.append(
             ActuatorDescription(
-                "Schedule:Constant", "Schedule Value", new_schedule_name
+                component_type="Schedule:Constant",
+                control_type="Schedule Value",
+                component_name=new_schedule_name,
+                units="Availability",
             )
         )
 

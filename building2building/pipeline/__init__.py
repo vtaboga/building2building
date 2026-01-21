@@ -2,12 +2,30 @@
 Pipeline package.
 """
 
-from building2building.pipeline.entrypoints import create_complete_pipeline
-from building2building.pipeline.pipelines import (
-    create_control_pipeline,
-    create_discovery_pipeline,
+from pathlib import Path
+
+from building2building.pipeline.actuators import ActuatorDescription, make_controllable
+from building2building.pipeline.discovery import Metadata, extract_discovery_metadata
+from building2building.pipeline.parse_edd import (
+    EddActuatorDescriptor,
+    get_airflow_and_coil_node_setpoint_actuators,
+    get_b2b_scheduled_node_setpoint_actuators,
+    get_hvac_actuators,
+    get_schedule_value_actuators,
+    get_zone_temperature_control_actuators,
+    iter_edd_actuators,
 )
-from building2building.pipeline.simulation import eddfile, eiofile, eplustbl, run_simulation
+from building2building.pipeline.parse_reports import (
+    get_net_conditioned_area,
+    get_warmup_days,
+)
+from building2building.pipeline.simulation import (
+    detect_warmup_phases,
+    eddfile,
+    eiofile,
+    eplustbl,
+    run_simulation,
+)
 from building2building.pipeline.steps.conversion import (
     ConvertIDF,
     Transition,
@@ -18,14 +36,11 @@ from building2building.pipeline.steps.conversion import (
     upgrade_idf,
 )
 from building2building.pipeline.steps.outputs import (
-    AddEDDOutput,
-    AddHVACMeters,
-    AddOutdoorAirMeters,
-    AddTabularOutput,
-    ModifyTimestep,
+    add_all_outputs,
     add_edd_output,
     add_hvac_meters,
     add_outdoor_air_meters,
+    add_sqlite_output,
     add_tabular_output,
     modify_timestep,
 )
@@ -36,39 +51,74 @@ from building2building.pipeline.steps.thermostat_setpoints import (
     add_setpoint_control,
     get_temperature_setpoints,
 )
-from building2building.pipeline.hvac.baseboard import (
-    AddBaseboardAvailabilityControl,
-    get_baseboard_availability_schedule_names,
-)
-from building2building.pipeline.hvac.unitary import (
-    AddNodeSetpointDiagnostics,
-    EnsureScheduledNodeTemperatureSetpoints,
-    SetUnitarySystemsToSetpointControl,
-    add_node_setpoint_diagnostics,
-    add_node_setpoint_diagnostics_inplace,
-    ensure_scheduled_node_temperature_setpoints,
-    ensure_scheduled_node_temperature_setpoints_inplace,
-    get_b2b_scheduled_setpoint_schedule_names,
-    get_unitary_air_outlet_node_names,
-    set_unitary_systems_to_setpoint_control,
-    set_unitary_systems_to_setpoint_control_inplace,
-)
-from building2building.pipeline.parse_reports import get_net_conditioned_area, get_warmup_days
-from building2building.pipeline.parse_edd import (
-    EddActuatorDescriptor,
-    get_airflow_and_coil_node_setpoint_actuators,
-    get_b2b_scheduled_node_setpoint_actuators,
-    get_hvac_actuators,
-    get_schedule_value_actuators,
-    get_zone_temperature_control_actuators,
-    iter_edd_actuators,
-)
+from building2building.store import Derivation, Expression, Realizable, Rename
+
+
+def prepare_building(
+    input_file: Derivation,
+    energyplus_path: Realizable,
+    src_version: str,
+) -> Derivation:
+    """
+    Convert IDF to epJSON and prepare for controllability.
+
+    Steps:
+    1. Upgrade IDF to target EnergyPlus version
+    2. Convert IDF → epJSON
+    3. Add HVAC meters (electricity, gas) - needed for RL reward calculation
+    4. Add outdoor air meters - needed for RL observations
+    5. Modify timestep to 4 steps/hour
+
+    Does NOT add discovery outputs (EDD, tabular, SQLite) or modify HVAC control.
+    Use make_controllable() and extract_discovery_metadata() for those.
+
+    Returns:
+        Derivation resolving to prepared epJSON
+    """
+    current = upgrade(input_file, energyplus_path, src_version)
+    current = convert_idf(current, energyplus_path)
+    current = add_hvac_meters(current)
+    current = add_outdoor_air_meters(current)
+    current = modify_timestep(current, timesteps_per_hour=4)
+    current = Rename("building.epjson", current)
+    return current
+
+
+def create_complete_pipeline(
+    input_file: Derivation,
+    energyplus_path: Realizable,
+    src_version: str,
+) -> Expression[tuple[Path, list[ActuatorDescription]]]:
+    """
+    Complete pipeline: IDF → controllable epJSON with actuators.
+
+    Standard pipeline for converting IDF files to control-ready epJSON:
+    1. Upgrade and convert IDF
+    2. Add meters needed for RL (HVAC energy, outdoor air)
+    3. Configure timestep
+    4. Make HVAC systems controllable
+
+    For metadata extraction (area, warmup_phases), use extract_discovery_metadata()
+    separately as needed.
+
+    Returns:
+        Expression resolving to (epjson_path, actuator_descriptions)
+    """
+    epjson = prepare_building(input_file, energyplus_path, src_version)
+    return make_controllable(epjson)
+
 
 __all__ = [
     # Entry points
     "create_complete_pipeline",
-    "create_discovery_pipeline",
-    "create_control_pipeline",
+    "prepare_building",
+    "make_controllable",
+    # Types
+    "ActuatorDescription",
+    "Metadata",
+    # Discovery metadata
+    "extract_discovery_metadata",
+    "Metadata",
     # Conversion / upgrade
     "Transition",
     "all_transitions",
@@ -78,16 +128,14 @@ __all__ = [
     "ConvertIDF",
     "convert_idf",
     # Output and simulation steps
-    "AddHVACMeters",
+    "add_all_outputs",
     "add_hvac_meters",
-    "AddOutdoorAirMeters",
     "add_outdoor_air_meters",
-    "AddEDDOutput",
     "add_edd_output",
-    "AddTabularOutput",
+    "add_sqlite_output",
     "add_tabular_output",
-    "ModifyTimestep",
     "modify_timestep",
+    "detect_warmup_phases",
     "run_simulation",
     "eplustbl",
     "eddfile",
@@ -99,20 +147,6 @@ __all__ = [
     "get_temperature_setpoints",
     "GlueSurfaces",
     "glue_surfaces",
-    # HVAC system helpers (unitary + baseboard)
-    "SetUnitarySystemsToSetpointControl",
-    "set_unitary_systems_to_setpoint_control",
-    "set_unitary_systems_to_setpoint_control_inplace",
-    "EnsureScheduledNodeTemperatureSetpoints",
-    "ensure_scheduled_node_temperature_setpoints",
-    "ensure_scheduled_node_temperature_setpoints_inplace",
-    "AddNodeSetpointDiagnostics",
-    "add_node_setpoint_diagnostics",
-    "add_node_setpoint_diagnostics_inplace",
-    "get_unitary_air_outlet_node_names",
-    "get_b2b_scheduled_setpoint_schedule_names",
-    "AddBaseboardAvailabilityControl",
-    "get_baseboard_availability_schedule_names",
     # Parsers / utilities
     "get_net_conditioned_area",
     "get_warmup_days",
@@ -124,4 +158,3 @@ __all__ = [
     "iter_edd_actuators",
     "get_airflow_and_coil_node_setpoint_actuators",
 ]
-

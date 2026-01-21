@@ -2,13 +2,14 @@ import json
 import logging
 from pathlib import Path
 
-from building2building.store import Derivation, OUTPUT, derivation
+from building2building.store import OUTPUT, Derivation, Realizable, derivation
 
 logger = logging.getLogger(__name__)
 
 
-@derivation("with-meters")
-def AddHVACMeters(input: Path):
+@derivation("with-meters.epjson")
+def add_hvac_meters(input: Path):
+    """Add HVAC energy meters to epJSON."""
     dst = OUTPUT.get()
     with open(input, "r") as f:
         epjson: dict = json.load(f)
@@ -27,8 +28,9 @@ def AddHVACMeters(input: Path):
         json.dump(epjson, f, indent=4)
 
 
-@derivation("outdoor-air")
-def AddOutdoorAirMeters(input: Path):
+@derivation("outdoor-air.epjson")
+def add_outdoor_air_meters(input: Path):
+    """Add outdoor air monitoring to epJSON."""
     dst = OUTPUT.get()
 
     with open(input, "r") as f:
@@ -84,12 +86,9 @@ def AddOutdoorAirMeters(input: Path):
         json.dump(epjson, f, indent=4)
 
 
-@derivation("with-edd-output")
-def AddEDDOutput(input: Path):
-    """
-    For dummy simulation.
-    Ensure Output:EnergyManagementSystem is configured to generate .edd file.
-    """
+@derivation("with-edd-output.epjson")
+def add_edd_output(input: Path):
+    """Ensure Output:EnergyManagementSystem is configured to generate .edd file."""
     dst = OUTPUT.get()
 
     with open(input, "r") as f:
@@ -130,13 +129,9 @@ def AddEDDOutput(input: Path):
         json.dump(epjson, f, indent=4)
 
 
-@derivation("with-tabular-output")
-def AddTabularOutput(input: Path):
-    """
-    For dummy simulation.
-    Ensure OutputControl:Files and OutputControl:Table:Style are configured to generate
-    eplustbl.htm.
-    """
+@derivation("with-tabular-output.epjson")
+def add_tabular_output(input: Path):
+    """Ensure OutputControl:Files and OutputControl:Table:Style are configured to generate eplustbl.htm."""
     dst = OUTPUT.get()
 
     with open(input, "r") as f:
@@ -158,9 +153,7 @@ def AddTabularOutput(input: Path):
 
     # Ensure output_tabular is set to "Yes"
     epjson["OutputControl:Files"][files_key]["output_tabular"] = "Yes"
-    logger.info(
-        f"Ensured OutputControl:Files '{files_key}' has output_tabular enabled"
-    )
+    logger.info(f"Ensured OutputControl:Files '{files_key}' has output_tabular enabled")
 
     # Ensure OutputControl:Table:Style exists and is set to HTML
     if "OutputControl:Table:Style" not in epjson:
@@ -186,11 +179,43 @@ def AddTabularOutput(input: Path):
         json.dump(epjson, f, indent=4)
 
 
-@derivation("timestep")
-def ModifyTimestep(
+@derivation("with-sqlite-output.epjson")
+def add_sqlite_output(input: Path):
+    """Ensure Output:SQLite is configured to generate eplusout.sql file."""
+    dst = OUTPUT.get()
+
+    with open(input, "r") as f:
+        epjson = json.load(f)
+
+    # Ensure Output:SQLite exists
+    if "Output:SQLite" not in epjson:
+        epjson["Output:SQLite"] = {}
+
+    # Find or create Output:SQLite entry
+    sqlite_key = None
+    for key in epjson["Output:SQLite"].keys():
+        sqlite_key = key
+        break
+
+    if sqlite_key is None:
+        sqlite_key = "Output:SQLite 1"
+        epjson["Output:SQLite"][sqlite_key] = {}
+
+    # Set option_type to "SimpleAndTabular" (most comprehensive)
+    # Options: "Simple" | "SimpleAndTabular"
+    epjson["Output:SQLite"][sqlite_key]["option_type"] = "SimpleAndTabular"
+    logger.info(f"Ensured Output:SQLite '{sqlite_key}' is configured")
+
+    with open(dst, "w") as f:
+        json.dump(epjson, f, indent=4)
+
+
+@derivation("timestep.epjson")
+def modify_timestep(
     input: Path,
     timesteps_per_hour: int = 4,
 ):
+    """Modify simulation timestep."""
     dst = OUTPUT.get()
 
     with open(input, "r") as f:
@@ -223,27 +248,12 @@ def ModifyTimestep(
         json.dump(epjson, f, indent=4)
 
 
-def add_hvac_meters(epjson_in: Derivation) -> Derivation:
-    """Add HVAC energy meters to epJSON."""
-    return AddHVACMeters(epjson_in)
-
-
-def add_outdoor_air_meters(epjson_in: Derivation) -> Derivation:
-    """Add outdoor air monitoring to epJSON."""
-    return AddOutdoorAirMeters(epjson_in)
-
-
-def add_edd_output(epjson_in: Derivation) -> Derivation:
-    """Add EMS output to generate .edd file."""
-    return AddEDDOutput(epjson_in)
-
-
-def add_tabular_output(epjson_in: Derivation) -> Derivation:
-    """Add tabular output configuration to generate eplustbl.htm file."""
-    return AddTabularOutput(epjson_in)
-
-
-def modify_timestep(epjson_in: Derivation, timesteps_per_hour: int = 4) -> Derivation:
-    """Modify simulation timestep."""
-    return ModifyTimestep(epjson_in, timesteps_per_hour)
-
+def add_all_outputs(epjson_in: Realizable) -> Derivation:
+    """Add all output configurations needed for dummy simulations."""
+    out = epjson_in
+    out = add_hvac_meters(out)
+    out = add_outdoor_air_meters(out)
+    out = add_edd_output(out)
+    out = add_tabular_output(out)
+    out = add_sqlite_output(out)
+    return out

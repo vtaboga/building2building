@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Union
 
+from building2building.pipeline.actuators import ActuatorDescription
+
 
 @dataclass
 class BaseRewardConfig:
@@ -11,6 +13,7 @@ class BaseRewardConfig:
 @dataclass
 class BarrierRewardConfig:
     energy_weight: float
+
 
 @dataclass
 class DeadbandRewardConfig:
@@ -31,4 +34,4 @@ class BuildingConfig:
     eplus_output_dir: Path
     warmup_phases: int
     area: float
-    hvac_actuators: list[dict[str, str]]
+    hvac_actuators: list[ActuatorDescription]

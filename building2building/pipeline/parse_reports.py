@@ -56,7 +56,7 @@ def get_net_conditioned_area(html_path: Path) -> float:
     return value
 
 
-def get_warmup_days(html_path: Path) -> float:
+def get_warmup_days(html_path: Path) -> int:
     """Extract the number of warm-up days from an EnergyPlus HTML summary file."""
     with open(html_path, "r", encoding="utf-8", errors="ignore") as f:
         soup = BeautifulSoup(f, "html.parser")
@@ -111,6 +111,5 @@ def get_warmup_days(html_path: Path) -> float:
 
     if series.empty:
         raise Exception("could not read warmup days")
-    warmup_days = float(series.iloc[0])
+    warmup_days = int(series.iloc[0])
     return warmup_days
-

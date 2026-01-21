@@ -23,7 +23,7 @@ from building2building.simulator.observation_spaces import (
 from building2building.simulator.rewards import (
     BarrierReward,
     BaseReward,
-    DeadbandReward
+    DeadbandReward,
 )
 from building2building.types import (
     DeadbandRewardConfig,
@@ -99,10 +99,9 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     action_transform = hvac_actuators_transform(building_config.hvac_actuators)
     action_names = [
-        f"{a['component_type']}::{a['control_type']}::{a['component_name']}"
+        f"{a.component_type}::{a.control_type}::{a.component_name}"
         for a in building_config.hvac_actuators
     ]
-
 
     make_energyplus = MakeEnergyPlus(
         building_config.path_to_building,
