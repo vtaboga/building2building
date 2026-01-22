@@ -329,6 +329,17 @@ def ExtractZip(input_der: Derivation):
     return inner(input_der)
 
 
+def extract_from_zip(zip_file: Derivation, filename: str) -> Derivation:
+    @derivation(filename)
+    def inner(input: Path, name: str):
+        dst = OUTPUT.get()
+        with zipfile.ZipFile(input, "r") as zip_ref:
+            with zip_ref.open(filename) as src, open(dst, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+
+    return inner(zip_file, filename)
+
+
 def hash_directory_tree(hasher, dir: Path):
     # Get all files and sort them for deterministic ordering
     file_paths = []

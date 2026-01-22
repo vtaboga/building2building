@@ -1,5 +1,6 @@
 import re
 import tempfile
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,82 +15,86 @@ from building2building.store import (
     ExtractZip,
     Rename,
     derivation,
+    extract_from_zip,
     realize,
 )
 from building2building.types import BaseRewardConfig, BuildingConfig
 from pandas import DataFrame
 
 
-def ASHRAE901_all() -> Derivation:
-    return ExtractZip(
-        DownloadFile(
-            "ASHRAE901_all.zip",
-            "https://www.energycodes.gov/sites/default/files/2023-10/ASHRAE901_all.zip",
-            bytes.fromhex(
-                "de35252dada89f6e24f6007e24c2c1796a047c294707f491b65e81cc7ee212ab"
-            ),
+def ASHRAE901_all_zip() -> Derivation:
+    return DownloadFile(
+        "ASHRAE901_all.zip",
+        "https://www.energycodes.gov/sites/default/files/2023-10/ASHRAE901_all.zip",
+        bytes.fromhex(
+            "de35252dada89f6e24f6007e24c2c1796a047c294707f491b65e81cc7ee212ab"
         ),
     )
 
 
 @derivation("idf_index.parquet")
-def index_buildings(input: Path):
+def index_buildings(input_zip: Path):
     dst = OUTPUT.get()
-    directory = input
     records = []
+
+    idf_pattern = re.compile(r".*\.idf$")
+
+    with zipfile.ZipFile(input_zip) as zip_ref:
+        info_list = zip_ref.infolist()
 
     pattern = re.compile(r"^ASHRAE901_([^_]+)_STD(\d{4})_([^.]+)\.idf$")
 
-    # Get all .idf files in the directory
-    directory_path = Path(directory)
-    for file_path in directory_path.glob("*.idf"):
-        filename = file_path.name
-        match = pattern.match(filename)
+    for info in info_list:
+        if not idf_pattern.match(info.filename):
+            continue
 
+        match = pattern.match(info.filename)
         if match:
             building_type = match.group(1)
             year = match.group(2)
             place = match.group(3)
 
-            records.append((building_type, int(year), place, str(file_path)))
+            records.append((building_type, int(year), place, str(info.filename)))
 
     # Sort by building type, then year, then place for consistent ordering
     records.sort(key=lambda x: (x[0], x[1], x[2]))
-
-    df = DataFrame(records, columns=["building_type", "year", "place", "path"])
+    df = DataFrame(records, columns=["building_type", "year", "place", "filename"])
     df.to_parquet(str(dst))
 
 
 @derivation("epw_index.parquet")
-def index_weathers(input: Path):
+def index_weathers(input_zip: Path):
     dst = OUTPUT.get()
-    directory = input
     records = []
 
-    pattern = re.compile(r"^USA_([^.]+)_([^.]+).*$")
+    pattern = re.compile(r"^USA_([^.]+)_([^.]+).*\.epw$")
 
-    # Get all .idf files in the directory
-    for file_path in directory.glob("*.epw"):
-        filename = file_path.name
-        match = pattern.match(filename)
+    with zipfile.ZipFile(input_zip) as zip_ref:
+        info_list = zip_ref.infolist()
+
+    # Get all .epw files in the directory
+    for file_info in info_list:
+        match = pattern.match(file_info.filename)
 
         if match:
             state = match.group(1)
             county = match.group(2)
 
-            records.append((state, county, str(file_path)))
+            records.append((state, county, str(file_info.filename)))
 
     # Sort by building type, then year, then place for consistent ordering
     records.sort(key=lambda x: (x[0], x[1], x[2]))
 
-    df = DataFrame(records, columns=["state", "county", "path"])
+    df = DataFrame(records, columns=["state", "county", "filename"])
     df.to_parquet(str(dst))
 
 
 def search_buildings(
     building_type: str | None = None, year: int | None = None, place: str | None = None
 ) -> DataFrame:
-    idf_index = realize(STORE_PATH.get(), index_buildings(ASHRAE901_all()))
+    zip_derivation = ASHRAE901_all_zip()
+
+    idf_index = realize(STORE_PATH.get(), index_buildings(zip_derivation))
     db = duckdb.from_parquet(str(idf_index))
 
     expr = db
@@ -113,21 +118,22 @@ def search_buildings(
 
     ep = energyplus_path()
 
-    def trans(path):
+    def trans(name: str):
         return lambda: create_complete_pipeline(
-            Constant(Path(path)),
+            extract_from_zip(zip_derivation, name),
             ep,
             src_version="22.1.0",
         )
 
-    return df.assign(derivation_thunk=df["path"].apply(trans))
+    return df.assign(derivation_thunk=df["filename"].apply(trans))
 
 
 def search_weathers(
     state: str | None = None,
     county: str | None = None,
 ) -> DataFrame:
-    epw_index = realize(STORE_PATH.get(), index_weathers(ASHRAE901_all()))
+    zip_derivation = ASHRAE901_all_zip()
+    epw_index = realize(STORE_PATH.get(), index_weathers(zip_derivation))
     db = duckdb.from_parquet(str(epw_index))
     expr = db
     if state is not None:
@@ -142,10 +148,10 @@ def search_weathers(
 
     df = expr.to_df()
 
-    def trans(path: str):
-        return lambda: Constant(Path(path))
+    def trans(filename: str):
+        return lambda: extract_from_zip(zip_derivation, filename)
 
-    return df.assign(derivation_thunk=df["path"].apply(trans))
+    return df.assign(derivation_thunk=df["filename"].apply(trans))
 
 
 def search_config(
@@ -155,7 +161,7 @@ def search_config(
     state: str | None = None,
     county: str | None = None,
 ) -> BuildingConfig:
-    b = realize(
+    b, actuators = realize(
         STORE_PATH.get(),
         search_buildings(
             building_type=building_type,
@@ -182,5 +188,5 @@ def search_config(
         eplus_output_dir=Path(tempfile.mkdtemp()),
         warmup_phases=3,
         area=1000.0,
-        hvac_actuators=[],
+        hvac_actuators=actuators,
     )
