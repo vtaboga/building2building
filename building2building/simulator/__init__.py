@@ -1,4 +1,5 @@
 import itertools
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,7 @@ from building2building.types import (
     DeadbandRewardConfig,
 )
 
+from .controllable_zones import get_all_controllable_zones
 from .transform_utils import TransformInverse
 
 logger = logging.getLogger(__name__)
@@ -85,7 +87,12 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     eplus_output_dir = building_config.eplus_output_dir
 
-    ont = Ontology.from_json(building_config.path_to_building)
+    with open(building_config.path_to_building, "r") as epjson_file:
+        epjson: dict[str, Any] = json.load(epjson_file)
+
+    ont = Ontology.from_object(epjson)
+
+    controlled_zones = get_all_controllable_zones(epjson)
 
     # We compute the observation side stuff
     obs_info = flat_observation_info(ont, area=building_config.area)
@@ -113,19 +120,19 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
             area=building_config.area,
-            setpoints={},
+            controlled_zones=controlled_zones,
             energy_weight=building_config.reward_config.energy_weight,
         )
     elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
             area=building_config.area,
-            setpoints={},
+            controlled_zones=controlled_zones,
             energy_weight=building_config.reward_config.energy_weight,
         )
     elif isinstance(building_config.reward_config, DeadbandRewardConfig):
         reward_function = DeadbandReward(
             area=building_config.area,
-            setpoints={},
+            controlled_zones=controlled_zones,
             energy_weight=building_config.reward_config.energy_weight,
             target_temp=building_config.reward_config.target_temp,
             dT=building_config.reward_config.dT,
@@ -134,10 +141,8 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         raise ValueError(f"Invalid reward type: {building_config.reward_config}")
 
     # Finally, we compute the data necessary to fillin the metadata
-    # TODO: Determine controlled zones from HVAC actuators (not thermostat setpoints)
-    controlled_zones = []  # Empty for now - HVAC actuator mode doesn't control via zone setpoints
-    all_zones = [str(z) for z in ont.zones()]
-    uncontrolled_zones = all_zones  # All zones are "uncontrolled" in the setpoint sense
+    all_zones = set(str(z) for z in ont.zones())
+    uncontrolled_zones = sorted(all_zones.difference(set(controlled_zones)))
 
     gymenv = EnergyPlusEnvironment[np.ndarray, np.ndarray](
         make_energyplus,

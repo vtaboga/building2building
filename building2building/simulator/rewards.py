@@ -8,7 +8,7 @@ from building2building.simulator.action_spaces import ThermostatSetpoint
 def base_reward_function(
     obs,
     area: float,
-    setpoints: dict[str, list[ThermostatSetpoint]] | None = None,
+    controlled_zones: list[str],
     energy_weight=1.0,
 ) -> float:
     """Calculate a reward combining temperature tracking and energy consumption.
@@ -26,13 +26,6 @@ def base_reward_function(
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
     energy_penalty = energy_penalty / 3600.0 / area
 
-    # If no setpoints provided, return just the power penalty
-    if setpoints is None:
-        return -energy_penalty
-
-    # Get controlled zones (zones that have setpoints)
-    controlled_zones = list(setpoints.keys())
-
     # Calculate temperature tracking error for controlled zones
     temp_error = 0
     target_temp = 21.0  # Target temperature in °C
@@ -41,9 +34,7 @@ def base_reward_function(
         current_temp = obs["temperature"][zone]
         temp_error += (current_temp - target_temp) ** 2
 
-    # Calculate mean squared error
-    if controlled_zones:
-        temp_error = temp_error / len(controlled_zones)
+    temp_error = temp_error / len(controlled_zones)
 
     # Combine rewards (negative values represent penalties)
     # Equal weighting between temperature tracking and energy consumption
@@ -55,17 +46,19 @@ def base_reward_function(
 @dataclass
 class BaseReward:
     area: float
-    setpoints: dict[str, list[ThermostatSetpoint]]
+    controlled_zones: list[str]
     energy_weight: float
 
     def __call__(self, obs):
-        return base_reward_function(obs, self.area, self.setpoints, self.energy_weight)
+        return base_reward_function(
+            obs, self.area, self.controlled_zones, self.energy_weight
+        )
 
 
 def barrier_reward_function(
     obs,
     area: float,
-    setpoints: dict[str, list[ThermostatSetpoint]] | None = None,
+    controlled_zones: list[str],
     energy_weight=1.0,
 ) -> float:
     """Calculate a reward combining temperature tracking and energy consumption.
@@ -84,13 +77,6 @@ def barrier_reward_function(
         obs["energy"]["HVAC_electricity"] + obs["energy"]["HVAC_natural_gas"]
     )
     energy_penalty = energy_penalty / 3600.0 / area
-
-    # If no setpoints provided, return just the power penalty
-    if setpoints is None:
-        return -energy_penalty
-
-    # Get controlled zones (zones that have setpoints)
-    controlled_zones = list(setpoints.keys())
 
     # Calculate temperature tracking error for controlled zones
     temp_error = 0
@@ -112,53 +98,47 @@ def barrier_reward_function(
 @dataclass
 class BarrierReward:
     area: float
-    setpoints: dict[str, list[ThermostatSetpoint]]
+    controlled_zones: list[str]
     energy_weight: float
 
     def __call__(self, obs):
         return barrier_reward_function(
-            obs, self.area, self.setpoints, self.energy_weight
+            obs, self.area, self.controlled_zones, self.energy_weight
         )
 
 
 def deadband_reward_function(
     obs,
     area: float,
-    setpoints: dict[str, list[ThermostatSetpoint]] | None = None,
+    controlled_zones: list[str],
     energy_weight=1.0,
     target_temp: float = 21.0,
     dT: float = 0.5,
-    return_components: bool = False
 ) -> float:
-
     # Energy consumption penalty (in Wh/floor area)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
     energy_penalty = energy_penalty / 3600.0 / area
 
     # Comfort: temperature error for controlled zones
     temp_error = 0
-    
-    controlled_zones = list(setpoints.keys())
 
     for zone in controlled_zones:
         current_temp = obs["temperature"][zone]
         temp_error += np.max([0, np.abs(current_temp - target_temp) - dT])
-    
-    if controlled_zones:
-        temp_error = temp_error / len(controlled_zones)
+
+    temp_error = temp_error / len(controlled_zones)
 
     comfort_penalty = temp_error
 
     total_reward = -(comfort_penalty + energy_weight * energy_penalty)
 
-    if return_components:
-        return total_reward, comfort_penalty, energy_penalty
     return total_reward
+
 
 @dataclass
 class DeadbandReward:
     area: float
-    setpoints: dict[str, list[ThermostatSetpoint]]
+    controlled_zones: list[str]
     energy_weight: float
     target_temp: float
     dT: float
@@ -167,8 +147,8 @@ class DeadbandReward:
         return deadband_reward_function(
             obs=obs,
             area=self.area,
-            setpoints=self.setpoints,
+            controlled_zones=self.controlled_zones,
             energy_weight=self.energy_weight,
             target_temp=self.target_temp,
-            dT=self.dT
+            dT=self.dT,
         )
