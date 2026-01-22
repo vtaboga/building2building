@@ -1,8 +1,10 @@
+import io
 import itertools
 import json
 import logging
 import subprocess
 import tempfile
+import zipfile
 from importlib.resources import files
 from pathlib import Path
 
@@ -22,8 +24,10 @@ from building2building.store import (
     OUTPUT,
     Constant,
     Derivation,
+    ExtractFromZip,
     ExtractZip,
     LocalFile,
+    Realizable,
     derivation,
     realize,
 )
@@ -38,77 +42,82 @@ from pandas import DataFrame
 logger = logging.getLogger(__name__)
 
 
-def _build_control_derivation(idf_path: Path, schedule_path: Path, ep: Derivation):
+# We should try not to call this function too often. Each call of LocalFile
+# requires reading the file in its entirety, which is bad. Perhaps this should
+# use LocalSymlink?
+def dataset_zip() -> Derivation:
+    place = files("building2building.sources.data") / "hydroquebec.zip"
+    if not isinstance(place, Path):
+        raise Exception("error")
+
+    return LocalFile(place)
+
+
+@derivation("table.parquet")
+def table_index(root_zip: Path):
+    out = OUTPUT.get()
+
+    with zipfile.ZipFile(root_zip) as zip_ref:
+        contents = io.StringIO(
+            zip_ref.open("2025-10-09_building-stock-100-mila.csv")
+            .read()
+            .decode("utf-8")
+        )
+
+    df = duckdb.from_csv_auto(contents).to_df()
+
+    df = df.assign(
+        epw_filename=df.weather_station_epw_filepath.apply(
+            lambda name: f"weather/{name}"
+        )
+    )
+
+    df = df.assign(
+        idf_filename=[f"IDFsAndSchedules/{i}/in.idf" for i in range(1, len(df) + 1)]
+    )
+
+    df = df.assign(
+        schedule_filename=[
+            f"IDFsAndSchedules/{i}/in.schedules.csv" for i in range(1, len(df) + 1)
+        ]
+    )
+
+    df = df.drop(columns=["geometry_roof_pitch"])
+
+    df.to_parquet(str(out))
+
+
+def _build_control_derivation(
+    root_zip: Realizable, idf_filename: str, schedule_filename: str, ep: Realizable
+):
     """
     Build control-ready epJSON from IDF (hydroquebec-specific).
 
     Pipeline: IDF → prepare → link schedule → make controllable
     """
-    # Step 1: Prepare epJSON (upgrade, convert, add meters, set timestep)
-    epjson = prepare_building(Constant(idf_path), ep, src_version="24.2.0")
 
+    idf_derivation = ExtractFromZip(root_zip, idf_filename)
+
+    # Step 1: Prepare epJSON (upgrade, convert, add meters, set timestep)
+    epjson = prepare_building(idf_derivation, ep, src_version="24.2.0")
+
+    schedule_derivation = ExtractFromZip(root_zip, schedule_filename)
     # Step 2: Link schedule data (hydroquebec-specific)
-    epjson = link_in_schedule(epjson, Path(schedule_path))
+    epjson = link_in_schedule(epjson, schedule_derivation)
 
     # Step 3: Make controllable
     return make_controllable(epjson)
 
 
-def extracted() -> Derivation:
-    place = files("building2building.sources.data") / "hydroquebec.zip"
-    if not isinstance(place, Path):
-        raise Exception("error")
-
-    return ExtractZip(LocalFile(place))
-
-
-def table_index():
-    @derivation("table.parquet")
-    def build_database(root: Path):
-        out = OUTPUT.get()
-
-        df = duckdb.from_csv_auto(
-            str(root / "2025-10-09_building-stock-100-mila.csv")
-        ).to_df()
-
-        df = df.assign(
-            epw_path=df.weather_station_epw_filepath.apply(
-                lambda name: str(root / "weather" / name)
-            )
-        )
-
-        df = df.assign(
-            idf_path=[
-                str(root / "IDFsAndSchedules" / str(i) / "in.idf")
-                for i in range(1, len(df) + 1)
-            ]
-        )
-
-        df = df.assign(
-            schedule_path=[
-                str(root / "IDFsAndSchedules" / str(i) / "in.schedules.csv")
-                for i in range(1, len(df) + 1)
-            ]
-        )
-
-        df = df.drop(columns=["geometry_roof_pitch"])
-
-        df.to_parquet(str(out))
-
-    return build_database(extracted())
-
-
-def search_weathers() -> DataFrame:
-    index = realize(STORE_PATH.get(), table_index())
-    return duckdb.from_parquet(str(index)).to_df()
-
-
 def search_buildings(**query) -> DataFrame:
-    index = realize(STORE_PATH.get(), table_index())
+    root_zip = dataset_zip()
+    index = realize(STORE_PATH.get(), table_index(root_zip))
     ep = energyplus_path()
 
-    def trans(idf_path, schedule_path):
-        return lambda: _build_control_derivation(str(idf_path), str(schedule_path), ep)
+    def trans(idf_filename, schedule_filename):
+        return lambda: _build_control_derivation(
+            root_zip, idf_filename, schedule_filename, ep
+        )
 
     db = duckdb.from_parquet(str(index))
 
@@ -123,7 +132,9 @@ def search_buildings(**query) -> DataFrame:
 
     df = db.to_df()
 
-    df = df.assign(derivation_thunk=list(map(trans, df.idf_path, df.schedule_path)))
+    df = df.assign(
+        derivation_thunk=list(map(trans, df.idf_filename, df.schedule_filename))
+    )
     return df
 
 
@@ -158,21 +169,26 @@ def search_configs(
         and isinstance(config_nn["bldg"], dict)
     ):
         config_nn = config_nn["bldg"]
-    ep_path = energyplus_path()
 
     rows = search_buildings(**config_nn)
 
+    root_zip = dataset_zip()
+
     configs: list[BuildingConfig] = []
     for _, row in itertools.islice(rows.iterrows(), n):
-        epw = Path(row.epw_path)  # use the weather file for THIS building
+        epw_derivation = ExtractFromZip(
+            root_zip, row.epw_filename
+        )  # use the weather file for THIS building
 
         # Get control-ready building with actuators from make_controllable()
         control_derivation = row.derivation_thunk()
         epjson, actuator_descriptions = realize(STORE_PATH.get(), control_derivation)
-
         metadata = realize(
-            STORE_PATH.get(), extract_discovery_metadata(Constant(epjson), epw)
+            STORE_PATH.get(),
+            extract_discovery_metadata(Constant(epjson), epw_derivation),
         )
+
+        epw = realize(STORE_PATH.get(), epw_derivation)
 
         area = metadata.net_conditioned_area
         warmup_phases = metadata.warmup_phases

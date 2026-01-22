@@ -40,6 +40,11 @@ class Derivation:
     # Builder now receives only realized dependencies; output path is read from the ContextVar
     builder: Callable[[list[Any]], None]
 
+    def __post_init__(self):
+        assert Path(self.name).name == self.name, (
+            "name of derivation can't contain a slash"
+        )
+
 
 Result = TypeVar("Result")
 
@@ -329,8 +334,8 @@ def ExtractZip(input_der: Derivation):
     return inner(input_der)
 
 
-def extract_from_zip(zip_file: Derivation, filename: str) -> Derivation:
-    @derivation(filename)
+def ExtractFromZip(zip_file: Realizable, filename: str) -> Derivation:
+    @derivation(Path(filename).name)
     def inner(input: Path, name: str):
         dst = OUTPUT.get()
         with zipfile.ZipFile(input, "r") as zip_ref:

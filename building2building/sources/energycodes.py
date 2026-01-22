@@ -12,10 +12,10 @@ from building2building.store import (
     Constant,
     Derivation,
     DownloadFile,
+    ExtractFromZip,
     ExtractZip,
     Rename,
     derivation,
-    extract_from_zip,
     realize,
 )
 from building2building.types import BaseRewardConfig, BuildingConfig
@@ -120,7 +120,7 @@ def search_buildings(
 
     def trans(name: str):
         return lambda: create_complete_pipeline(
-            extract_from_zip(zip_derivation, name),
+            ExtractFromZip(zip_derivation, name),
             ep,
             src_version="22.1.0",
         )
@@ -149,7 +149,7 @@ def search_weathers(
     df = expr.to_df()
 
     def trans(filename: str):
-        return lambda: extract_from_zip(zip_derivation, filename)
+        return lambda: ExtractFromZip(zip_derivation, filename)
 
     return df.assign(derivation_thunk=df["filename"].apply(trans))
 
