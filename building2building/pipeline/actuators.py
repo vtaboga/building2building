@@ -206,6 +206,21 @@ WHERE {
             fan_mode_schedule_name
         )
 
+        supply_fan_name = unitary_system["supply_fan_name"]
+
+        # The fan air mass flow rate isn't acuated through a schedule, but
+        # directly through an EnergyManagementSystem:Actuator.
+
+        fan_air_mass_flow_rate = ActuatorDescription(
+            "Fan",
+            "Fan Air Mass Flow Rate",
+            supply_fan_name,
+            "[kg/s]",
+            0,
+            100,
+        )
+        new_actuators.append(fan_air_mass_flow_rate)
+
         for node in set(
             [
                 outlet_node,
