@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
-import wandb
 from building2building.simulator import create_simulator
 from building2building.sources import hydroquebec
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
+from algorithms.wandb_utils import wandb_log_xy_series
 
 logger = logging.getLogger(__name__)
 
@@ -94,16 +94,14 @@ def _log_line_series(df: pd.DataFrame):
         # Average each 4 consecutive elements (n is multiple of 4)
         y = series.reshape(-1, 4).mean(axis=1)
         xs = list(range(0, n//4))
-        table = wandb.Table(columns=["timestep", "value"])
-        for i, t in enumerate(xs):
-            table.add_data(int(t), float(y[i]))
-        chart = wandb.plot.line(
-            table,
-            x="timestep",
-            y="value",
+        wandb_log_xy_series(
+            x=xs,
+            y=[float(v) for v in y],
+            key=f"Test Graphs/{col}",
             title=str(col),
+            x_name="timestep",
+            y_name="value",
         )
-        wandb.log({f"Test Graphs/{col}": chart})
 
 
 def log_test_graphs_wandb(test_csv: str | Path):

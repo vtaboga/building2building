@@ -1,0 +1,50 @@
+type: unitary_airflow_first_sat
+
+# Control objective
+target_temp_c: 19.0
+deadband_c: 1.0
+
+# Optional time-based target schedule (no hardcoded setpoints in code).
+# EnergyPlus day_of_week convention: 1=Sunday, ..., 7=Saturday
+target_schedule:
+  enabled: true
+  weekend_days: [1, 7]
+  weekend_target_c: 21.0
+  weekday_target_c: 21.0
+  weekday_setback_target_c: 18.0
+  weekday_setback_start_hour: 9.0
+  weekday_setback_end_hour: 16.0
+
+# Force HVAC system available while commanding airflow + setpoints.
+# EnergyPlus availability override values:
+# 1=ForceOff, 2=CycleOn, 3=CycleOnZoneFansOnly
+availability_on: 2.0
+
+# Default outlet (supply) air temperature setpoints used on mode entry [°C]
+outlet_temp_heating_c: 35.0
+outlet_temp_cooling_c: 14.0
+
+# Primary loop: PI on fan air mass flow rate [kg/s]
+# Tuned to reduce oscillations (less aggressive than defaults).
+fan_base_kg_s: 0.3
+kp: 0.2
+ki: 0.0002
+integral_limit: 200.0
+
+# Optional clamps (null means "use action_space bounds")
+fan_min_kg_s: null
+fan_max_kg_s: null
+
+# Secondary loop: SAT trim/reset (only when airflow is pegged and still in error)
+sat_min_c: 10.0
+sat_max_c: 45.0
+
+# Step applied when saturated (sign chosen by mode: heating warms, cooling cools)
+sat_step_c: 0.2
+
+# Per-step rate limit on SAT changes (large default disables rate limiting)
+sat_rate_limit_c_per_step: 0.2
+
+# Require airflow to be at min/max for N steps before trimming SAT
+sat_saturation_steps: 4
+

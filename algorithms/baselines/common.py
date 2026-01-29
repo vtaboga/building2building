@@ -88,6 +88,74 @@ def find_controlled_zone_air_temp_index(
     return find_first_zone_air_temp_index(observation_names)
 
 
+def _find_obs_index_by_name(observation_names: list[str], *, key: str) -> int:
+    """
+    Find the index of a time-like scalar observation by its canonical key.
+
+    `flat_observation_info` uses canonical slot names like "time_of_day".
+    This helper also supports best-effort substring matching for robustness.
+    """
+    key_l = key.strip().lower()
+    for i, name in enumerate(observation_names):
+        if str(name).strip().lower() == key_l:
+            return int(i)
+    for i, name in enumerate(observation_names):
+        if key_l in str(name).strip().lower():
+            return int(i)
+    raise RuntimeError(f"Could not find observation '{key}' in observation_names")
+
+
+def find_time_of_day_index(observation_names: list[str]) -> int:
+    return _find_obs_index_by_name(observation_names, key="time_of_day")
+
+
+def find_day_of_week_index(observation_names: list[str]) -> int:
+    return _find_obs_index_by_name(observation_names, key="day_of_week")
+
+
+def find_zone_air_temp_index_for_zone(observation_names: list[str], *, zone_name: str) -> int:
+    """
+    Find the flat observation index for "Zone Air Temperature {zone}".
+
+    Matches the naming conventions used by `flat_observation_info`.
+    """
+    zn = zone_name.strip().lower()
+    prefix = "zone air temperature"
+
+    # Exact-ish match.
+    for i, name in enumerate(observation_names):
+        s = str(name).strip()
+        sl = s.lower()
+        if not sl.startswith(prefix):
+            continue
+        zone_part = sl[len(prefix) :].strip()
+        if zone_part == zn:
+            return int(i)
+
+    # Fallback substring match.
+    for i, name in enumerate(observation_names):
+        sl = str(name).strip().lower()
+        if not sl.startswith(prefix):
+            continue
+        zone_part = sl[len(prefix) :].strip()
+        if zn in zone_part or zone_part in zn:
+            return int(i)
+
+    raise RuntimeError(f"Could not find Zone Air Temperature for zone '{zone_name}'")
+
+
+def find_obs_index_by_exact_name(observation_names: list[str], *, name: str) -> int | None:
+    """
+    Find an observation index by exact (case-insensitive) match.
+    Returns None if not present.
+    """
+    key = name.strip().lower()
+    for i, n in enumerate(observation_names):
+        if str(n).strip().lower() == key:
+            return int(i)
+    return None
+
+
 def find_action_index(
     action_names: list[str], component_type: str, control_type: str
 ) -> int | None:

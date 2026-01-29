@@ -20,10 +20,13 @@ def select_unitary_actuator_indices(action_names: list[str]) -> UnitaryActuatorI
     Select actuator indices for unitary HVAC control mode:
     - availability override
     - fan air mass flow
-    - coil/outlet node temperature setpoints
+    - outlet (or "outlet-like") node temperature setpoints
 
-    We support two equivalent encodings for node setpoints:
-    - Preferred: Schedule:* / Schedule Value actuators (B2B scheduled node setpoints)
+    We support two equivalent encodings for outlet setpoints:
+    - Preferred: `Schedule:Constant` / `Schedule Value` actuators created by
+      `make_unitary_hvac_controllable` (B2B scheduled node setpoints). Note:
+      recent versions name these schedules as "B2B unitaryhvac schedule for node (N)"
+      (no longer encoding the node role in the schedule name).
     - Fallback: System Node Setpoint / Temperature Setpoint actuators (fixtures / legacy)
     """
     idx_avail = find_action_indices(
@@ -38,6 +41,8 @@ def select_unitary_actuator_indices(action_names: list[str]) -> UnitaryActuatorI
     )
 
     # 1) Preferred: scheduled setpoints (Schedule Value actuators)
+    #
+    # Legacy naming (role encoded in the schedule name).
     idx_heat_nodes_sched = find_action_indices(
         action_names,
         component_type_prefix="schedule:",
@@ -62,6 +67,25 @@ def select_unitary_actuator_indices(action_names: list[str]) -> UnitaryActuatorI
         control_type="schedule value",
         component_name_contains="b2b node temp sp unitary_outlet",
     )
+
+    # Current naming: schedules are created per node, but without embedding the
+    # node role in the schedule name. In that case, we conservatively treat all
+    # unitaryhvac node schedules as "outlet-like" setpoints so the baseline can
+    # still hold all relevant node setpoints at a reasonable fixed value.
+    idx_unitary_nodes_sched = find_action_indices(
+        action_names,
+        component_type_prefix="schedule:constant",
+        control_type="schedule value",
+        component_name_contains="b2b unitaryhvac schedule for node",
+    )
+    if (
+        not idx_heat_nodes_sched
+        and not idx_supp_nodes_sched
+        and not idx_cool_nodes_sched
+        and not idx_outlet_nodes_sched
+        and idx_unitary_nodes_sched
+    ):
+        idx_outlet_nodes_sched = idx_unitary_nodes_sched
 
     # 2) Fallback: direct system node setpoint actuators (fixtures / legacy)
     idx_heat_nodes_node = find_action_indices(
@@ -113,15 +137,12 @@ def select_unitary_actuator_indices(action_names: list[str]) -> UnitaryActuatorI
         idx_outlet_nodes = idx_outlet_nodes_node
 
     if not idx_fans or (
-        not idx_heat_nodes
-        and not idx_supp_nodes
-        and not idx_cool_nodes
-        and not idx_outlet_nodes
+        not idx_outlet_nodes
     ):
         raise RuntimeError(
-            "Baseline fan/node-setpoint controller could not find required actuators in action_names. "
+            "Baseline unitary PI controller could not find required actuators in action_names. "
             "Expected at least one Fan::Fan Air Mass Flow Rate and at least one "
-            "node temperature setpoint actuator (scheduled or direct) for a coil/outlet node.\n"
+            "outlet (or outlet-like) node temperature setpoint actuator (scheduled or direct).\n"
             f"action_names={action_names}"
         )
 

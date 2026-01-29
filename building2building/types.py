@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Union
+from typing import Any, Literal, Union
 
 
 @dataclass
@@ -44,3 +44,6 @@ class BuildingConfig:
     warmup_phases: int
     area: float
     hvac_actuators: list[ActuatorDescription]
+    # Optional metadata describing the building source/selection (e.g. dataset row id,
+    # original IDF filename, weather station, etc.). This is meant for logging/debug.
+    source_metadata: dict[str, Any] = field(default_factory=dict)

@@ -9,15 +9,30 @@ import pandas as pd
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
+from algorithms.wandb_utils import (
+    finish_wandb_if_started,
+    init_wandb_from_config,
+)
 from algorithms.baselines.common import (
     RolloutPaths,
+    find_day_of_week_index,
     find_controlled_zone_air_temp_index,
+    find_obs_index_by_exact_name,
+    find_time_of_day_index,
+    find_zone_air_temp_index_for_zone,
     make_rollout_paths,
     require_env_metadata_list_str,
 )
 from algorithms.baselines.controllers.fan_coil_constant import compute_fan_command_constant
-from algorithms.baselines.controllers.unitary_pi import PIState, compute_fan_command_pi
-from algorithms.baselines.plotting import plot_actuators_dual_axis
+from algorithms.baselines.controllers.unitary_airflow_first_sat import (
+    AirflowFirstSatState,
+    compute_outlet_sat_sp_airflow_first,
+)
+from algorithms.baselines.controllers.unitary_pi import (
+    PIState,
+    UnitaryPIMode,
+    compute_fan_command_pi,
+)
 from algorithms.baselines.unitary_actuators import select_unitary_actuator_indices
 
 logger = logging.getLogger(__name__)
@@ -60,8 +75,27 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
     eplus_output_dir = run_dir / "eplus_outputs"
     env = _get_make_env()(config=cfg, eplus_output_dir=str(eplus_output_dir))
     try:
+        # Log which *actual* building was fetched/selected (not just the query config).
+        building_source_meta: dict[str, object] = {}
+        if hasattr(env, "metadata") and isinstance(env.metadata, dict):
+            raw = env.metadata.get("building_source_metadata")
+            if isinstance(raw, dict):
+                building_source_meta = dict(raw)
+
+        if building_source_meta:
+            # Write to disk for reproducibility / debugging.
+            try:
+                with (paths.out_dir / "building_info.json").open("w", encoding="utf-8") as f:
+                    json.dump(building_source_meta, f, indent=2)
+            except Exception as e:
+                logger.warning("Failed to write building_info.json: %s", e)
+
         obs_names = require_env_metadata_list_str(env, "observation_names")
         act_names = require_env_metadata_list_str(env, "action_names")
+
+        # Initialize Weights & Biases early so we can log per-step scalars
+        # (which creates plots in the "rollout" panel) without logging W&B Tables.
+        wandb_run, started_here = init_wandb_from_config(cfg, run_dir=run_dir)
 
         # Print action bounds for debugging.
         try:
@@ -104,12 +138,115 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
         target = float(getattr(cfg.policy, "target_temp_c", 21.0))
         deadband = float(getattr(cfg.policy, "deadband_c", 1.0))
 
-        # Node setpoints: keep them at "classic" values (configurable) while airflow does the work.
-        t_heat = float(getattr(cfg.policy, "heating_coil_setpoint_c", 35.0))
-        t_supp = float(getattr(cfg.policy, "supplemental_coil_setpoint_c", 45.0))
-        t_cool = float(getattr(cfg.policy, "cooling_coil_setpoint_c", 12.0))
-        # Supply/outlet node setpoint (unitary system air outlet node).
-        t_outlet = float(getattr(cfg.policy, "outlet_node_setpoint_c", 22.0))
+        # Baseline rollout reward: compute a deadband-style reward per step and
+        # log episode return.
+        #
+        # This is independent from the environment reward, and supports
+        # time-varying target setpoints (e.g. weekday setback schedule).
+        reward_energy_weight = float(getattr(cfg.reward, "energy_weight", 0.0))
+        reward_deadband_c = float(getattr(cfg.reward, "dT", 0.5))
+
+        # Indices needed for reward computation from flat observations.
+        idx_energy_elec = find_obs_index_by_exact_name(obs_names, name="energy_electricity")
+        idx_energy_gas = find_obs_index_by_exact_name(obs_names, name="energy_gas")
+        idx_outdoor_temp = find_obs_index_by_exact_name(obs_names, name="outdoor_temperature")
+        idx_time_of_day = find_obs_index_by_exact_name(obs_names, name="time_of_day")
+        controlled_zone_temp_idxs: list[int] = []
+        if controlled_zones:
+            for z in controlled_zones:
+                try:
+                    controlled_zone_temp_idxs.append(
+                        find_zone_air_temp_index_for_zone(obs_names, zone_name=z)
+                    )
+                except Exception:
+                    continue
+        if not controlled_zone_temp_idxs:
+            # Fallback: at least compute reward from the representative zone temperature.
+            controlled_zone_temp_idxs = [int(temp_idx)]
+
+        # Optional time-based target setpoint schedule.
+        #
+        # When enabled, we compute the active target setpoint from:
+        # - time_of_day (hours)
+        # - day_of_week (EnergyPlus convention: 1=Sunday, ..., 7=Saturday)
+        schedule_cfg = getattr(cfg.policy, "target_schedule", None)
+        schedule_enabled = bool(getattr(schedule_cfg, "enabled", False)) if schedule_cfg else False
+        time_of_day_idx: int | None = None
+        day_of_week_idx: int | None = None
+        weekend_days: set[int] = {1, 7}
+        weekend_target_c = 21.0
+        weekday_target_c = 21.0
+        weekday_setback_target_c = 18.0
+        weekday_setback_start_hour = 9.0
+        weekday_setback_end_hour = 16.0
+
+        if schedule_enabled:
+            time_of_day_idx = find_time_of_day_index(obs_names)
+            day_of_week_idx = find_day_of_week_index(obs_names)
+
+            raw_weekend_days = getattr(schedule_cfg, "weekend_days", [1, 7])
+            try:
+                weekend_days_list = list(raw_weekend_days)
+            except Exception as e:
+                raise RuntimeError(
+                    "policy.target_schedule.weekend_days must be a list-like of ints"
+                ) from e
+            if not weekend_days_list or not all(
+                isinstance(x, (int, float)) and not isinstance(x, bool)
+                for x in weekend_days_list
+            ):
+                raise RuntimeError(
+                    "policy.target_schedule.weekend_days must be a list-like of ints"
+                )
+            weekend_days = {int(x) for x in weekend_days_list}
+
+            weekend_target_c = float(getattr(schedule_cfg, "weekend_target_c"))
+            weekday_target_c = float(getattr(schedule_cfg, "weekday_target_c"))
+            weekday_setback_target_c = float(
+                getattr(schedule_cfg, "weekday_setback_target_c")
+            )
+            weekday_setback_start_hour = float(
+                getattr(schedule_cfg, "weekday_setback_start_hour")
+            )
+            weekday_setback_end_hour = float(
+                getattr(schedule_cfg, "weekday_setback_end_hour")
+            )
+
+        def _scheduled_target_c(*, obs_arr: np.ndarray) -> float:
+            if not schedule_enabled:
+                return float(target)
+            assert time_of_day_idx is not None and day_of_week_idx is not None
+            tod = float(obs_arr[time_of_day_idx])
+            # Normalize to [0, 24) for robust comparisons even if E+ returns 24/25 at boundaries.
+            hour = float(tod % 24.0)
+
+            dow = int(round(float(obs_arr[day_of_week_idx])))
+            if dow in weekend_days:
+                return float(weekend_target_c)
+
+            # Weekday.
+            if weekday_setback_start_hour <= hour < weekday_setback_end_hour:
+                return float(weekday_setback_target_c)
+            return float(weekday_target_c)
+
+        # Unitary PI baseline: only control fan airflow + a single outlet node temperature setpoint.
+        #
+        # Prefer explicit outlet temps if provided; otherwise fall back to legacy keys
+        # (previously used to drive multiple node setpoints).
+        outlet_heat_c = float(
+            getattr(
+                cfg.policy,
+                "outlet_temp_heating_c",
+                getattr(cfg.policy, "heating_coil_setpoint_c", 35.0),
+            )
+        )
+        outlet_cool_c = float(
+            getattr(
+                cfg.policy,
+                "outlet_temp_cooling_c",
+                getattr(cfg.policy, "cooling_coil_setpoint_c", 12.0),
+            )
+        )
 
         # Force HVAC system available while commanding airflow + setpoints.
         availability_on = float(getattr(cfg.policy, "availability_on", 2.0))
@@ -125,20 +262,36 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
         fan_min_cfg = getattr(cfg.policy, "fan_min_kg_s", None)
         fan_max_cfg = getattr(cfg.policy, "fan_max_kg_s", None)
 
+        # Option 1: airflow-first with SAT trim/reset
+        sat_min_c = float(getattr(cfg.policy, "sat_min_c", 10.0))
+        sat_max_c = float(getattr(cfg.policy, "sat_max_c", 45.0))
+        sat_step_c = float(getattr(cfg.policy, "sat_step_c", 0.5))
+        sat_rate_limit_c_per_step = float(
+            getattr(cfg.policy, "sat_rate_limit_c_per_step", 1e6)
+        )
+        sat_saturation_steps = int(getattr(cfg.policy, "sat_saturation_steps", 1))
+
         all_rows: list[dict[str, float]] = []
+        episode_returns_deadband: list[float] = []
+        last_time_of_day: float | None = None
 
         for ep in range(n_episodes):
             obs, _info = env.reset()
             done = False
             step = 0
             pi_state = PIState(integral=0.0)
+            sat_state = AirflowFirstSatState(sat_sp_c=float(target))
+            ep_return_deadband = 0.0
 
             while not done and step < max_steps:
                 tz = float(np.asarray(obs, dtype=float).reshape(-1)[temp_idx])
 
+                obs_arr_now = np.asarray(obs, dtype=float).reshape(-1)
+
                 # Allow runtime override (Hydra sweeps) without reloading config objects.
                 target = float(getattr(cfg.policy, "target_temp_c", target))
                 deadband = float(getattr(cfg.policy, "deadband_c", deadband))
+                target_now = float(_scheduled_target_c(obs_arr=obs_arr_now))
 
                 action_cmd = np.zeros((len(act_names),), dtype=float)
 
@@ -146,21 +299,51 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
                     action_cmd[int(idx)] = availability_on
 
                 # Fan command (either constant or PI-controlled).
-                if policy_type == "unitary_pi":
+                if policy_type in ("unitary_pi", "unitary_airflow_first_sat"):
+                    # Determine operating mode from the zone temperature.
+                    if tz < target_now - deadband:
+                        mode: UnitaryPIMode = "heating"
+                    elif tz > target_now + deadband:
+                        mode = "cooling"
+                    else:
+                        mode = "deadband"
+
                     fan_cmd = compute_fan_command_pi(
                         state=pi_state,
                         tz_c=tz,
-                        target_c=target,
+                        target_c=target_now,
                         deadband_c=deadband,
                         fan_base_kg_s=fan_base,
                         kp=kp,
                         ki=ki,
                         integral_limit=integral_limit,
+                        mode=mode,
                     )
                 else:
                     fan_cmd = compute_fan_command_constant(
                         fan_mass_flow_kg_s=fan_mdot_const
                     )
+
+                # Compute fan command bounds (used by option 1 SAT logic).
+                # Prefer action space bounds when present; fall back to config or a wide range.
+                fan_low = float("-inf")
+                fan_high = float("inf")
+                if idxs.idx_fans and hasattr(env, "action_space"):
+                    try:
+                        lows = np.asarray(env.action_space.low, dtype=float).reshape(-1)
+                        highs = np.asarray(env.action_space.high, dtype=float).reshape(-1)
+                        i0 = int(idxs.idx_fans[0])
+                        if 0 <= i0 < len(lows) and 0 <= i0 < len(highs):
+                            fan_low = float(lows[i0])
+                            fan_high = float(highs[i0])
+                    except Exception:
+                        pass
+                if fan_min_cfg is not None:
+                    fan_low = max(fan_low, float(fan_min_cfg))
+                if fan_max_cfg is not None:
+                    fan_high = min(fan_high, float(fan_max_cfg))
+
+                fan_cmd_for_logic = float(np.clip(float(fan_cmd), fan_low, fan_high))
 
                 for idx in idxs.idx_fans:
                     i = int(idx)
@@ -187,21 +370,95 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
 
                     action_cmd[i] = cmd_i
 
-                for idx in idxs.idx_heat_nodes:
-                    action_cmd[int(idx)] = t_heat
-                for idx in idxs.idx_supp_nodes:
-                    action_cmd[int(idx)] = t_supp
-                for idx in idxs.idx_cool_nodes:
-                    action_cmd[int(idx)] = t_cool
-                for idx in idxs.idx_outlet_nodes:
-                    action_cmd[int(idx)] = t_outlet
+                # Node setpoint management:
+                # For `unitary_pi`, we **only** set a fixed outlet-node setpoint
+                # (mode-dependent) and do not override other node setpoints.
+                if policy_type == "unitary_pi":
+                    if mode == "heating":
+                        outlet_sp = outlet_heat_c
+                    elif mode == "cooling":
+                        outlet_sp = outlet_cool_c
+                    else:
+                        # In deadband we should not force heating or cooling; using
+                        # the comfort target lets the HVAC float naturally.
+                        outlet_sp = target_now
+                    for idx in idxs.idx_outlet_nodes:
+                        action_cmd[int(idx)] = float(outlet_sp)
+                elif policy_type == "unitary_airflow_first_sat":
+                    # Option 1: airflow-first, then SAT trim/reset at airflow limits.
+                    outlet_sp = compute_outlet_sat_sp_airflow_first(
+                        state=sat_state,
+                        tz_c=tz,
+                        target_c=target_now,
+                        deadband_c=deadband,
+                        fan_cmd_kg_s=fan_cmd_for_logic,
+                        fan_min_kg_s=float(fan_low),
+                        fan_max_kg_s=float(fan_high),
+                        mode=mode,
+                        outlet_sp_heating_c=outlet_heat_c,
+                        outlet_sp_cooling_c=outlet_cool_c,
+                        sat_min_c=sat_min_c,
+                        sat_max_c=sat_max_c,
+                        sat_step_c=sat_step_c,
+                        sat_rate_limit_c_per_step=sat_rate_limit_c_per_step,
+                        sat_saturation_steps=sat_saturation_steps,
+                    )
+                    for idx in idxs.idx_outlet_nodes:
+                        i = int(idx)
+                        cmd_i = float(outlet_sp)
+                        # Clamp using action space bounds when available (preferred).
+                        if (
+                            hasattr(env, "action_space")
+                            and hasattr(env.action_space, "low")
+                            and hasattr(env.action_space, "high")
+                        ):
+                            lows = np.asarray(env.action_space.low, dtype=float).reshape(-1)
+                            highs = np.asarray(env.action_space.high, dtype=float).reshape(-1)
+                            if i < len(lows) and i < len(highs):
+                                cmd_i = float(
+                                    np.clip(cmd_i, float(lows[i]), float(highs[i]))
+                                )
+                        action_cmd[i] = cmd_i
 
                 obs2, reward, terminated, truncated, _info = env.step(action_cmd)
+
+                # Deadband reward computed on the *resulting* state obs2.
+                obs2_arr = np.asarray(obs2, dtype=float).reshape(-1)
+                temps = [float(obs2_arr[i]) for i in controlled_zone_temp_idxs if i < len(obs2_arr)]
+                if not temps:
+                    temps = [float(obs2_arr[temp_idx])]
+
+                comfort_penalty = float(
+                    np.mean([max(0.0, abs(t - target_now) - reward_deadband_c) for t in temps])
+                )
+
+                # Energy penalty from flat observations.
+                # Observation energy channels come from EnergyPlus meters (J per timestep),
+                # divided by building area in the observation transform (=> J/m² per step).
+                # Convert to Wh/m² per step for the reward term.
+                e_j_per_m2 = 0.0
+                if idx_energy_elec is not None and idx_energy_elec < len(obs2_arr):
+                    e_j_per_m2 += float(obs2_arr[idx_energy_elec])
+                if idx_energy_gas is not None and idx_energy_gas < len(obs2_arr):
+                    e_j_per_m2 += float(obs2_arr[idx_energy_gas])
+                energy_penalty_wh_per_m2 = float(e_j_per_m2 / 3600.0)
+
+                reward_deadband = float(
+                    -(comfort_penalty + reward_energy_weight * energy_penalty_wh_per_m2)
+                )
+                ep_return_deadband += reward_deadband
 
                 row: dict[str, float] = {
                     "episode": float(ep),
                     "step": float(step),
-                    "reward": float(reward),
+                    # Baseline (deadband) reward used for analysis.
+                    "reward": float(reward_deadband),
+                    "reward_deadband": float(reward_deadband),
+                    # Environment's native reward (kept for debugging / comparison).
+                    "reward_env": float(reward),
+                    "reward/comfort_penalty": float(comfort_penalty),
+                    "reward/energy_wh_per_m2": float(energy_penalty_wh_per_m2),
+                    "reward/target_temp_c": float(target_now),
                 }
 
                 obs_arr = np.asarray(obs2, dtype=float).reshape(-1)
@@ -215,11 +472,67 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
                         row[f"act::{name}"] = float(act_arr[i])
                 all_rows.append(row)
 
+                # Per-step W&B logging (no Tables): store under "rollout/*" so plots
+                # naturally appear in the "rollout" panel.
+                if wandb_run is not None:
+                    try:
+                        import wandb  # type: ignore
+
+                        # Infer dt from time_of_day when available (hours, modulo midnight).
+                        dt_hours_step = 0.25
+                        if idx_time_of_day is not None and idx_time_of_day < len(obs2_arr):
+                            tod = float(obs2_arr[idx_time_of_day])
+                            if last_time_of_day is not None:
+                                dt = float((tod - last_time_of_day) % 24.0)
+                                if 0.0 < dt <= 6.0:
+                                    dt_hours_step = dt
+                            last_time_of_day = tod
+
+                        # Energy J/m2 per step -> kW/m2 over this step.
+                        energy_kw_per_m2 = float(e_j_per_m2 / (dt_hours_step * 3600.0) / 1000.0)
+
+                        # Actuator summaries (mean over selected channels).
+                        fan_vals = [float(action_cmd[int(i)]) for i in idxs.idx_fans]
+                        sp_vals = [float(action_cmd[int(i)]) for i in idxs.idx_outlet_nodes]
+                        avail_vals = [float(action_cmd[int(i)]) for i in idxs.idx_avail]
+
+                        # Use a monotonically increasing global step to avoid episode resets
+                        # overwriting plots in W&B.
+                        global_step = int(ep) * int(max_steps) + int(step)
+                        wandb.log(
+                            {
+                                "rollout/reward_deadband": float(reward_deadband),
+                                "rollout/reward_env": float(reward),
+                                "rollout/comfort_penalty": float(comfort_penalty),
+                                "rollout/energy_wh_per_m2": float(energy_penalty_wh_per_m2),
+                                "rollout/energy_kw_per_m2": float(energy_kw_per_m2),
+                                "rollout/target_temp_c": float(target_now),
+                                "rollout/zone_temp_c": float(tz),
+                                "rollout/outdoor_temp_c": float(obs2_arr[idx_outdoor_temp])
+                                if idx_outdoor_temp is not None
+                                and idx_outdoor_temp < len(obs2_arr)
+                                else float("nan"),
+                                "rollout/actuators/fan_mass_flow_kg_s_mean": float(np.mean(fan_vals))
+                                if fan_vals
+                                else float("nan"),
+                                "rollout/actuators/outlet_temp_sp_c_mean": float(np.mean(sp_vals))
+                                if sp_vals
+                                else float("nan"),
+                                "rollout/actuators/availability_mean": float(np.mean(avail_vals))
+                                if avail_vals
+                                else float("nan"),
+                            },
+                            step=global_step,
+                        )
+                    except Exception as e:
+                        logger.warning("wandb per-step logging failed: %s", e)
+
                 obs = obs2
                 done = bool(terminated or truncated)
                 step += 1
 
             logger.info(f"episode={ep} steps={step} saved_rows={len(all_rows)}")
+            episode_returns_deadband.append(float(ep_return_deadband))
 
         df = pd.DataFrame(all_rows)
         df.to_csv(paths.csv_path, index=False)
@@ -245,42 +558,131 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
         outdoor_temp_cols = [c for c in obs_cols if c.lower().endswith("outdoor_temperature")]
         temp_cols = zone_temp_cols + outdoor_temp_cols
 
-        _get_plot_timeseries()(
-            df=df,
-            x="step",
-            y_cols=temp_cols[:25],
-            out_path=paths.plot_temperature_path,
-            title=f"Zone Temperatures (target={target:.1f}C deadband=±{deadband:.1f}C)",
-            ylabel="Temperature [C]",
-            hlines=[
-                (target, "target"),
-                (target - deadband, "target-deadband"),
-                (target + deadband, "target+deadband"),
-            ],
-        )
+        # Energy observations are per-area, per-timestep energy [J/m2 per timestep]
+        # (see `building2building/simulator/observation_spaces.py`).
+        #
+        # Convert to average power per area [kW/m2] using the timestep duration derived
+        # from the `time_of_day` observation.
+        time_col = "obs::time_of_day"
+        dt_hours: float | None = None
+        if time_col in df.columns and len(df) >= 2:
+            tod = pd.to_numeric(df[time_col], errors="coerce").astype(float)
+            # Difference in hours, modulo 24 to handle midnight wrap-around.
+            diffs = (tod.diff() % 24.0).dropna()
+            diffs = diffs[(diffs > 0.0) & (diffs <= 6.0)]  # keep plausible timesteps
+            if len(diffs) > 0:
+                dt_hours = float(diffs.median())
+        if dt_hours is None or not (dt_hours > 0.0):
+            # Default pipeline timestep is 4/hour = 0.25h (15min).
+            dt_hours = 0.25
 
-        energy_cols = [c for c in obs_cols if c.lower().endswith("energy_electricity")] + [
+        energy_cols_wh_m2 = [c for c in obs_cols if c.lower().endswith("energy_electricity")] + [
             c for c in obs_cols if c.lower().endswith("energy_gas")
         ]
-        _get_plot_timeseries()(
-            df=df,
-            x="step",
-            y_cols=energy_cols,
-            out_path=paths.plot_energy_path,
-            title="HVAC Energy (per-area, per-timestep)",
-            ylabel="Wh / m2 / timestep",
-        )
+        energy_cols_kw_m2: list[str] = []
+        for c in energy_cols_wh_m2:
+            out_c = f"{c}_kw_per_m2"
+            # J/m2 per step -> kW/m2:
+            #   (J/m2) / (dt_hours*3600) = W/m2 ; /1000 = kW/m2
+            df[out_c] = (
+                pd.to_numeric(df[c], errors="coerce").astype(float)
+                / (dt_hours * 3600.0)
+                / 1000.0
+            )
+            energy_cols_kw_m2.append(out_c)
 
-        plot_actuators_dual_axis(
-            df=df,
-            x="step",
-            act_cols=act_cols,
-            out_path=paths.plot_actuators_path,
-        )
+        try:
+            if wandb_run is not None:
+                # Log controller type for easy filtering in the W&B UI.
+                try:
+                    import wandb  # type: ignore
+
+                    wandb.summary["baseline/controller_type"] = str(policy_type)
+                    wandb.summary["baseline/policy_type"] = str(policy_type)
+                    wandb.summary["rollout/timestep_hours"] = float(dt_hours)
+                    wandb.summary["rollout/episode_return_deadband_mean"] = float(
+                        np.mean(episode_returns_deadband) if episode_returns_deadband else 0.0
+                    )
+                    wandb.summary["rollout/episode_return_deadband_sum"] = float(
+                        np.sum(episode_returns_deadband) if episode_returns_deadband else 0.0
+                    )
+                    wandb.summary["reward/deadband_c"] = float(reward_deadband_c)
+                    wandb.summary["reward/energy_weight"] = float(reward_energy_weight)
+
+                    # Also add as a run tag (opt-in, best-effort).
+                    try:
+                        existing = list(getattr(wandb_run, "tags", []) or [])
+                        tag = f"baseline:{policy_type}"
+                        if tag not in existing:
+                            existing.append(tag)
+                        wandb_run.tags = existing  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+                except Exception as e:
+                    logger.warning("Failed to log baseline controller type to wandb: %s", e)
+
+                # Attach building identification to the run summary.
+                try:
+                    import wandb  # type: ignore
+
+                    # Prefer simulator-provided metadata, but fall back to config so
+                    # these fields are never empty in W&B.
+                    source = building_source_meta.get("source") if building_source_meta else None
+                    if source is None:
+                        source = OmegaConf.select(cfg, "bldg.source")
+                    if source is not None:
+                        wandb.summary["building/source"] = source
+
+                    # 1) From simulator metadata (if present)
+                    if building_source_meta:
+                        for k in (
+                            "dataset_row_index",
+                            "idf_filename",
+                            "schedule_filename",
+                            "epw_filename",
+                            "geometry_unit_type",
+                            "geometry_building_num_units",
+                            "year_built",
+                        ):
+                            v = building_source_meta.get(k)
+                            if v is not None:
+                                wandb.summary[f"building/{k}"] = v
+
+                    # 2) Fallback from config (baseline configs use `bldg.bldg.*`)
+                    cfg_fallbacks = {
+                        "geometry_unit_type": OmegaConf.select(cfg, "bldg.bldg.geometry_unit_type"),
+                        "geometry_building_num_units": OmegaConf.select(
+                            cfg, "bldg.bldg.geometry_building_num_units"
+                        ),
+                        "year_built": OmegaConf.select(cfg, "bldg.bldg.year_built"),
+                    }
+                    for k, v in cfg_fallbacks.items():
+                        if v is not None and wandb.summary.get(f"building/{k}") is None:
+                            wandb.summary[f"building/{k}"] = v
+                except Exception as e:
+                    logger.warning("Failed to log building info to wandb: %s", e)
+
+                try:
+                    import wandb  # type: ignore
+
+                    wandb.summary["rollout/mean_reward"] = float(df["reward"].mean())
+
+                    # Histogram of episode returns (total reward over each trajectory).
+                    if episode_returns_deadband:
+                        wandb.log(
+                            {
+                                "rollout/episode_return_deadband_hist": wandb.Histogram(
+                                    episode_returns_deadband
+                                )
+                            }
+                        )
+                except Exception:
+                    pass
+        finally:
+            finish_wandb_if_started(wandb_run, started_here=started_here)
 
         logger.info(f"Saved raw rollout CSV: {paths.csv_path}")
         logger.info(f"Saved raw rollout NPZ: {paths.npz_path}")
-        logger.info(f"Saved plots under: {paths.out_dir}")
         return paths
     finally:
         try:

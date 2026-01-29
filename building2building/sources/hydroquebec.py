@@ -41,6 +41,45 @@ from pandas import DataFrame
 
 logger = logging.getLogger(__name__)
 
+def _row_source_metadata(row) -> dict[str, object]:
+    """
+    Extract a compact, JSON-friendly subset of identifying info from the selected row.
+    Use for logging to identify the chosen building.
+    """
+    meta: dict[str, object] = {"source": "hydroquebec"}
+    # DataFrame index from duckdb/parquet (helps uniquely identify the chosen row)
+    try:
+        meta["dataset_row_index"] = int(row.name)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+    # Common identifiers we know we add in `table_index`
+    for k in ("idf_filename", "schedule_filename", "epw_filename"):
+        try:
+            if k in row and row[k] is not None:
+                meta[k] = str(row[k])
+        except Exception:
+            continue
+
+    # Useful building descriptors (only if present)
+    for k in (
+        "geometry_unit_type",
+        "geometry_building_num_units",
+        "year_built",
+        "weather_station_epw_filepath",
+    ):
+        try:
+            if k in row and row[k] is not None:
+                v = row[k]
+                if isinstance(v, (int, float, str, bool)):
+                    meta[k] = v
+                else:
+                    meta[k] = str(v)
+        except Exception:
+            continue
+
+    return meta
+
 
 # We should try not to call this function too often. Each call of LocalFile
 # requires reading the file in its entirety, which is bad. Perhaps this should
@@ -123,12 +162,15 @@ def search_buildings(**query) -> DataFrame:
 
     for k, v in query.items():
         if isinstance(v, str):
+            # Case-insensitive exact match on strings.
             db = db.filter(
                 duckdb.FunctionExpression("lower", duckdb.ColumnExpression(k))
-                == duckdb.ConstantExpression(v)
+                == duckdb.ConstantExpression(v.lower())
             )
         elif isinstance(v, (int, float)):
-            db.order(f"abs({k} - {v})")
+            # Prefer closest numeric match (e.g., year_built).
+            # NOTE: duckdb relations are immutable; `order()` returns a new relation.
+            db = db.order(f"abs({k} - {v})")
 
     df = db.to_df()
 
@@ -233,6 +275,7 @@ def search_configs(
                 eplus_output_dir=eplus_output_dir,
                 warmup_phases=warmup_phases,
                 area=area,
+                source_metadata=_row_source_metadata(row),
             )
         )
 
