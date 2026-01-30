@@ -17,9 +17,7 @@ from algorithms.baselines.common import (
     RolloutPaths,
     find_day_of_week_index,
     find_controlled_zone_air_temp_index,
-    find_obs_index_by_exact_name,
     find_time_of_day_index,
-    find_zone_air_temp_index_for_zone,
     make_rollout_paths,
     require_env_metadata_list_str,
 )
@@ -93,8 +91,7 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
         obs_names = require_env_metadata_list_str(env, "observation_names")
         act_names = require_env_metadata_list_str(env, "action_names")
 
-        # Initialize Weights & Biases early so we can log per-step scalars
-        # (which creates plots in the "rollout" panel) without logging W&B Tables.
+        # Start W&B early so we can log scalar time series (no tables / no images).
         wandb_run, started_here = init_wandb_from_config(cfg, run_dir=run_dir)
 
         # Print action bounds for debugging.
@@ -137,32 +134,6 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
         # Target temperature used for PI control (and for plot annotation).
         target = float(getattr(cfg.policy, "target_temp_c", 21.0))
         deadband = float(getattr(cfg.policy, "deadband_c", 1.0))
-
-        # Baseline rollout reward: compute a deadband-style reward per step and
-        # log episode return.
-        #
-        # This is independent from the environment reward, and supports
-        # time-varying target setpoints (e.g. weekday setback schedule).
-        reward_energy_weight = float(getattr(cfg.reward, "energy_weight", 0.0))
-        reward_deadband_c = float(getattr(cfg.reward, "dT", 0.5))
-
-        # Indices needed for reward computation from flat observations.
-        idx_energy_elec = find_obs_index_by_exact_name(obs_names, name="energy_electricity")
-        idx_energy_gas = find_obs_index_by_exact_name(obs_names, name="energy_gas")
-        idx_outdoor_temp = find_obs_index_by_exact_name(obs_names, name="outdoor_temperature")
-        idx_time_of_day = find_obs_index_by_exact_name(obs_names, name="time_of_day")
-        controlled_zone_temp_idxs: list[int] = []
-        if controlled_zones:
-            for z in controlled_zones:
-                try:
-                    controlled_zone_temp_idxs.append(
-                        find_zone_air_temp_index_for_zone(obs_names, zone_name=z)
-                    )
-                except Exception:
-                    continue
-        if not controlled_zone_temp_idxs:
-            # Fallback: at least compute reward from the representative zone temperature.
-            controlled_zone_temp_idxs = [int(temp_idx)]
 
         # Optional time-based target setpoint schedule.
         #
@@ -272,16 +243,16 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
         sat_saturation_steps = int(getattr(cfg.policy, "sat_saturation_steps", 1))
 
         all_rows: list[dict[str, float]] = []
-        episode_returns_deadband: list[float] = []
-        last_time_of_day: float | None = None
+        episode_returns: list[float] = []
 
         for ep in range(n_episodes):
             obs, _info = env.reset()
             done = False
             step = 0
+            ep_return = 0.0
             pi_state = PIState(integral=0.0)
+            last_time_of_day: float | None = None
             sat_state = AirflowFirstSatState(sat_sp_c=float(target))
-            ep_return_deadband = 0.0
 
             while not done and step < max_steps:
                 tz = float(np.asarray(obs, dtype=float).reshape(-1)[temp_idx])
@@ -421,47 +392,22 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
                         action_cmd[i] = cmd_i
 
                 obs2, reward, terminated, truncated, _info = env.step(action_cmd)
+                ep_return += float(reward)
 
-                # Deadband reward computed on the *resulting* state obs2.
-                obs2_arr = np.asarray(obs2, dtype=float).reshape(-1)
-                temps = [float(obs2_arr[i]) for i in controlled_zone_temp_idxs if i < len(obs2_arr)]
-                if not temps:
-                    temps = [float(obs2_arr[temp_idx])]
-
-                comfort_penalty = float(
-                    np.mean([max(0.0, abs(t - target_now) - reward_deadband_c) for t in temps])
+                obs_arr = np.asarray(obs2, dtype=float).reshape(-1)
+                conditioned_tz = (
+                    float(obs_arr[int(temp_idx)]) if int(temp_idx) < len(obs_arr) else float("nan")
                 )
-
-                # Energy penalty from flat observations.
-                # Observation energy channels come from EnergyPlus meters (J per timestep),
-                # divided by building area in the observation transform (=> J/m² per step).
-                # Convert to Wh/m² per step for the reward term.
-                e_j_per_m2 = 0.0
-                if idx_energy_elec is not None and idx_energy_elec < len(obs2_arr):
-                    e_j_per_m2 += float(obs2_arr[idx_energy_elec])
-                if idx_energy_gas is not None and idx_energy_gas < len(obs2_arr):
-                    e_j_per_m2 += float(obs2_arr[idx_energy_gas])
-                energy_penalty_wh_per_m2 = float(e_j_per_m2 / 3600.0)
-
-                reward_deadband = float(
-                    -(comfort_penalty + reward_energy_weight * energy_penalty_wh_per_m2)
-                )
-                ep_return_deadband += reward_deadband
 
                 row: dict[str, float] = {
                     "episode": float(ep),
                     "step": float(step),
-                    # Baseline (deadband) reward used for analysis.
-                    "reward": float(reward_deadband),
-                    "reward_deadband": float(reward_deadband),
-                    # Environment's native reward (kept for debugging / comparison).
-                    "reward_env": float(reward),
-                    "reward/comfort_penalty": float(comfort_penalty),
-                    "reward/energy_wh_per_m2": float(energy_penalty_wh_per_m2),
-                    "reward/target_temp_c": float(target_now),
+                    "global_step": float(int(ep) * int(max_steps) + int(step)),
+                    "reward": float(reward),
+                    # For plotting (setpoint vs conditioned zone temperature).
+                    "target_temp_c": float(target_now),
+                    "conditioned_zone_temp_c": float(conditioned_tz),
                 }
-
-                obs_arr = np.asarray(obs2, dtype=float).reshape(-1)
                 for i, name in enumerate(obs_names):
                     if i < len(obs_arr):
                         row[f"obs::{name}"] = float(obs_arr[i])
@@ -472,58 +418,37 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
                         row[f"act::{name}"] = float(act_arr[i])
                 all_rows.append(row)
 
-                # Per-step W&B logging (no Tables): store under "rollout/*" so plots
-                # naturally appear in the "rollout" panel.
+                # W&B scalar time series:
+                # Keep per-step logging light (reward/actuators only). Temperature plots are
+                # logged as multi-line charts from the final dataframe for readability.
                 if wandb_run is not None:
                     try:
                         import wandb  # type: ignore
 
-                        # Infer dt from time_of_day when available (hours, modulo midnight).
-                        dt_hours_step = 0.25
-                        if idx_time_of_day is not None and idx_time_of_day < len(obs2_arr):
-                            tod = float(obs2_arr[idx_time_of_day])
-                            if last_time_of_day is not None:
-                                dt = float((tod - last_time_of_day) % 24.0)
-                                if 0.0 < dt <= 6.0:
-                                    dt_hours_step = dt
-                            last_time_of_day = tod
+                        log_payload: dict[str, float] = {
+                            "rollout/reward": float(reward),
+                        }
 
-                        # Energy J/m2 per step -> kW/m2 over this step.
-                        energy_kw_per_m2 = float(e_j_per_m2 / (dt_hours_step * 3600.0) / 1000.0)
-
-                        # Actuator summaries (mean over selected channels).
+                        # Also log actuator means for convenience.
                         fan_vals = [float(action_cmd[int(i)]) for i in idxs.idx_fans]
                         sp_vals = [float(action_cmd[int(i)]) for i in idxs.idx_outlet_nodes]
                         avail_vals = [float(action_cmd[int(i)]) for i in idxs.idx_avail]
+                        if fan_vals:
+                            log_payload["rollout/actuators/fan_mass_flow_kg_s_mean"] = float(
+                                np.mean(fan_vals)
+                            )
+                        if sp_vals:
+                            log_payload["rollout/actuators/outlet_temp_sp_c_mean"] = float(
+                                np.mean(sp_vals)
+                            )
+                        if avail_vals:
+                            log_payload["rollout/actuators/availability_mean"] = float(
+                                np.mean(avail_vals)
+                            )
 
-                        # Use a monotonically increasing global step to avoid episode resets
-                        # overwriting plots in W&B.
+                        # Use a monotonically increasing global step for multi-episode runs.
                         global_step = int(ep) * int(max_steps) + int(step)
-                        wandb.log(
-                            {
-                                "rollout/reward_deadband": float(reward_deadband),
-                                "rollout/reward_env": float(reward),
-                                "rollout/comfort_penalty": float(comfort_penalty),
-                                "rollout/energy_wh_per_m2": float(energy_penalty_wh_per_m2),
-                                "rollout/energy_kw_per_m2": float(energy_kw_per_m2),
-                                "rollout/target_temp_c": float(target_now),
-                                "rollout/zone_temp_c": float(tz),
-                                "rollout/outdoor_temp_c": float(obs2_arr[idx_outdoor_temp])
-                                if idx_outdoor_temp is not None
-                                and idx_outdoor_temp < len(obs2_arr)
-                                else float("nan"),
-                                "rollout/actuators/fan_mass_flow_kg_s_mean": float(np.mean(fan_vals))
-                                if fan_vals
-                                else float("nan"),
-                                "rollout/actuators/outlet_temp_sp_c_mean": float(np.mean(sp_vals))
-                                if sp_vals
-                                else float("nan"),
-                                "rollout/actuators/availability_mean": float(np.mean(avail_vals))
-                                if avail_vals
-                                else float("nan"),
-                            },
-                            step=global_step,
-                        )
+                        wandb.log(log_payload, step=global_step)
                     except Exception as e:
                         logger.warning("wandb per-step logging failed: %s", e)
 
@@ -532,7 +457,7 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
                 step += 1
 
             logger.info(f"episode={ep} steps={step} saved_rows={len(all_rows)}")
-            episode_returns_deadband.append(float(ep_return_deadband))
+            episode_returns.append(float(ep_return))
 
         df = pd.DataFrame(all_rows)
         df.to_csv(paths.csv_path, index=False)
@@ -558,7 +483,7 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
         outdoor_temp_cols = [c for c in obs_cols if c.lower().endswith("outdoor_temperature")]
         temp_cols = zone_temp_cols + outdoor_temp_cols
 
-        # Energy observations are per-area, per-timestep energy [J/m2 per timestep]
+        # Energy observations are per-area, per-timestep energy [Wh/m2 per timestep]
         # (see `building2building/simulator/observation_spaces.py`).
         #
         # Convert to average power per area [kW/m2] using the timestep duration derived
@@ -582,13 +507,7 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
         energy_cols_kw_m2: list[str] = []
         for c in energy_cols_wh_m2:
             out_c = f"{c}_kw_per_m2"
-            # J/m2 per step -> kW/m2:
-            #   (J/m2) / (dt_hours*3600) = W/m2 ; /1000 = kW/m2
-            df[out_c] = (
-                pd.to_numeric(df[c], errors="coerce").astype(float)
-                / (dt_hours * 3600.0)
-                / 1000.0
-            )
+            df[out_c] = pd.to_numeric(df[c], errors="coerce").astype(float) / dt_hours / 1000.0
             energy_cols_kw_m2.append(out_c)
 
         try:
@@ -600,14 +519,9 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
                     wandb.summary["baseline/controller_type"] = str(policy_type)
                     wandb.summary["baseline/policy_type"] = str(policy_type)
                     wandb.summary["rollout/timestep_hours"] = float(dt_hours)
-                    wandb.summary["rollout/episode_return_deadband_mean"] = float(
-                        np.mean(episode_returns_deadband) if episode_returns_deadband else 0.0
+                    wandb.summary["rollout/episode_return_mean"] = float(
+                        np.mean(episode_returns) if episode_returns else 0.0
                     )
-                    wandb.summary["rollout/episode_return_deadband_sum"] = float(
-                        np.sum(episode_returns_deadband) if episode_returns_deadband else 0.0
-                    )
-                    wandb.summary["reward/deadband_c"] = float(reward_deadband_c)
-                    wandb.summary["reward/energy_weight"] = float(reward_energy_weight)
 
                     # Also add as a run tag (opt-in, best-effort).
                     try:
@@ -666,18 +580,84 @@ def run_baseline_rollout(cfg: DictConfig, *, run_dir: Path | None = None) -> Rol
                     import wandb  # type: ignore
 
                     wandb.summary["rollout/mean_reward"] = float(df["reward"].mean())
-
-                    # Histogram of episode returns (total reward over each trajectory).
-                    if episode_returns_deadband:
-                        wandb.log(
-                            {
-                                "rollout/episode_return_deadband_hist": wandb.Histogram(
-                                    episode_returns_deadband
-                                )
-                            }
-                        )
                 except Exception:
                     pass
+
+                # Add two easy-to-read baseline temperature charts:
+                # - Outdoor + all zone temperatures (single chart, multiple series)
+                # - Setpoint + conditioned zone temperature (single chart, multiple series)
+                try:
+                    import wandb  # type: ignore
+
+                    # Identify temperature columns in the raw rollout dataframe.
+                    zone_temp_cols = [
+                        c for c in obs_cols if "zone air temperature" in c.lower()
+                    ]
+                    outdoor_temp_cols = [
+                        c for c in obs_cols if c.lower().endswith("outdoor_temperature")
+                    ]
+
+                    plot_cols = [
+                        "global_step",
+                        *outdoor_temp_cols,
+                        *zone_temp_cols,
+                        "target_temp_c",
+                        "conditioned_zone_temp_c",
+                    ]
+                    plot_cols = [c for c in plot_cols if c in df.columns]
+
+                    if "global_step" in plot_cols and len(plot_cols) > 1:
+                        plot_df = df[plot_cols].copy()
+                        # Ensure numeric types for W&B tables/plots.
+                        for c in plot_cols:
+                            plot_df[c] = pd.to_numeric(plot_df[c], errors="coerce").astype(float)
+
+                        # Log the underlying table too (handy for debugging / ad-hoc plots).
+                        wandb.log({"rollout/tables/temperature_timeseries": wandb.Table(dataframe=plot_df)})
+
+                        x_vals = plot_df["global_step"].tolist()
+
+                        y_outdoor_and_zones = [
+                            c
+                            for c in [*outdoor_temp_cols, *zone_temp_cols]
+                            if c in plot_df.columns
+                        ]
+                        if y_outdoor_and_zones:
+                            ys = [plot_df[c].tolist() for c in y_outdoor_and_zones]
+                            keys = [c.replace("obs::", "") for c in y_outdoor_and_zones]
+                            wandb.log(
+                                {
+                                    "rollout/plots/outdoor_and_zones_temperature": wandb.plot.line_series(
+                                        xs=x_vals,
+                                        ys=ys,
+                                        keys=keys,
+                                        title="Outdoor + Zone Air Temperatures",
+                                        xname="global_step",
+                                    )
+                                }
+                            )
+
+                        y_setpoint = [
+                            c
+                            for c in ("target_temp_c", "conditioned_zone_temp_c")
+                            if c in plot_df.columns
+                        ]
+                        if len(y_setpoint) >= 2:
+                            ys = [plot_df[c].tolist() for c in y_setpoint]
+                            keys = ["setpoint_c", "conditioned_zone_temp_c"]
+                            wandb.log(
+                                {
+                                    "rollout/plots/setpoint_and_conditioned_zone_temperature": wandb.plot.line_series(
+                                        xs=x_vals,
+                                        ys=ys,
+                                        keys=keys,
+                                        title="Setpoint + Conditioned Zone Temperature",
+                                        xname="global_step",
+                                    )
+                                }
+                            )
+                except Exception as e:
+                    logger.warning("Failed to log baseline temperature plots to wandb: %s", e)
         finally:
             finish_wandb_if_started(wandb_run, started_here=started_here)
 

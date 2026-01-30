@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 import logging
+import os
+import traceback
 import uuid
 from pathlib import Path
 from typing import Iterable
@@ -18,13 +21,44 @@ logger = logging.getLogger(__name__)
 def make_env(config, eplus_output_dir: str):
     # EnergyPlus needs a unique output dir for each run
     eplus_output_dir = Path(eplus_output_dir) / str(uuid.uuid4())
+    eplus_output_dir.mkdir(parents=True, exist_ok=True)
     # Fetch exactly one BuildingConfig and build a single simulator env
-    configs = hydroquebec.search_configs(config=config, n=1, eplus_output_dir=Path(eplus_output_dir))
-    if not configs:
-        raise RuntimeError("No building configurations found for the provided config.")
-    env_config = configs[0]
-    env = create_simulator(env_config)
-    return env
+    try:
+        # Let the pipeline copy discovery `eplusout.err` into this run folder.
+        prev = os.environ.get("B2B_PIPELINE_DEBUG_DIR")
+        os.environ["B2B_PIPELINE_DEBUG_DIR"] = str(eplus_output_dir)
+        configs = hydroquebec.search_configs(
+            config=config, n=1, eplus_output_dir=Path(eplus_output_dir)
+        )
+        if not configs:
+            raise RuntimeError(
+                "No building configurations found for the provided config "
+                "(see pipeline_errors.jsonl in the EnergyPlus output dir if present)."
+            )
+        env_config = configs[0]
+        env = create_simulator(env_config)
+        return env
+    except Exception as e:
+        # Persist a structured error record to make batch runs debuggable.
+        err_path = Path(eplus_output_dir) / "env_creation_error.json"
+        record = {
+            "error_type": type(e).__name__,
+            "message": str(e),
+            "traceback": traceback.format_exc(),
+        }
+        try:
+            with err_path.open("w", encoding="utf-8") as f:
+                json.dump(record, f, indent=2)
+        except Exception:
+            logger.exception("Failed to write env creation error to %s", err_path)
+        raise
+    finally:
+        # Restore previous value to avoid leaking run-specific state.
+        if "prev" in locals():
+            if prev is None:
+                os.environ.pop("B2B_PIPELINE_DEBUG_DIR", None)
+            else:
+                os.environ["B2B_PIPELINE_DEBUG_DIR"] = prev
 
 
 def make_dummy_vec_env(config, eplus_output_dir: str, seed: int | None = None, wrapper_fn=None):

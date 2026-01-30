@@ -1,8 +1,9 @@
 type: unitary_pi
 
 # Control objective
-target_temp_c: 19.0
-deadband_c: 2.0
+target_temp_c: 21.0
+# Smaller deadband reduces steady-state offset from setpoint tracking.
+deadband_c: 0.5
 
 # Optional time-based target schedule (no hardcoded setpoints in code).
 # EnergyPlus day_of_week convention: 1=Sunday, ..., 7=Saturday

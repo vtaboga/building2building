@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -47,7 +48,11 @@ def DiscoveryMetadata(epjson: Path, epw: Path):
 
     api.runtime.callback_after_new_environment_warmup_complete(state, warmup_callback)
 
-    tmpdir = tempfile.mkdtemp()
+    out.mkdir()
+    metadata_out = out / "metadata.json"
+    eplusout = out / "eplusout"
+
+    tmpdir = Path(tempfile.mkdtemp())
 
     api.runtime.run_energyplus(
         state,
@@ -60,11 +65,38 @@ def DiscoveryMetadata(epjson: Path, epw: Path):
         ],
     )
 
-    # When it is over, we write the number of warmup phases to the output
-    # directory.
+    # Always persist the EnergyPlus outputs directory, even when parsing fails.
+    # This is critical for debugging fatal E+ errors (e.g. when `eplustbl.htm` is missing).
+    if eplusout.exists():
+        shutil.rmtree(eplusout, ignore_errors=True)
+    shutil.move(str(tmpdir), str(eplusout))
 
-    # Extract metadata from simulation outputs
-    htm_file = Path(tmpdir) / "eplustbl.htm"
+    # If a per-run debug directory is provided, copy `eplusout.err` there so it is
+    # easily accessible from experiment output folders.
+    debug_dir_raw = os.environ.get("B2B_PIPELINE_DEBUG_DIR")
+    if debug_dir_raw:
+        debug_dir = Path(debug_dir_raw).expanduser().resolve()
+        try:
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            dbg = debug_dir / "discovery-metadata"
+            dbg.mkdir(parents=True, exist_ok=True)
+            err_src = eplusout / "eplusout.err"
+            if err_src.exists():
+                shutil.copy(err_src, dbg / "eplusout.err")
+        except Exception:
+            # Best-effort only; never mask the underlying failure.
+            pass
+
+    # Extract metadata from simulation outputs (may raise if EnergyPlus terminated early)
+    htm_file = eplusout / "eplustbl.htm"
+    if not htm_file.exists():
+        # Provide a helpful error message; the detailed reason is in `eplusout.err`.
+        err_path = eplusout / "eplusout.err"
+        hint = f"EnergyPlus did not produce {htm_file.name} (see {err_path})."
+        if debug_dir_raw:
+            hint += f" Copied to {Path(debug_dir_raw) / 'discovery-metadata' / 'eplusout.err'}."
+        raise FileNotFoundError(hint)
+
     area = get_net_conditioned_area(htm_file)
     warmup_days = get_warmup_days(htm_file)
 
@@ -74,12 +106,6 @@ def DiscoveryMetadata(epjson: Path, epw: Path):
         warmup_phases=warmup_count,
         warmup_days=warmup_days,
     )
-
-    out.mkdir()
-    eplusout = out / "eplusout"
-    metadata_out = out / "metadata.json"
-
-    shutil.move(tmpdir, eplusout)
 
     with open(metadata_out, "w") as f:
         json.dump(unstructure(metadata), f, indent=2)
@@ -119,8 +145,36 @@ def extract_discovery_metadata(
     @expression()
     def parse_metadata(base_path: Path) -> Metadata:
         """Parse metadata JSON into Metadata dataclass."""
-        with open(base_path / "metadata.json", "r") as f:
-            metadata_dict = json.load(f)
+        meta_path = base_path / "metadata.json"
+        try:
+            with open(meta_path, "r") as f:
+                metadata_dict = json.load(f)
+        except FileNotFoundError as e:
+            # When EnergyPlus terminates early, `DiscoveryMetadata` may have persisted
+            # `eplusout/` but not produced `metadata.json`. Copy `eplusout.err` into the
+            # per-run debug directory (if configured) so the underlying E+ fatal is easy
+            # to inspect even when the derivation output is cached.
+            debug_dir_raw = os.environ.get("B2B_PIPELINE_DEBUG_DIR")
+            if debug_dir_raw:
+                try:
+                    debug_dir = Path(debug_dir_raw).expanduser().resolve()
+                    dbg = debug_dir / "discovery-metadata"
+                    dbg.mkdir(parents=True, exist_ok=True)
+                    err_src = base_path / "eplusout" / "eplusout.err"
+                    if err_src.exists():
+                        shutil.copy(err_src, dbg / "eplusout.err")
+                except Exception:
+                    pass
+            raise FileNotFoundError(
+                f"Discovery metadata missing at {meta_path}. "
+                f"EnergyPlus likely terminated early; check "
+                f"{base_path / 'eplusout' / 'eplusout.err'}"
+                + (
+                    f" (also copied to {Path(debug_dir_raw) / 'discovery-metadata' / 'eplusout.err'})."
+                    if debug_dir_raw
+                    else "."
+                )
+            ) from e
 
         return structure(metadata_dict, Metadata)
 

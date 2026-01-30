@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Generic, TypeVar, Union, overload
+from uuid import uuid4
 
 import git
 import requests
@@ -73,20 +74,51 @@ def realize(store_path: Path, realizable: Realizable) -> Path | Result:
             if output_path.exists():
                 return output_path
 
+            # Build into a unique temporary path, then atomically rename into place.
+            # This prevents:
+            # - partially-built outputs from being treated as complete
+            # - concurrent processes from clobbering the same output directory/files
+            tmp_output_path = store_path / (
+                f"{realizable.hash.hex()}-{realizable.name}.tmp-{os.getpid()}-{uuid4().hex}"
+            )
+
             # Realize dependencies
             realized_deps = [inner(dep) for dep in realizable.dependencies]
 
-            # Build with ContextVar carrying the output path
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            token_output = OUTPUT.set(output_path)
+            # Build with ContextVar carrying the temp output path
+            tmp_output_path.parent.mkdir(parents=True, exist_ok=True)
+            token_output = OUTPUT.set(tmp_output_path)
             try:
                 logger.info(f"building {realizable.name}")
                 realizable.builder(realized_deps)
-                if not output_path.exists():
+                if not tmp_output_path.exists():
                     raise Exception(
                         f"derivation {realizable.name} didn't product an output"
                     )
+                # If another process finished first, keep the existing output and
+                # clean up our temp output.
+                if output_path.exists():
+                    try:
+                        if tmp_output_path.is_dir():
+                            shutil.rmtree(tmp_output_path, ignore_errors=True)
+                        else:
+                            tmp_output_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    return output_path
 
+                try:
+                    tmp_output_path.rename(output_path)
+                except FileExistsError:
+                    # Race: another process created it between our check and rename.
+                    try:
+                        if tmp_output_path.is_dir():
+                            shutil.rmtree(tmp_output_path, ignore_errors=True)
+                        else:
+                            tmp_output_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    return output_path
             finally:
                 OUTPUT.reset(token_output)
             return output_path
