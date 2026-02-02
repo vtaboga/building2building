@@ -54,14 +54,6 @@ def _row_source_metadata(row) -> dict[str, object]:
     except Exception:
         pass
 
-    # Common identifiers we know we add in `table_index`
-    for k in ("idf_filename", "schedule_filename", "epw_filename"):
-        try:
-            if k in row and row[k] is not None:
-                meta[k] = str(row[k])
-        except Exception:
-            continue
-
     # Useful building descriptors (only if present)
     for k in (
         "geometry_unit_type",
