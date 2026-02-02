@@ -110,16 +110,10 @@ def table_index(root_zip: Path):
 
     df = duckdb.from_csv_auto(contents).to_df()
 
-    # Dataset schema differs slightly between zip variants. Prefer the legacy
-    # `weather_station_epw_filepath` if present; otherwise derive EPW from the
-    # administrative region mapping shipped in the zip.
-    if "weather_station_epw_filepath" in df.columns:
-        df = df.assign(
-            epw_filename=df["weather_station_epw_filepath"].apply(
-                lambda name: f"weather/{name}"
-            )
-        )
-    elif "Region_Administrative" in df.columns:
+    # Dataset schema differs slightly between zip variants. derive EPW from the
+    # administrative region mapping shipped in the zip. Otherwise use the
+    # `weather_station_epw_filepath` if present.
+    if "Region_Administrative" in df.columns:
         with zipfile.ZipFile(root_zip) as zip_ref:
             mapping = json.loads(zip_ref.read("Mapping-Region-EPWfiles.json"))
         if not isinstance(mapping, dict):
@@ -136,6 +130,10 @@ def table_index(root_zip: Path):
             return f"weather/{epw}"
 
         df = df.assign(epw_filename=df["Region_Administrative"].apply(_region_to_epw))
+    elif "weather_station_epw_filepath" in df.columns:
+        df = df.assign(epw_filename=df["weather_station_epw_filepath"].apply(
+            lambda name: f"weather/{name}"
+        ))
     else:
         raise KeyError(
             "Could not derive EPW filename: expected one of "

@@ -370,9 +370,6 @@ def make_controllable(
 ) -> Expression[tuple[Path, list[ActuatorDescription]]]:
     @derivation("controllable-building")
     def make_controllable_builder(input: Path):
-        # Bump this string when changing controllability logic so cached derivations
-        # are invalidated and rebuilt.
-        pipeline_version = "2026-01-29-01"
 
         real_out = OUTPUT.get()
         with open(input, "rb") as f:
@@ -386,11 +383,6 @@ def make_controllable(
 
         # out.mkdir()
 
-        json.dump(
-            {"pipeline_version": pipeline_version},
-            open(tmp_out / "pipeline_info.json", "w"),
-            indent=2,
-        )
         json.dump(json_obj, open(tmp_out / "building.epjson", "w"), indent=4)
         json.dump(
             unstructure(hvac_actuators + baseboard_actuators + fanonoff_actuators),
