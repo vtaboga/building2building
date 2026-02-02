@@ -24,6 +24,7 @@ from building2building.store import (
     OUTPUT,
     Constant,
     Derivation,
+    DownloadFile,
     ExtractFromZip,
     ExtractZip,
     LocalFile,
@@ -45,12 +46,22 @@ logger = logging.getLogger(__name__)
 # We should try not to call this function too often. Each call of LocalFile
 # requires reading the file in its entirety, which is bad. Perhaps this should
 # use LocalSymlink?
-def dataset_zip() -> Derivation:
+def dataset_zip_small() -> Derivation:
     place = files("building2building.sources.data") / "hydroquebec.zip"
     if not isinstance(place, Path):
         raise Exception("error")
 
     return LocalFile(place)
+
+
+def dataset_zip() -> Derivation:
+    return DownloadFile(
+        "hydroquebec_big.zip",
+        "https://huggingface.co/datasets/Terramorpha/b2b-hq-big/resolve/main/hydroquebec_big.zip",
+        bytes.fromhex(
+            "ce6f77015250a959fb76869e158f275ce5de286779b7d0818e190ab72c54a3d8"
+        ),
+    )
 
 
 @derivation("table.parquet")
