@@ -159,6 +159,9 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         "observation_names": obs_info.slot_names,
         "action_names": action_names,
         "hvac_actuators": building_config.hvac_actuators,
+        "building_source_metadata": dict(building_config.source_metadata)
+        if isinstance(building_config.source_metadata, dict)
+        else {},
     }
 
     return gymenv

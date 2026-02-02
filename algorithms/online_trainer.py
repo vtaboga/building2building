@@ -7,6 +7,7 @@ from wandb.integration.sb3 import WandbCallback
 import wandb
 
 from algorithms.utils import make_dummy_vec_env, make_env, log_test_dir_graphs_wandb
+from algorithms.wandb_utils import init_wandb_from_config
 from algorithms.test import test_policy
 from building2building.simulator.wrappers import NormalizeObservation
 from stable_baselines3.common.env_util import make_vec_env
@@ -127,22 +128,12 @@ def online_trainer(config: OmegaConf, output_dir: Path):
     # File is at: <repo_root>/algorithms/online_trainer.py
     repo_root = Path(__file__).resolve().parents[1]
 
-    wandb_run = wandb.init(
-        project=config.wandb.project,
-		entity=config.wandb.entity,
-        config=OmegaConf.to_container(config, resolve=True),
-		sync_tensorboard=True,
-        dir=str(output_dir),
-        save_code=True,
+    wandb_run, _started_here = init_wandb_from_config(
+        config,
+        run_dir=output_dir,
+        sync_tensorboard=True,
+        log_code_root=repo_root,
     )
-
-    # Ensure the run is explicitly associated with this code checkout in W&B,
-    # even if Hydra changes the runtime working directory.
-    if wandb_run is not None:
-        try:
-            wandb_run.log_code(root=str(repo_root))
-        except Exception as e:
-            logger.warning("wandb log_code failed: %s", e)
 
 
     # Prepare IO dirs

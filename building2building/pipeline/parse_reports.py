@@ -57,7 +57,13 @@ def get_net_conditioned_area(html_path: Path) -> float:
 
 
 def get_warmup_days(html_path: Path) -> int:
-    """Extract the number of warm-up days from an EnergyPlus HTML summary file."""
+    """
+    Extract the number of warm-up days from an EnergyPlus HTML summary file.
+
+    Note: Some EnergyPlus versions / output configurations may not include the
+    warmup-days table in `eplustbl.htm`. In that case we return 0 instead of
+    failing the whole pipeline.
+    """
     with open(html_path, "r", encoding="utf-8", errors="ignore") as f:
         soup = BeautifulSoup(f, "html.parser")
 
@@ -67,7 +73,7 @@ def get_warmup_days(html_path: Path) -> int:
             table_tag = b.find_next("table")
             break
     if table_tag is None:
-        raise Exception("could not read warmup days")
+        return 0
 
     # Read without trusting header detection; promote first row to header if needed
     df = pd.read_html(StringIO(str(table_tag)), header=None)[0]
@@ -98,7 +104,7 @@ def get_warmup_days(html_path: Path) -> int:
                 target = c
                 break
     if target is None:
-        raise Exception("could not read warmup days")
+        return 0
 
     # Take the first numeric value in that column
     def to_float(x):
@@ -110,6 +116,6 @@ def get_warmup_days(html_path: Path) -> int:
     series = df[target].map(to_float).dropna()
 
     if series.empty:
-        raise Exception("could not read warmup days")
+        return 0
     warmup_days = int(series.iloc[0])
     return warmup_days

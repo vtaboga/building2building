@@ -31,6 +31,11 @@ def lifted_day_of_year(state):
     return api.exchange.day_of_year(state)
 
 
+def lifted_day_of_week(state):
+    # EnergyPlus convention: 1=Sunday, 2=Monday, ..., 7=Saturday
+    return api.exchange.day_of_week(state)
+
+
 @dataclass
 class ObservationFlattener:
     flatten_transform: Transform
@@ -108,6 +113,7 @@ def flat_observation_info(ont: Ontology, *, area: float) -> ObservationInfo:
     -    - Outdoor Air Temperature [-50°C, 50°C]
     -    - Outdoor Air Relative Humidity [0%, 100%]
     -    - Current Time of Day [0, 24]
+    -    - Day of Week [1, 7]  (1=Sunday, ..., 7=Saturday)
     -    - Day of Year [1, 366]
     -    - HVAC Electricity Consumption [0, 50]  Wh / m2 / 15min timestep
     -    - HVAC Natural Gas Consumption [0, 50]  Wh / m2 / 15min timestep
@@ -128,6 +134,11 @@ def flat_observation_info(ont: Ontology, *, area: float) -> ObservationInfo:
                 "time_of_day",
                 FunctionHole(lifted_current_time),
                 (1.0, 25.0),
+            ),
+            "day_of_week": (
+                "day_of_week",
+                FunctionHole(lifted_day_of_week),
+                (1.0, 7.0),
             ),
             "day_of_year": (
                 "day_of_year",
@@ -198,6 +209,9 @@ def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
                 {
                     "time_of_day": TransformScalarToArray(
                         FunctionHole(lifted_current_time), 1.0, 25.0
+                    ),
+                    "day_of_week": TransformScalarToArray(
+                        FunctionHole(lifted_day_of_week), 1.0, 7.0
                     ),
                     "day_of_year": TransformScalarToArray(
                         FunctionHole(lifted_day_of_year), 1.0, 366.0

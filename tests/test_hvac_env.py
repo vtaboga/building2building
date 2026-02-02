@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from building2building.env import STORE_PATH
 from building2building.pipeline import make_controllable, extract_discovery_metadata

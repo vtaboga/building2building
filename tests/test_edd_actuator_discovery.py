@@ -19,12 +19,23 @@ def test_make_controllable_creates_expected_actuators() -> None:
     # Should have created actuators
     assert len(actuator_descriptions) > 0, "Should create at least one actuator"
 
-    # All actuators should be Schedule:Constant / Schedule Value
+    # We expect a mix of:
+    # - scheduled setpoints (Schedule:Constant / Schedule Value)
+    # - direct fan airflow actuation (Fan / Fan Air Mass Flow Rate)
     for act in actuator_descriptions:
-        assert act.component_type == "Schedule:Constant"
-        assert act.control_type == "Schedule Value"
-        assert act.component_name.startswith("B2B")
-        assert act.units in ["Temperature", "Availability"]
+        assert act.units in ["Temperature", "Availability", "[kg/s]"]
+
+        if act.component_type == "Schedule:Constant":
+            assert act.control_type == "Schedule Value"
+            assert act.component_name.startswith("B2B")
+            assert act.units in ["Temperature", "Availability"]
+        elif act.component_type == "Fan":
+            assert act.control_type == "Fan Air Mass Flow Rate"
+            assert act.units == "[kg/s]"
+        else:
+            raise AssertionError(
+                f"Unexpected actuator type/control: {act.component_type} / {act.control_type}"
+            )
 
     # Check that we have actuators for the mini split heat pump system
     # The fixture has a unitary system, so we should have temperature setpoint schedules
@@ -62,14 +73,16 @@ def test_make_controllable_produces_valid_epjson() -> None:
     # Should have ScheduleTypeLimits
     assert "ScheduleTypeLimits" in epjson_data
 
-    # Verify all schedules referenced by actuators exist
+    # Verify all schedules referenced by schedule actuators exist
     for act in actuator_descriptions:
-        assert act.component_name in epjson_data["Schedule:Constant"], (
-            f"Schedule {act.component_name} should exist in epJSON"
-        )
+        if act.component_type == "Schedule:Constant":
+            assert act.component_name in epjson_data["Schedule:Constant"], (
+                f"Schedule {act.component_name} should exist in epJSON"
+            )
 
     print(f"\n✓ Control epJSON is valid")
     print(
         f"✓ Contains {len(epjson_data['Schedule:Constant'])} Schedule:Constant objects"
     )
-    print(f"✓ All {len(actuator_descriptions)} actuator schedules exist")
+    n_sched = sum(1 for a in actuator_descriptions if a.component_type == "Schedule:Constant")
+    print(f"✓ All {n_sched} actuator schedules exist")

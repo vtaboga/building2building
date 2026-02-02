@@ -1,4 +1,5 @@
 import json
+import logging
 import shutil
 import tempfile
 from copy import deepcopy
@@ -17,6 +18,8 @@ from building2building.store import (
     expression,
 )
 from building2building.types import ActuatorDescription
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -221,15 +224,33 @@ WHERE {
         )
         new_actuators.append(fan_air_mass_flow_rate)
 
-        for node in set(
-            [
-                outlet_node,
-                cooling_coil_node,
-                heating_coil_node,
-                supplemental_coil_node,
-            ]
-        ):
-            node_name = str(node)
+        # Some buildings legitimately have missing coil outlet nodes or explicit
+        # "NONE" placeholders in node fields. Never create setpoint managers for
+        # such nodes, otherwise EnergyPlus errors out with:
+        #   Node Connection Error, Node="NONE", Setpoint node did not find a matching node...
+        raw_nodes = [
+            outlet_node,
+            cooling_coil_node,
+            heating_coil_node,
+            supplemental_coil_node,
+        ]
+        node_names: set[str] = set()
+        for node in raw_nodes:
+            if node is None:
+                continue
+            s = str(node).strip()
+            if not s or s.upper() == "NONE":
+                continue
+            node_names.add(s)
+
+        if not node_names:
+            logger.warning(
+                "Unitary system %s has no valid setpoint nodes (skipping SPM creation).",
+                str(loop),
+            )
+            continue
+
+        for node_name in node_names:
 
             sched_constant_name = create_schedule_constant(
                 obj,
@@ -349,6 +370,7 @@ def make_controllable(
 ) -> Expression[tuple[Path, list[ActuatorDescription]]]:
     @derivation("controllable-building")
     def make_controllable_builder(input: Path):
+
         real_out = OUTPUT.get()
         with open(input, "rb") as f:
             json_obj = json.load(f)
