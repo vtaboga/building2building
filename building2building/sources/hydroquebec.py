@@ -198,7 +198,6 @@ def search_buildings(**query) -> DataFrame:
             )
         elif isinstance(v, (int, float)):
             # Prefer closest numeric match (e.g., year_built).
-            # NOTE: duckdb relations are immutable; `order()` returns a new relation.
             db = db.order(f"abs({k} - {v})")
 
     df = db.to_df()

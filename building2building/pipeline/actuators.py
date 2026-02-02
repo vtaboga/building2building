@@ -48,8 +48,8 @@ def create_onoff_availability_stl(obj: dict[str, Any], *, name="OnOff") -> str:
     return name
 
 
-temp_stl_lower_bound = -100.0
-temp_stl_upper_bound = 200.0
+temp_stl_lower_bound = 5.0
+temp_stl_upper_bound = 50.0
 
 
 def create_temp_stl(obj: dict[str, Any], *, name="Temperature") -> str:
@@ -61,8 +61,8 @@ def create_temp_stl(obj: dict[str, Any], *, name="Temperature") -> str:
 
     name = f"B2B {name} ({gensym()})"
     schedule_type_limits[name] = {
-        "lower_limit_value": -100,
-        "upper_limit_value": 200,
+        "lower_limit_value": 5.0,
+        "upper_limit_value": 50.0,
         "numeric_type": "Continuous",
         "unit_type": "Temperature",
     }

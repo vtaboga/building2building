@@ -5,6 +5,7 @@ defaults:
   - training: default
   - policy: ppo
   - reward: deadband
+  - bldg: single_family
   - rollout: default
 
 env:
