@@ -11,6 +11,11 @@ from typing import Iterable
 import pandas as pd
 from building2building.simulator import create_simulator
 from building2building.sources import hydroquebec
+from building2building.utils import (
+    hydroquebec_building_id_from_split_index,
+    hydroquebec_filenames_for_building_id,
+)
+from omegaconf import OmegaConf
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
 from algorithms.wandb_utils import wandb_log_xy_series
@@ -24,6 +29,50 @@ def make_env(config, eplus_output_dir: str):
     eplus_output_dir.mkdir(parents=True, exist_ok=True)
     # Fetch exactly one BuildingConfig and build a single simulator env
     try:
+        # Optional: deterministic building selection from train/test row-id lists.
+        #
+        # Config shape (recommended):
+        #   bldg:
+        #     selection:
+        #       enabled: true
+        #       split: train|test
+        #       index: 0
+        #
+        # This injects an `idf_filename` filter so `hydroquebec.search_configs(...)`
+        # selects exactly that building.
+        cfg_any = config
+        if not isinstance(cfg_any, dict):
+            try:
+                cfg_any = OmegaConf.to_container(cfg_any, resolve=True)  # type: ignore[assignment]
+            except Exception:
+                cfg_any = config
+
+        if isinstance(cfg_any, dict):
+            bldg_section = cfg_any.get("bldg")
+            if isinstance(bldg_section, dict):
+                sel = bldg_section.get("selection")
+                if isinstance(sel, dict) and bool(sel.get("enabled", False)):
+                    split = str(sel.get("split", "train")).strip().lower()
+                    if split not in ("train", "test"):
+                        raise ValueError(f"bldg.selection.split must be 'train' or 'test', got {split!r}")
+                    split_idx_raw = sel.get("index", 0)
+                    if not isinstance(split_idx_raw, int):
+                        raise TypeError(
+                            f"bldg.selection.index must be int, got {type(split_idx_raw).__name__}"
+                        )
+                    building_id = hydroquebec_building_id_from_split_index(
+                        split=split, split_index=split_idx_raw
+                    )
+                    idf_filename, schedule_filename = hydroquebec_filenames_for_building_id(building_id)
+
+                    # Override any existing building query: pick exactly this building.
+                    bldg_section["bldg"] = {
+                        "idf_filename": idf_filename,
+                        "schedule_filename": schedule_filename,
+                    }
+                    cfg_any["bldg"] = bldg_section
+                    config = cfg_any
+
         # Let the pipeline copy discovery `eplusout.err` into this run folder.
         prev = os.environ.get("B2B_PIPELINE_DEBUG_DIR")
         os.environ["B2B_PIPELINE_DEBUG_DIR"] = str(eplus_output_dir)

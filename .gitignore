@@ -9,7 +9,6 @@ __pycache__/
 /.pytest_cache/
 *.py[cod]
 *$py.class
-data/
 logs
 container/*.sif
 container/*.sh
@@ -28,6 +27,9 @@ uv.lock
 multirun/
 jobs_logs/
 docs/ 
+analyze_metadata.ipynb
+data/
+!building2building/sources/data/
 
 # temporary
 simulator/patched_minergym_simulation.py

@@ -1,3 +1,8 @@
+selection:
+  enabled: false
+  split: train
+  index: 0
+
 bldg:
   # This selector is intended to pick a Hydro-Québec building that has:
   # - electric resistance space heating (typically modeled as electric baseboards)
