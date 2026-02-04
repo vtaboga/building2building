@@ -1,0 +1,29 @@
+# PPO configuration optimized for parameterized multi-building training
+
+algorithm: "ppo"
+policy_type: "MlpPolicy"
+device: "cpu"  # Set to "cuda" if GPU available
+
+# PPO-specific hyperparameters
+# These are tuned for the augmented observation space
+n_steps: 2048
+batch_size: 64
+n_epochs: 10
+gamma: 0.99
+learning_rate: 0.0003
+clip_range: 0.2
+ent_coef: 0.01  # Slightly higher entropy for exploration across buildings
+vf_coef: 0.5
+max_grad_norm: 0.5
+gae_lambda: 0.95
+
+# Network architecture
+# The policy network will automatically adapt to the augmented observation space
+policy_kwargs:
+  net_arch:
+    - 256  # Larger network to handle building parameter variations
+    - 256
+    - 128
+
+verbose: 1
+
