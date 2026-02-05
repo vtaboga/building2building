@@ -4,7 +4,7 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "building2building"
+name = "b2b"
 version = "0.1.0"
 description = "A framework for energyplus building simulation for RL."
 readme = "README.md"
@@ -30,6 +30,7 @@ dependencies = [
     "stable-baselines3>=2.7.0",
     "sb3-contrib>=2.7.0",
     "tensorboard>=2.20.0",
+    "cattrs>=25.3.0",
 ]
 
 [project.optional-dependencies]
@@ -44,10 +45,10 @@ dev = [
     # ... your dev dependencies
 ]
 
-all = ["building2building[test,dev]"]
+all = ["b2b[test,dev]"]
 
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["building2building*"]
+include = ["b2b*"]
 exclude = ["tests*"]

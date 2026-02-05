@@ -5,7 +5,7 @@ import logging
 import hydra
 from omegaconf import DictConfig
 
-from algorithms.baselines import run_baseline_rollout
+from b2b.baselines import run_baseline_rollout
 
 logger = logging.getLogger(__name__)
 

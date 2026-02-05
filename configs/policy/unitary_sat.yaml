@@ -1,0 +1,37 @@
+type: unitary_sat
+
+# Same parameters as `policy/unitary_airflow_first_sat.yaml` (kept for compatibility).
+
+# Control objective
+target_temp_c: 21.0
+deadband_c: 0.5
+
+# Optional time-based target schedule
+target_schedule:
+  enabled: true
+  weekend_days: [1, 7]
+  weekend_target_c: 21.0
+  weekday_target_c: 21.0
+  weekday_setback_target_c: 18.0
+  weekday_setback_start_hour: 9.0
+  weekday_setback_end_hour: 16.0
+
+availability_on: 2.0
+
+outlet_temp_heating_c: 35.0
+outlet_temp_cooling_c: 14.0
+
+fan_base_kg_s: 0.3
+kp: 0.2
+ki: 0.0002
+integral_limit: 200.0
+
+fan_min_kg_s: null
+fan_max_kg_s: null
+
+sat_min_c: 10.0
+sat_max_c: 45.0
+sat_step_c: 0.2
+sat_rate_limit_c_per_step: 0.2
+sat_saturation_steps: 4
+

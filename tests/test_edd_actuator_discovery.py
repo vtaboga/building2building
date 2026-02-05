@@ -1,64 +1,88 @@
+"""Test that make_controllable creates expected actuators for the fixture building."""
+
 from pathlib import Path
 
-from building2building.pipeline import get_airflow_and_coil_node_setpoint_actuators
+from b2b.env import STORE_PATH
+from b2b.pipeline import make_controllable
+from b2b.store import Constant, realize
 
 
-def test_get_airflow_and_coil_node_setpoint_actuators_finds_expected() -> None:
-    edd_path = Path(__file__).parent / "fixtures" / "eplusout.edd"
-    actuators = get_airflow_and_coil_node_setpoint_actuators(edd_path)
+def test_make_controllable_creates_expected_actuators() -> None:
+    """Test that make_controllable creates controllable schedules for HVAC systems."""
+    epjson_path = Path(__file__).parent / "fixtures" / "bldg1.epjson"
+    assert epjson_path.exists()
 
-    keys = {
-        (a["component_name"], a["component_type"], a["control_type"], a["units"])
-        for a in actuators
-    }
+    # Make the building controllable
+    control_expr = make_controllable(Constant(epjson_path))
+    control_epjson, actuator_descriptions = realize(STORE_PATH.get(), control_expr)
 
-    # Fan air mass flow rate actuator
-    assert (
-        "MINI SPLIT HEAT PUMP SUPPLY FAN",
-        "Fan",
-        "Fan Air Mass Flow Rate",
-        "[kg/s]",
-    ) in keys
+    # Should have created actuators
+    assert len(actuator_descriptions) > 0, "Should create at least one actuator"
 
-    # Coil node temperature setpoints (system node setpoint temperature setpoint)
-    assert (
-        "MINI SPLIT HEAT PUMP UNITARY SYSTEM FAN - COOLING COIL NODE",
-        "System Node Setpoint",
-        "Temperature Setpoint",
-        "[C]",
-    ) in keys
-    assert (
-        "MINI SPLIT HEAT PUMP UNITARY SYSTEM COOLING COIL - HEATING COIL NODE",
-        "System Node Setpoint",
-        "Temperature Setpoint",
-        "[C]",
-    ) in keys
-    assert (
-        "MINI SPLIT HEAT PUMP UNITARY SYSTEM HEATING COIL - SUPPLEMENTAL COIL NODE",
-        "System Node Setpoint",
-        "Temperature Setpoint",
-        "[C]",
-    ) in keys
+    # We expect a mix of:
+    # - scheduled setpoints (Schedule:Constant / Schedule Value)
+    # - direct fan airflow actuation (Fan / Fan Air Mass Flow Rate)
+    for act in actuator_descriptions:
+        assert act.units in ["Temperature", "Availability", "[kg/s]"]
 
-    # Availability override for the air loop
-    assert (
-        "MINI SPLIT HEAT PUMP AIRLOOP",
-        "AirLoopHVAC",
-        "Availability Status",
-        "[ ]",
-    ) in keys
+        if act.component_type == "Schedule:Constant":
+            assert act.control_type == "Schedule Value"
+            assert act.component_name.startswith("B2B")
+            assert act.units in ["Temperature", "Availability"]
+        elif act.component_type == "Fan":
+            assert act.control_type == "Fan Air Mass Flow Rate"
+            assert act.units == "[kg/s]"
+        else:
+            raise AssertionError(
+                f"Unexpected actuator type/control: {act.component_type} / {act.control_type}"
+            )
 
-
-def test_get_airflow_and_coil_node_setpoint_actuators_includes_unitary_outlet_node() -> None:
-    edd_path = Path(__file__).parent / "fixtures" / "eplusout.edd"
-    actuators = get_airflow_and_coil_node_setpoint_actuators(
-        edd_path, unitary_outlet_nodes=["NODE 3"]
+    # Check that we have actuators for the mini split heat pump system
+    # The fixture has a unitary system, so we should have temperature setpoint schedules
+    temp_actuators = [a for a in actuator_descriptions if a.units == "Temperature"]
+    assert len(temp_actuators) > 0, (
+        "Should have temperature setpoint actuators for unitary system"
     )
 
-    keys = {
-        (a["component_name"], a["component_type"], a["control_type"], a["units"])
-        for a in actuators
-    }
+    print(f"\n✓ Created {len(actuator_descriptions)} actuators:")
+    for act in actuator_descriptions:
+        print(f"  - {act.component_name} ({act.units})")
 
-    assert ("NODE 3", "System Node Setpoint", "Temperature Setpoint", "[C]") in keys
 
+def test_make_controllable_produces_valid_epjson() -> None:
+    """Test that make_controllable produces a valid epJSON file."""
+    import json
+
+    epjson_path = Path(__file__).parent / "fixtures" / "bldg1.epjson"
+    assert epjson_path.exists()
+
+    # Make the building controllable
+    control_expr = make_controllable(Constant(epjson_path))
+    control_epjson, actuator_descriptions = realize(STORE_PATH.get(), control_expr)
+
+    # Verify the output epJSON is valid
+    assert control_epjson.exists()
+
+    with open(control_epjson) as f:
+        epjson_data = json.load(f)
+
+    # Should have Schedule:Constant objects
+    assert "Schedule:Constant" in epjson_data
+    assert len(epjson_data["Schedule:Constant"]) > 0
+
+    # Should have ScheduleTypeLimits
+    assert "ScheduleTypeLimits" in epjson_data
+
+    # Verify all schedules referenced by schedule actuators exist
+    for act in actuator_descriptions:
+        if act.component_type == "Schedule:Constant":
+            assert act.component_name in epjson_data["Schedule:Constant"], (
+                f"Schedule {act.component_name} should exist in epJSON"
+            )
+
+    print(f"\n✓ Control epJSON is valid")
+    print(
+        f"✓ Contains {len(epjson_data['Schedule:Constant'])} Schedule:Constant objects"
+    )
+    n_sched = sum(1 for a in actuator_descriptions if a.component_type == "Schedule:Constant")
+    print(f"✓ All {n_sched} actuator schedules exist")

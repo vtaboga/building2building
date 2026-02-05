@@ -3,6 +3,7 @@ defaults:
   - bldg: single_family
   - policy: unitary_pi
   - reward: deadband
+  - wandb: default
 
 hydra:
   run:
@@ -10,6 +11,6 @@ hydra:
 
 env:
   normalize_obs: false
-  max_steps: 2880
+  max_steps: 672
 
 n_episodes: 1
