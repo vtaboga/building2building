@@ -9,10 +9,10 @@ __pycache__/
 /.pytest_cache/
 *.py[cod]
 *$py.class
-data/
 logs
 container/*.sif
 container/*.sh
+b2b.egg-info/
 building2building.egg-info/
 results/
 !tests/fixtures/results/
@@ -23,4 +23,15 @@ notebooks/
 OfflineRL-Kit/
 jobs/
 eplus_out/
+outputs/
 uv.lock
+multirun/
+jobs_logs/
+docs/ 
+analyze_metadata.ipynb
+data/
+b2b_outputs/
+!b2b/sources/data/
+
+# temporary
+simulator/patched_minergym_simulation.py

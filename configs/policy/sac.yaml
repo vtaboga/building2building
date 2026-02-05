@@ -1,0 +1,8 @@
+algorithm: "sac"
+buffer_size: 100000
+batch_size: 128
+learning_starts: 1000
+tau: 0.005
+gamma: 0.99
+learning_rate: 0.0003
+policy_type: "MlpPolicy"

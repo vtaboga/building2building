@@ -1,0 +1,6 @@
+defaults:
+  - policy: constant
+  - reward: deadband
+  - bldg: single_family
+
+n_episodes: 1

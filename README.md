@@ -1,103 +1,214 @@
-<div align="center">
-  <h1>Building2Building</h1>
-  <img src="images/building2building.png" alt="Building2Building" width="50%">
-  <p><strong>Benchmarking transfer learning in Reinforcement Learning on millions of buildings.</strong></p>
-</div>
+### Building2Building (B2B)
 
+Building2Building is a **reinforcement-learning framework for EnergyPlus building simulation** built on top of **Gymnasium**. It provides:
 
-## Installation Steps
+- **A simulator environment** wrapping EnergyPlus via `minergym`
+- **A data/pipeline layer** to select and prepare buildings (e.g., Hydro-Québec datasets)
+- **Baselines**: rule-based HVAC controllers and Stable-Baselines3 training utilities
+- **Benchmarks**: reproducible evaluation loops and experiment definitions on fixed building sets
 
-To install from a local checkout, do
+---
 
-``` shell
-pip install -e .
+### Quick start
+
+#### Prerequisites
+
+- **Python**: 3.10+
+- **EnergyPlus**: automatically managed by the project (see notes below), or you can point to an existing install.
+
+#### Setup
+
+Create and activate a virtual environment, then install the project:
+
+```bash
+uv venv .venv
+source .venv/bin/activate
+uv pip install -e .
 ```
 
-### EnergyPlus path
+#### EnergyPlus management (important)
 
-This library uses energyplus's simulator through its python API. In a standard
-system, the appropriate binary distribution of energyplus should be
-automatically downloaded and used, but if that is not appropriate for your
-system and you want to use a custom energyplus installation, set the
-`ENERGYPLUS_PATH` environment variable to point to the root of your energyplus
-installation directory, which should look like this:
+By default, B2B will download and cache an EnergyPlus binary the first time it needs one. You can also provide an existing install:
 
-```
-$ ls
-bin
-Bugreprt.txt
-ConvertInputFormat
-ConvertInputFormat-25.1.0
-DataSets
-Deprecation.html
-Documentation
-Energy+.idd
-energyplus
-energyplus.1
-energyplus-25.1.0
-Energy+.schema.epJSON
-EPLaunch
-EPMacro
-etc
-ExampleFiles
-ExpandObjects
-favicon.png
-include
-lib
-libenergyplusapi.so
-libenergyplusapi.so.25.1.0
-libpython3.12.so.1.0
-LICENSE.txt
-MacroDataSets
-manifest
-PostProcess
-PreProcess
-pyenergyplus
-python_lib
-PythonLicense.txt
-readme.html
-runenergyplus
-runepmacro
-runreadvars
-SetupOutputVariables.csv
-share
-VersionUpdater
-WeatherData
-workflows
+- **Use your own EnergyPlus**: set `ENERGYPLUS_PATH` to the install directory.
+- **Control cache location**: set `STORE_PATH` to where downloads/extractions should live.
+
+---
+
+### Running scripts
+
+All scripts use **Hydra** configs from `configs/`. Hydra creates a run directory and (by default) changes the working directory to it; files written via `Path.cwd()` typically land inside that run directory.
+
+Always activate the venv first:
+
+```bash
+source .venv/bin/activate
 ```
 
-## Workflow
+---
 
-### Searching the IDF files and weather files databases
+### Benchmark: adaptive dynamics (Hydro-Québec building set)
 
-In the `building2building.sources.*` family, there are a couple of submodules
-containing procedures that expose to you energyplus resources (weather files and
-idf files) from different datasets. Before being ready to use, however, many of
-these files need to go through a relatively complex pipeline that upgrades them
-to the latest energyplus version, adds relevant meters and more. The procedures
-in each source submodule arrange for the pipeline to be run correctly on files
-that you end up using for simulation. For caching purposes, many of these
-procedures will return "Derivations" that you can then `realize` to obtain the
-actual file.
+This benchmark evaluates a **controller policy** (e.g. `unitary_sat`) across a fixed list of Hydro-Québec buildings. The default script config is `configs/bm_adaptive_dynamics.yaml`.
 
-``` python
-from building2building.env import STORE_PATH
-from building2building.sources.energycodes import search_buildings
-from building2building.store import realize
+#### Minimal smoke run (fast)
 
-small_offices = search_buildings(building_type="SmallOffice")
-
-file = realize(STORE_PATH.get(), small_offices.iloc[0].derivation_thunk())
+```bash
+python -m scripts.bm_adaptive_dynamics benchmark.limit=1 benchmark.max_steps=1
 ```
 
-### Creating gym environments
+#### Typical usage
 
-In the `building2building.sources.*` familty of submodules, there will also be
-functions to compose together building files, weather files reward configs and
-other parameters into a `BuildingConfig` that is used to create a gymnasium
-environment using `building2building.simulator.create_simulator`.
+- **Run on the whole split**:
 
-## Minergym
+```bash
+python -m scripts.bm_adaptive_dynamics benchmark.split=train benchmark.start=0 benchmark.limit=0
+```
 
-The gym wrapper of energyplus is based on the minergym repository https://github.com/Terramorpha/minergym
+- **Evaluate a different controller** (examples):
+
+```bash
+python -m scripts.bm_adaptive_dynamics policy=unitary_pi
+python -m scripts.bm_adaptive_dynamics policy=fan_coil_constant
+```
+
+Outputs are stored under:
+
+- `outputs/benchmarks/adaptive_dynamics/<date>/<time>/`
+
+The benchmark also writes incremental results to:
+
+- `adaptive_dynamics_results.jsonl`
+
+---
+
+### Baseline rollouts: `scripts/baselines.py`
+
+`scripts/baselines.py` runs **rule-based baseline controllers** (not SB3 training) and saves a rollout as CSV/NPZ.
+
+#### Run the default baseline config
+
+```bash
+python -m scripts.baselines
+```
+
+This uses `configs/baseline.yaml`, which composes:
+
+- building selector: `configs/bldg/*`
+- controller policy: `configs/policy/*` (must define `policy.type`)
+- reward: `configs/reward/*`
+
+#### Useful overrides
+
+- **Choose a controller policy**:
+
+```bash
+python -m scripts.baselines policy=unitary_sat
+python -m scripts.baselines policy=unitary_pi
+python -m scripts.baselines policy=fan_coil_constant
+```
+
+- **Change rollout length**:
+
+```bash
+python -m scripts.baselines env.max_steps=672 n_episodes=1
+```
+
+Rollout artifacts are written to the Hydra run directory (example files):
+
+- `rollout.csv`
+- `rollout.npz`
+- `config_resolved.json`
+
+---
+
+### RL training entrypoint: `scripts/main.py`
+
+`scripts/main.py` is the **Stable-Baselines3 training entrypoint**. It uses `configs/base.yaml` by default (which composes training, SB3 policy, reward, and building selection).
+
+#### Run a training job
+
+```bash
+python -m scripts.main
+```
+
+#### Common overrides
+
+- **Select the SB3 algorithm config**:
+
+```bash
+python -m scripts.main policy=ppo
+python -m scripts.main policy=sac
+python -m scripts.main policy=dqn
+```
+
+- **Control number of parallel envs**:
+
+```bash
+python -m scripts.main training.num_train_envs=4
+```
+
+- **Set episode length / env settings**:
+
+```bash
+python -m scripts.main env.max_steps=672 env.normalize_obs=true
+```
+
+Training outputs (models, logs, tensorboard, test rollouts) are written under the Hydra run directory.
+
+---
+
+### Repository structure (detailed)
+
+#### Top-level
+
+- **`b2b/`**: main Python package
+- **`configs/`**: Hydra configuration tree (policies, rewards, buildings, training, benchmarks)
+- **`scripts/`**: CLI entrypoints (Hydra apps)
+- **`tests/`**: pytest suite + fixtures
+- **`images/`**: documentation images
+- **`pyproject.toml`**: packaging + dependencies
+
+#### `b2b/` package
+
+- **`b2b/make_env.py`**
+  - Central **environment factory**: `make_env(config, eplus_output_dir)`
+  - Handles deterministic Hydro-Québec selection via `bldg.selection`
+  - Creates a UUID subfolder under the EnergyPlus output directory
+
+- **`b2b/simulator/`**
+  - Gymnasium environment creation (`create_simulator`)
+  - Observation/action space definitions (`observation_spaces.py`, `action_spaces.py`)
+  - Rewards (`rewards.py`)
+  - Wrappers/utilities (`wrappers.py`, `transform_utils.py`)
+
+- **`b2b/pipeline/`**
+  - Building preparation pipeline (parsing EDD/reports, controllable actuator discovery, schedule/surface processing, simulation steps)
+
+- **`b2b/sources/`**
+  - Dataset connectors and selectors (Hydro-Québec, NREL, OneClimate, etc.)
+  - Includes some stored selection lists under `b2b/sources/data/`
+
+- **`b2b/baselines/`**
+  - **Controllers** live in `b2b/baselines/controllers/`
+    - Rule-based policies expose SB3-like `predict()` and optionally `bind_env/reset/step_metrics`
+    - Any policy-specific “patches” should be implemented here (not in rollout loops)
+  - **SB3 interaction utilities** (training, callbacks, evaluation helpers)
+  - `b2b/baselines/runner.py` is a thin compatibility wrapper; the rollout executor is centralized in `b2b/benchmark/`
+
+- **`b2b/benchmark/`**
+  - Centralized **simulation execution** (`runner.py`) with Gymnasium-standard loops
+  - Problem definitions (e.g. `problem_adaptive_dynamics.py`)
+  - Experiment/Hydra wrappers under `b2b/benchmark/experiments/`
+  - Baseline rollout implementation used by `scripts/baselines.py` (`baseline_rollout.py`)
+
+- **`b2b/env.py`**, **`b2b/store.py`**
+  - Download/caching utilities (including EnergyPlus binaries)
+
+---
+
+### Notes / troubleshooting
+
+- **Hydra run dirs**: Hydra changes the working directory into a run folder unless configured otherwise. This is why scripts often write outputs relative to `Path.cwd()`.
+- **Slow tests**: some integration tests that download/process building datasets are intentionally slow; prefer running targeted tests during development.
 

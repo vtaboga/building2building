@@ -1,7 +1,7 @@
-from building2building import simulator
-from building2building.env import STORE_PATH, binaries
-from building2building.sources import hydroquebec
-from building2building.store import realize
+from b2b import simulator
+from b2b.env import STORE_PATH, binaries
+from b2b.sources import hydroquebec
+from b2b.store import realize
 
 
 def test_binary():
@@ -9,11 +9,11 @@ def test_binary():
 
 
 def test_hydroquebec():
-    hydroquebec.search_configs({}, n=1)
+    hydroquebec.search_configs({"env": {"control_mode": "hvac_actuators"}}, n=1)
 
 
 def test_hydroquebec_env():
-    config = hydroquebec.search_configs({}, n=1)[0]
+    config = hydroquebec.search_configs({"env": {"control_mode": "hvac_actuators"}}, n=1)[0]
 
     env = simulator.create_simulator(config)
 

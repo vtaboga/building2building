@@ -1,0 +1,12 @@
+defaults:
+  - base
+  - _self_
+  - override /policy: on_off
+
+env:
+  normalize_obs: false
+  control_mode: sensible_load
+
+n_episodes: 1
+
+

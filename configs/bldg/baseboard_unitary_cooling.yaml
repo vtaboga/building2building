@@ -1,0 +1,16 @@
+selection:
+  enabled: false
+  split: train
+  index: 0
+
+bldg:
+  # This selector is intended to pick a Hydro-Québec building that has:
+  # - electric resistance space heating (typically modeled as electric baseboards)
+  # - a mini-split cooling system (unitary HVAC), which should expose a "Sensible Load Request" actuator
+  geometry_unit_type: "single-family detached"
+  geometry_building_num_units: 1
+  year_built: 1940
+  heating_system_type: "electricresistance"
+  cooling_system_type: "mini-split"
+
+

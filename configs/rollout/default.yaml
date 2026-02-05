@@ -1,0 +1,27 @@
+# Rollout configuration.
+#
+# This config group exists primarily to satisfy Hydra composition from
+# `configs/base.yaml` (which includes `- rollout: default`).
+#
+# Today, most scripts use top-level keys like `n_episodes` and `env.max_steps`
+# directly, so these values are optional and mainly serve as a central place
+# for future rollout/evaluation settings.
+
+# Whether to run a rollout / evaluation phase after training.
+enabled: true
+
+# How many episodes to run during rollouts/evaluation.
+# Prefer using `n_episodes` at the root level for ad-hoc scripts.
+n_episodes: 1
+
+# Max number of environment steps per episode during rollouts.
+# If set to null, scripts should fall back to `env.max_steps` or their defaults.
+max_steps: null
+
+# Output controls (when a script supports them).
+save_resolved_config: true
+save_csv: true
+save_npz: true
+make_plots: true
+
+

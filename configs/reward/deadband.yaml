@@ -1,0 +1,4 @@
+reward_type: DeadbandRewardConfig
+target_temp: 21.0
+dT: 0.5
+energy_weight: 0.0
