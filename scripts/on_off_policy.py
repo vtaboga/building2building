@@ -5,8 +5,44 @@ import hydra
 import numpy as np
 from omegaconf import OmegaConf
 
-from algorithms.baselines import OnOffSensibleLoadPolicy
-from algorithms.utils import make_env
+from b2b.make_env import make_env
+
+
+class OnOffSensibleLoadPolicy:
+    """
+    Simple on/off sensible load controller for single-zone setups.
+
+    This is intentionally minimal and lives in the script so it doesn't impose a
+    public API on the `b2b.baselines` package.
+    """
+
+    def __init__(
+        self,
+        *,
+        target_temp_c: float,
+        deadband_c: float,
+        q_heat_w: float,
+        q_cool_w: float,
+        temp_obs_index: int,
+    ) -> None:
+        self.target_temp_c = float(target_temp_c)
+        self.deadband_c = float(deadband_c)
+        self.q_heat_w = float(q_heat_w)
+        self.q_cool_w = float(q_cool_w)
+        self.temp_obs_index = int(temp_obs_index)
+        self.last_mode: str = "deadband"
+
+    def predict(self, obs, deterministic: bool = True):
+        arr = np.asarray(obs, dtype=float).reshape(-1)
+        tz = float(arr[self.temp_obs_index])
+        if tz < self.target_temp_c - self.deadband_c:
+            self.last_mode = "heating"
+            return np.asarray([self.q_heat_w], dtype=float), None
+        if tz > self.target_temp_c + self.deadband_c:
+            self.last_mode = "cooling"
+            return np.asarray([self.q_cool_w], dtype=float), None
+        self.last_mode = "deadband"
+        return np.asarray([0.0], dtype=float), None
 
 logger = logging.getLogger(__name__)
 

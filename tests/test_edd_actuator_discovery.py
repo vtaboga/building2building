@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from building2building.env import STORE_PATH
-from building2building.pipeline import make_controllable
-from building2building.store import Constant, realize
+from b2b.env import STORE_PATH
+from b2b.pipeline import make_controllable
+from b2b.store import Constant, realize
 
 
 def test_make_controllable_creates_expected_actuators() -> None:

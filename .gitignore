@@ -12,6 +12,7 @@ __pycache__/
 logs
 container/*.sif
 container/*.sh
+b2b.egg-info/
 building2building.egg-info/
 results/
 !tests/fixtures/results/
@@ -29,7 +30,8 @@ jobs_logs/
 docs/ 
 analyze_metadata.ipynb
 data/
-!building2building/sources/data/
+b2b_outputs/
+!b2b/sources/data/
 
 # temporary
 simulator/patched_minergym_simulation.py

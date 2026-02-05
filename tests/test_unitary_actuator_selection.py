@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from algorithms.baselines.unitary_actuators import select_unitary_actuator_indices
+from b2b.baselines.unitary_actuators import select_unitary_actuator_indices
 
 
 def test_select_unitary_actuator_indices_accepts_new_unitary_node_schedule_names() -> None:

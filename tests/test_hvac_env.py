@@ -6,11 +6,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from building2building.env import STORE_PATH
-from building2building.pipeline import make_controllable, extract_discovery_metadata
-from building2building.simulator import create_simulator
-from building2building.store import Constant, realize
-from building2building.types import BaseRewardConfig, BuildingConfig
+from b2b.env import STORE_PATH
+from b2b.pipeline import make_controllable, extract_discovery_metadata
+from b2b.simulator import create_simulator
+from b2b.store import Constant, realize
+from b2b.types import BaseRewardConfig, BuildingConfig
 
 
 @pytest.mark.skip(reason="Segfault with pyenergyplus API - needs investigation")

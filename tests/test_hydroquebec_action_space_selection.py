@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 from omegaconf import OmegaConf
 
-from algorithms.utils import make_env
-from building2building.utils import HydroQuebecRowIdSplits
+from b2b.make_env import make_env
+from b2b.utils import HydroQuebecRowIdSplits
 
 
 @dataclass(frozen=True)
@@ -55,13 +55,8 @@ def test_hydroquebec_selection_action_space_has_one_fan_one_node(tmp_path: Path)
     - 1 fan actuator
     - 1 node temperature setpoint actuator
 
-    This is intentionally opt-in because it is very slow (downloads + processing).
+    Note: this is slow (downloads + processing).
     """
-    if os.environ.get("B2B_RUN_HQ_SELECTION_VALIDATION") != "1":
-        pytest.skip(
-            "Set B2B_RUN_HQ_SELECTION_VALIDATION=1 to run "
-            "(very slow; iterates HydroQuebec train/test ids)."
-        )
 
     # Optional safety valve for debugging.
     limit_raw = os.environ.get("B2B_HQ_SELECTION_VALIDATION_LIMIT", "").strip()

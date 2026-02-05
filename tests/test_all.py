@@ -1,7 +1,7 @@
-from building2building import simulator
-from building2building.env import STORE_PATH, binaries
-from building2building.sources import hydroquebec
-from building2building.store import realize
+from b2b import simulator
+from b2b.env import STORE_PATH, binaries
+from b2b.sources import hydroquebec
+from b2b.store import realize
 
 
 def test_binary():
