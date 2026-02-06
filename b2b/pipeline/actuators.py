@@ -1,5 +1,4 @@
 import json
-import logging
 import shutil
 import tempfile
 from copy import deepcopy
@@ -18,8 +17,6 @@ from b2b.store import (
     expression,
 )
 from b2b.types import ActuatorDescription
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -107,8 +104,8 @@ def make_unitary_hvac_controllable(
     *,
     gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
-    """Find all "AirLoopHVAC:UnitarySystem" and expose the relevant node
-    setpoints as schedules that can be controlled by minergym.
+    """Find all "AirLoopHVAC:UnitaryHeatPump:AirToAir" and expose the relevant 
+    node setpoints as schedules that can be controlled by minergym.
 
     This is done in many steps:
 
@@ -121,8 +118,8 @@ def make_unitary_hvac_controllable(
        2. a Temperature type which will be used by all schedules we use for
           controlling temperature.
 
-    2. We query the ontology and look for all "AirLoopHVAC:UnitarySystem". For
-       each of those, we do the following:
+    2. We query the ontology and look for all "AirLoopHVAC:UnitaryHeatPump:AirToAir". 
+       For each of those, we do the following:
 
        1. We set the control_type to SetPoint
 
@@ -161,7 +158,7 @@ def make_unitary_hvac_controllable(
     all_loops_query = """# -*- mode: sparql-*-
 SELECT ?loop ?outlet_node ?cooling_coil ?cooling_coil_node ?heating_coil ?heating_coil_node ?supplemental_coil ?supplemental_coil_node
 WHERE {
-  ?loop a "AirLoopHVAC:UnitarySystem" .
+  ?loop a "AirLoopHVAC:UnitaryHeatPump:AirToAir" .
   ?loop idf:air_outlet_node_name ?outlet_node .
 
   # Cooling coil outlet
@@ -212,7 +209,7 @@ WHERE {
         supplemental_coil,
         supplemental_coil_node,
     ) in ont.rdf.query(all_loops_query):
-        unitary_system = obj["AirLoopHVAC:UnitarySystem"][str(loop)]
+        unitary_system = obj["AirLoopHVAC:UnitaryHeatPump:AirToAir"][str(loop)]
 
         unitary_system["control_type"] = "SetPoint"
 
@@ -229,7 +226,7 @@ WHERE {
             fan_mode_schedule_name
         )
 
-        supply_fan_name = unitary_system["supply_fan_name"]
+        supply_air_fan_name = unitary_system["supply_air_fan_name"]
 
         # The fan air mass flow rate isn't acuated through a schedule, but
         # directly through an EnergyManagementSystem:Actuator.
@@ -237,7 +234,7 @@ WHERE {
         fan_air_mass_flow_rate = ActuatorDescription(
             "Fan",
             "Fan Air Mass Flow Rate",
-            supply_fan_name,
+            supply_air_fan_name,
             "[kg/s]",
             0,
             100,
@@ -413,13 +410,206 @@ SELECT ?fan WHERE {
 
     return obj, new_actuators
 
+'''def make_waterheater_controllable(
+    obj: dict[str, Any],
+) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+     """Find all waterheaters and for each of those, expose the availibility
+        schedue as a schedule that can be controlled."""
+     
+     obj = deepcopy(obj)
+
+     ont = Ontology.from_object(obj)
+
+     binary_stl = create_onoff_availability_stl(obj, name="baseboard availibility")
+'''
+
+def make_waterheater_controllable(
+    obj: dict[str, Any],
+) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+    """Find all waterheaters and for each of those, expose the availibility
+        schedue as a schedule that can be controlled."""
+
+    obj = deepcopy(obj)
+    
+    ont = Ontology.from_object(obj)
+    
+    temp_stl_name = create_temp_stl(obj, name="water heater temperature stl")
+
+    # SPARQL query for Water Heaters 
+    all_waterheaters_query = """# -*- mode: sparql -*-
+    SELECT ?wh WHERE {
+      ?wh a "WaterHeater:Mixed" .
+    }"""
+
+    new_actuators = []
+
+    for (wh_id,) in ont.rdf.query(all_waterheaters_query):
+        wh_name = str(wh_id)
+        wh_entry = obj["WaterHeater:Mixed"][wh_name]
+
+        # Create a new controllable schedule for the setpoint 
+        sched_name = create_schedule_constant(
+            obj, temp_stl_name, 60, name=f"controllable setpoint for {wh_name}"
+        )
+        
+        # Override the original schedule 
+        wh_entry["setpoint_temperature_schedule_name"] = sched_name
+
+        new_actuators.append(
+            ActuatorDescription(
+                component_type="WaterHeater",
+                control_type="Setpoint Temperature",
+                component_name=sched_name,
+                units="Temperature",
+                lower_bound=10.0,
+                upper_bound=80.0,
+            )
+        )
+
+    return obj, new_actuators
+
+def make_pump_controllable(
+    obj: dict[str, Any],
+) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+    """Find all Pump:ConstantSpeed and for each of those, expose the availibility
+        schedue as a schedule that can be controlled."""
+    
+    obj = deepcopy(obj)
+    
+    new_actuators = []
+    
+    ont = Ontology.from_object(obj)
+
+    binary_stl = create_onoff_availability_stl(obj, name="pump availability stl")
+
+    # SPARQL query for Constant Speed Pumps
+    pump_query = """# -*- mode: sparql -*-
+    SELECT ?pump WHERE {
+      ?pump a "Pump:ConstantSpeed" .
+    }"""
+
+    for (pump_id,) in ont.rdf.query(pump_query):
+        pump_name = str(pump_id)
+        # In EnergyPlus pumps are often controlled via availability schedules
+        new_schedule_name = create_schedule_constant(
+            obj, binary_stl, 1, name=f"controllable schedule for pump {pump_name}"
+        )
+
+        # Set the pump to use this new schedule (Adding field if not present)
+        obj["Pump:ConstantSpeed"][pump_name]["pump_scheduling_control_scheme"] = "Schedule"
+        obj["Pump:ConstantSpeed"][pump_name]["availability_schedule_name"] = new_schedule_name
+
+        new_actuators.append(
+            ActuatorDescription(
+                component_type="Schedule:Constant",
+                control_type="Schedule Value",
+                component_name=new_schedule_name,
+                units="Availability",
+                lower_bound=0.0,
+                upper_bound=1.0,
+            )
+        )
+
+    return obj, new_actuators
+
+def make_airterminal_controllable(
+    obj: dict[str, Any],
+) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+    """Find all ConstantVolume:NoReheat Air Terminals and for each of those, expose the availibility
+        schedue as a schedule that can be controlled."""
+    
+    obj = deepcopy(obj)
+    
+    new_actuators = []
+    
+    ont = Ontology.from_object(obj)
+
+    binary_stl = create_onoff_availability_stl(obj, name="terminal availability stl")
+
+    terminal_query = """# -*- mode: sparql -*-
+    SELECT ?terminal WHERE {
+      ?terminal a "AirTerminal:SingleDuct:ConstantVolume:NoReheat" .
+    }"""
+
+    for (term_id,) in ont.rdf.query(terminal_query):
+        term_name = str(term_id)
+        new_schedule_name = create_schedule_constant(
+            obj, binary_stl, 1, name=f"controllable schedule for terminal {term_name}"
+        )
+
+        obj["AirTerminal:SingleDuct:ConstantVolume:NoReheat"][term_name][
+            "availability_schedule_name"
+        ] = new_schedule_name
+
+        new_actuators.append(
+            ActuatorDescription(
+                component_type="Schedule:Constant",
+                control_type="Schedule Value",
+                component_name=new_schedule_name,
+                units="Availability",
+                lower_bound=0.0,
+                upper_bound=1.0,
+            )
+        )
+
+    return obj, new_actuators
+
+def make_controller_outdoorair_controllable(
+    obj: dict[str, Any],
+) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+    """Find all Controller:OutdoorAir and for each of those, expose the availibility
+        schedue as a schedule that can be controlled."""
+     
+    obj = deepcopy(obj)
+    
+    new_actuators = []
+    
+    ont = Ontology.from_object(obj)
+
+    fraction_stl = obj.get("ScheduleTypeLimits", {}).get("Fraction", None)
+    if not fraction_stl:
+        # Create a fraction STL if it doesn't exist for the controller
+        schedule_type_limits = obj.setdefault("ScheduleTypeLimits", {})
+        fraction_stl = "B2B Fraction STL"
+        schedule_type_limits[fraction_stl] = {
+            "lower_limit_value": 0,
+            "upper_limit_value": 1,
+            "numeric_type": "Continuous",
+        }
+
+    oa_controller_query = """# -*- mode: sparql -*-
+    SELECT ?controller WHERE {
+      ?controller a "Controller:OutdoorAir" .
+    }"""
+
+    for (ctrl_id,) in ont.rdf.query(oa_controller_query):
+        ctrl_name = str(ctrl_id)
+        new_schedule_name = create_schedule_constant(
+            obj, str(fraction_stl), 1, name=f"controllable OA fraction for {ctrl_name}"
+        )
+
+        obj["Controller:OutdoorAir"][ctrl_name][
+            "minimum_outdoor_air_schedule_name"
+        ] = new_schedule_name
+
+        new_actuators.append(
+            ActuatorDescription(
+                component_type="Schedule:Constant",
+                control_type="Schedule Value",
+                component_name=new_schedule_name,
+                units="Fraction",
+                lower_bound=0.0,
+                upper_bound=1.0,
+            )
+        )
+
+    return obj, new_actuators
 
 def make_controllable(
     input_epjson: Realizable,
 ) -> Expression[tuple[Path, list[ActuatorDescription]]]:
     @derivation("controllable-building")
     def make_controllable_builder(input: Path):
-
         real_out = OUTPUT.get()
         with open(input, "rb") as f:
             json_obj = json.load(f)
