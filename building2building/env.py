@@ -59,7 +59,7 @@ STORE_PATH: ContextVar[Path] = ContextVar("STORE_PATH")
 STORE_PATH.set(store_path())
 
 
-Platform = Literal["linux-x86_64"]
+Platform = Literal["linux-x86_64", "macosx-10.9-x86_64", "macosx-11.0-arm64"]
 GlibcVersion = Literal["2.35", "2.38"]
 
 
@@ -84,14 +84,24 @@ binaries: dict[Platform, Derivation] = {
 
 
 def energyplus_path() -> Realizable:
-    current_platform: Platform = sysconfig.get_platform()  # type: ignore
-    assert current_platform in get_args(Platform)
-
+    # 1. Check for manual override FIRST
     if p := os.getenv("ENERGYPLUS_PATH"):
         path = Path(p).resolve()
         return LocalSymlink("energyplus-path", path)
-    else:
-        return binaries[current_platform]
+    
+    # 2. If no manual path, then check platform for auto-download
+    current_platform: str = sysconfig.get_platform()
+    
+    # If we are on Mac and didn't provide a path, this script doesn't 
+    # have a download link for Mac anyway, so let's provide a clear error.
+    if "macosx" in current_platform:
+        raise RuntimeError(
+            f"EnergyPlus auto-download not supported on macOS. "
+            f"Please set ENERGYPLUS_PATH='/Applications/EnergyPlus-25-1-0' in your terminal."
+        )
+
+    assert current_platform in get_args(Platform)
+    return binaries[current_platform]
 
 
 def setup_energyplus_path():
