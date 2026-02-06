@@ -9,6 +9,38 @@ from omegaconf import OmegaConf
 
 logger = logging.getLogger(__name__)
 
+def _derived_wandb_tags(cfg: Any) -> list[str]:
+    """
+    Add lightweight tags for experiment filtering.
+
+    We keep this intentionally simple: the RL method and the data split.
+    """
+    tags: list[str] = []
+
+    # RL algorithm (SB3): cfg.policy.algorithm (e.g. "sac", "ppo")
+    algo = getattr(getattr(cfg, "policy", None), "algorithm", None)
+    if isinstance(algo, str) and algo.strip():
+        tags.append(f"algo:{algo.strip().lower()}")
+
+    # Baseline controllers: cfg.policy.type
+    policy_type = getattr(getattr(cfg, "policy", None), "type", None)
+    if isinstance(policy_type, str) and policy_type.strip():
+        tags.append(f"policy:{policy_type.strip().lower()}")
+
+    # Dataset split (you run RL with benchmark.split=test)
+    split = getattr(getattr(cfg, "benchmark", None), "split", None)
+    if isinstance(split, str) and split.strip():
+        tags.append(f"split:{split.strip().lower()}")
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in tags:
+        if t not in seen:
+            out.append(t)
+            seen.add(t)
+    return out
+
 
 def init_wandb_from_config(
     cfg: Any,
@@ -44,6 +76,9 @@ def init_wandb_from_config(
 
     entity = getattr(wandb_cfg, "entity", None)
     tags = getattr(wandb_cfg, "tags", None)
+    user_tags = list(tags) if tags is not None else []
+    extra_tags = _derived_wandb_tags(cfg)
+    merged_tags = [str(t) for t in (user_tags + extra_tags) if str(t).strip()]
 
     # `cfg` is typically an OmegaConf/DictConfig, but keep this helper usable
     # with plain dicts / objects in scripts.
@@ -57,7 +92,7 @@ def init_wandb_from_config(
     init_kwargs: dict[str, Any] = {
         "project": str(project),
         "entity": str(entity) if entity is not None else None,
-        "tags": list(tags) if tags is not None else None,
+        "tags": merged_tags,
         "config": cfg_dict,
         "dir": str(run_dir),
         "save_code": save_code,

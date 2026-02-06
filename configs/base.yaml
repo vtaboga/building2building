@@ -10,6 +10,7 @@ defaults:
 
 env:
   normalize_obs: true
+  max_steps: 35040
 
 n_episodes: 1
 
