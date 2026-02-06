@@ -79,10 +79,10 @@ def test_policy(config, policy_model, output_dir: Path):
     if norm_obs:
         env = NormalizeObservation(env)
 
-    # Column names
+    # Column names (prefix for robust downstream parsing/logging)
     obs_names = _get_names(env, "observation", env.observation_space, "obs")
     act_names = _get_names(env, "action", env.action_space, "action")
-    header = obs_names + act_names + ["reward"]
+    header = ["step"] + [f"obs::{n}" for n in obs_names] + [f"act::{n}" for n in act_names] + ["reward"]
 
     # Output directory for CSV logs
     test_dir.mkdir(parents=True, exist_ok=True)

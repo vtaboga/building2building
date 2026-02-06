@@ -8,6 +8,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import gymnasium as gym
 from omegaconf import OmegaConf
 
 from b2b.simulator import create_simulator
@@ -93,6 +94,12 @@ def make_env(config: object, eplus_output_dir: str | Path):
             )
         env_config = configs[0]
         env = create_simulator(env_config)
+
+        # Enforce a deterministic episode horizon when requested (e.g. full-year episodes).
+        max_steps = getattr(getattr(config, "env", None), "max_steps", None)
+        if max_steps is not None:
+            env = gym.wrappers.TimeLimit(env, max_episode_steps=int(max_steps))
+
         return env
     except Exception as e:
         # Persist a structured error record to make batch runs debuggable.
