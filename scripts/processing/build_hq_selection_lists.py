@@ -149,8 +149,8 @@ def _classify_two_actuators(actuator_names: list[str]) -> tuple[int, int, int]:
 def main() -> None:
     args = _parse_args()
 
-    # scripts/processing/<this_file>.py -> repo root is two levels up
-    repo_root = Path(__file__).resolve().parents[2]
+    # Assumes this script is executed from the repo root.
+    repo_root = Path.cwd().resolve()
     inputs_dir = Path(args.inputs_dir)
     if not inputs_dir.is_absolute():
         inputs_dir = (repo_root / inputs_dir).resolve()

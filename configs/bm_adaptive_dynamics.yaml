@@ -11,7 +11,7 @@ env:
 
 hydra:
   run:
-    dir: ${oc.env:B2B_REPO_ROOT}/outputs/benchmarks/adaptive_dynamics/${now:%Y%m%d}/${now:%H%M%S}
+    dir: outputs/benchmarks/adaptive_dynamics/${now:%Y%m%d}/${now:%H%M%S}
   job:
     chdir: true
 
