@@ -50,7 +50,7 @@ def housing_archetypes_database() -> Derivation:
         # There are two different ways québec is written. we defer to the one
         # without the accent because it's easier to work with.
         df.loc[df.region == "QUÉBEC", "region"] = "QUEBEC"
-
+        df = df.reset_index()
         duckdb.from_df(df).to_parquet(str(output))
 
     return index(housing_archetypes())
@@ -82,11 +82,12 @@ def search_buildings(**query) -> DataFrame:
 
 
 def search_config(
+    id: int | None = None,
     province: str | None = None,
     city: str | None = None,
     eplus_output_dir: Path = Path("eplus_out"),
 ) -> BuildingConfig:
-    buildings = search_buildings(province=province, location=city)
+    buildings = search_buildings(index=id, province=province, location=city)
 
     matching_buildings = buildings.iloc[[0]]
 
