@@ -425,15 +425,20 @@ SELECT ?fan WHERE {
 
 def make_waterheater_controllable(
     obj: dict[str, Any],
+    *,
+    gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all waterheaters and for each of those, expose the availibility
         schedue as a schedule that can be controlled."""
 
     obj = deepcopy(obj)
-    
+    gensym = Gensym() if gensym is None else gensym
+
     ont = Ontology.from_object(obj)
     
-    temp_stl_name = create_temp_stl(obj, name="water heater temperature stl")
+    temp_stl_name = create_temp_stl(
+        obj, name="water heater temperature stl", gensym=gensym
+    )
 
     # SPARQL query for Water Heaters 
     all_waterheaters_query = """# -*- mode: sparql -*-
@@ -449,7 +454,11 @@ def make_waterheater_controllable(
 
         # Create a new controllable schedule for the setpoint 
         sched_name = create_schedule_constant(
-            obj, temp_stl_name, 60, name=f"controllable setpoint for {wh_name}"
+            obj,
+            temp_stl_name,
+            60,
+            name=f"controllable setpoint for {wh_name}",
+            gensym=gensym,
         )
         
         # Override the original schedule 
@@ -470,17 +479,22 @@ def make_waterheater_controllable(
 
 def make_pump_controllable(
     obj: dict[str, Any],
+    *,
+    gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all Pump:ConstantSpeed and for each of those, expose the availibility
         schedue as a schedule that can be controlled."""
     
     obj = deepcopy(obj)
-    
+    gensym = Gensym() if gensym is None else gensym
+
     new_actuators = []
     
     ont = Ontology.from_object(obj)
 
-    binary_stl = create_onoff_availability_stl(obj, name="pump availability stl")
+    binary_stl = create_onoff_availability_stl(
+        obj, name="pump availability stl", gensym=gensym
+    )
 
     # SPARQL query for Constant Speed Pumps
     pump_query = """# -*- mode: sparql -*-
@@ -492,7 +506,11 @@ def make_pump_controllable(
         pump_name = str(pump_id)
         # In EnergyPlus pumps are often controlled via availability schedules
         new_schedule_name = create_schedule_constant(
-            obj, binary_stl, 1, name=f"controllable schedule for pump {pump_name}"
+            obj,
+            binary_stl,
+            1,
+            name=f"controllable schedule for pump {pump_name}",
+            gensym=gensym,
         )
 
         # Set the pump to use this new schedule (Adding field if not present)
@@ -513,18 +531,21 @@ def make_pump_controllable(
     return obj, new_actuators
 
 def make_airterminal_controllable(
-    obj: dict[str, Any],
+    obj: dict[str, Any],    
+    *,
+    gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all ConstantVolume:NoReheat Air Terminals and for each of those, expose the availibility
         schedue as a schedule that can be controlled."""
     
     obj = deepcopy(obj)
-    
+    gensym = Gensym() if gensym is None else gensym
+
     new_actuators = []
     
     ont = Ontology.from_object(obj)
 
-    binary_stl = create_onoff_availability_stl(obj, name="terminal availability stl")
+    binary_stl = create_onoff_availability_stl(obj, name="terminal availability stl", gensym=gensym)
 
     terminal_query = """# -*- mode: sparql -*-
     SELECT ?terminal WHERE {
@@ -534,7 +555,11 @@ def make_airterminal_controllable(
     for (term_id,) in ont.rdf.query(terminal_query):
         term_name = str(term_id)
         new_schedule_name = create_schedule_constant(
-            obj, binary_stl, 1, name=f"controllable schedule for terminal {term_name}"
+            obj,
+            binary_stl,
+            1,
+            name=f"controllable schedule for terminal {term_name}",
+            gensym=gensym,
         )
 
         obj["AirTerminal:SingleDuct:ConstantVolume:NoReheat"][term_name][
@@ -556,12 +581,15 @@ def make_airterminal_controllable(
 
 def make_controller_outdoorair_controllable(
     obj: dict[str, Any],
+    *,
+    gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all Controller:OutdoorAir and for each of those, expose the availibility
         schedue as a schedule that can be controlled."""
      
     obj = deepcopy(obj)
-    
+    gensym = Gensym() if gensym is None else gensym 
+
     new_actuators = []
     
     ont = Ontology.from_object(obj)
@@ -570,7 +598,7 @@ def make_controller_outdoorair_controllable(
     if not fraction_stl:
         # Create a fraction STL if it doesn't exist for the controller
         schedule_type_limits = obj.setdefault("ScheduleTypeLimits", {})
-        fraction_stl = "B2B Fraction STL"
+        fraction_stl = f"B2B Fraction STL ({gensym()})"
         schedule_type_limits[fraction_stl] = {
             "lower_limit_value": 0,
             "upper_limit_value": 1,
@@ -585,7 +613,11 @@ def make_controller_outdoorair_controllable(
     for (ctrl_id,) in ont.rdf.query(oa_controller_query):
         ctrl_name = str(ctrl_id)
         new_schedule_name = create_schedule_constant(
-            obj, str(fraction_stl), 1, name=f"controllable OA fraction for {ctrl_name}"
+            obj,
+            str(fraction_stl),
+            1,
+            name=f"controllable OA fraction for {ctrl_name}",
+            gensym=gensym,
         )
 
         obj["Controller:OutdoorAir"][ctrl_name][
@@ -622,6 +654,18 @@ def make_controllable(
             json_obj, gensym=gensym
         )
         json_obj, fanonoff_actuators = make_fanonoff_controllable(
+            json_obj, gensym=gensym
+        )
+        json_obj, waterheater_actuators = make_waterheater_controllable(
+            json_obj, gensym=gensym
+        )
+        json_obj, pump_actuators = make_pump_controllable(
+            json_obj, gensym=gensym
+        )
+        json_obj, airterminal_actuators = make_airterminal_controllable(
+            json_obj, gensym=gensym
+        )
+        json_obj, controller_outdoorair_actuators = make_controller_outdoorair_controllable(
             json_obj, gensym=gensym
         )
 
