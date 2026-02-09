@@ -4,8 +4,9 @@ import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Protocol
 
+import rdflib
 from cattrs import structure, unstructure
 from minergym.ontology import Ontology
 
@@ -28,17 +29,17 @@ class Gensym:
         self.i += 1
         return out
 
+    def reset(self):
+        self.i = 0
+
 
 # global counter for schedule type limits and constants
 # Use this to ensure that the names are unique across all components.
-_DEFAULT_GENSYM = Gensym()
+gensym = Gensym()
 
 
-def create_onoff_availability_stl(
-    obj: dict[str, Any], *, name: str = "OnOff", gensym: Gensym | None = None
-) -> str:
+def create_onoff_availability_stl(obj: dict[str, Any], *, name: str = "OnOff") -> str:
     """Create a binary ScheduleTypeLimits entity and return its name."""
-    gensym = _DEFAULT_GENSYM if gensym is None else gensym
     schedule_type_limits = obj.setdefault("ScheduleTypeLimits", {})
     name = f"B2B {name} ({gensym()})"
     schedule_type_limits[name] = {
@@ -54,14 +55,11 @@ temp_stl_lower_bound = 5.0
 temp_stl_upper_bound = 50.0
 
 
-def create_temp_stl(
-    obj: dict[str, Any], *, name: str = "Temperature", gensym: Gensym | None = None
-) -> str:
+def create_temp_stl(obj: dict[str, Any], *, name: str = "Temperature") -> str:
     """Create a continuous ScheduleTypeLimits for temperatures and return its
     name.
 
     """
-    gensym = _DEFAULT_GENSYM if gensym is None else gensym
     schedule_type_limits = obj.setdefault("ScheduleTypeLimits", {})
 
     name = f"B2B {name} ({gensym()})"
@@ -81,13 +79,11 @@ def create_schedule_constant(
     hourly_value: int,
     *,
     name: str = "constant schedule",
-    gensym: Gensym | None = None,
 ) -> str:
     """Create a constant schedule with the given type and the given constant
     value and return its name.
 
     """
-    gensym = _DEFAULT_GENSYM if gensym is None else gensym
     schedule_constants = obj.setdefault("Schedule:Constant", {})
     name = f"B2B {name} ({gensym()})"
     schedule_constants[name] = {
@@ -98,13 +94,29 @@ def create_schedule_constant(
     return name
 
 
-def make_unitary_hvac_controllable(
+class Equipment(Protocol):
+    def actuator_descriptions(self) -> list[ActuatorDescription]: ...
+    def zones(self) -> list[str]: ...
+
+
+@dataclass
+class AirloopHVAC:
+    zone: str
+
+    actuators: list[ActuatorDescription]
+
+    def actuator_descriptions(self) -> list[ActuatorDescription]:
+        return self.actuators
+
+    def zones(self) -> list[str]:
+        return [self.zone]
+
+
+def make_airloophvac_controllable(
     obj: dict[str, Any],
-    only_outlet_nodes: bool = False,
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
-    """Find all "AirLoopHVAC:UnitaryHeatPump:AirToAir" and expose the relevant 
+    type: str,
+) -> tuple[dict[str, Any], list[AirloopHVAC]]:
+    """Find all "AirLoopHVAC:UnitaryHeatPump:AirToAir" and expose the relevant
     node setpoints as schedules that can be controlled by minergym.
 
     This is done in many steps:
@@ -118,7 +130,7 @@ def make_unitary_hvac_controllable(
        2. a Temperature type which will be used by all schedules we use for
           controlling temperature.
 
-    2. We query the ontology and look for all "AirLoopHVAC:UnitaryHeatPump:AirToAir". 
+    2. We query the ontology and look for all "AirLoopHVAC:{type}".
        For each of those, we do the following:
 
        1. We set the control_type to SetPoint
@@ -132,11 +144,12 @@ def make_unitary_hvac_controllable(
 
     """
 
+    complete_type = f"AirLoopHVAC:{type}"
+    complete_type_rdf = rdflib.Literal(complete_type)
+
     obj = deepcopy(obj)
+    devices = []
 
-    new_actuators = []
-
-    gensym = Gensym() if gensym is None else gensym
     ont = Ontology.from_object(obj)
 
     setpoint_managers = obj.setdefault("SetpointManager:Scheduled", {})
@@ -144,11 +157,9 @@ def make_unitary_hvac_controllable(
     # We define the schedule type descriptors (onoff and temperature)
 
     onoff_stl_name = create_onoff_availability_stl(
-        obj, name="unitaryhvac fan availibiliby stl", gensym=gensym
+        obj, name="unitaryhvac fan availibiliby stl"
     )
-    temp_stl_name = create_temp_stl(
-        obj, name="unitaryhvac temperature setpoints stl", gensym=gensym
-    )
+    temp_stl_name = create_temp_stl(obj, name="unitaryhvac temperature setpoints stl")
 
     # Note: I wrapped each coil section in OPTIONAL blocks because not all
     # unitary systems have all three coil types (e.g., cooling-only systems
@@ -156,44 +167,11 @@ def make_unitary_hvac_controllable(
     #
     # TODO: actually handle cases where some of these are None.
     all_loops_query = """# -*- mode: sparql-*-
-SELECT ?loop ?outlet_node ?cooling_coil ?cooling_coil_node ?heating_coil ?heating_coil_node ?supplemental_coil ?supplemental_coil_node
+SELECT ?loop ?zone ?outlet_node
 WHERE {
-  ?loop a "AirLoopHVAC:UnitaryHeatPump:AirToAir" .
+  ?loop a ?completeType .
   ?loop idf:air_outlet_node_name ?outlet_node .
-
-  # Cooling coil outlet
-  OPTIONAL {
-    ?loop idf:cooling_coil_name ?cooling_coil .
-    ?loop idf:cooling_coil_object_type ?cooling_coil_type .
-    ?cooling_coil a ?cooling_coil_type .
-
-    # Try both possible outlet field names
-    { ?cooling_coil idf:air_outlet_node_name ?cooling_coil_node }
-    UNION
-    { ?cooling_coil idf:outlet_node_name ?cooling_coil_node }
-  }
-
-  # Heating coil outlet
-  OPTIONAL {
-    ?loop idf:heating_coil_name ?heating_coil .
-    ?loop idf:heating_coil_object_type ?heating_coil_type .
-    ?heating_coil a ?heating_coil_type .
-
-    { ?heating_coil idf:air_outlet_node_name ?heating_coil_node }
-    UNION
-    { ?heating_coil idf:outlet_node_name ?heating_coil_node }
-  }
-
-  # Supplemental heating coil outlet
-  OPTIONAL {
-    ?loop idf:supplemental_heating_coil_name ?supplemental_coil .
-    ?loop idf:supplemental_heating_coil_object_type ?supplemental_coil_type .
-    ?supplemental_coil a ?supplemental_coil_type .
-
-    { ?supplemental_coil idf:air_outlet_node_name ?supplemental_coil_node }
-    UNION
-    { ?supplemental_coil idf:outlet_node_name ?supplemental_coil_node }
-  }
+  ?loop idf:controlling_zone_or_thermostat_location ?zone .
 }
 
 
@@ -201,17 +179,20 @@ WHERE {
     # loop, outlet, cooling_coil, cooling_coil_node
     for (
         loop,
+        zone,
         outlet_node,
-        cooling_coil,
-        cooling_coil_node,
-        heating_coil,
-        heating_coil_node,
-        supplemental_coil,
-        supplemental_coil_node,
-    ) in ont.rdf.query(all_loops_query):
-        unitary_system = obj["AirLoopHVAC:UnitaryHeatPump:AirToAir"][str(loop)]
+    ) in ont.rdf.query(
+        all_loops_query,
+        initBindings={
+            "completeType": complete_type_rdf,
+        },
+    ):
+        # new_obj = AirloopHVAC()
+        system = obj[complete_type][str(loop)]
 
-        unitary_system["control_type"] = "SetPoint"
+        system["control_type"] = "SetPoint"
+
+        new_actuators = []
 
         # Set up the fan mode. It should be always on
         fan_mode_schedule_name = create_schedule_constant(
@@ -219,14 +200,11 @@ WHERE {
             onoff_stl_name,
             1,
             name="unitaryhvac fan mode schedule",
-            gensym=gensym,
         )
 
-        unitary_system["supply_air_fan_operating_mode_schedule_name"] = (
-            fan_mode_schedule_name
-        )
+        system["supply_air_fan_operating_mode_schedule_name"] = fan_mode_schedule_name
 
-        supply_air_fan_name = unitary_system["supply_air_fan_name"]
+        supply_fan_name = system["supply_fan_name"]
 
         # The fan air mass flow rate isn't acuated through a schedule, but
         # directly through an EnergyManagementSystem:Actuator.
@@ -234,45 +212,14 @@ WHERE {
         fan_air_mass_flow_rate = ActuatorDescription(
             "Fan",
             "Fan Air Mass Flow Rate",
-            supply_air_fan_name,
+            supply_fan_name,
             "[kg/s]",
             0,
             100,
         )
         new_actuators.append(fan_air_mass_flow_rate)
 
-        # Some buildings legitimately have missing coil outlet nodes or explicit
-        # "NONE" placeholders in node fields. Never create setpoint managers for
-        # such nodes, otherwise EnergyPlus errors out with:
-        #   Node Connection Error, Node="NONE", Setpoint node did not find a matching node...
-        if only_outlet_nodes:
-            raw_nodes = [("outlet", outlet_node)]
-        else:
-            raw_nodes = [
-                ("outlet", outlet_node),
-                ("cooling", cooling_coil_node),
-                ("heating", heating_coil_node),
-                ("reheat", supplemental_coil_node),
-            ]
-
-        # Keep track of where each setpoint node came from (outlet/cooling/heating/reheat)
-        # for interpretability, while still deduplicating identical node names.
-        node_to_roles: dict[str, set[str]] = {}
-        for role, node in raw_nodes:
-            if node is None:
-                continue
-            s = str(node).strip()
-            if not s or s.upper() == "NONE":
-                continue
-            node_to_roles.setdefault(s, set()).add(role)
-
-        if not node_to_roles:
-            logger.warning(
-                "Unitary system %s has no valid setpoint nodes (skipping SPM creation).",
-                str(loop),
-            )
-            continue
-
+        node_to_roles = {outlet_node.toPython(): ["outlet"]}
         for node_name in sorted(node_to_roles):
             roles = sorted(node_to_roles[node_name])
             roles_str = "+".join(roles)
@@ -282,7 +229,6 @@ WHERE {
                 temp_stl_name,
                 22,
                 name=f"unitaryhvac {roles_str} temp setpoint schedule",
-                gensym=gensym,
             )
 
             setpoint_manager_name = (
@@ -306,33 +252,45 @@ WHERE {
                 )
             )
 
-    return obj, new_actuators
+        devices.append(
+            AirloopHVAC(
+                zone,
+                new_actuators,
+            )
+        )
+
+    return obj, devices
+
+
+@dataclass
+class Baseboard:
+    actuator: ActuatorDescription
+
+    def actuator_descriptions(self) -> list[ActuatorDescription]:
+        return [self.actuator]
+
+    def zones(self) -> list[str]:
+        return []
 
 
 def make_baseboard_controllable(
     obj: dict[str, Any],
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+) -> tuple[dict[str, Any], list[Baseboard]]:
     """Find all baseboards and for each of those, expose the availibility
     schedue as a schedule that can be controlled."""
 
     obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym
 
     ont = Ontology.from_object(obj)
 
-    binary_stl = create_onoff_availability_stl(
-        obj, name="baseboard availibility", gensym=gensym
-    )
+    binary_stl = create_onoff_availability_stl(obj, name="baseboard availibility")
 
     all_baseboards_query = """# -*- mode: sparql -*-
 SELECT ?baseboard WHERE {
   ?baseboard a "ZoneHVAC:Baseboard:Convective:Electric" .
 }"""
 
-    new_actuators = []
-
+    new_devices = []
     for (baseboard,) in ont.rdf.query(all_baseboards_query):
         baseboard_name = baseboard.toPython()
         new_schedule_name = create_schedule_constant(
@@ -340,50 +298,57 @@ SELECT ?baseboard WHERE {
             binary_stl,
             1,
             name="controllable schedule for baseboard",
-            gensym=gensym,
         )
 
         obj["ZoneHVAC:Baseboard:Convective:Electric"][baseboard_name][
             "availability_schedule_name"
         ] = new_schedule_name
 
-        new_actuators.append(
-            ActuatorDescription(
-                component_type="Schedule:Constant",
-                control_type="Schedule Value",
-                component_name=new_schedule_name,
-                units="Availability",
-                lower_bound=0.0,
-                upper_bound=1.0,
+        new_devices.append(
+            Baseboard(
+                ActuatorDescription(
+                    component_type="Schedule:Constant",
+                    control_type="Schedule Value",
+                    component_name=new_schedule_name,
+                    units="Availability",
+                    lower_bound=0.0,
+                    upper_bound=1.0,
+                ),
             )
         )
 
-    return obj, new_actuators
+    return obj, new_devices
+
+
+@dataclass
+class FanOnOff:
+    actuator: ActuatorDescription
+
+    def actuator_descriptions(self) -> list[ActuatorDescription]:
+        return [self.actuator]
+
+    def zones(self) -> list[str]:
+        return []
 
 
 def make_fanonoff_controllable(
     obj: dict[str, Any],
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+) -> tuple[dict[str, Any], list[FanOnOff]]:
     """Find all Fan:OnOff objects and expose the availability schedule as a
     schedule that can be controlled."""
 
     obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym
 
     ont = Ontology.from_object(obj)
 
-    binary_stl = create_onoff_availability_stl(
-        obj, name="fanonoff availability", gensym=gensym
-    )
+    binary_stl = create_onoff_availability_stl(obj, name="fanonoff availability")
 
     all_fans_query = """# -*- mode: sparql -*-
 SELECT ?fan WHERE {
   ?fan a "Fan:OnOff" .
 }"""
 
-    new_actuators = []
+    new_devices = []
 
     for (fan,) in ont.rdf.query(all_fans_query):
         fan_name = fan.toPython()
@@ -392,90 +357,98 @@ SELECT ?fan WHERE {
             binary_stl,
             1,
             name="controllable schedule for fanonoff",
-            gensym=gensym,
         )
 
         obj["Fan:OnOff"][fan_name]["availability_schedule_name"] = new_schedule_name
 
-        new_actuators.append(
-            ActuatorDescription(
-                component_type="Schedule:Constant",
-                control_type="Schedule Value",
-                component_name=new_schedule_name,
-                units="Availability",
-                lower_bound=0.0,
-                upper_bound=1.0,
+        new_devices.append(
+            FanOnOff(
+                ActuatorDescription(
+                    component_type="Schedule:Constant",
+                    control_type="Schedule Value",
+                    component_name=new_schedule_name,
+                    units="Availability",
+                    lower_bound=0.0,
+                    upper_bound=1.0,
+                ),
             )
         )
 
-    return obj, new_actuators
+    return obj, new_devices
 
-'''def make_waterheater_controllable(
-    obj: dict[str, Any],
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
-     """Find all waterheaters and for each of those, expose the availibility
-        schedue as a schedule that can be controlled."""
-     
-     obj = deepcopy(obj)
 
-     ont = Ontology.from_object(obj)
+@dataclass
+class WaterHeater:
+    actuator: ActuatorDescription
 
-     binary_stl = create_onoff_availability_stl(obj, name="baseboard availibility")
-'''
+    def actuator_descriptions(self) -> list[ActuatorDescription]:
+        return [self.actuator]
+
+    def zones(self) -> list[str]:
+        return []
+
 
 def make_waterheater_controllable(
     obj: dict[str, Any],
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+) -> tuple[dict[str, Any], list[WaterHeater]]:
     """Find all waterheaters and for each of those, expose the availibility
-        schedue as a schedule that can be controlled."""
+    schedue as a schedule that can be controlled."""
 
     obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym
 
     ont = Ontology.from_object(obj)
-    
-    temp_stl_name = create_temp_stl(
-        obj, name="water heater temperature stl", gensym=gensym
-    )
 
-    # SPARQL query for Water Heaters 
+    temp_stl_name = create_temp_stl(obj, name="water heater temperature stl")
+
+    # SPARQL query for Water Heaters
     all_waterheaters_query = """# -*- mode: sparql -*-
     SELECT ?wh WHERE {
       ?wh a "WaterHeater:Mixed" .
     }"""
 
-    new_actuators = []
+    new_devices = []
 
     for (wh_id,) in ont.rdf.query(all_waterheaters_query):
         wh_name = str(wh_id)
         wh_entry = obj["WaterHeater:Mixed"][wh_name]
 
-        # Create a new controllable schedule for the setpoint 
+        # Create a new controllable schedule for the setpoint
         sched_name = create_schedule_constant(
             obj,
             temp_stl_name,
             60,
             name=f"controllable setpoint for {wh_name}",
-            gensym=gensym,
         )
-        
-        # Override the original schedule 
+
+        # Override the original schedule
         wh_entry["setpoint_temperature_schedule_name"] = sched_name
 
-        new_actuators.append(
-            ActuatorDescription(
-                component_type="WaterHeater",
-                control_type="Setpoint Temperature",
-                component_name=sched_name,
-                units="Temperature",
-                lower_bound=10.0,
-                upper_bound=80.0,
+        new_devices.append(
+            WaterHeater(
+                ActuatorDescription(
+                    component_type="WaterHeater",
+                    control_type="Setpoint Temperature",
+                    component_name=sched_name,
+                    units="Temperature",
+                    lower_bound=10.0,
+                    upper_bound=80.0,
+                ),
             )
         )
 
-    return obj, new_actuators
+    return obj, new_devices
+
+
+@dataclass
+class Pump:
+    actuator: ActuatorDescription
+
+    def actuator_descriptions(self) -> list[ActuatorDescription]:
+        return [self.actuator]
+
+    def zones(self) -> list[str]:
+        return []
+
 
 def make_pump_controllable(
     obj: dict[str, Any],
@@ -483,18 +456,15 @@ def make_pump_controllable(
     gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all Pump:ConstantSpeed and for each of those, expose the availibility
-        schedue as a schedule that can be controlled."""
-    
-    obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym
+    schedue as a schedule that can be controlled."""
 
-    new_actuators = []
-    
+    obj = deepcopy(obj)
+
+    new_devices = []
+
     ont = Ontology.from_object(obj)
 
-    binary_stl = create_onoff_availability_stl(
-        obj, name="pump availability stl", gensym=gensym
-    )
+    binary_stl = create_onoff_availability_stl(obj, name="pump availability stl")
 
     # SPARQL query for Constant Speed Pumps
     pump_query = """# -*- mode: sparql -*-
@@ -510,42 +480,56 @@ def make_pump_controllable(
             binary_stl,
             1,
             name=f"controllable schedule for pump {pump_name}",
-            gensym=gensym,
         )
 
         # Set the pump to use this new schedule (Adding field if not present)
-        obj["Pump:ConstantSpeed"][pump_name]["pump_scheduling_control_scheme"] = "Schedule"
-        obj["Pump:ConstantSpeed"][pump_name]["availability_schedule_name"] = new_schedule_name
+        obj["Pump:ConstantSpeed"][pump_name]["pump_scheduling_control_scheme"] = (
+            "Schedule"
+        )
+        obj["Pump:ConstantSpeed"][pump_name]["availability_schedule_name"] = (
+            new_schedule_name
+        )
 
-        new_actuators.append(
-            ActuatorDescription(
-                component_type="Schedule:Constant",
-                control_type="Schedule Value",
-                component_name=new_schedule_name,
-                units="Availability",
-                lower_bound=0.0,
-                upper_bound=1.0,
+        new_devices.append(
+            Pump(
+                ActuatorDescription(
+                    component_type="Schedule:Constant",
+                    control_type="Schedule Value",
+                    component_name=new_schedule_name,
+                    units="Availability",
+                    lower_bound=0.0,
+                    upper_bound=1.0,
+                ),
             )
         )
 
-    return obj, new_actuators
+    return obj, new_devices
+
+
+@dataclass
+class AirTerminal:
+    actuator: ActuatorDescription
+
+    def actuator_descriptions(self) -> list[ActuatorDescription]:
+        return [self.actuator]
+
+    def zones(self) -> list[str]:
+        return []
+
 
 def make_airterminal_controllable(
-    obj: dict[str, Any],    
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+    obj: dict[str, Any],
+) -> tuple[dict[str, Any], list[AirTerminal]]:
     """Find all ConstantVolume:NoReheat Air Terminals and for each of those, expose the availibility
-        schedue as a schedule that can be controlled."""
-    
-    obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym
+    schedue as a schedule that can be controlled."""
 
-    new_actuators = []
-    
+    obj = deepcopy(obj)
+
+    new_devices = []
+
     ont = Ontology.from_object(obj)
 
-    binary_stl = create_onoff_availability_stl(obj, name="terminal availability stl", gensym=gensym)
+    binary_stl = create_onoff_availability_stl(obj, name="terminal availability stl")
 
     terminal_query = """# -*- mode: sparql -*-
     SELECT ?terminal WHERE {
@@ -559,39 +543,49 @@ def make_airterminal_controllable(
             binary_stl,
             1,
             name=f"controllable schedule for terminal {term_name}",
-            gensym=gensym,
         )
 
         obj["AirTerminal:SingleDuct:ConstantVolume:NoReheat"][term_name][
             "availability_schedule_name"
         ] = new_schedule_name
 
-        new_actuators.append(
-            ActuatorDescription(
-                component_type="Schedule:Constant",
-                control_type="Schedule Value",
-                component_name=new_schedule_name,
-                units="Availability",
-                lower_bound=0.0,
-                upper_bound=1.0,
+        new_devices.append(
+            AirTerminal(
+                ActuatorDescription(
+                    component_type="Schedule:Constant",
+                    control_type="Schedule Value",
+                    component_name=new_schedule_name,
+                    units="Availability",
+                    lower_bound=0.0,
+                    upper_bound=1.0,
+                ),
             )
         )
 
-    return obj, new_actuators
+    return obj, new_devices
+
+
+@dataclass
+class OutdoorAir:
+    actuator: ActuatorDescription
+
+    def actuator_descriptions(self) -> list[ActuatorDescription]:
+        return [self.actuator]
+
+    def zones(self) -> list[str]:
+        return []
+
 
 def make_controller_outdoorair_controllable(
     obj: dict[str, Any],
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+) -> tuple[dict[str, Any], list[OutdoorAir]]:
     """Find all Controller:OutdoorAir and for each of those, expose the availibility
-        schedue as a schedule that can be controlled."""
-     
-    obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym 
+    schedue as a schedule that can be controlled."""
 
-    new_actuators = []
-    
+    obj = deepcopy(obj)
+
+    new_devices = []
+
     ont = Ontology.from_object(obj)
 
     fraction_stl = obj.get("ScheduleTypeLimits", {}).get("Fraction", None)
@@ -617,25 +611,49 @@ def make_controller_outdoorair_controllable(
             str(fraction_stl),
             1,
             name=f"controllable OA fraction for {ctrl_name}",
-            gensym=gensym,
         )
 
-        obj["Controller:OutdoorAir"][ctrl_name][
-            "minimum_outdoor_air_schedule_name"
-        ] = new_schedule_name
+        obj["Controller:OutdoorAir"][ctrl_name]["minimum_outdoor_air_schedule_name"] = (
+            new_schedule_name
+        )
 
-        new_actuators.append(
-            ActuatorDescription(
-                component_type="Schedule:Constant",
-                control_type="Schedule Value",
-                component_name=new_schedule_name,
-                units="Fraction",
-                lower_bound=0.0,
-                upper_bound=1.0,
+        new_devices.append(
+            OutdoorAir(
+                ActuatorDescription(
+                    component_type="Schedule:Constant",
+                    control_type="Schedule Value",
+                    component_name=new_schedule_name,
+                    units="Fraction",
+                    lower_bound=0.0,
+                    upper_bound=1.0,
+                ),
             )
         )
 
-    return obj, new_actuators
+    return obj, new_devices
+
+
+def make_all_equipment(
+    json_obj: dict[str, Any],
+) -> tuple[dict[str, Any], list[Equipment]]:
+    all_functions: list[
+        Callable[[dict[str, Any]], tuple[dict[str, Any], list[Equipment]]]
+    ] = [
+        lambda obj: make_airloophvac_controllable(obj, "UnitarySystem"),
+        make_baseboard_controllable,
+        make_fanonoff_controllable,
+        make_waterheater_controllable,
+        make_pump_controllable,
+        make_airterminal_controllable,
+        make_controller_outdoorair_controllable,
+    ]  # type: ignore
+    all_equipment = []
+    for func in all_functions:
+        json_obj, devices = func(json_obj)
+        all_equipment += devices
+
+    return json_obj, all_equipment
+
 
 def make_controllable(
     input_epjson: Realizable,
@@ -646,37 +664,20 @@ def make_controllable(
         with open(input, "rb") as f:
             json_obj = json.load(f)
 
-        gensym = Gensym()
-        json_obj, hvac_actuators = make_unitary_hvac_controllable(
-            json_obj, only_outlet_nodes=True, gensym=gensym
-        )
-        json_obj, baseboard_actuators = make_baseboard_controllable(
-            json_obj, gensym=gensym
-        )
-        json_obj, fanonoff_actuators = make_fanonoff_controllable(
-            json_obj, gensym=gensym
-        )
-        json_obj, waterheater_actuators = make_waterheater_controllable(
-            json_obj, gensym=gensym
-        )
-        json_obj, pump_actuators = make_pump_controllable(
-            json_obj, gensym=gensym
-        )
-        json_obj, airterminal_actuators = make_airterminal_controllable(
-            json_obj, gensym=gensym
-        )
-        json_obj, controller_outdoorair_actuators = make_controller_outdoorair_controllable(
-            json_obj, gensym=gensym
-        )
+        actuator_descriptions = []
+
+        gensym.reset()
+
+        json_obj, equipment = make_all_equipment(json_obj)
+
+        for e in equipment:
+            actuator_descriptions += e.actuator_descriptions()
 
         tmp_out = Path(tempfile.mkdtemp())
 
-        # out.mkdir()
-
         json.dump(json_obj, open(tmp_out / "building.epjson", "w"), indent=4)
         json.dump(
-            unstructure(hvac_actuators + baseboard_actuators + fanonoff_actuators + waterheater_actuators 
-                        + pump_actuators + airterminal_actuators + controller_outdoorair_actuators),
+            unstructure(actuator_descriptions),
             open(tmp_out / "actuators.json", mode="w"),
             indent=4,
         )
