@@ -32,11 +32,16 @@ class Gensym:
         return out
 
 
-gensym = Gensym()
+# global counter for schedule type limits and constants
+# Use this to ensure that the names are unique across all components.
+_DEFAULT_GENSYM = Gensym()
 
 
-def create_onoff_availability_stl(obj: dict[str, Any], *, name="OnOff") -> str:
+def create_onoff_availability_stl(
+    obj: dict[str, Any], *, name: str = "OnOff", gensym: Gensym | None = None
+) -> str:
     """Create a binary ScheduleTypeLimits entity and return its name."""
+    gensym = _DEFAULT_GENSYM if gensym is None else gensym
     schedule_type_limits = obj.setdefault("ScheduleTypeLimits", {})
     name = f"B2B {name} ({gensym()})"
     schedule_type_limits[name] = {
@@ -52,11 +57,14 @@ temp_stl_lower_bound = 5.0
 temp_stl_upper_bound = 50.0
 
 
-def create_temp_stl(obj: dict[str, Any], *, name="Temperature") -> str:
+def create_temp_stl(
+    obj: dict[str, Any], *, name: str = "Temperature", gensym: Gensym | None = None
+) -> str:
     """Create a continuous ScheduleTypeLimits for temperatures and return its
     name.
 
     """
+    gensym = _DEFAULT_GENSYM if gensym is None else gensym
     schedule_type_limits = obj.setdefault("ScheduleTypeLimits", {})
 
     name = f"B2B {name} ({gensym()})"
@@ -71,12 +79,18 @@ def create_temp_stl(obj: dict[str, Any], *, name="Temperature") -> str:
 
 
 def create_schedule_constant(
-    obj: dict[str, Any], stl_name: str, hourly_value: int, *, name="constant schedule"
+    obj: dict[str, Any],
+    stl_name: str,
+    hourly_value: int,
+    *,
+    name: str = "constant schedule",
+    gensym: Gensym | None = None,
 ) -> str:
     """Create a constant schedule with the given type and the given constant
     value and return its name.
 
     """
+    gensym = _DEFAULT_GENSYM if gensym is None else gensym
     schedule_constants = obj.setdefault("Schedule:Constant", {})
     name = f"B2B {name} ({gensym()})"
     schedule_constants[name] = {
@@ -89,6 +103,9 @@ def create_schedule_constant(
 
 def make_unitary_hvac_controllable(
     obj: dict[str, Any],
+    only_outlet_nodes: bool = False,
+    *,
+    gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all "AirLoopHVAC:UnitarySystem" and expose the relevant node
     setpoints as schedules that can be controlled by minergym.
@@ -122,7 +139,7 @@ def make_unitary_hvac_controllable(
 
     new_actuators = []
 
-    gensym = Gensym()
+    gensym = Gensym() if gensym is None else gensym
     ont = Ontology.from_object(obj)
 
     setpoint_managers = obj.setdefault("SetpointManager:Scheduled", {})
@@ -130,9 +147,11 @@ def make_unitary_hvac_controllable(
     # We define the schedule type descriptors (onoff and temperature)
 
     onoff_stl_name = create_onoff_availability_stl(
-        obj, name="unitaryhvac fan availibiliby stl"
+        obj, name="unitaryhvac fan availibiliby stl", gensym=gensym
     )
-    temp_stl_name = create_temp_stl(obj, name="unitaryhvac temperature setpoints stl")
+    temp_stl_name = create_temp_stl(
+        obj, name="unitaryhvac temperature setpoints stl", gensym=gensym
+    )
 
     # Note: I wrapped each coil section in OPTIONAL blocks because not all
     # unitary systems have all three coil types (e.g., cooling-only systems
@@ -203,6 +222,7 @@ WHERE {
             onoff_stl_name,
             1,
             name="unitaryhvac fan mode schedule",
+            gensym=gensym,
         )
 
         unitary_system["supply_air_fan_operating_mode_schedule_name"] = (
@@ -228,38 +248,49 @@ WHERE {
         # "NONE" placeholders in node fields. Never create setpoint managers for
         # such nodes, otherwise EnergyPlus errors out with:
         #   Node Connection Error, Node="NONE", Setpoint node did not find a matching node...
-        raw_nodes = [
-            outlet_node,
-            cooling_coil_node,
-            heating_coil_node,
-            supplemental_coil_node,
-        ]
-        node_names: set[str] = set()
-        for node in raw_nodes:
+        if only_outlet_nodes:
+            raw_nodes = [("outlet", outlet_node)]
+        else:
+            raw_nodes = [
+                ("outlet", outlet_node),
+                ("cooling", cooling_coil_node),
+                ("heating", heating_coil_node),
+                ("reheat", supplemental_coil_node),
+            ]
+
+        # Keep track of where each setpoint node came from (outlet/cooling/heating/reheat)
+        # for interpretability, while still deduplicating identical node names.
+        node_to_roles: dict[str, set[str]] = {}
+        for role, node in raw_nodes:
             if node is None:
                 continue
             s = str(node).strip()
             if not s or s.upper() == "NONE":
                 continue
-            node_names.add(s)
+            node_to_roles.setdefault(s, set()).add(role)
 
-        if not node_names:
+        if not node_to_roles:
             logger.warning(
                 "Unitary system %s has no valid setpoint nodes (skipping SPM creation).",
                 str(loop),
             )
             continue
 
-        for node_name in node_names:
+        for node_name in sorted(node_to_roles):
+            roles = sorted(node_to_roles[node_name])
+            roles_str = "+".join(roles)
 
             sched_constant_name = create_schedule_constant(
                 obj,
                 temp_stl_name,
                 22,
-                name="unitaryhvac schedule for node",
+                name=f"unitaryhvac {roles_str} temp setpoint schedule",
+                gensym=gensym,
             )
 
-            setpoint_manager_name = f"B2B Node TEMP SPM for {node_name} ({gensym()}) "
+            setpoint_manager_name = (
+                f"B2B {roles_str} Node TEMP SPM for {node_name} ({gensym()})"
+            )
 
             setpoint_managers[setpoint_manager_name] = {
                 "control_variable": "Temperature",
@@ -283,15 +314,20 @@ WHERE {
 
 def make_baseboard_controllable(
     obj: dict[str, Any],
+    *,
+    gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all baseboards and for each of those, expose the availibility
     schedue as a schedule that can be controlled."""
 
     obj = deepcopy(obj)
+    gensym = Gensym() if gensym is None else gensym
 
     ont = Ontology.from_object(obj)
 
-    binary_stl = create_onoff_availability_stl(obj, name="baseboard availibility")
+    binary_stl = create_onoff_availability_stl(
+        obj, name="baseboard availibility", gensym=gensym
+    )
 
     all_baseboards_query = """# -*- mode: sparql -*-
 SELECT ?baseboard WHERE {
@@ -303,7 +339,11 @@ SELECT ?baseboard WHERE {
     for (baseboard,) in ont.rdf.query(all_baseboards_query):
         baseboard_name = baseboard.toPython()
         new_schedule_name = create_schedule_constant(
-            obj, binary_stl, 1, name="controllable schedule for baseboard"
+            obj,
+            binary_stl,
+            1,
+            name="controllable schedule for baseboard",
+            gensym=gensym,
         )
 
         obj["ZoneHVAC:Baseboard:Convective:Electric"][baseboard_name][
@@ -326,15 +366,20 @@ SELECT ?baseboard WHERE {
 
 def make_fanonoff_controllable(
     obj: dict[str, Any],
+    *,
+    gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all Fan:OnOff objects and expose the availability schedule as a
     schedule that can be controlled."""
 
     obj = deepcopy(obj)
+    gensym = Gensym() if gensym is None else gensym
 
     ont = Ontology.from_object(obj)
 
-    binary_stl = create_onoff_availability_stl(obj, name="fanonoff availability")
+    binary_stl = create_onoff_availability_stl(
+        obj, name="fanonoff availability", gensym=gensym
+    )
 
     all_fans_query = """# -*- mode: sparql -*-
 SELECT ?fan WHERE {
@@ -346,7 +391,11 @@ SELECT ?fan WHERE {
     for (fan,) in ont.rdf.query(all_fans_query):
         fan_name = fan.toPython()
         new_schedule_name = create_schedule_constant(
-            obj, binary_stl, 1, name="controllable schedule for fanonoff"
+            obj,
+            binary_stl,
+            1,
+            name="controllable schedule for fanonoff",
+            gensym=gensym,
         )
 
         obj["Fan:OnOff"][fan_name]["availability_schedule_name"] = new_schedule_name
@@ -375,9 +424,16 @@ def make_controllable(
         with open(input, "rb") as f:
             json_obj = json.load(f)
 
-        json_obj, hvac_actuators = make_unitary_hvac_controllable(json_obj)
-        json_obj, baseboard_actuators = make_baseboard_controllable(json_obj)
-        json_obj, fanonoff_actuators = make_fanonoff_controllable(json_obj)
+        gensym = Gensym()
+        json_obj, hvac_actuators = make_unitary_hvac_controllable(
+            json_obj, only_outlet_nodes=True, gensym=gensym
+        )
+        json_obj, baseboard_actuators = make_baseboard_controllable(
+            json_obj, gensym=gensym
+        )
+        json_obj, fanonoff_actuators = make_fanonoff_controllable(
+            json_obj, gensym=gensym
+        )
 
         tmp_out = Path(tempfile.mkdtemp())
 
