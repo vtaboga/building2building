@@ -1,8 +1,9 @@
-
 import logging
+import random
+from typing import Any, Callable
+
 import gymnasium as gym
 import numpy as np
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +26,18 @@ class SetpointDeltaActionWrapper(gym.Wrapper):
         super().__init__(env)
 
         if not hasattr(env, "metadata") or not isinstance(env.metadata, dict):
-            raise RuntimeError("env.metadata missing; required for setpoint delta mapping")
+            raise RuntimeError(
+                "env.metadata missing; required for setpoint delta mapping"
+            )
         obs_names = env.metadata.get("observation_names")
         act_names = env.metadata.get("action_names")
-        if not isinstance(obs_names, list) or not all(isinstance(x, str) for x in obs_names):
+        if not isinstance(obs_names, list) or not all(
+            isinstance(x, str) for x in obs_names
+        ):
             raise RuntimeError("env.metadata['observation_names'] must be a list[str]")
-        if not isinstance(act_names, list) or not all(isinstance(x, str) for x in act_names):
+        if not isinstance(act_names, list) or not all(
+            isinstance(x, str) for x in act_names
+        ):
             raise RuntimeError("env.metadata['action_names'] must be a list[str]")
 
         self._obs_names = obs_names
@@ -102,7 +109,9 @@ class SetpointDeltaActionWrapper(gym.Wrapper):
             if zn in zone_part or zone_part in zn:
                 return int(j)
 
-        raise RuntimeError(f"Could not map Zone Temperature Control zone '{zone_name}' to a Zone Air Temperature obs")
+        raise RuntimeError(
+            f"Could not map Zone Temperature Control zone '{zone_name}' to a Zone Air Temperature obs"
+        )
 
     def reset(self, **kwargs):  # type: ignore[override]
         obs, info = self.env.reset(**kwargs)
@@ -143,9 +152,13 @@ class SetpointDeltaActionWrapper(gym.Wrapper):
 
             if heat_abs is not None and cool_abs is not None:
                 if cool_abs < heat_abs + self._MIN_DEADBAND_C:
-                    cool_abs = min(heat_abs + self._MIN_DEADBAND_C, self._ABS_SETPOINT_MAX_C)
+                    cool_abs = min(
+                        heat_abs + self._MIN_DEADBAND_C, self._ABS_SETPOINT_MAX_C
+                    )
                     if cool_abs < heat_abs + self._MIN_DEADBAND_C:
-                        heat_abs = max(cool_abs - self._MIN_DEADBAND_C, self._ABS_SETPOINT_MIN_C)
+                        heat_abs = max(
+                            cool_abs - self._MIN_DEADBAND_C, self._ABS_SETPOINT_MIN_C
+                        )
 
             if heat_idx is not None and heat_abs is not None:
                 act[int(heat_idx)] = heat_abs
@@ -156,68 +169,62 @@ class SetpointDeltaActionWrapper(gym.Wrapper):
         self._last_obs = np.asarray(obs, dtype=float).reshape(-1)
         return obs, reward, terminated, truncated, info
 
+
 class NormalizeObservation(gym.ObservationWrapper):
     """
     Observation wrapper that normalizes observations to a [0, 1] range according to the observation space bounds.
     Values may be outside of this range if they are out of the environment's observation space bounds.
     """
-    
+
     def __init__(self, env: gym.Env, dtype: np.dtype = np.float32):
-        """ 
+        """
         Args:
             env: The environment to wrap
             dtype: The dtype of the observation space
         """
         super().__init__(env)
-        
+
         # Ensure the observation space is a Box
         if not isinstance(env.observation_space, gym.spaces.Box):
             raise ValueError(
                 f"Expected observation space to be Box, got {type(env.observation_space)}"
             )
 
-        
         # Store the original observation space bounds
         self.obs_low = self.env.observation_space.low
         self.obs_high = self.env.observation_space.high
-        
+
         # Handle infinite bounds by replacing them with large finite values
-        self.obs_low = np.where(
-            np.isinf(self.obs_low), -1e10, self.obs_low
-        )
-        self.obs_high = np.where(
-            np.isinf(self.obs_high), 1e10, self.obs_high
-        )
-        
+        self.obs_low = np.where(np.isinf(self.obs_low), -1e10, self.obs_low)
+        self.obs_high = np.where(np.isinf(self.obs_high), 1e10, self.obs_high)
+
         # Calculate the range of the observation space
         self.obs_range = self.obs_high - self.obs_low
         # Avoid division by zero for dimensions with zero range
         self.obs_range = np.where(self.obs_range == 0, 1.0, self.obs_range)
-        
+
         # Set the new observation space to be in the target range
         target_low = np.zeros(self.obs_low.shape, dtype=dtype)
         target_high = np.ones(self.obs_high.shape, dtype=dtype)
-        
+
         self.observation_space = gym.spaces.Box(
-            low=target_low, 
-            high=target_high, 
-            dtype=dtype
+            low=target_low, high=target_high, dtype=dtype
         )
-    
+
     def observation(self, observation: Any) -> np.ndarray:
         """
         Normalize the observation to the target range.
-        
+
         Args:
             observation: The original observation from the environment
-            
+
         Returns:
             The normalized observation
         """
         observation = np.asarray(observation, dtype=self.observation_space.dtype)
         normalized_observation = (observation - self.obs_low) / self.obs_range
         return normalized_observation
-    
+
     def denormalize(self, observation: np.ndarray) -> np.ndarray:
         """
         Denormalize the observation to the original range.
@@ -233,14 +240,14 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
     allowing a single policy to generalize across multiple buildings.
 
     Building parameters included:
-    - net_conditioned_area: Building floor area (m²)
+    - area: Building floor area (m²)
     - warmup_phases: Number of warmup phases
     - num_actuators: Number of HVAC actuators
+    - year_built: Year the building was constructed
+    - num_units: Number of units in the building
     """
 
-    def __init__(
-        self, env: gym.Env, building_params: dict[str, float] | None = None
-    ):
+    def __init__(self, env: gym.Env, building_params: dict[str, float] | None = None):
         """
         Args:
             env: The environment to wrap
@@ -283,50 +290,68 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         )
 
         logger.info(
-            f"Augmented observation space from {len(orig_low)} to "
-            f"{len(new_low)} dimensions. "
-            f"Building params: {list(building_params.keys())}"
+            "Augmented observation space from %d to %d dimensions. "
+            "Building params: %s",
+            len(orig_low),
+            len(new_low),
+            list(building_params.keys()),
         )
 
     def _extract_building_params(self, env: gym.Env) -> dict[str, float]:
         """Extract building parameters from environment metadata."""
-        params = {}
+        params: dict[str, float] = {}
 
         # Try to get parameters from env metadata
-        unwrapped = env.unwrapped if hasattr(env, 'unwrapped') else env
+        unwrapped = env.unwrapped if hasattr(env, "unwrapped") else env
 
-        if hasattr(unwrapped, 'metadata') and isinstance(
-            unwrapped.metadata, dict
-        ):
+        if hasattr(unwrapped, "metadata") and isinstance(unwrapped.metadata, dict):
             metadata = unwrapped.metadata
             # Extract area
-            if 'area' in metadata:
-                params['area'] = float(metadata['area'])
+            if "area" in metadata:
+                params["area"] = float(metadata["area"])
             # Extract warmup_phases
-            if 'warmup_phases' in metadata:
-                params['warmup_phases'] = float(metadata['warmup_phases'])
+            if "warmup_phases" in metadata:
+                params["warmup_phases"] = float(metadata["warmup_phases"])
             # Extract num_actuators from hvac_actuators list
-            if 'hvac_actuators' in metadata:
-                params['num_actuators'] = float(len(metadata['hvac_actuators']))
+            if "hvac_actuators" in metadata:
+                params["num_actuators"] = float(len(metadata["hvac_actuators"]))
+
+            # Extract additional parameters from building_source_metadata
+            source_meta = metadata.get("building_source_metadata", {})
+            if isinstance(source_meta, dict):
+                if (
+                    "year_built" in source_meta
+                    and source_meta["year_built"] is not None
+                ):
+                    try:
+                        params["year_built"] = float(source_meta["year_built"])
+                    except (TypeError, ValueError):
+                        pass
+                num_units_key = "geometry_building_num_units"
+                if (
+                    num_units_key in source_meta
+                    and source_meta[num_units_key] is not None
+                ):
+                    try:
+                        params["num_units"] = float(source_meta[num_units_key])
+                    except (TypeError, ValueError):
+                        pass
 
         # Use defaults for any missing parameters
-        if 'area' not in params:
-            logger.warning(
-                "Could not extract 'area' from env metadata, using default"
-            )
-            params['area'] = 100.0
-        if 'warmup_phases' not in params:
-            logger.warning(
-                "Could not extract 'warmup_phases' from env metadata, "
-                "using default"
-            )
-            params['warmup_phases'] = 3.0
-        if 'num_actuators' not in params:
-            logger.warning(
-                "Could not extract 'num_actuators' from env metadata, "
-                "using default"
-            )
-            params['num_actuators'] = 1.0
+        defaults: dict[str, float] = {
+            "area": 100.0,
+            "warmup_phases": 3.0,
+            "num_actuators": 1.0,
+            "year_built": 1980.0,
+            "num_units": 1.0,
+        }
+        for key, default_val in defaults.items():
+            if key not in params:
+                logger.warning(
+                    "Could not extract %r from env metadata, using default",
+                    key,
+                )
+                params[key] = default_val
 
         return params
 
@@ -334,10 +359,12 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         """Normalize building parameters to reasonable ranges."""
         # Define normalization ranges (min, max) for each parameter
         param_ranges = {
-            'area': (50.0, 500.0),  # m² - typical range for buildings
-            'warmup_phases': (1.0, 10.0),
-            'num_actuators': (1.0, 20.0),
-            'num_zones': (1.0, 10.0),
+            "area": (50.0, 500.0),  # m² - typical range for buildings
+            "warmup_phases": (1.0, 10.0),
+            "num_actuators": (1.0, 20.0),
+            "num_zones": (1.0, 10.0),
+            "year_built": (1940.0, 2025.0),  # year range for building stock
+            "num_units": (1.0, 10.0),  # number of units in the building
         }
 
         normalized = []
@@ -355,6 +382,16 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
 
         return np.array(normalized, dtype=np.float32)
 
+    def reset(self, **kwargs):  # type: ignore[override]
+        """Reset and re-extract building parameters (inner env may have changed)."""
+        obs, info = self.env.reset(**kwargs)
+
+        # Re-extract in case the inner env was swapped (e.g. by ResampleBuildingOnResetWrapper)
+        self.building_params = self._extract_building_params(self.env)
+        self.normalized_params = self._normalize_params(self.building_params)
+
+        return self.observation(obs), info
+
     def observation(self, obs: np.ndarray) -> np.ndarray:
         """Augment observation with normalized building parameters."""
         return np.concatenate([obs, self.normalized_params])
@@ -370,8 +407,177 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         obs_without_params = obs[:-n_params] if n_params > 0 else obs
 
         # If the wrapped env has a denormalize method, use it
-        if hasattr(self.env, 'denormalize'):
+        if hasattr(self.env, "denormalize"):
             return self.env.denormalize(obs_without_params)
 
         # Otherwise, just return the observation without building params
         return obs_without_params
+
+
+class ResampleBuildingOnResetWrapper(gym.Wrapper):
+    """Resample a new building environment on each episode reset.
+
+    On every call to ``reset()``, a new index is drawn uniformly from
+    ``available_indices`` and, if it differs from the current one, the
+    old environment is closed and a fresh one is created via
+    ``env_factory``.
+
+    At each reset the wrapper also:
+
+    * logs the **previous** episode's summary statistics (total reward,
+      episode length) to W&B, and
+    * logs the **new** building's environment parameters to W&B.
+
+    W&B logging is best-effort: if ``wandb`` is not installed or no
+    active run exists the wrapper still works normally.
+
+    Args:
+        env_factory: ``env_factory(index) -> gym.Env``.  Called to
+            create a new environment for the given index.
+        available_indices: Non-empty sequence of integer indices that
+            ``env_factory`` accepts.
+    """
+
+    def __init__(
+        self,
+        env_factory: Callable[[int], gym.Env],
+        available_indices: list[int],
+    ):
+        if not available_indices:
+            raise ValueError("available_indices must not be empty")
+
+        self._env_factory = env_factory
+        self._available_indices = list(available_indices)
+        self._current_index = random.choice(self._available_indices)
+
+        initial_env = env_factory(self._current_index)
+        super().__init__(initial_env)
+
+        # Episode tracking
+        self._episode_reward: float = 0.0
+        self._episode_steps: int = 0
+        self._episode_count: int = 0
+        self._has_stepped: bool = False
+
+        logger.info(
+            "ResampleBuildingOnResetWrapper: %d buildings available",
+            len(self._available_indices),
+        )
+
+    # ------------------------------------------------------------------
+    # wandb helpers (best-effort, never raise)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _wandb_is_active() -> bool:
+        try:
+            import wandb  # type: ignore[import-untyped]
+
+            return getattr(wandb, "run", None) is not None
+        except Exception:
+            return False
+
+    def _log_episode_summary(self) -> None:
+        """Log previous episode reward / length to wandb."""
+        if not self._wandb_is_active():
+            return
+        try:
+            import wandb  # type: ignore[import-untyped]
+
+            wandb.log(
+                {
+                    "episode/reward": self._episode_reward,
+                    "episode/length": self._episode_steps,
+                    "episode/number": self._episode_count,
+                    "episode/building_index": self._current_index,
+                },
+            )
+        except Exception as exc:
+            logger.debug("wandb episode log failed: %s", exc)
+
+    def _log_building_params(self) -> None:
+        """Log the current building's environment parameters to wandb."""
+        if not self._wandb_is_active():
+            return
+        try:
+            import wandb  # type: ignore[import-untyped]
+
+            meta = getattr(self.env, "metadata", None)
+            if not isinstance(meta, dict):
+                return
+
+            payload: dict[str, Any] = {
+                "building/split_index": self._current_index,
+            }
+
+            # Core building parameters
+            for key in ("area", "warmup_phases"):
+                if key in meta:
+                    payload[f"building/{key}"] = float(meta[key])
+
+            if "hvac_actuators" in meta:
+                payload["building/num_actuators"] = len(meta["hvac_actuators"])
+
+            if "controlled_zones" in meta:
+                payload["building/num_controlled_zones"] = len(meta["controlled_zones"])
+
+            # Source metadata (year_built, num_units, …)
+            src = meta.get("building_source_metadata")
+            if isinstance(src, dict):
+                for src_key in (
+                    "year_built",
+                    "geometry_building_num_units",
+                ):
+                    val = src.get(src_key)
+                    if val is not None:
+                        try:
+                            payload[f"building/{src_key}"] = float(val)
+                        except (TypeError, ValueError):
+                            pass
+
+            wandb.log(payload)
+        except Exception as exc:
+            logger.debug("wandb building-param log failed: %s", exc)
+
+    # ------------------------------------------------------------------
+    # gym.Wrapper overrides
+    # ------------------------------------------------------------------
+
+    def step(self, action):  # type: ignore[override]
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        self._episode_reward += float(reward)
+        self._episode_steps += 1
+        self._has_stepped = True
+        return obs, reward, terminated, truncated, info
+
+    def reset(self, **kwargs):  # type: ignore[override]
+        """Reset with a newly sampled building."""
+        # Log the *previous* episode's summary (skip the very first reset)
+        if self._has_stepped:
+            self._log_episode_summary()
+
+        # Sample a new building
+        new_index = random.choice(self._available_indices)
+
+        if new_index != self._current_index:
+            logger.info(
+                "Resampling building: index %d -> %d",
+                self._current_index,
+                new_index,
+            )
+            self.env.close()
+            self.env = self._env_factory(new_index)
+            self._current_index = new_index
+
+        # Reset episode counters
+        self._episode_reward = 0.0
+        self._episode_steps = 0
+        self._episode_count += 1
+        self._has_stepped = False
+
+        obs_info = self.env.reset(**kwargs)
+
+        # Log the *new* building's parameters
+        self._log_building_params()
+
+        return obs_info

@@ -1,0 +1,37 @@
+#!/bin/bash
+#SBATCH --job-name=ppo_param_adaptive
+#SBATCH --output=logs/ppo_param_adaptive_%j.out
+#SBATCH --error=logs/ppo_param_adaptive_%j.err
+#SBATCH --time=24:00:00
+#SBATCH --mem=32G
+#SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:1
+
+# Parameterized PPO training on adaptive dynamics benchmark
+# Trains on 900 buildings from train split
+# Evaluates on 100 buildings from test split
+
+# Load modules
+module load python/3.10
+module load cuda/11.8
+
+# Activate conda environment
+source $HOME/miniconda3/etc/profile.d/conda.sh
+conda activate b2b
+
+# Set environment variables
+export B2B_REPO_ROOT=$PWD
+export PYTHONPATH=$PWD:$PYTHONPATH
+
+# Create logs directory
+mkdir -p logs
+
+# Run training
+python -m scripts.parameterized_adaptive_dynamics_main \
+    seed=42 \
+    training.total_timesteps=1000000 \
+    training.eval_freq=10000 \
+    wandb.project=building2building
+
+echo "Training complete!"
+

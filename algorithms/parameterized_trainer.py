@@ -9,21 +9,22 @@ import importlib
 import inspect
 import logging
 from pathlib import Path
-from omegaconf import OmegaConf
-from wandb.integration.sb3 import WandbCallback
+
 import wandb
-
-from b2b.make_env import make_env
-from b2b.wandb_utils import init_wandb_from_config, log_test_dir_graphs_wandb
-from b2b.baselines.test import test_policy
-from b2b.simulator.wrappers import (
-    NormalizeObservation,
-    AugmentObservationWithBuildingParams,
-)
+from omegaconf import OmegaConf
+from stable_baselines3.common.callbacks import CallbackList, EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.callbacks import EvalCallback, CallbackList
 from stable_baselines3.common.utils import set_random_seed
+from wandb.integration.sb3 import WandbCallback
 
+from b2b.baselines.test import test_policy
+from b2b.baselines.utils import log_test_dir_graphs_wandb
+from b2b.baselines.wandb_utils import init_wandb_from_config
+from b2b.make_env import make_env
+from b2b.simulator.wrappers import (
+    AugmentObservationWithBuildingParams,
+    NormalizeObservation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +32,13 @@ logger = logging.getLogger(__name__)
 def _make_parameterized_envs(config: OmegaConf, output_dir: Path):
     """
     Create training and evaluation environments with building parameter augmentation.
-    
+
     This differs from the standard trainer by adding building parameters to observations,
     enabling a single policy to work across multiple buildings.
     """
     # Read required config without providing defaults; raise if missing
     norm_obs = config.env.normalize_obs  # expect under env
-    augment_params = config.env.get('augment_building_params', True)
+    augment_params = config.env.get("augment_building_params", True)
 
     def wrapper_fn(env):
         # First augment with building parameters (if enabled)
@@ -53,23 +54,23 @@ def _make_parameterized_envs(config: OmegaConf, output_dir: Path):
         make_env,
         n_envs=num_envs,
         env_kwargs={
-            'config': config,
-            'eplus_output_dir': str(output_dir / "train_eplus_outputs")
+            "config": config,
+            "eplus_output_dir": str(output_dir / "train_eplus_outputs"),
         },
         wrapper_class=wrapper_fn,
     )
-    
+
     # For evaluation, we typically use a single environment
     eval_env = make_vec_env(
         make_env,
         n_envs=1,
         env_kwargs={
-            'config': config,
-            'eplus_output_dir': str(output_dir / "eval_eplus_outputs")
+            "config": config,
+            "eplus_output_dir": str(output_dir / "eval_eplus_outputs"),
         },
         wrapper_class=wrapper_fn,
     )
-    
+
     return train_env, eval_env
 
 
@@ -126,11 +127,11 @@ def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
     # pass only valid arguments
     sig = inspect.signature(algo_cls.__init__)
     valid_params = {
-        k for k in sig.parameters.keys() if k not in ['self', 'env', 'policy']
+        k for k in sig.parameters.keys() if k not in ["self", "env", "policy"]
     }
     kwargs = {k: v for k, v in params.items() if k in valid_params}
 
-    kwargs['tensorboard_log'] = str(tb_dir)
+    kwargs["tensorboard_log"] = str(tb_dir)
     policy = config.policy.policy_type
 
     model = algo_cls(policy, train_env, **kwargs)
@@ -191,12 +192,14 @@ def parameterized_trainer(config: OmegaConf, output_dir: Path):
     set_random_seed(config.seed)
 
     # Create parameterized environments
-    logger.info("Creating parameterized environments with building parameter augmentation")
+    logger.info(
+        "Creating parameterized environments with building parameter augmentation"
+    )
     train_env, eval_env = _make_parameterized_envs(config, output_dir)
 
     # Log observation space info
-    logger.info(f"Observation space shape: {train_env.observation_space.shape}")
-    logger.info(f"Action space shape: {train_env.action_space.shape}")
+    logger.info("Observation space shape: %s", train_env.observation_space.shape)
+    logger.info("Action space shape: %s", train_env.action_space.shape)
 
     # Build model and callbacks
     callbacks = _make_callbacks(config, eval_env, model_dir, log_dir)
@@ -204,14 +207,14 @@ def parameterized_trainer(config: OmegaConf, output_dir: Path):
 
     # Train
     total_timesteps = int(config.training.total_timesteps)
-    logger.info(f"Starting training for {total_timesteps} timesteps")
+    logger.info("Starting training for %d timesteps", total_timesteps)
     model.learn(total_timesteps=total_timesteps, callback=callbacks)
     logger.info("Training complete")
 
     # Save final model
     final_model_path = model_dir / "final_model.zip"
     model.save(str(final_model_path))
-    logger.info(f"Saved final model to {final_model_path}")
+    logger.info("Saved final model to %s", final_model_path)
 
     # Load best model for testing
     best_model = _load_best_model(config, model_dir)
@@ -235,5 +238,4 @@ def parameterized_trainer(config: OmegaConf, output_dir: Path):
     if wandb_run is not None:
         wandb.finish()
 
-    logger.info(f"Parameterized training complete. Outputs saved to {output_dir}")
-
+    logger.info("Parameterized training complete. Outputs saved to %s", output_dir)

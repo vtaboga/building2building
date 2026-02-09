@@ -1,0 +1,33 @@
+# Configuration for parameterized PPO on adaptive dynamics benchmark
+# Trains on 900 buildings from train split, evaluates on 100 from test split
+
+defaults:
+  - _self_
+  - wandb: default
+  - training: default
+  - policy: ppo_parameterized
+  - reward: deadband
+
+# Environment configuration
+env:
+  normalize_obs: true
+  # Enable building parameter augmentation (area, warmup_phases, num_actuators)
+  augment_building_params: true
+  control_mode: hvac_actuators
+  max_steps: 35040  # One year at 15-min timesteps (365 * 24 * 4)
+
+# Building selection - will be overridden by the trainer
+# The trainer uses bldg.selection mechanism to sample from train/test splits
+bldg:
+  bldg: {}
+  selection:
+    enabled: false  # Will be enabled by trainer
+
+# Random seed for reproducibility
+seed: 42
+
+# Hydra output directory configuration
+hydra:
+  run:
+    dir: outputs/parameterized_adaptive_dynamics/${policy.algorithm}/${now:%d-%m-%Y}/${now:%H-%M-%S}
+
