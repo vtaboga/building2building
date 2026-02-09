@@ -156,7 +156,7 @@ def table_index(root_zip: Path):
 
 
 def _build_control_derivation(
-    root_zip: Realizable, idf_filename: str, schedule_filename: str, ep: Realizable
+    root_zip: Realizable, idf_filename: str, schedule_filename: str, ep: Realizable, controls: list[str]
 ):
     """
     Build control-ready epJSON from IDF (hydroquebec-specific).
@@ -174,7 +174,7 @@ def _build_control_derivation(
     epjson = link_in_schedule(epjson, schedule_derivation)
 
     # Step 3: Make controllable
-    return make_controllable(epjson)
+    return make_controllable(epjson, controls=controls)
 
 
 def search_buildings(**query) -> DataFrame:

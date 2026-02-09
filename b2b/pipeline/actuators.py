@@ -4,7 +4,7 @@ import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Sequence
 
 from cattrs import structure, unstructure
 from minergym.ontology import Ontology
@@ -104,7 +104,7 @@ def make_unitary_hvac_controllable(
     *,
     gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
-    """Find all "AirLoopHVAC:UnitaryHeatPump:AirToAir" and expose the relevant 
+    """Find all unitary air loops and expose the relevant
     node setpoints as schedules that can be controlled by minergym.
 
     This is done in many steps:
@@ -118,7 +118,8 @@ def make_unitary_hvac_controllable(
        2. a Temperature type which will be used by all schedules we use for
           controlling temperature.
 
-    2. We query the ontology and look for all "AirLoopHVAC:UnitaryHeatPump:AirToAir". 
+    2. We query the ontology and look for unitary air loops
+       ("AirLoopHVAC:UnitarySystem" and "AirLoopHVAC:UnitaryHeatPump:AirToAir").
        For each of those, we do the following:
 
        1. We set the control_type to SetPoint
@@ -156,9 +157,10 @@ def make_unitary_hvac_controllable(
     #
     # TODO: actually handle cases where some of these are None.
     all_loops_query = """# -*- mode: sparql-*-
-SELECT ?loop ?outlet_node ?cooling_coil ?cooling_coil_node ?heating_coil ?heating_coil_node ?supplemental_coil ?supplemental_coil_node
+SELECT ?loop ?loop_type ?outlet_node ?cooling_coil ?cooling_coil_node ?heating_coil ?heating_coil_node ?supplemental_coil ?supplemental_coil_node
 WHERE {
-  ?loop a "AirLoopHVAC:UnitaryHeatPump:AirToAir" .
+  VALUES ?loop_type { "AirLoopHVAC:UnitarySystem" "AirLoopHVAC:UnitaryHeatPump:AirToAir" } .
+  ?loop a ?loop_type .
   ?loop idf:air_outlet_node_name ?outlet_node .
 
   # Cooling coil outlet
@@ -201,6 +203,7 @@ WHERE {
     # loop, outlet, cooling_coil, cooling_coil_node
     for (
         loop,
+        loop_type,
         outlet_node,
         cooling_coil,
         cooling_coil_node,
@@ -209,7 +212,8 @@ WHERE {
         supplemental_coil,
         supplemental_coil_node,
     ) in ont.rdf.query(all_loops_query):
-        unitary_system = obj["AirLoopHVAC:UnitaryHeatPump:AirToAir"][str(loop)]
+        loop_type_name = str(loop_type)
+        unitary_system = obj[loop_type_name][str(loop)]
 
         unitary_system["control_type"] = "SetPoint"
 
@@ -226,20 +230,30 @@ WHERE {
             fan_mode_schedule_name
         )
 
-        supply_air_fan_name = unitary_system["supply_air_fan_name"]
+        # UnitaryHeatPump:AirToAir uses "supply_air_fan_name", while UnitarySystem
+        # uses "supply_fan_name".
+        if loop_type_name == "AirLoopHVAC:UnitaryHeatPump:AirToAir":
+            supply_fan_name = unitary_system.get("supply_air_fan_name")
+        else:
+            supply_fan_name = unitary_system.get("supply_fan_name")
+
+        if not isinstance(supply_fan_name, str) or not supply_fan_name.strip():
+            # Keep going: setpoints can still be created even if fan name is missing.
+            supply_fan_name = None
 
         # The fan air mass flow rate isn't acuated through a schedule, but
         # directly through an EnergyManagementSystem:Actuator.
 
-        fan_air_mass_flow_rate = ActuatorDescription(
-            "Fan",
-            "Fan Air Mass Flow Rate",
-            supply_air_fan_name,
-            "[kg/s]",
-            0,
-            100,
-        )
-        new_actuators.append(fan_air_mass_flow_rate)
+        if supply_fan_name is not None:
+            fan_air_mass_flow_rate = ActuatorDescription(
+                "Fan",
+                "Fan Air Mass Flow Rate",
+                supply_fan_name,
+                "[kg/s]",
+                0,
+                100,
+            )
+            new_actuators.append(fan_air_mass_flow_rate)
 
         # Some buildings legitimately have missing coil outlet nodes or explicit
         # "NONE" placeholders in node fields. Never create setpoint managers for
@@ -639,7 +653,24 @@ def make_controller_outdoorair_controllable(
 
 def make_controllable(
     input_epjson: Realizable,
+    *,
+    controls: Sequence[
+        Literal[
+            "unitary_hvac",
+            "baseboard",
+            "fanonoff",
+            "waterheater",
+            "pump",
+            "airterminal",
+            "controller_outdoorair",
+        ]
+    ]
+    | None = None,
 ) -> Expression[tuple[Path, list[ActuatorDescription]]]:
+    # By default, we enable all controls.
+    # Keep the controls argument for backwards compatibility until code is stable
+    controls = controls if controls is not None else ["unitary_hvac", "baseboard", "fanonoff", "waterheater", "pump", "airterminal", "controller_outdoorair"]
+
     @derivation("controllable-building")
     def make_controllable_builder(input: Path):
         real_out = OUTPUT.get()
@@ -647,27 +678,51 @@ def make_controllable(
             json_obj = json.load(f)
 
         gensym = Gensym()
-        json_obj, hvac_actuators = make_unitary_hvac_controllable(
-            json_obj, only_outlet_nodes=True, gensym=gensym
-        )
-        json_obj, baseboard_actuators = make_baseboard_controllable(
-            json_obj, gensym=gensym
-        )
-        json_obj, fanonoff_actuators = make_fanonoff_controllable(
-            json_obj, gensym=gensym
-        )
-        json_obj, waterheater_actuators = make_waterheater_controllable(
-            json_obj, gensym=gensym
-        )
-        json_obj, pump_actuators = make_pump_controllable(
-            json_obj, gensym=gensym
-        )
-        json_obj, airterminal_actuators = make_airterminal_controllable(
-            json_obj, gensym=gensym
-        )
-        json_obj, controller_outdoorair_actuators = make_controller_outdoorair_controllable(
-            json_obj, gensym=gensym
-        )
+        selected = set(controls) if controls is not None else None
+        all_actuators: list[ActuatorDescription] = []
+
+        def _enabled(name: str) -> bool:
+            return selected is None or name in selected
+
+        if _enabled("unitary_hvac"):
+            json_obj, hvac_actuators = make_unitary_hvac_controllable(
+                json_obj, only_outlet_nodes=True, gensym=gensym
+            )
+            all_actuators.extend(hvac_actuators)
+
+        if _enabled("baseboard"):
+            json_obj, baseboard_actuators = make_baseboard_controllable(
+                json_obj, gensym=gensym
+            )
+            all_actuators.extend(baseboard_actuators)
+
+        if _enabled("fanonoff"):
+            json_obj, fanonoff_actuators = make_fanonoff_controllable(
+                json_obj, gensym=gensym
+            )
+            all_actuators.extend(fanonoff_actuators)
+
+        if _enabled("waterheater"):
+            json_obj, waterheater_actuators = make_waterheater_controllable(
+                json_obj, gensym=gensym
+            )
+            all_actuators.extend(waterheater_actuators)
+
+        if _enabled("pump"):
+            json_obj, pump_actuators = make_pump_controllable(json_obj, gensym=gensym)
+            all_actuators.extend(pump_actuators)
+
+        if _enabled("airterminal"):
+            json_obj, airterminal_actuators = make_airterminal_controllable(
+                json_obj, gensym=gensym
+            )
+            all_actuators.extend(airterminal_actuators)
+
+        if _enabled("controller_outdoorair"):
+            json_obj, controller_outdoorair_actuators = (
+                make_controller_outdoorair_controllable(json_obj, gensym=gensym)
+            )
+            all_actuators.extend(controller_outdoorair_actuators)
 
         tmp_out = Path(tempfile.mkdtemp())
 
@@ -675,8 +730,7 @@ def make_controllable(
 
         json.dump(json_obj, open(tmp_out / "building.epjson", "w"), indent=4)
         json.dump(
-            unstructure(hvac_actuators + baseboard_actuators + fanonoff_actuators + waterheater_actuators 
-                        + pump_actuators + airterminal_actuators + controller_outdoorair_actuators),
+            unstructure(all_actuators),
             open(tmp_out / "actuators.json", mode="w"),
             indent=4,
         )
