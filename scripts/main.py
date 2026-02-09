@@ -1,7 +1,7 @@
 import hydra
 from pathlib import Path
 
-from algorithms.online_trainer import online_trainer
+from b2b.baselines.online_trainer import online_trainer
 
 
 @hydra.main(config_path="../configs", config_name="base")

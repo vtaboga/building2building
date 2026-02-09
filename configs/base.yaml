@@ -5,14 +5,23 @@ defaults:
   - training: default
   - policy: ppo
   - reward: deadband
+  - bldg: single_family
   - rollout: default
 
 env:
   normalize_obs: true
+  max_steps: 35040
 
 n_episodes: 1
 
 seed: 42
+
+# Benchmark-specific settings (used by scripts/bm_adaptive_dynamics.py and other problems).
+benchmark:
+  split: train
+  start: 0
+  limit: 0
+  max_steps: null
 
 
 

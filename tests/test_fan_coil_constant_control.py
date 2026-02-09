@@ -7,12 +7,12 @@ import numpy as np
 import pytest
 from omegaconf import OmegaConf
 
-from algorithms import baselines
-from building2building.env import STORE_PATH
-from building2building.pipeline import extract_discovery_metadata, make_controllable
-from building2building.simulator import create_simulator
-from building2building.store import Constant, realize
-from building2building.types import BaseRewardConfig, BuildingConfig
+from b2b import baselines
+from b2b.env import STORE_PATH
+from b2b.pipeline import extract_discovery_metadata, make_controllable
+from b2b.simulator import create_simulator
+from b2b.store import Constant, realize
+from b2b.types import BaseRewardConfig, BuildingConfig
 
 
 def _compute_rollout_metrics(npz_path: Path) -> tuple[float, float]:
