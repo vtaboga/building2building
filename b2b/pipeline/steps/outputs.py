@@ -262,23 +262,63 @@ def modify_run_period(
     with open(input, "r") as f:
         epjson = json.load(f)
 
-    run_period_obj = epjson.setdefault("RunPeriod", {})
+    template_run_period = {
+        "Run Period 1": {
+        "apply_weekend_holiday_rule": "No",
+        "begin_day_of_month": begin_day_of_month,
+        "begin_month": begin_month,
+        "begin_year": 2023,
+        "day_of_week_for_start_day": "Sunday",
+        "end_day_of_month": end_day_of_month,
+        "end_month": end_month,
+        "end_year": 2023,
+        "use_weather_file_daylight_saving_period": "No",
+        "use_weather_file_holidays_and_special_days": "No",
+        "use_weather_file_rain_indicators": "Yes",
+        "use_weather_file_snow_indicators": "Yes"
+        }
+    }
+
+    run_period_obj = epjson.get("RunPeriod")
+    if run_period_obj is None:
+        run_period_obj = template_run_period
+        epjson["RunPeriod"] = run_period_obj
     if not isinstance(run_period_obj, dict):
         raise TypeError(
             f"Expected epJSON['RunPeriod'] to be a dict, got {type(run_period_obj)}"
         )
 
-    # Keep only "Run Period 1" and delete any other existing run periods.
-    for key in list(run_period_obj.keys()):
-        if key != "Run Period 1":
-            del run_period_obj[key]
+    # Rules:
+    # - If "Run Period 1" exists, do not replace the object; only update its dates.
+    # - If there is exactly one run period (any key), rename it to "Run Period 1".
+    # - If there are multiple run periods, keep only the first one, rename it to
+    #   "Run Period 1", and delete the others.
+    # - If empty/missing, use the template.
 
-    run_period_obj["Run Period 1"] = {
-        "begin_day_of_month": begin_day_of_month,
-        "begin_month": begin_month,
-        "end_day_of_month": end_day_of_month,
-        "end_month": end_month,
-    }
+    if not run_period_obj:
+        run_period_obj.update(template_run_period)
+
+    if "Run Period 1" in run_period_obj:
+        rp1 = run_period_obj["Run Period 1"]
+        if not isinstance(rp1, dict):
+            raise TypeError(
+                f"Expected epJSON['RunPeriod']['Run Period 1'] to be a dict, got {type(rp1)}"
+            )
+    else:
+        # Choose the first existing run period (in file/insertion order).
+        first_key, rp1 = next(iter(run_period_obj.items()))
+        if not isinstance(rp1, dict):
+            raise TypeError(
+                f"Expected epJSON['RunPeriod'][{first_key!r}] to be a dict, got {type(rp1)}"
+            )
+        run_period_obj.clear()
+        run_period_obj["Run Period 1"] = rp1
+
+    rp1["begin_day_of_month"] = begin_day_of_month
+    rp1["begin_month"] = begin_month
+    rp1["end_day_of_month"] = end_day_of_month
+    rp1["end_month"] = end_month
+
     with open(dst, "w") as f:
         json.dump(epjson, f, indent=4)
 
