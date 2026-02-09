@@ -248,6 +248,41 @@ def modify_timestep(
         json.dump(epjson, f, indent=4)
 
 
+@derivation("run-period.epjson")
+def modify_run_period(
+    input: Path,
+    begin_day_of_month: int,
+    begin_month: int,
+    end_day_of_month: int,
+    end_month: int,
+):
+    """Modify run period."""
+    dst = OUTPUT.get()
+
+    with open(input, "r") as f:
+        epjson = json.load(f)
+
+    run_period_obj = epjson.setdefault("RunPeriod", {})
+    if not isinstance(run_period_obj, dict):
+        raise TypeError(
+            f"Expected epJSON['RunPeriod'] to be a dict, got {type(run_period_obj)}"
+        )
+
+    # Keep only "Run Period 1" and delete any other existing run periods.
+    for key in list(run_period_obj.keys()):
+        if key != "Run Period 1":
+            del run_period_obj[key]
+
+    run_period_obj["Run Period 1"] = {
+        "begin_day_of_month": begin_day_of_month,
+        "begin_month": begin_month,
+        "end_day_of_month": end_day_of_month,
+        "end_month": end_month,
+    }
+    with open(dst, "w") as f:
+        json.dump(epjson, f, indent=4)
+
+
 def add_all_outputs(epjson_in: Realizable) -> Derivation:
     """Add all output configurations needed for dummy simulations."""
     out = epjson_in

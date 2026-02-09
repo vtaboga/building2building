@@ -43,6 +43,7 @@ from b2b.pipeline.steps.outputs import (
     add_sqlite_output,
     add_tabular_output,
     modify_timestep,
+    modify_run_period,
 )
 from b2b.pipeline.steps.schedule_files import link_in_schedule
 from b2b.pipeline.steps.surfaces import GlueSurfaces, glue_surfaces
@@ -80,6 +81,7 @@ def prepare_building(
     current = add_hvac_meters(current)
     current = add_outdoor_air_meters(current)
     current = modify_timestep(current, timesteps_per_hour=4)
+    current = modify_run_period(current, begin_day_of_month=1, begin_month=1, end_day_of_month=31, end_month=12)
     current = Rename("building.epjson", current)
     return current
 

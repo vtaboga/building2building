@@ -67,7 +67,11 @@ def _require_scratch_store() -> Path:
         )
 
     scratch = Path(scratch_raw).expanduser().resolve()
-    store_path = (scratch / "b2b").resolve()
+    store_path_raw = os.environ.get("STORE_PATH")
+    if store_path_raw:
+        store_path = Path(store_path_raw).expanduser().resolve()
+    else:
+        store_path = (scratch / "Building2Building" / "store").resolve()
 
     home = Path.home().expanduser().resolve()
     if store_path.is_relative_to(home):
@@ -75,7 +79,14 @@ def _require_scratch_store() -> Path:
             f"Refusing to use STORE_PATH={store_path} because it is under home={home}."
         )
 
+    if not store_path.is_relative_to(scratch):
+        raise RuntimeError(
+            f"Refusing to use STORE_PATH={store_path} because it is not under "
+            f"SCRATCH={scratch}."
+        )
+
     # Ensure all b2b caching goes here.
+    store_path.mkdir(parents=True, exist_ok=True)
     os.environ["STORE_PATH"] = str(store_path)
     return store_path
 
@@ -291,7 +302,8 @@ def _load_hq_dataframe_from_zip(zip_path: Path) -> "Any":
 def main() -> None:
     args = _parse_args()
 
-    repo_root = Path(__file__).resolve().parents[1]
+    # scripts/processing/<this_file>.py -> repo root is two levels up
+    repo_root = Path(__file__).resolve().parents[2]
     _ensure_outputs_dir(repo_root)
 
     store_path = _require_scratch_store()
