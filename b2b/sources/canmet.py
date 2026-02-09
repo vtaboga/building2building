@@ -3,11 +3,12 @@ from pathlib import Path
 import b2b.sources.oneclimate as oneclimate
 import duckdb
 from b2b.env import STORE_PATH, energyplus_path
-from b2b.pipeline import create_complete_pipeline
+from b2b.pipeline import ActuatorDescription, create_complete_pipeline
 from b2b.store import (
     OUTPUT,
     Constant,
     Derivation,
+    Expression,
     GitClone,
     Rename,
     derivation,
@@ -55,7 +56,7 @@ def housing_archetypes_database() -> Derivation:
     return index(housing_archetypes())
 
 
-def process(path: Path) -> Derivation:
+def process(path: Path) -> Expression[tuple[Path, list[ActuatorDescription]]]:
     return create_complete_pipeline(
         Rename("input.idf", Constant(path)),
         energyplus_path(),
@@ -64,8 +65,6 @@ def process(path: Path) -> Derivation:
 
 
 def search_buildings(**query) -> DataFrame:
-    ep = energyplus_path()
-
     db_path = realize(STORE_PATH.get(), housing_archetypes_database())
     db = duckdb.read_parquet(str(db_path)).select(duckdb.StarExpression())
 
@@ -77,11 +76,7 @@ def search_buildings(**query) -> DataFrame:
     df = db.to_df()
 
     def trans(path: str):
-        return lambda: create_complete_pipeline(
-            Constant(Path(path)),
-            ep,
-            src_version="24.2.0",
-        )
+        return lambda: process(Path(path))
 
     return df.assign(derivation_thunk=df["filepath"].apply(trans))
 
@@ -115,7 +110,7 @@ def search_config(
 
     best_row = max(weather_df.iterrows(), key=lambda r: score(r[1].url))
     weather_path = realize(STORE_PATH.get(), best_row[1].derivation_thunk())
-    building_path = realize(
+    building_path, hvac_actuators = realize(
         STORE_PATH.get(), matching_buildings.iloc[0].derivation_thunk()
     )
 
@@ -127,5 +122,5 @@ def search_config(
         # Empirically, this works for this dataset.
         warmup_phases=1,  # TODO: handle warmup
         area=1000.0,
-        hvac_actuators=[],
+        hvac_actuators=hvac_actuators,
     )
