@@ -55,7 +55,9 @@ temp_stl_lower_bound = 5.0
 temp_stl_upper_bound = 50.0
 
 
-def create_temp_stl(obj: dict[str, Any], *, name: str = "Temperature") -> str:
+def create_temp_stl(
+    obj: dict[str, Any], lower: float, upper: float, *, name: str = "Temperature"
+) -> str:
     """Create a continuous ScheduleTypeLimits for temperatures and return its
     name.
 
@@ -64,8 +66,8 @@ def create_temp_stl(obj: dict[str, Any], *, name: str = "Temperature") -> str:
 
     name = f"B2B {name} ({gensym()})"
     schedule_type_limits[name] = {
-        "lower_limit_value": 5.0,
-        "upper_limit_value": 50.0,
+        "lower_limit_value": lower,
+        "upper_limit_value": upper,
         "numeric_type": "Continuous",
         "unit_type": "Temperature",
     }
@@ -159,7 +161,12 @@ def make_airloophvac_controllable(
     onoff_stl_name = create_onoff_availability_stl(
         obj, name="unitaryhvac fan availibiliby stl"
     )
-    temp_stl_name = create_temp_stl(obj, name="unitaryhvac temperature setpoints stl")
+    temp_stl_name = create_temp_stl(
+        obj,
+        5.0,
+        50.0,
+        name="unitaryhvac temperature setpoints stl",
+    )
 
     # Note: I wrapped each coil section in OPTIONAL blocks because not all
     # unitary systems have all three coil types (e.g., cooling-only systems
@@ -377,6 +384,8 @@ SELECT ?fan WHERE {
     return obj, new_devices
 
 
+# WaterHeater and friends dosn't seem to work. The actuator name that is
+# produced is not present in the discovery edd and causes a runtime crash.
 @dataclass
 class WaterHeater:
     actuator: ActuatorDescription
@@ -394,11 +403,14 @@ def make_waterheater_controllable(
     """Find all waterheaters and for each of those, expose the availibility
     schedue as a schedule that can be controlled."""
 
+    low, high = 5, 50
+
     obj = deepcopy(obj)
 
     ont = Ontology.from_object(obj)
 
-    temp_stl_name = create_temp_stl(obj, name="water heater temperature stl")
+    # those are the bound of water heater
+    temp_stl_name = create_temp_stl(obj, low, high, name="water heater temperature stl")
 
     # SPARQL query for Water Heaters
     all_waterheaters_query = """# -*- mode: sparql -*-
@@ -409,14 +421,14 @@ def make_waterheater_controllable(
     new_devices = []
 
     for (wh_id,) in ont.rdf.query(all_waterheaters_query):
-        wh_name = str(wh_id)
+        wh_name = wh_id.toPython()
         wh_entry = obj["WaterHeater:Mixed"][wh_name]
 
         # Create a new controllable schedule for the setpoint
         sched_name = create_schedule_constant(
             obj,
             temp_stl_name,
-            60,
+            25,
             name=f"controllable setpoint for {wh_name}",
         )
 
@@ -430,8 +442,8 @@ def make_waterheater_controllable(
                     control_type="Setpoint Temperature",
                     component_name=sched_name,
                     units="Temperature",
-                    lower_bound=10.0,
-                    upper_bound=80.0,
+                    lower_bound=low,
+                    upper_bound=high,
                 ),
             )
         )
@@ -642,7 +654,7 @@ def make_all_equipment(
         lambda obj: make_airloophvac_controllable(obj, "UnitarySystem"),
         make_baseboard_controllable,
         make_fanonoff_controllable,
-        make_waterheater_controllable,
+        # make_waterheater_controllable,
         make_pump_controllable,
         make_airterminal_controllable,
         make_controller_outdoorair_controllable,
