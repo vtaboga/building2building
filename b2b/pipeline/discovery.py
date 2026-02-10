@@ -25,6 +25,8 @@ from b2b.store import (
 class Metadata:
     """Discovery metadata extracted from EnergyPlus simulation."""
 
+    source_path: Path
+
     net_conditioned_area: float
     warmup_phases: int
     warmup_days: int
@@ -102,6 +104,7 @@ def DiscoveryMetadata(epjson: Path, epw: Path):
 
     # Create Metadata instance and serialize with cattrs
     metadata = Metadata(
+        eplusout,
         net_conditioned_area=area,
         warmup_phases=warmup_count,
         warmup_days=warmup_days,
