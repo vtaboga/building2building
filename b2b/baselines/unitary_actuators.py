@@ -68,6 +68,18 @@ def select_unitary_actuator_indices(action_names: list[str]) -> UnitaryActuatorI
         component_name_contains="b2b node temp sp unitary_outlet",
     )
 
+    # Additional legacy naming (used by some pipelines): outlet setpoint schedule
+    # for the unitary HVAC is named like:
+    #   "B2B unitaryhvac outlet temp setpoint schedule (N)"
+    # We treat these as "outlet-like" temperature setpoints.
+    if not idx_outlet_nodes_sched:
+        idx_outlet_nodes_sched = find_action_indices(
+            action_names,
+            component_type_prefix="schedule:constant",
+            control_type="schedule value",
+            component_name_contains="b2b unitaryhvac outlet temp setpoint schedule",
+        )
+
     # Current naming: schedules are created per node, but without embedding the
     # node role in the schedule name. In that case, we conservatively treat all
     # unitaryhvac node schedules as "outlet-like" setpoints so the baseline can
