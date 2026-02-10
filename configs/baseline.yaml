@@ -11,6 +11,6 @@ hydra:
 
 env:
   normalize_obs: false
-  max_steps: 672
+  max_steps: 35040
 
 n_episodes: 1

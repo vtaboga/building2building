@@ -8,6 +8,7 @@ import traceback
 import zipfile
 from importlib.resources import files
 from pathlib import Path
+from typing import List
 
 import duckdb
 from b2b import pipeline
@@ -181,10 +182,11 @@ def search_buildings(**query) -> DataFrame:
     root_zip = dataset_zip()
     index = realize(STORE_PATH.get(), table_index(root_zip))
     ep = energyplus_path()
+    controls = query.get("controls")
 
     def trans(idf_filename, schedule_filename):
         return lambda: _build_control_derivation(
-            root_zip, idf_filename, schedule_filename, ep
+            root_zip, idf_filename, schedule_filename, ep, controls
         )
 
     db = duckdb.from_parquet(str(index))
@@ -239,6 +241,23 @@ def search_configs(
         and isinstance(config_nn["bldg"], dict)
     ):
         config_nn = config_nn["bldg"]
+
+    # Propagate controls from `bldg.selection.controls` into the pipeline.
+    #
+    # Important: `make_env()` overwrites `bldg.bldg` to pick a specific
+    # (idf_filename, schedule_filename) pair, so controls must be read from the
+    # sibling `selection` section.
+    if isinstance(cfg.get("bldg"), dict) and isinstance(config_nn, dict):
+        sel = cfg["bldg"].get("selection")
+        if isinstance(sel, dict) and "controls" in sel:
+            controls = sel.get("controls")
+            if not isinstance(controls, list) or not all(
+                isinstance(x, str) for x in controls
+            ):
+                raise TypeError("bldg.selection.controls must be a list[str]")
+            # `search_buildings()` already looks for a `controls` entry in the
+            # query dict and forwards it to `_build_control_derivation()`.
+            config_nn["controls"] = controls
 
     rows = search_buildings(**config_nn)
     # Heuristic: when no explicit filters are provided, prioritize simpler
