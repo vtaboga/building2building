@@ -20,6 +20,7 @@ import wandb
 from omegaconf import OmegaConf
 from stable_baselines3.common.callbacks import CallbackList, EvalCallback
 from stable_baselines3.common.utils import set_random_seed
+from stable_baselines3.common.vec_env import DummyVecEnv
 from wandb.integration.sb3 import WandbCallback
 
 from b2b.baselines.wandb_utils import init_wandb_from_config
@@ -150,6 +151,41 @@ def _apply_wrappers(
     return env
 
 
+def _make_single_wrapped_env(
+    config: OmegaConf,
+    eplus_output_dir: str,
+    split: str,
+    split_indices: list[int],
+    *,
+    target_obs_size: int | None,
+    augment_params: bool,
+    norm_obs: bool,
+    wandb_prefix: str,
+) -> gym.Env:
+    """Create one fully-wrapped adaptive dynamics env.
+
+    The wrapper stack (inside → out) is:
+        raw EnergyPlus env
+        → ResampleBuildingOnResetWrapper
+        → PadObservation
+        → AugmentObservationWithBuildingParams
+        → NormalizeObservation
+    """
+    env = make_adaptive_dynamics_env(
+        config=config,
+        eplus_output_dir=eplus_output_dir,
+        split=split,
+        split_indices=split_indices,
+        wandb_prefix=wandb_prefix,
+    )
+    return _apply_wrappers(
+        env,
+        target_obs_size=target_obs_size,
+        augment_params=augment_params,
+        norm_obs=norm_obs,
+    )
+
+
 def _make_adaptive_dynamics_envs(
     config: OmegaConf,
     output_dir: Path,
@@ -157,57 +193,69 @@ def _make_adaptive_dynamics_envs(
     target_obs_size: int | None,
     augment_params: bool,
     norm_obs: bool,
-):
-    """
-    Create training and evaluation environments for adaptive dynamics benchmark.
+) -> tuple[DummyVecEnv, DummyVecEnv]:
+    """Create vectorized training and single evaluation environments.
+
+    Training uses ``n_train_envs`` parallel environments (each independently
+    resampling buildings via ``ResampleBuildingOnResetWrapper``) so that each
+    PPO rollout buffer contains experiences from many diverse buildings.
+
+    Evaluation uses a single environment for deterministic benchmarking.
 
     Buildings in the split may have different raw observation sizes (e.g. 8, 9,
     or 10 dims).  When *target_obs_size* is set the observations are
     zero-padded to that fixed size so that SB3's fixed-shape buffers work.
     """
+    n_train_envs: int = int(config.training.num_train_envs)
 
     # Load splits to get sizes
     splits = HydroQuebecRowIdSplits.load_from_action_space_2_zone_1()
-    n_train = len(splits.train_row_ids)
-    n_test = len(splits.test_row_ids)
+    train_indices = list(range(len(splits.train_row_ids)))
+    test_indices = list(range(len(splits.test_row_ids)))
 
     logger.info(
         "Adaptive dynamics benchmark: %d train buildings, %d test buildings",
-        n_train,
-        n_test,
+        len(train_indices),
+        len(test_indices),
     )
+    logger.info("Using %d parallel training environments", n_train_envs)
     if target_obs_size is not None:
         logger.info("Padding raw observations to fixed size %d", target_obs_size)
 
-    # Create single training environment
-    train_env = make_adaptive_dynamics_env(
-        config=config,
-        eplus_output_dir=str(output_dir / "train_eplus_outputs"),
-        split="train",
-        split_indices=None,
-        wandb_prefix="train",
-    )
-    train_env = _apply_wrappers(
-        train_env,
-        target_obs_size=target_obs_size,
-        augment_params=augment_params,
-        norm_obs=norm_obs,
+    # Shared keyword arguments for _make_single_wrapped_env
+    wrapper_kwargs = {
+        "target_obs_size": target_obs_size,
+        "augment_params": augment_params,
+        "norm_obs": norm_obs,
+    }
+
+    # --- Vectorized training environments ---
+    def _make_train_env(env_idx: int) -> gym.Env:
+        return _make_single_wrapped_env(
+            config=config,
+            eplus_output_dir=str(output_dir / f"train_eplus_outputs_{env_idx}"),
+            split="train",
+            split_indices=train_indices,
+            wandb_prefix="train",
+            **wrapper_kwargs,
+        )
+
+    train_env = DummyVecEnv(
+        [lambda idx=i: _make_train_env(idx) for i in range(n_train_envs)]
     )
 
-    # Create single evaluation environment
-    eval_env = make_adaptive_dynamics_env(
-        config=config,
-        eplus_output_dir=str(output_dir / "eval_eplus_outputs"),
-        split="test",
-        split_indices=None,
-        wandb_prefix="eval",
-    )
-    eval_env = _apply_wrappers(
-        eval_env,
-        target_obs_size=target_obs_size,
-        augment_params=augment_params,
-        norm_obs=norm_obs,
-    )
+    # --- Single evaluation environment (wrapped in DummyVecEnv for SB3) ---
+    def _make_eval_env() -> gym.Env:
+        return _make_single_wrapped_env(
+            config=config,
+            eplus_output_dir=str(output_dir / "eval_eplus_outputs"),
+            split="test",
+            split_indices=test_indices,
+            wandb_prefix="eval",
+            **wrapper_kwargs,
+        )
+
+    eval_env = DummyVecEnv([_make_eval_env])
 
     return train_env, eval_env
 
@@ -349,8 +397,12 @@ def parameterized_adaptive_dynamics_trainer(config: OmegaConf, output_dir: Path)
         )
 
         # Log observation space info
-        logger.info("Observation space shape: %s", train_env.observation_space.shape)
-        logger.info("Action space shape: %s", train_env.action_space.shape)
+        logger.info(
+            "Train VecEnv: %d envs, obs shape %s, action shape %s",
+            train_env.num_envs,
+            train_env.observation_space.shape,
+            train_env.action_space.shape,
+        )
 
         # Build model and callbacks
         callbacks = _make_callbacks(config, eval_env, model_dir, log_dir)

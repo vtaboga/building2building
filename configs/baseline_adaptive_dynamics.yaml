@@ -11,6 +11,13 @@ defaults:
   - policy: ppo_parameterized
   - reward: deadband
 
+# Training overrides
+training:
+  # Number of parallel training environments.  Each env independently
+  # resamples buildings, so PPO's rollout buffer contains diverse building
+  # experiences before each policy update.
+  num_train_envs: 4
+
 # Environment configuration
 env:
   normalize_obs: true
