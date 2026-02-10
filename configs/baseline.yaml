@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - bldg: single_family
-  - policy: unitary_pi
+  - policy: unitary_sat
   - reward: deadband
   - wandb: default
 
