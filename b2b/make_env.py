@@ -53,7 +53,7 @@ def make_env(config: object, eplus_output_dir: str | Path):
             bldg_section = cfg_any.get("bldg")
             if isinstance(bldg_section, dict):
                 sel = bldg_section.get("selection")
-                if isinstance(sel, dict) and bool(sel.get("enabled", False)):
+                if isinstance(sel, dict) and sel.get("enabled"):
                     split = str(sel.get("split", "train")).strip().lower()
                     if split not in ("train", "test"):
                         raise ValueError(

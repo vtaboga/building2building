@@ -55,7 +55,12 @@ temp_stl_upper_bound = 50.0
 
 
 def create_temp_stl(
-    obj: dict[str, Any], *, name: str = "Temperature", gensym: Gensym | None = None
+    obj: dict[str, Any],
+    *,
+    name: str = "Temperature",
+    gensym: Gensym | None = None,
+    lower_limit_value: float = temp_stl_lower_bound,
+    upper_limit_value: float = temp_stl_upper_bound,
 ) -> str:
     """Create a continuous ScheduleTypeLimits for temperatures and return its
     name.
@@ -66,8 +71,8 @@ def create_temp_stl(
 
     name = f"B2B {name} ({gensym()})"
     schedule_type_limits[name] = {
-        "lower_limit_value": 5.0,
-        "upper_limit_value": 50.0,
+        "lower_limit_value": float(lower_limit_value),
+        "upper_limit_value": float(upper_limit_value),
         "numeric_type": "Continuous",
         "unit_type": "Temperature",
     }
@@ -78,7 +83,7 @@ def create_temp_stl(
 def create_schedule_constant(
     obj: dict[str, Any],
     stl_name: str,
-    hourly_value: int,
+    hourly_value: float,
     *,
     name: str = "constant schedule",
     gensym: Gensym | None = None,
@@ -450,8 +455,15 @@ def make_waterheater_controllable(
 
     ont = Ontology.from_object(obj)
     
+    # Water heater setpoints are typically higher than space HVAC setpoints.
+    # Align ScheduleTypeLimits bounds with the actuator bounds to avoid E+ fatal
+    # errors during ProcessScheduleInput.
     temp_stl_name = create_temp_stl(
-        obj, name="water heater temperature stl", gensym=gensym
+        obj,
+        name="water heater temperature stl",
+        gensym=gensym,
+        lower_limit_value=40.0,
+        upper_limit_value=70.0,
     )
 
     # SPARQL query for Water Heaters 
@@ -470,7 +482,7 @@ def make_waterheater_controllable(
         sched_name = create_schedule_constant(
             obj,
             temp_stl_name,
-            60,
+            60.0,
             name=f"controllable setpoint for {wh_name}",
             gensym=gensym,
         )
@@ -669,20 +681,34 @@ def make_controllable(
 ) -> Expression[tuple[Path, list[ActuatorDescription]]]:
     # By default, we enable all controls.
     # Keep the controls argument for backwards compatibility until code is stable
-    controls = controls if controls is not None else ["unitary_hvac", "baseboard", "fanonoff", "waterheater", "pump", "airterminal", "controller_outdoorair"]
+    selected_controls = (
+        list(controls)
+        if controls is not None
+        else [
+            "unitary_hvac",
+            "baseboard",
+            "fanonoff",
+            "waterheater",
+            "pump",
+            "airterminal",
+            "controller_outdoorair",
+        ]
+    )
 
     @derivation("controllable-building")
-    def make_controllable_builder(input: Path):
+    def make_controllable_builder(input: Path, controls: list[str]):
         real_out = OUTPUT.get()
         with open(input, "rb") as f:
             json_obj = json.load(f)
 
         gensym = Gensym()
-        selected = set(controls) if controls is not None else None
+        # IMPORTANT: `controls` must be a derivation argument (not a closure),
+        # so it is included in the derivation hash and caching is correct.
+        selected = set(controls)
         all_actuators: list[ActuatorDescription] = []
 
         def _enabled(name: str) -> bool:
-            return selected is None or name in selected
+            return name in selected
 
         if _enabled("unitary_hvac"):
             json_obj, hvac_actuators = make_unitary_hvac_controllable(
@@ -746,4 +772,4 @@ def make_controllable(
             actuators_json, list[ActuatorDescription]
         )
 
-    return parse_expr(make_controllable_builder(input_epjson))
+    return parse_expr(make_controllable_builder(input_epjson, selected_controls))
