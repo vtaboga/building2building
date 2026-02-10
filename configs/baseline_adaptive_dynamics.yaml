@@ -1,5 +1,8 @@
-# Configuration for parameterized PPO on adaptive dynamics benchmark
-# Trains on 900 buildings from train split, evaluates on 100 from test split
+# Configuration for baseline PPO on adaptive dynamics benchmark
+# Same as parameterized_adaptive_dynamics but WITHOUT building parameter augmentation.
+# The agent does not see building parameters — it must learn a single policy
+# that works across all buildings without knowing which building it is in.
+# Buildings are still resampled on each episode reset.
 
 defaults:
   - _self_
@@ -11,9 +14,9 @@ defaults:
 # Environment configuration
 env:
   normalize_obs: true
-  # Enable building parameter augmentation (area, warmup_phases, num_actuators)
-  augment_building_params: true
-  # Pad raw observations to this fixed size before augmentation/normalisation.
+  # Disable building parameter augmentation — baseline agent has no building info
+  augment_building_params: false
+  # Pad raw observations to this fixed size so all buildings produce the same shape.
   # Buildings in action_space_2_zone_1 have variable zone counts (obs = N_zones + 7).
   # 20 accommodates up to 13 thermal zones; extra zero-padded dims are harmless.
   target_obs_size: 20
@@ -33,5 +36,5 @@ seed: 42
 # Hydra output directory configuration
 hydra:
   run:
-    dir: outputs/parameterized_adaptive_dynamics/${policy.algorithm}/${now:%d-%m-%Y}/${now:%H-%M-%S}
+    dir: outputs/baseline_adaptive_dynamics/${policy.algorithm}/${now:%d-%m-%Y}/${now:%H-%M-%S}
 

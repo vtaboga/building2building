@@ -211,6 +211,30 @@ class NormalizeObservation(gym.ObservationWrapper):
             low=target_low, high=target_high, dtype=dtype
         )
 
+    def _update_bounds(self) -> None:
+        """Re-read observation space bounds from the inner env and recompute derived state."""
+        self.obs_low = self.env.observation_space.low
+        self.obs_high = self.env.observation_space.high
+
+        self.obs_low = np.where(np.isinf(self.obs_low), -1e10, self.obs_low)
+        self.obs_high = np.where(np.isinf(self.obs_high), 1e10, self.obs_high)
+
+        self.obs_range = self.obs_high - self.obs_low
+        self.obs_range = np.where(self.obs_range == 0, 1.0, self.obs_range)
+
+        dtype = self.observation_space.dtype
+        target_low = np.zeros(self.obs_low.shape, dtype=dtype)
+        target_high = np.ones(self.obs_high.shape, dtype=dtype)
+        self.observation_space = gym.spaces.Box(
+            low=target_low, high=target_high, dtype=dtype
+        )
+
+    def reset(self, **kwargs):  # type: ignore[override]
+        """Reset and re-read observation space bounds (inner env may have changed)."""
+        obs, info = self.env.reset(**kwargs)
+        self._update_bounds()
+        return self.observation(obs), info
+
     def observation(self, observation: Any) -> np.ndarray:
         """
         Normalize the observation to the target range.
@@ -230,6 +254,95 @@ class NormalizeObservation(gym.ObservationWrapper):
         Denormalize the observation to the original range.
         """
         return observation * self.obs_range + self.obs_low
+
+
+class PadObservation(gym.ObservationWrapper):
+    """Pad observations to a fixed target size with zeros.
+
+    When buildings produce observations of different sizes (e.g. 8, 9, or 10
+    dimensions), this wrapper zero-pads each observation so that downstream
+    consumers always see a tensor of shape ``(target_size,)``.  Padded
+    dimensions have observation-space bounds ``[0, 0]`` so that normalisation
+    layers treat them as constants.
+
+    On every ``reset`` the wrapper re-reads the inner environment's
+    observation space (which may have changed after a building resample) and
+    rebuilds its own bounds accordingly, keeping the shape fixed.
+    """
+
+    def __init__(self, env: gym.Env, target_size: int):
+        super().__init__(env)
+
+        if not isinstance(env.observation_space, gym.spaces.Box):
+            raise ValueError(
+                "Expected observation space to be Box, "
+                f"got {type(env.observation_space)}"
+            )
+
+        self._target_size = target_size
+        orig_size = env.observation_space.shape[0]
+
+        if orig_size > target_size:
+            raise ValueError(
+                f"Inner observation size ({orig_size}) exceeds "
+                f"target_size ({target_size})"
+            )
+
+        self._rebuild_observation_space()
+
+        logger.info(
+            "PadObservation: inner obs %d → padded to %d",
+            orig_size,
+            target_size,
+        )
+
+    # ------------------------------------------------------------------
+    def _rebuild_observation_space(self) -> None:
+        """Rebuild padded observation space from current inner env bounds."""
+        inner_low = self.env.observation_space.low
+        inner_high = self.env.observation_space.high
+        inner_size = inner_low.shape[0]
+        dtype = self.env.observation_space.dtype
+
+        if inner_size > self._target_size:
+            raise ValueError(
+                f"Inner observation size ({inner_size}) exceeds "
+                f"target_size ({self._target_size}). "
+                "Increase target_obs_size in your config."
+            )
+
+        pad_size = self._target_size - inner_size
+
+        if pad_size > 0:
+            pad_zeros = np.zeros(pad_size, dtype=dtype)
+            new_low = np.concatenate([inner_low, pad_zeros])
+            new_high = np.concatenate([inner_high, pad_zeros])
+        else:
+            new_low = inner_low
+            new_high = inner_high
+
+        self.observation_space = gym.spaces.Box(low=new_low, high=new_high, dtype=dtype)
+
+    # ------------------------------------------------------------------
+    def reset(self, **kwargs):  # type: ignore[override]
+        """Reset and re-read inner observation space (may have changed)."""
+        obs, info = self.env.reset(**kwargs)
+        self._rebuild_observation_space()
+        return self.observation(obs), info
+
+    def observation(self, obs: np.ndarray) -> np.ndarray:
+        obs = np.asarray(obs, dtype=self.observation_space.dtype)
+        obs_size = obs.shape[0]
+        if obs_size > self._target_size:
+            raise ValueError(
+                f"Observation size ({obs_size}) exceeds target_size "
+                f"({self._target_size}). Increase target_obs_size in "
+                "your config."
+            )
+        pad_size = self._target_size - obs_size
+        if pad_size > 0:
+            return np.concatenate([obs, np.zeros(pad_size, dtype=obs.dtype)])
+        return obs
 
 
 class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
@@ -390,6 +503,22 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         self.building_params = self._extract_building_params(self.env)
         self.normalized_params = self._normalize_params(self.building_params)
 
+        # Rebuild observation space in case inner env's obs shape changed
+        orig_low = self.env.observation_space.low
+        orig_high = self.env.observation_space.high
+
+        param_low = -np.ones(len(self.normalized_params), dtype=orig_low.dtype)
+        param_high = np.ones(len(self.normalized_params), dtype=orig_high.dtype)
+
+        new_low = np.concatenate([orig_low, param_low])
+        new_high = np.concatenate([orig_high, param_high])
+
+        self.observation_space = gym.spaces.Box(
+            low=new_low,
+            high=new_high,
+            dtype=self.env.observation_space.dtype,
+        )
+
         return self.observation(obs), info
 
     def observation(self, obs: np.ndarray) -> np.ndarray:
@@ -436,12 +565,17 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
             create a new environment for the given index.
         available_indices: Non-empty sequence of integer indices that
             ``env_factory`` accepts.
+        wandb_prefix: Prefix for all W&B log keys.  Use ``"train"``
+            for training environments and ``"eval"`` for evaluation
+            environments so that their metrics appear in separate
+            W&B panels.
     """
 
     def __init__(
         self,
         env_factory: Callable[[int], gym.Env],
         available_indices: list[int],
+        wandb_prefix: str = "train",
     ):
         if not available_indices:
             raise ValueError("available_indices must not be empty")
@@ -449,6 +583,7 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         self._env_factory = env_factory
         self._available_indices = list(available_indices)
         self._current_index = random.choice(self._available_indices)
+        self._wandb_prefix = wandb_prefix
 
         initial_env = env_factory(self._current_index)
         super().__init__(initial_env)
@@ -460,7 +595,8 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         self._has_stepped: bool = False
 
         logger.info(
-            "ResampleBuildingOnResetWrapper: %d buildings available",
+            "ResampleBuildingOnResetWrapper(%s): %d buildings available",
+            wandb_prefix,
             len(self._available_indices),
         )
 
@@ -484,12 +620,13 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         try:
             import wandb  # type: ignore[import-untyped]
 
+            p = self._wandb_prefix
             wandb.log(
                 {
-                    "episode/reward": self._episode_reward,
-                    "episode/length": self._episode_steps,
-                    "episode/number": self._episode_count,
-                    "episode/building_index": self._current_index,
+                    f"{p}/episode/reward": self._episode_reward,
+                    f"{p}/episode/length": self._episode_steps,
+                    f"{p}/episode/number": self._episode_count,
+                    f"{p}/episode/building_index": self._current_index,
                 },
             )
         except Exception as exc:
@@ -506,20 +643,23 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
             if not isinstance(meta, dict):
                 return
 
+            p = self._wandb_prefix
             payload: dict[str, Any] = {
-                "building/split_index": self._current_index,
+                f"{p}/building/split_index": self._current_index,
             }
 
             # Core building parameters
             for key in ("area", "warmup_phases"):
                 if key in meta:
-                    payload[f"building/{key}"] = float(meta[key])
+                    payload[f"{p}/building/{key}"] = float(meta[key])
 
             if "hvac_actuators" in meta:
-                payload["building/num_actuators"] = len(meta["hvac_actuators"])
+                payload[f"{p}/building/num_actuators"] = len(meta["hvac_actuators"])
 
             if "controlled_zones" in meta:
-                payload["building/num_controlled_zones"] = len(meta["controlled_zones"])
+                payload[f"{p}/building/num_controlled_zones"] = len(
+                    meta["controlled_zones"]
+                )
 
             # Source metadata (year_built, num_units, …)
             src = meta.get("building_source_metadata")
@@ -531,7 +671,7 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
                     val = src.get(src_key)
                     if val is not None:
                         try:
-                            payload[f"building/{src_key}"] = float(val)
+                            payload[f"{p}/building/{src_key}"] = float(val)
                         except (TypeError, ValueError):
                             pass
 

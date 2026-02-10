@@ -10,24 +10,26 @@ This trainer:
 import importlib
 import inspect
 import logging
-import random
 import shutil
 import uuid
 from pathlib import Path
+from typing import Any
 
+import gymnasium as gym
 import wandb
 from omegaconf import OmegaConf
 from stable_baselines3.common.callbacks import CallbackList, EvalCallback
 from stable_baselines3.common.utils import set_random_seed
 from wandb.integration.sb3 import WandbCallback
 
-from b2b.baselines.test import test_policy
-from b2b.baselines.utils import log_test_dir_graphs_wandb
 from b2b.baselines.wandb_utils import init_wandb_from_config
+from b2b.benchmark.experiments.bm_adaptive_dynamics import log_returns_to_wandb
+from b2b.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
 from b2b.make_env import make_env
 from b2b.simulator.wrappers import (
     AugmentObservationWithBuildingParams,
     NormalizeObservation,
+    PadObservation,
     ResampleBuildingOnResetWrapper,
 )
 from b2b.utils import HydroQuebecRowIdSplits
@@ -88,6 +90,7 @@ def make_adaptive_dynamics_env(
     eplus_output_dir: str,
     split: str = "train",
     split_indices: list[int] | None = None,
+    wandb_prefix: str = "train",
 ):
     """
     Create an environment that resamples from the adaptive dynamics benchmark splits on each reset.
@@ -97,6 +100,7 @@ def make_adaptive_dynamics_env(
         eplus_output_dir: Directory for EnergyPlus outputs
         split: "train" or "test"
         split_indices: List of split indices to sample from. If None, uses all indices.
+        wandb_prefix: Prefix for W&B log keys (e.g. ``"train"`` or ``"eval"``).
 
     Returns:
         gym.Env: EnergyPlus environment wrapped with ResampleBuildingOnResetWrapper
@@ -115,21 +119,52 @@ def make_adaptive_dynamics_env(
         return _create_env_for_split_index(config, eplus_output_dir, split, split_index)
 
     # Wrap with resampling wrapper
-    env = ResampleBuildingOnResetWrapper(env_factory, split_indices)
+    env = ResampleBuildingOnResetWrapper(
+        env_factory, split_indices, wandb_prefix=wandb_prefix
+    )
 
     return env
 
 
-def _make_adaptive_dynamics_envs(config: OmegaConf, output_dir: Path):
+def _apply_wrappers(
+    env: gym.Env,
+    *,
+    target_obs_size: int | None,
+    augment_params: bool,
+    norm_obs: bool,
+) -> gym.Env:
+    """Apply the standard wrapper stack for adaptive dynamics envs.
+
+    Order (inside → out):
+        raw env → ResampleBuildingOnResetWrapper (already applied)
+        → PadObservation (if target_obs_size is set)
+        → AugmentObservationWithBuildingParams (if augment_params)
+        → NormalizeObservation (if norm_obs)
+    """
+    if target_obs_size is not None:
+        env = PadObservation(env, target_size=target_obs_size)
+    if augment_params:
+        env = AugmentObservationWithBuildingParams(env)
+    if norm_obs:
+        env = NormalizeObservation(env)
+    return env
+
+
+def _make_adaptive_dynamics_envs(
+    config: OmegaConf,
+    output_dir: Path,
+    *,
+    target_obs_size: int | None,
+    augment_params: bool,
+    norm_obs: bool,
+):
     """
     Create training and evaluation environments for adaptive dynamics benchmark.
 
-    Note: We don't use vectorized environments because buildings have different
-    observation space sizes, which would cause shape mismatches.
+    Buildings in the split may have different raw observation sizes (e.g. 8, 9,
+    or 10 dims).  When *target_obs_size* is set the observations are
+    zero-padded to that fixed size so that SB3's fixed-shape buffers work.
     """
-    # Read required config
-    norm_obs = config.env.normalize_obs
-    augment_params = config.env.get("augment_building_params", True)
 
     # Load splits to get sizes
     splits = HydroQuebecRowIdSplits.load_from_action_space_2_zone_1()
@@ -141,9 +176,8 @@ def _make_adaptive_dynamics_envs(config: OmegaConf, output_dir: Path):
         n_train,
         n_test,
     )
-    logger.info(
-        "Note: Not using vectorized environments due to variable observation space sizes"
-    )
+    if target_obs_size is not None:
+        logger.info("Padding raw observations to fixed size %d", target_obs_size)
 
     # Create single training environment
     train_env = make_adaptive_dynamics_env(
@@ -151,13 +185,14 @@ def _make_adaptive_dynamics_envs(config: OmegaConf, output_dir: Path):
         eplus_output_dir=str(output_dir / "train_eplus_outputs"),
         split="train",
         split_indices=None,
+        wandb_prefix="train",
     )
-
-    # Apply wrappers
-    if augment_params:
-        train_env = AugmentObservationWithBuildingParams(train_env)
-    if norm_obs:
-        train_env = NormalizeObservation(train_env)
+    train_env = _apply_wrappers(
+        train_env,
+        target_obs_size=target_obs_size,
+        augment_params=augment_params,
+        norm_obs=norm_obs,
+    )
 
     # Create single evaluation environment
     eval_env = make_adaptive_dynamics_env(
@@ -165,13 +200,14 @@ def _make_adaptive_dynamics_envs(config: OmegaConf, output_dir: Path):
         eplus_output_dir=str(output_dir / "eval_eplus_outputs"),
         split="test",
         split_indices=None,
+        wandb_prefix="eval",
     )
-
-    # Apply wrappers
-    if augment_params:
-        eval_env = AugmentObservationWithBuildingParams(eval_env)
-    if norm_obs:
-        eval_env = NormalizeObservation(eval_env)
+    eval_env = _apply_wrappers(
+        eval_env,
+        target_obs_size=target_obs_size,
+        augment_params=augment_params,
+        norm_obs=norm_obs,
+    )
 
     return train_env, eval_env
 
@@ -294,11 +330,23 @@ def parameterized_adaptive_dynamics_trainer(config: OmegaConf, output_dir: Path)
         # Set random seed
         set_random_seed(config.seed)
 
+        # Read wrapper config once — used for both training envs and
+        # the post-training benchmark.
+        norm_obs: bool = config.env.normalize_obs
+        augment_params: bool = config.env.get("augment_building_params", True)
+        target_obs_size: int | None = config.env.get("target_obs_size", None)
+
         # Create adaptive dynamics environments
         logger.info(
             "Creating adaptive dynamics environments with building parameter augmentation"
         )
-        train_env, eval_env = _make_adaptive_dynamics_envs(config, output_dir)
+        train_env, eval_env = _make_adaptive_dynamics_envs(
+            config,
+            output_dir,
+            target_obs_size=target_obs_size,
+            augment_params=augment_params,
+            norm_obs=norm_obs,
+        )
 
         # Log observation space info
         logger.info("Observation space shape: %s", train_env.observation_space.shape)
@@ -325,13 +373,42 @@ def parameterized_adaptive_dynamics_trainer(config: OmegaConf, output_dir: Path)
             logger.warning("Could not load best model, using final model for testing")
             best_model = model
 
-        # Test on multiple test buildings
-        logger.info("Testing best model on test split buildings")
-        test_policy(config, best_model, output_dir)
+        # ----------------------------------------------------------
+        # Benchmark on the full test split using AdaptiveDynamicsProblem
+        # ----------------------------------------------------------
+        logger.info("Running adaptive dynamics benchmark on test split")
 
-        # Log test results to WandB
+        cfg_dict_raw = OmegaConf.to_container(config, resolve=True)
+        cfg_dict: dict[str, Any] = (
+            dict(cfg_dict_raw) if isinstance(cfg_dict_raw, dict) else {}
+        )
+        # The benchmark creates raw envs; we must apply the same
+        # wrapper stack so the model sees the expected obs shape.
+        cfg_dict["env"] = dict(cfg_dict.get("env", {}))
+        cfg_dict["env"]["normalize_obs"] = False  # we normalise via wrapper
+
+        problem = AdaptiveDynamicsProblem(
+            split="test",
+            base_config=cfg_dict,
+        )
+        records = problem.run(
+            best_model,
+            output_dir=test_dir,
+            env_wrapper=lambda env: _apply_wrappers(
+                env,
+                target_obs_size=target_obs_size,
+                augment_params=augment_params,
+                norm_obs=norm_obs,
+            ),
+        )
+
         if wandb_run is not None:
-            log_test_dir_graphs_wandb(test_dir)
+            returns: list[float] = [
+                float(r.episode_result.total_reward)
+                for r in records
+                if r.episode_result is not None
+            ]
+            log_returns_to_wandb(returns=returns)
 
         logger.info("=" * 80)
         logger.info("Training and testing complete!")
