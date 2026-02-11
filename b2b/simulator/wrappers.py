@@ -630,7 +630,7 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
                 },
             )
         except Exception as exc:
-            logger.debug("wandb episode log failed: %s", exc)
+            logger.warning("wandb episode log failed: %s", exc)
 
     def _log_building_params(self) -> None:
         """Log the current building's environment parameters to wandb."""
@@ -677,7 +677,7 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
 
             wandb.log(payload)
         except Exception as exc:
-            logger.debug("wandb building-param log failed: %s", exc)
+            logger.warning("wandb building-param log failed: %s", exc)
 
     # ------------------------------------------------------------------
     # gym.Wrapper overrides
