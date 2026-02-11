@@ -20,6 +20,7 @@ import gymnasium as gym
 import wandb
 from omegaconf import OmegaConf
 from stable_baselines3.common.callbacks import CallbackList, EvalCallback
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv
 from wandb.integration.sb3 import WandbCallback
@@ -142,6 +143,7 @@ def _apply_wrappers(
         → PadObservation (if target_obs_size is set)
         → AugmentObservationWithBuildingParams (if augment_params)
         → NormalizeObservation (if norm_obs)
+        → Monitor (SB3 episode tracking for rollout/ metrics)
     """
     if target_obs_size is not None:
         env = PadObservation(env, target_size=target_obs_size)
@@ -149,6 +151,7 @@ def _apply_wrappers(
         env = AugmentObservationWithBuildingParams(env)
     if norm_obs:
         env = NormalizeObservation(env)
+    env = Monitor(env)
     return env
 
 
@@ -363,7 +366,9 @@ def parameterized_adaptive_dynamics_trainer(config: OmegaConf, output_dir: Path)
     logger.info("Output directory: %s", output_dir)
 
     # Initialize WandB
-    wandb_run, started_here = init_wandb_from_config(config, run_dir=output_dir)
+    wandb_run, started_here = init_wandb_from_config(
+        config, run_dir=output_dir, sync_tensorboard=True
+    )
 
     try:
         # Prepare IO dirs

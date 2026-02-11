@@ -22,6 +22,7 @@ import gymnasium as gym
 import wandb
 from omegaconf import OmegaConf
 from stable_baselines3.common.callbacks import CallbackList, EvalCallback
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv
 from wandb.integration.sb3 import WandbCallback
@@ -87,6 +88,7 @@ def _make_envs(
     def _wrap(env: gym.Env) -> gym.Env:
         if norm_obs:
             env = NormalizeObservation(env)
+        env = Monitor(env)
         return env
 
     def _make_train() -> gym.Env:
