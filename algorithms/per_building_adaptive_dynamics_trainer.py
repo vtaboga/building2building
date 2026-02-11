@@ -229,7 +229,7 @@ def per_building_adaptive_dynamics_trainer(
     # Tag the wandb run with the building index for easy filtering.
     extra_tags = [f"split={split}", f"building_{split_index}"]
     wandb_run, started_here = init_wandb_from_config(
-        config, run_dir=output_dir, extra_tags=extra_tags
+        config, run_dir=output_dir, extra_tags=extra_tags, sync_tensorboard=True
     )
 
     try:
