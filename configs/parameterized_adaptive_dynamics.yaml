@@ -13,7 +13,7 @@ training:
   # Number of parallel training environments.  Each env independently
   # resamples buildings, so PPO's rollout buffer contains diverse building
   # experiences before each policy update.
-  num_train_envs: 4
+  num_train_envs: 8
 
 # Environment configuration
 env:
