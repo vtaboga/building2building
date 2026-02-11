@@ -429,6 +429,7 @@ SELECT ?fan WHERE {
 
     return obj, new_actuators
 
+
 '''def make_waterheater_controllable(
     obj: dict[str, Any],
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
@@ -442,19 +443,20 @@ SELECT ?fan WHERE {
      binary_stl = create_onoff_availability_stl(obj, name="baseboard availibility")
 '''
 
+
 def make_waterheater_controllable(
     obj: dict[str, Any],
     *,
     gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all waterheaters and for each of those, expose the availibility
-        schedue as a schedule that can be controlled."""
+    schedue as a schedule that can be controlled."""
 
     obj = deepcopy(obj)
     gensym = Gensym() if gensym is None else gensym
 
     ont = Ontology.from_object(obj)
-    
+
     # Water heater setpoints are typically higher than space HVAC setpoints.
     # Align ScheduleTypeLimits bounds with the actuator bounds to avoid E+ fatal
     # errors during ProcessScheduleInput.
@@ -466,7 +468,7 @@ def make_waterheater_controllable(
         upper_limit_value=70.0,
     )
 
-    # SPARQL query for Water Heaters 
+    # SPARQL query for Water Heaters
     all_waterheaters_query = """# -*- mode: sparql -*-
     SELECT ?wh WHERE {
       ?wh a "WaterHeater:Mixed" .
@@ -478,7 +480,7 @@ def make_waterheater_controllable(
         wh_name = str(wh_id)
         wh_entry = obj["WaterHeater:Mixed"][wh_name]
 
-        # Create a new controllable schedule for the setpoint 
+        # Create a new controllable schedule for the setpoint
         sched_name = create_schedule_constant(
             obj,
             temp_stl_name,
@@ -486,22 +488,23 @@ def make_waterheater_controllable(
             name=f"controllable setpoint for {wh_name}",
             gensym=gensym,
         )
-        
-        # Override the original schedule 
+
+        # Override the original schedule
         wh_entry["setpoint_temperature_schedule_name"] = sched_name
 
         new_actuators.append(
             ActuatorDescription(
-                component_type="WaterHeater",
-                control_type="Setpoint Temperature",
+                component_type="Schedule:Constant",
+                control_type="Schedule Value",
                 component_name=sched_name,
                 units="Temperature",
-                lower_bound=10.0,
-                upper_bound=80.0,
+                lower_bound=40.0,
+                upper_bound=70.0,
             )
         )
 
     return obj, new_actuators
+
 
 def make_pump_controllable(
     obj: dict[str, Any],
@@ -509,13 +512,13 @@ def make_pump_controllable(
     gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all Pump:ConstantSpeed and for each of those, expose the availibility
-        schedue as a schedule that can be controlled."""
-    
+    schedue as a schedule that can be controlled."""
+
     obj = deepcopy(obj)
     gensym = Gensym() if gensym is None else gensym
 
     new_actuators = []
-    
+
     ont = Ontology.from_object(obj)
 
     binary_stl = create_onoff_availability_stl(
@@ -540,8 +543,12 @@ def make_pump_controllable(
         )
 
         # Set the pump to use this new schedule (Adding field if not present)
-        obj["Pump:ConstantSpeed"][pump_name]["pump_scheduling_control_scheme"] = "Schedule"
-        obj["Pump:ConstantSpeed"][pump_name]["availability_schedule_name"] = new_schedule_name
+        obj["Pump:ConstantSpeed"][pump_name][
+            "pump_scheduling_control_scheme"
+        ] = "Schedule"
+        obj["Pump:ConstantSpeed"][pump_name][
+            "availability_schedule_name"
+        ] = new_schedule_name
 
         new_actuators.append(
             ActuatorDescription(
@@ -556,22 +563,25 @@ def make_pump_controllable(
 
     return obj, new_actuators
 
+
 def make_airterminal_controllable(
-    obj: dict[str, Any],    
+    obj: dict[str, Any],
     *,
     gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all ConstantVolume:NoReheat Air Terminals and for each of those, expose the availibility
-        schedue as a schedule that can be controlled."""
-    
+    schedue as a schedule that can be controlled."""
+
     obj = deepcopy(obj)
     gensym = Gensym() if gensym is None else gensym
 
     new_actuators = []
-    
+
     ont = Ontology.from_object(obj)
 
-    binary_stl = create_onoff_availability_stl(obj, name="terminal availability stl", gensym=gensym)
+    binary_stl = create_onoff_availability_stl(
+        obj, name="terminal availability stl", gensym=gensym
+    )
 
     terminal_query = """# -*- mode: sparql -*-
     SELECT ?terminal WHERE {
@@ -605,19 +615,20 @@ def make_airterminal_controllable(
 
     return obj, new_actuators
 
+
 def make_controller_outdoorair_controllable(
     obj: dict[str, Any],
     *,
     gensym: Gensym | None = None,
 ) -> tuple[dict[str, Any], list[ActuatorDescription]]:
     """Find all Controller:OutdoorAir and for each of those, expose the availibility
-        schedue as a schedule that can be controlled."""
-     
+    schedue as a schedule that can be controlled."""
+
     obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym 
+    gensym = Gensym() if gensym is None else gensym
 
     new_actuators = []
-    
+
     ont = Ontology.from_object(obj)
 
     fraction_stl = obj.get("ScheduleTypeLimits", {}).get("Fraction", None)
@@ -663,21 +674,24 @@ def make_controller_outdoorair_controllable(
 
     return obj, new_actuators
 
+
 def make_controllable(
     input_epjson: Realizable,
     *,
-    controls: Sequence[
-        Literal[
-            "unitary_hvac",
-            "baseboard",
-            "fanonoff",
-            "waterheater",
-            "pump",
-            "airterminal",
-            "controller_outdoorair",
+    controls: (
+        Sequence[
+            Literal[
+                "unitary_hvac",
+                "baseboard",
+                "fanonoff",
+                "waterheater",
+                "pump",
+                "airterminal",
+                "controller_outdoorair",
+            ]
         ]
-    ]
-    | None = None,
+        | None
+    ) = None,
 ) -> Expression[tuple[Path, list[ActuatorDescription]]]:
     # By default, we enable all controls.
     # Keep the controls argument for backwards compatibility until code is stable
