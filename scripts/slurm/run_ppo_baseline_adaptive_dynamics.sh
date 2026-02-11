@@ -3,9 +3,9 @@
 #SBATCH --output=logs/ppo_baseline_adaptive_%j.out
 #SBATCH --error=logs/ppo_baseline_adaptive_%j.err
 #SBATCH --time=24:00:00
-#SBATCH --mem=32G
+#SBATCH --mem=48G
+#SBATCH --partition=long-cpu
 #SBATCH --cpus-per-task=8
-#SBATCH --gres=gpu:1
 
 # Baseline PPO training on adaptive dynamics benchmark
 # Same as parameterized variant but WITHOUT building parameter augmentation.
@@ -15,7 +15,6 @@
 
 # Load modules
 module load python/3.10
-module load cuda/11.8
 
 # Activate conda environment
 source $HOME/miniconda3/etc/profile.d/conda.sh

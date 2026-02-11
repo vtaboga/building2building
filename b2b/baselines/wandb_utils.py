@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
 
 import pandas as pd
 from omegaconf import OmegaConf
@@ -49,6 +49,7 @@ def init_wandb_from_config(
     save_code: bool = True,
     log_code_root: Path | None = None,
     sync_tensorboard: bool | None = None,
+    extra_tags: Sequence[str] | None = None,
 ) -> tuple[object | None, bool]:
     """
     Initialize a W&B run if `cfg` contains a `wandb` section.
@@ -77,8 +78,9 @@ def init_wandb_from_config(
     entity = getattr(wandb_cfg, "entity", None)
     tags = getattr(wandb_cfg, "tags", None)
     user_tags = list(tags) if tags is not None else []
-    extra_tags = _derived_wandb_tags(cfg)
-    merged_tags = [str(t) for t in (user_tags + extra_tags) if str(t).strip()]
+    derived_tags = _derived_wandb_tags(cfg)
+    extra_tags_list = list(extra_tags) if extra_tags else []
+    merged_tags = [str(t) for t in (user_tags + derived_tags + extra_tags_list) if str(t).strip()]
 
     # `cfg` is typically an OmegaConf/DictConfig, but keep this helper usable
     # with plain dicts / objects in scripts.
@@ -193,4 +195,3 @@ def wandb_log_xy_series(
         wandb.log({key: chart})
     except Exception as e:
         logger.warning("wandb logging failed for %s: %s", key, e)
-

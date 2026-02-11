@@ -7,6 +7,7 @@ This trainer:
 3. Uses building parameter augmentation for generalization
 """
 
+import gc
 import importlib
 import inspect
 import logging
@@ -424,6 +425,21 @@ def parameterized_adaptive_dynamics_trainer(config: OmegaConf, output_dir: Path)
         if best_model is None:
             logger.warning("Could not load best model, using final model for testing")
             best_model = model
+
+        # Close training environments to free memory before benchmark.
+        # Each env keeps an EnergyPlus process alive; running the benchmark
+        # with them still open can cause OOM kills.
+        logger.info("Closing training environments to free memory")
+        try:
+            train_env.close()
+        except Exception as exc:
+            logger.warning("Error closing train_env: %s", exc)
+        try:
+            eval_env.close()
+        except Exception as exc:
+            logger.warning("Error closing eval_env: %s", exc)
+        del train_env, eval_env, model
+        gc.collect()
 
         # ----------------------------------------------------------
         # Benchmark on the full test split using AdaptiveDynamicsProblem
