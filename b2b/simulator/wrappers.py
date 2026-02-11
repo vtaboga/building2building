@@ -576,6 +576,7 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         env_factory: Callable[[int], gym.Env],
         available_indices: list[int],
         wandb_prefix: str = "train",
+        log_interval_steps: int = 2048,
     ):
         if not available_indices:
             raise ValueError("available_indices must not be empty")
@@ -584,6 +585,7 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         self._available_indices = list(available_indices)
         self._current_index = random.choice(self._available_indices)
         self._wandb_prefix = wandb_prefix
+        self._log_interval_steps = log_interval_steps
 
         initial_env = env_factory(self._current_index)
         super().__init__(initial_env)
@@ -593,11 +595,14 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         self._episode_steps: int = 0
         self._episode_count: int = 0
         self._has_stepped: bool = False
+        self._total_steps: int = 0
+        self._steps_since_last_log: int = 0
 
         logger.info(
-            "ResampleBuildingOnResetWrapper(%s): %d buildings available",
+            "ResampleBuildingOnResetWrapper(%s): %d buildings available, log_interval=%d",
             wandb_prefix,
             len(self._available_indices),
+            log_interval_steps,
         )
 
     # ------------------------------------------------------------------
@@ -679,6 +684,24 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         except Exception as exc:
             logger.warning("wandb building-param log failed: %s", exc)
 
+    def _log_intermediate_reward(self) -> None:
+        """Log cumulative reward during long episodes (before completion)."""
+        if not self._wandb_is_active():
+            return
+        try:
+            import wandb  # type: ignore[import-untyped]
+
+            p = self._wandb_prefix
+            wandb.log(
+                {
+                    f"{p}/episode/cumulative_reward": self._episode_reward,
+                    f"{p}/episode/current_length": self._episode_steps,
+                    f"{p}/episode/current_number": self._episode_count,
+                },
+            )
+        except Exception as exc:
+            logger.warning("wandb intermediate reward log failed: %s", exc)
+
     # ------------------------------------------------------------------
     # gym.Wrapper overrides
     # ------------------------------------------------------------------
@@ -687,7 +710,15 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         obs, reward, terminated, truncated, info = self.env.step(action)
         self._episode_reward += float(reward)
         self._episode_steps += 1
+        self._total_steps += 1
+        self._steps_since_last_log += 1
         self._has_stepped = True
+
+        # Log intermediate rewards every N steps (for long episodes)
+        if self._steps_since_last_log >= self._log_interval_steps:
+            self._log_intermediate_reward()
+            self._steps_since_last_log = 0
+
         return obs, reward, terminated, truncated, info
 
     def reset(self, **kwargs):  # type: ignore[override]
