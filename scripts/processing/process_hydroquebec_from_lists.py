@@ -194,8 +194,8 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
 
-    # scripts/processing/<this_file>.py -> repo root is two levels up
-    repo_root = Path(__file__).resolve().parents[2]
+    # Assumes this script is executed from the repo root.
+    repo_root = Path.cwd().resolve()
     out_path = Path(args.output)
     if not out_path.is_absolute():
         out_path = (repo_root / out_path).resolve()

@@ -302,8 +302,8 @@ def _load_hq_dataframe_from_zip(zip_path: Path) -> "Any":
 def main() -> None:
     args = _parse_args()
 
-    # scripts/processing/<this_file>.py -> repo root is two levels up
-    repo_root = Path(__file__).resolve().parents[2]
+    # Assumes this script is executed from the repo root.
+    repo_root = Path.cwd().resolve()
     _ensure_outputs_dir(repo_root)
 
     store_path = _require_scratch_store()
