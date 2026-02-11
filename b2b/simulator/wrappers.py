@@ -707,19 +707,33 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
     # ------------------------------------------------------------------
 
     def step(self, action):  # type: ignore[override]
-        obs, reward, terminated, truncated, info = self.env.step(action)
-        self._episode_reward += float(reward)
-        self._episode_steps += 1
-        self._total_steps += 1
-        self._steps_since_last_log += 1
-        self._has_stepped = True
+        try:
+            obs, reward, terminated, truncated, info = self.env.step(action)
+            self._episode_reward += float(reward)
+            self._episode_steps += 1
+            self._total_steps += 1
+            self._steps_since_last_log += 1
+            self._has_stepped = True
 
-        # Log intermediate rewards every N steps (for long episodes)
-        if self._steps_since_last_log >= self._log_interval_steps:
-            self._log_intermediate_reward()
-            self._steps_since_last_log = 0
+            # Log intermediate rewards every N steps (for long episodes)
+            if self._steps_since_last_log >= self._log_interval_steps:
+                self._log_intermediate_reward()
+                self._steps_since_last_log = 0
 
-        return obs, reward, terminated, truncated, info
+            return obs, reward, terminated, truncated, info
+
+        except IndexError as exc:
+            # Handle actuator index errors from problematic buildings
+            logger.warning(
+                "IndexError in building %d during step (likely actuator mismatch): %s. "
+                "Resampling new building.",
+                self._current_index,
+                exc,
+            )
+            # Reset to a new building and return a terminal state
+            obs, info = self.reset()
+            # Return terminal state with zero reward to signal episode end
+            return obs, 0.0, True, False, info
 
     def reset(self, **kwargs):  # type: ignore[override]
         """Reset with a newly sampled building."""
