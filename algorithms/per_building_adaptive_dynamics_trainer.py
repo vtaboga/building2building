@@ -130,7 +130,13 @@ def _make_envs(
     *,
     norm_obs: bool,
 ) -> tuple[DummyVecEnv, DummyVecEnv]:
-    """Create train and eval DummyVecEnvs for a single fixed building."""
+    """Create train and eval DummyVecEnvs.
+
+    Train env: Single fixed building (the one being trained on).
+    Eval env: Resamples from all test buildings for fair comparison with parameterized trainer.
+    """
+    from b2b.benchmark.problem_adaptive_dynamics import HydroQuebecRowIdSplits
+    from b2b.simulator.wrappers import ResampleBuildingOnResetWrapper
 
     def _wrap(env: gym.Env) -> gym.Env:
         if norm_obs:
@@ -148,12 +154,32 @@ def _make_envs(
         return _wrap(env)
 
     def _make_eval() -> gym.Env:
+        """Eval env that resamples from all test buildings."""
+        # Load test split indices
+        splits = HydroQuebecRowIdSplits.load_from_action_space_2_zone_1()
+        test_indices = list(range(len(splits.test_row_ids)))
+
+        # Create base env (will be resampled on each reset)
         env = _create_env_for_split_index(
             config,
             str(output_dir / "eval_eplus_outputs"),
-            split,
-            split_index,
+            "test",  # Always eval on test split
+            0,  # Initial index (will be resampled)
         )
+
+        # Wrap with resampling to match parameterized trainer
+        env = ResampleBuildingOnResetWrapper(
+            env,
+            building_pool=test_indices,
+            create_env_fn=lambda idx: _create_env_for_split_index(
+                config,
+                str(output_dir / "eval_eplus_outputs"),
+                "test",
+                idx,
+            ),
+            wandb_prefix="eval",
+        )
+
         return _wrap(env)
 
     raw_train_env = DummyVecEnv([_make_train])
@@ -353,9 +379,10 @@ def per_building_adaptive_dynamics_trainer(
         gc.collect()
 
         # ----------------------------------------------------------
-        # Benchmark on this single building using AdaptiveDynamicsProblem
+        # Benchmark on ALL test buildings using AdaptiveDynamicsProblem
+        # (same as parameterized trainer for fair comparison)
         # ----------------------------------------------------------
-        logger.info("Running benchmark on building %d", split_index)
+        logger.info("Running benchmark on all 100 test buildings")
 
         cfg_dict_raw = OmegaConf.to_container(config, resolve=True)
         cfg_dict: dict[str, Any] = (
@@ -370,9 +397,9 @@ def per_building_adaptive_dynamics_trainer(
             return env
 
         problem = AdaptiveDynamicsProblem(
-            split=split,
-            start=split_index,
-            limit=1,
+            split="test",  # Always evaluate on test split
+            start=0,  # Start from first test building
+            limit=0,  # 0 means all buildings in the split
             base_config=cfg_dict,
         )
         records = problem.run(
@@ -390,7 +417,10 @@ def per_building_adaptive_dynamics_trainer(
             log_returns_to_wandb(returns=returns)
 
         logger.info("=" * 80)
-        logger.info("Training and testing complete for building %d!", split_index)
+        logger.info(
+            "Training and testing complete for building %d! (Evaluated on all 100 test buildings)",
+            split_index,
+        )
         logger.info("=" * 80)
 
     finally:
