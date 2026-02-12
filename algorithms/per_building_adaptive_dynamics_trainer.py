@@ -159,24 +159,19 @@ def _make_envs(
         splits = HydroQuebecRowIdSplits.load_from_action_space_2_zone_1()
         test_indices = list(range(len(splits.test_row_ids)))
 
-        # Create base env (will be resampled on each reset)
-        env = _create_env_for_split_index(
-            config,
-            str(output_dir / "eval_eplus_outputs"),
-            "test",  # Always eval on test split
-            0,  # Initial index (will be resampled)
-        )
-
-        # Wrap with resampling to match parameterized trainer
-        env = ResampleBuildingOnResetWrapper(
-            env,
-            building_pool=test_indices,
-            create_env_fn=lambda idx: _create_env_for_split_index(
+        # Factory function to create env for a given test split index
+        def env_factory(idx: int) -> gym.Env:
+            return _create_env_for_split_index(
                 config,
                 str(output_dir / "eval_eplus_outputs"),
                 "test",
                 idx,
-            ),
+            )
+
+        # Wrap with resampling to match parameterized trainer
+        env = ResampleBuildingOnResetWrapper(
+            env_factory=env_factory,
+            available_indices=test_indices,
             wandb_prefix="eval",
         )
 
