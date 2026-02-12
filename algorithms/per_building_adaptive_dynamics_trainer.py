@@ -130,13 +130,14 @@ def _make_envs(
     *,
     norm_obs: bool,
 ) -> tuple[DummyVecEnv, DummyVecEnv]:
-    """Create train and eval DummyVecEnvs.
+    """Create train and eval DummyVecEnvs for a single fixed building.
 
-    Train env: Single fixed building (the one being trained on).
-    Eval env: Resamples from all test buildings for fair comparison with parameterized trainer.
+    Both train and eval use the SAME building (the one being trained on).
+    This is correct for per-building training: we want to see how well the
+    specialist performs on its own building during training.
+
+    The final evaluation (after training) will test on all 100 test buildings.
     """
-    from b2b.utils import HydroQuebecRowIdSplits
-    from b2b.simulator.wrappers import ResampleBuildingOnResetWrapper
 
     def _wrap(env: gym.Env) -> gym.Env:
         if norm_obs:
@@ -154,27 +155,12 @@ def _make_envs(
         return _wrap(env)
 
     def _make_eval() -> gym.Env:
-        """Eval env that resamples from all test buildings."""
-        # Load test split indices
-        splits = HydroQuebecRowIdSplits.load_from_action_space_2_zone_1()
-        test_indices = list(range(len(splits.test_row_ids)))
-
-        # Factory function to create env for a given test split index
-        def env_factory(idx: int) -> gym.Env:
-            return _create_env_for_split_index(
-                config,
-                str(output_dir / "eval_eplus_outputs"),
-                "test",
-                idx,
-            )
-
-        # Wrap with resampling to match parameterized trainer
-        env = ResampleBuildingOnResetWrapper(
-            env_factory=env_factory,
-            available_indices=test_indices,
-            wandb_prefix="eval",
+        env = _create_env_for_split_index(
+            config,
+            str(output_dir / "eval_eplus_outputs"),
+            split,
+            split_index,
         )
-
         return _wrap(env)
 
     raw_train_env = DummyVecEnv([_make_train])
