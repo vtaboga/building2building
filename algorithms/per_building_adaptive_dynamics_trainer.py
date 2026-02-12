@@ -19,9 +19,10 @@ from pathlib import Path
 from typing import Any, Literal
 
 import gymnasium as gym
+import numpy as np
 import wandb
 from omegaconf import OmegaConf
-from stable_baselines3.common.callbacks import CallbackList, EvalCallback
+from stable_baselines3.common.callbacks import BaseCallback, CallbackList, EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
@@ -34,6 +35,52 @@ from b2b.make_env import make_env
 from b2b.simulator.wrappers import NormalizeObservation
 
 logger = logging.getLogger(__name__)
+
+
+class EvalHistogramCallback(BaseCallback):
+    """Log eval reward histogram to wandb after each evaluation."""
+
+    def __init__(self, eval_callback: EvalCallback, verbose: int = 0):
+        super().__init__(verbose)
+        self.eval_callback = eval_callback
+        self._last_eval_timestep = 0
+
+    def _on_step(self) -> bool:
+        # Check if EvalCallback just ran an evaluation
+        if (
+            len(self.eval_callback.evaluations_timesteps) > 0
+            and self.eval_callback.evaluations_timesteps[-1] > self._last_eval_timestep
+        ):
+            # New evaluation just completed
+            self._last_eval_timestep = self.eval_callback.evaluations_timesteps[-1]
+
+            # Get the most recent eval episode rewards
+            if len(self.eval_callback.evaluations_results) > 0:
+                episode_rewards = self.eval_callback.evaluations_results[-1]
+
+                # Log histogram to wandb
+                if wandb.run is not None:
+                    wandb.log(
+                        {
+                            "eval/reward_histogram": wandb.Histogram(episode_rewards),
+                            "eval/reward_mean": np.mean(episode_rewards),
+                            "eval/reward_std": np.std(episode_rewards),
+                            "eval/reward_min": np.min(episode_rewards),
+                            "eval/reward_max": np.max(episode_rewards),
+                        },
+                        step=self.num_timesteps,
+                    )
+
+                    if self.verbose >= 1:
+                        logger.info(
+                            "Eval histogram logged: mean=%.2f, std=%.2f, min=%.2f, max=%.2f",
+                            np.mean(episode_rewards),
+                            np.std(episode_rewards),
+                            np.min(episode_rewards),
+                            np.max(episode_rewards),
+                        )
+
+        return True
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +190,10 @@ def _make_callbacks(
         n_eval_episodes=config.training.eval_episodes,
         deterministic=True,
     )
-    return CallbackList([eval_cb, wandb_cb])
+    # Add histogram logging callback
+    eval_histogram_cb = EvalHistogramCallback(eval_cb, verbose=1)
+
+    return CallbackList([eval_cb, eval_histogram_cb, wandb_cb])
 
 
 def _build_sb3_model(config: OmegaConf, train_env: DummyVecEnv, tb_dir: Path):
