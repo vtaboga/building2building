@@ -1,5 +1,5 @@
 total_timesteps: 1000000
 eval_freq: 262144
-eval_episodes: 10
+eval_episodes: 20
 num_train_envs: 4
 cb_gradient_save_freq: 500

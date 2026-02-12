@@ -135,7 +135,7 @@ def _make_envs(
     Train env: Single fixed building (the one being trained on).
     Eval env: Resamples from all test buildings for fair comparison with parameterized trainer.
     """
-    from b2b.benchmark.problem_adaptive_dynamics import HydroQuebecRowIdSplits
+    from b2b.utils import HydroQuebecRowIdSplits
     from b2b.simulator.wrappers import ResampleBuildingOnResetWrapper
 
     def _wrap(env: gym.Env) -> gym.Env:
