@@ -6,10 +6,10 @@ device: "cpu"  # Set to "cuda" if GPU available
 
 # PPO-specific hyperparameters
 # These are tuned for the augmented observation space
-n_steps: 2048
+n_steps: 16384
 batch_size: 64
 n_epochs: 10
-gamma: 0.99
+gamma: 0.95
 learning_rate: 0.0003
 clip_range: 0.2
 ent_coef: 0.01  # Slightly higher entropy for exploration across buildings

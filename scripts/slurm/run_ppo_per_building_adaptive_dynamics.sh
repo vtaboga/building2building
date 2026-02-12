@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=per_bldg_ppo
-#SBATCH --array=0-2
+#SBATCH --array=0-10
 #SBATCH --output=logs/per_building_ppo_test_%a.out
 #SBATCH --error=logs/per_building_ppo_test_%a.err
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 #SBATCH --mem=48G
 #SBATCH --cpus-per-task=8
 #SBATCH --partition=long-cpu

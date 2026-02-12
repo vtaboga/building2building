@@ -24,7 +24,7 @@ from omegaconf import OmegaConf
 from stable_baselines3.common.callbacks import CallbackList, EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from wandb.integration.sb3 import WandbCallback
 
 from b2b.baselines.wandb_utils import init_wandb_from_config
@@ -109,8 +109,16 @@ def _make_envs(
         )
         return _wrap(env)
 
-    train_env = DummyVecEnv([_make_train])
-    eval_env = DummyVecEnv([_make_eval])
+    raw_train_env = DummyVecEnv([_make_train])
+    raw_eval_env = DummyVecEnv([_make_eval])
+
+    # Wrap with VecNormalize for reward normalization only.
+    # Observation normalization is already handled by NormalizeObservation.
+    train_env = VecNormalize(raw_train_env, norm_obs=False, norm_reward=True)
+    eval_env = VecNormalize(
+        raw_eval_env, norm_obs=False, norm_reward=True, training=False
+    )
+
     return train_env, eval_env
 
 
