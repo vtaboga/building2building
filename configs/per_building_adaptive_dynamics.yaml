@@ -38,6 +38,10 @@ split_index: 0
 
 seed: 42
 
+# SLURM array job ID for grouping runs from the same batch
+# Set via CLI: slurm_array_job_id="${SLURM_ARRAY_JOB_ID}"
+slurm_array_job_id: "none"
+
 hydra:
   run:
     dir: outputs/per_building_adaptive_dynamics/${policy.algorithm}/${now:%d-%m-%Y}/${now:%H-%M-%S}/building_${split_index}

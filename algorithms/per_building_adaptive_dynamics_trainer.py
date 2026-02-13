@@ -293,11 +293,27 @@ def per_building_adaptive_dynamics_trainer(
     logger.info("=" * 80)
     logger.info("Output directory: %s", output_dir)
 
-    # Tag the wandb run with the building index for easy filtering.
+    # Tag the wandb run with the building index and batch ID for easy filtering.
     extra_tags = [f"split={split}", f"building_{split_index}"]
+
+    # Add SLURM array job ID as a tag if available (for grouping runs from same batch)
+    slurm_array_job_id = str(config.get("slurm_array_job_id", "none"))
+    if slurm_array_job_id != "none":
+        extra_tags.append(f"batch={slurm_array_job_id}")
+        logger.info("SLURM array job ID: %s", slurm_array_job_id)
+
     wandb_run, started_here = init_wandb_from_config(
         config, run_dir=output_dir, extra_tags=extra_tags, sync_tensorboard=True
     )
+
+    # Add batch ID to wandb config for easy filtering/grouping
+    if wandb_run is not None and slurm_array_job_id != "none":
+        try:
+            wandb_run.config.update(
+                {"slurm_array_job_id": slurm_array_job_id}, allow_val_change=True
+            )
+        except Exception as e:
+            logger.warning("Failed to update wandb config with batch ID: %s", e)
 
     try:
         # Prepare IO dirs

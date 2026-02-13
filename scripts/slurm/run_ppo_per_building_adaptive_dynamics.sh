@@ -36,12 +36,14 @@ echo "Per-Building PPO | test split | building ${SLURM_ARRAY_TASK_ID}"
 echo "=========================================="
 
 # Run training for this building
+# Pass SLURM_ARRAY_JOB_ID so all runs from this batch can be grouped in wandb
 python -m scripts.per_building_adaptive_dynamics_main \
     split=test \
     split_index="${SLURM_ARRAY_TASK_ID}" \
     seed=42 \
     training.total_timesteps=1000000 \
-    wandb.project=building2building
+    wandb.project=building2building \
+    slurm_array_job_id="${SLURM_ARRAY_JOB_ID:-none}"
 
 echo "Training complete for building ${SLURM_ARRAY_TASK_ID}!"
 
