@@ -29,7 +29,7 @@ mkdir -p logs
 python -m scripts.parameterized_adaptive_dynamics_main \
     seed=42 \
     training.total_timesteps=1000000 \
-    training.eval_freq=10000 \
+    training.eval_freq=262144 \
     wandb.project=building2building
 
 echo "Training complete!"

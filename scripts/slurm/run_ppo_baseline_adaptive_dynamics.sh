@@ -4,7 +4,7 @@
 #SBATCH --error=logs/ppo_baseline_adaptive_%j.err
 #SBATCH --time=24:00:00
 #SBATCH --mem=48G
-#SBATCH --partition=long-cpu
+#SBATCH --partition=main-cpu
 #SBATCH --cpus-per-task=8
 
 # Baseline PPO training on adaptive dynamics benchmark
@@ -31,7 +31,7 @@ mkdir -p logs
 python -m scripts.baseline_adaptive_dynamics_main \
     seed=42 \
     training.total_timesteps=1000000 \
-    training.eval_freq=10000 \
+    training.eval_freq=262144 \
     wandb.project=building2building
 
 echo "Training complete!"
