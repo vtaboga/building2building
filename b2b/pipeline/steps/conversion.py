@@ -6,8 +6,6 @@ import tempfile
 from pathlib import Path
 from typing import Literal, TypeAlias
 
-from pandas import DataFrame
-
 from b2b.env import STORE_PATH
 from b2b.pipeline.common import chdir
 from b2b.store import (
@@ -19,6 +17,7 @@ from b2b.store import (
     expression,
     realize,
 )
+from pandas import DataFrame
 
 logger = logging.getLogger(__name__)
 
@@ -94,10 +93,10 @@ def ConvertIDF(input: Path, converter: Path):
             cwd=temp,
         )
 
-        if result.stderr:
-            print(result.stderr)
         if result.stdout:
-            print(result.stdout)
+            logger.debug(f"conversion output: {result.stdout}")
+        if result.stderr:
+            logger.warning(f"conversion errors: {result.stderr}")
 
         if not temp_epjson_path.exists():
             raise Exception("failed to convert idf to json")
