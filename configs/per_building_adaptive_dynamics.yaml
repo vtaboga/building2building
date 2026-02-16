@@ -42,7 +42,9 @@ seed: 42
 # Set via CLI: slurm_array_job_id="${SLURM_ARRAY_JOB_ID}"
 slurm_array_job_id: "none"
 
+# Hydra output directory configuration
+# Use $SCRATCH to avoid disk quota issues on $HOME
 hydra:
   run:
-    dir: outputs/per_building_adaptive_dynamics/${policy.algorithm}/${now:%d-%m-%Y}/${now:%H-%M-%S}/building_${split_index}
+    dir: ${oc.env:SCRATCH}/Building2Building/outputs/per_building_adaptive_dynamics/${policy.algorithm}/${now:%d-%m-%Y}/${now:%H-%M-%S}/building_${split_index}
 

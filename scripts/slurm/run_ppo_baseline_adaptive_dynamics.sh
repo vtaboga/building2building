@@ -4,7 +4,7 @@
 #SBATCH --error=logs/ppo_baseline_adaptive_%j.err
 #SBATCH --time=24:00:00
 #SBATCH --mem=48G
-#SBATCH --partition=main-cpu
+#SBATCH --partition=long-cpu
 #SBATCH --cpus-per-task=8
 
 # Baseline PPO training on adaptive dynamics benchmark

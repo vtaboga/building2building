@@ -41,7 +41,8 @@ bldg:
 seed: 42
 
 # Hydra output directory configuration
+# Use $SCRATCH to avoid disk quota issues on $HOME
 hydra:
   run:
-    dir: outputs/baseline_adaptive_dynamics/${policy.algorithm}/${now:%d-%m-%Y}/${now:%H-%M-%S}
+    dir: ${oc.env:SCRATCH}/Building2Building/outputs/baseline_adaptive_dynamics/${policy.algorithm}/${now:%d-%m-%Y}/${now:%H-%M-%S}
 
