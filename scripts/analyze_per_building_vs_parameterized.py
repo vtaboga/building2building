@@ -121,8 +121,6 @@ def extract_per_building_rewards(run: Any) -> dict[int, float] | None:
     For parameterized runs, we need to fetch the full evaluation results.
     """
     try:
-        # For now, we'll use the summary stats
-        # TODO: Fetch detailed per-building results from artifacts/history
         summary = run.summary
         split_index = run.config.get("split_index")
 
@@ -136,6 +134,81 @@ def extract_per_building_rewards(run: Any) -> dict[int, float] | None:
     except Exception as e:
         logger.warning(f"Failed to extract per-building rewards from run {run.id}: {e}")
         return None
+
+
+def fetch_per_building_results_from_jsonl(run: Any) -> dict[int, float] | None:
+    """
+    Fetch detailed per-building results from the adaptive_dynamics_results.jsonl file.
+
+    This file is saved locally during evaluation but may not be uploaded to wandb.
+    We'll try to fetch it from wandb artifacts first, then from files.
+    """
+    try:
+        import wandb
+        import json
+
+        # Try to fetch from wandb artifacts
+        try:
+            artifacts = run.logged_artifacts()
+            for artifact in artifacts:
+                if (
+                    "adaptive_dynamics_results" in artifact.name
+                    or "test" in artifact.name
+                ):
+                    logger.info(f"Found artifact: {artifact.name}")
+                    artifact_dir = artifact.download()
+                    jsonl_path = Path(artifact_dir) / "adaptive_dynamics_results.jsonl"
+                    if jsonl_path.exists():
+                        logger.info(f"Loading results from artifact: {jsonl_path}")
+                        return _parse_jsonl_results(jsonl_path)
+        except Exception as e:
+            logger.debug(f"Could not fetch from artifacts: {e}")
+
+        # Try to fetch from files (if run has files uploaded)
+        try:
+            files = run.files()
+            for file in files:
+                if "adaptive_dynamics_results.jsonl" in file.name:
+                    logger.info(f"Found file: {file.name}")
+                    file.download(replace=True)
+                    jsonl_path = Path(file.name)
+                    if jsonl_path.exists():
+                        logger.info(f"Loading results from file: {jsonl_path}")
+                        return _parse_jsonl_results(jsonl_path)
+        except Exception as e:
+            logger.debug(f"Could not fetch from files: {e}")
+
+        logger.warning(
+            f"Could not find adaptive_dynamics_results.jsonl for run {run.id}. "
+            "The file may not have been uploaded to wandb."
+        )
+        return None
+
+    except Exception as e:
+        logger.warning(f"Failed to fetch per-building results from run {run.id}: {e}")
+        return None
+
+
+def _parse_jsonl_results(jsonl_path: Path) -> dict[int, float]:
+    """Parse the adaptive_dynamics_results.jsonl file and extract per-building rewards."""
+    import json
+
+    results = {}
+    with open(jsonl_path, "r") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            split_index = record.get("split_index")
+            episode_result = record.get("episode_result")
+
+            if split_index is not None and episode_result is not None:
+                total_reward = episode_result.get("total_reward")
+                if total_reward is not None:
+                    results[int(split_index)] = float(total_reward)
+
+    logger.info(f"Parsed {len(results)} building results from {jsonl_path}")
+    return results
 
 
 def plot_mean_reward_comparison(
@@ -371,11 +444,30 @@ def main():
 
     # Plot 3: Per-building comparison (if we have parameterized per-building data)
     if parameterized_run and per_building_rewards_map:
-        # TODO: Fetch detailed per-building results from parameterized run
-        logger.warning(
-            "Per-building comparison requires fetching detailed evaluation results. "
-            "This feature is not yet implemented."
+        logger.info(
+            "Attempting to fetch detailed per-building results from parameterized run..."
         )
+        parameterized_per_building = fetch_per_building_results_from_jsonl(
+            parameterized_run
+        )
+
+        if parameterized_per_building:
+            plot_per_building_comparison(
+                parameterized_per_building,
+                per_building_rewards_map,
+                args.output_dir / "per_building_comparison.png",
+            )
+        else:
+            logger.warning(
+                "Could not fetch detailed per-building results from parameterized run. "
+                "Skipping per-building comparison plot. "
+                "\n\nTo enable this plot, you need to upload the test results to wandb. "
+                "Add this to the trainer after problem.run():\n"
+                "    if wandb_run:\n"
+                "        artifact = wandb.Artifact('test_results', type='evaluation')\n"
+                "        artifact.add_file(str(test_dir / 'adaptive_dynamics_results.jsonl'))\n"
+                "        wandb_run.log_artifact(artifact)"
+            )
 
     logger.info("Analysis complete!")
 

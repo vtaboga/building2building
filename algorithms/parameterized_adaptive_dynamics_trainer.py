@@ -540,6 +540,21 @@ def parameterized_adaptive_dynamics_trainer(config: OmegaConf, output_dir: Path)
             ]
             log_returns_to_wandb(returns=returns)
 
+            # Upload detailed per-building results to wandb for analysis
+            jsonl_path = test_dir / "adaptive_dynamics_results.jsonl"
+            if jsonl_path.exists():
+                try:
+                    artifact = wandb.Artifact(
+                        name="test_results",
+                        type="evaluation",
+                        description="Detailed per-building evaluation results",
+                    )
+                    artifact.add_file(str(jsonl_path))
+                    wandb_run.log_artifact(artifact)
+                    logger.info("Uploaded test results to wandb artifact")
+                except Exception as e:
+                    logger.warning("Failed to upload test results artifact: %s", e)
+
         logger.info("=" * 80)
         logger.info("Training and testing complete!")
         logger.info("=" * 80)
