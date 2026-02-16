@@ -34,23 +34,40 @@ description_path = "data/tables/base_archetype_description.csv"
 
 
 def housing_archetypes_database() -> Derivation:
+    # Some of the files that are in the table are not present in the repo
+    # itself. This is the case, for instance, for the ERS-EX-10160 file. To
+    # ensure the database is well-formed, we verify each file
+
     @derivation("index.parquet")
     def index(root: Path):
         output = OUTPUT.get()
 
         df = duckdb.from_csv_auto(str(root / description_path)).to_df()
 
-        def trans(name: str) -> str:
-            p = root / idf_path / name
+        def trans(name: str) -> str | None:
+            # The names we find in the csv look like this:
+            #
+            # ERS-EX-10000.H2K
+            #
+            # To find the corresponding filename, we need to change the
+            # extension to .idf and to add -in to the name.
 
-            return str(p.with_stem(p.stem + "-in").with_suffix(".idf"))
+            p = root / idf_path / name
+            p = p.with_suffix(".idf")
+            p = p.with_stem(p.stem + "-in")
+            if p.exists():
+                return str(p)
+            else:
+                return None
 
         df = df.assign(filepath=df.filename.apply(trans))
-
+        # Some filenames are missing (don't exist). Let's remove them
+        df = df.dropna(subset=["filepath"])
+        df = df.reset_index(drop=True)
+        df["id"] = range(len(df))
         # There are two different ways québec is written. we defer to the one
         # without the accent because it's easier to work with.
         df.loc[df.region == "QUÉBEC", "region"] = "QUEBEC"
-        df = df.reset_index()
         duckdb.from_df(df).to_parquet(str(output))
 
     return index(housing_archetypes())
@@ -87,7 +104,7 @@ def search_config(
     city: str | None = None,
     eplus_output_dir: Path = Path("eplus_out"),
 ) -> BuildingConfig:
-    buildings = search_buildings(index=id, province=province, location=city)
+    buildings = search_buildings(id=id, province=province, location=city)
 
     matching_buildings = buildings.iloc[[0]]
 
