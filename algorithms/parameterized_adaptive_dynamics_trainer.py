@@ -87,6 +87,99 @@ class EvalHistogramCallback(BaseCallback):
         return True
 
 
+class ActionDistributionCallback(BaseCallback):
+    """Log action distribution statistics during rollouts to detect trivial policies."""
+
+    def __init__(self, log_freq: int = 2048, verbose: int = 0):
+        """
+        Args:
+            log_freq: How often to log action statistics (in timesteps)
+            verbose: Verbosity level
+        """
+        super().__init__(verbose)
+        self.log_freq = log_freq
+        self.actions_buffer = []
+        self._last_log_timestep = 0
+
+    def _on_step(self) -> bool:
+        # Collect actions from the current step
+        # For vectorized envs, self.locals contains 'actions' from the last step
+        if "actions" in self.locals:
+            actions = self.locals["actions"]
+            # Convert to numpy array if needed
+            if not isinstance(actions, np.ndarray):
+                actions = np.array(actions)
+            self.actions_buffer.append(actions)
+
+        # Log statistics every log_freq steps
+        if self.num_timesteps - self._last_log_timestep >= self.log_freq:
+            if len(self.actions_buffer) > 0:
+                self._log_action_stats()
+                self.actions_buffer = []
+                self._last_log_timestep = self.num_timesteps
+
+        return True
+
+    def _log_action_stats(self):
+        """Compute and log action distribution statistics."""
+        if len(self.actions_buffer) == 0:
+            return
+
+        # Stack all actions: shape (num_steps, num_envs, action_dim) or (num_steps, action_dim)
+        all_actions = np.array(self.actions_buffer)
+
+        # Flatten to (num_samples, action_dim)
+        if all_actions.ndim == 3:
+            # Vectorized env case: (num_steps, num_envs, action_dim)
+            all_actions = all_actions.reshape(-1, all_actions.shape[-1])
+        elif all_actions.ndim == 2:
+            # Single env case: (num_steps, action_dim)
+            pass
+        else:
+            logger.warning(f"Unexpected action shape: {all_actions.shape}")
+            return
+
+        # Compute statistics per action dimension
+        action_means = np.mean(all_actions, axis=0)
+        action_stds = np.std(all_actions, axis=0)
+        action_mins = np.min(all_actions, axis=0)
+        action_maxs = np.max(all_actions, axis=0)
+
+        # Overall statistics
+        overall_mean = np.mean(all_actions)
+        overall_std = np.std(all_actions)
+
+        # Log to wandb
+        if wandb.run is not None:
+            log_dict = {
+                "rollout/action_mean": overall_mean,
+                "rollout/action_std": overall_std,
+                "rollout/action_mean_of_stds": np.mean(action_stds),
+            }
+
+            # Log per-dimension statistics (for first few dimensions to avoid clutter)
+            max_dims_to_log = min(10, len(action_means))
+            for i in range(max_dims_to_log):
+                log_dict[f"rollout/action_dim_{i}_mean"] = action_means[i]
+                log_dict[f"rollout/action_dim_{i}_std"] = action_stds[i]
+
+            # Log histograms for each action dimension
+            for i in range(max_dims_to_log):
+                log_dict[f"rollout/action_dim_{i}_histogram"] = wandb.Histogram(
+                    all_actions[:, i]
+                )
+
+            wandb.log(log_dict, step=self.num_timesteps)
+
+            if self.verbose >= 1:
+                logger.info(
+                    "Action stats logged: overall_mean=%.3f, overall_std=%.3f, mean_of_stds=%.3f",
+                    overall_mean,
+                    overall_std,
+                    np.mean(action_stds),
+                )
+
+
 def _create_env_for_split_index(
     config, eplus_output_dir: str, split: str, split_index: int
 ):
@@ -335,7 +428,12 @@ def _make_callbacks(config: OmegaConf, eval_env, model_dir: Path, log_dir: Path)
     # Add histogram logging callback
     eval_histogram_cb = EvalHistogramCallback(eval_cb, verbose=1)
 
-    return CallbackList([eval_cb, eval_histogram_cb, wandb_cb])
+    # Add action distribution logging callback
+    # Log every n_steps (same as PPO rollout buffer size)
+    action_log_freq = config.policy.get("n_steps", 2048)
+    action_dist_cb = ActionDistributionCallback(log_freq=action_log_freq, verbose=1)
+
+    return CallbackList([eval_cb, eval_histogram_cb, action_dist_cb, wandb_cb])
 
 
 def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
