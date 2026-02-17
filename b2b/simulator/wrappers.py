@@ -469,7 +469,10 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         return params
 
     def _normalize_params(self, params: dict[str, float]) -> np.ndarray:
-        """Normalize building parameters to reasonable ranges."""
+        """Normalize building parameters to reasonable ranges.
+
+        Logs warnings when values are clipped (outside expected ranges).
+        """
         # Define normalization ranges (min, max) for each parameter
         param_ranges = {
             "area": (50.0, 500.0),  # m² - typical range for buildings
@@ -481,17 +484,84 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         }
 
         normalized = []
+        clipped_params = {}  # Track which params were clipped for logging
+
         for key, value in params.items():
             if key in param_ranges:
                 min_val, max_val = param_ranges[key]
                 # Normalize to [-1, 1]
-                norm_val = 2.0 * (value - min_val) / (max_val - min_val) - 1.0
-                norm_val = np.clip(norm_val, -1.0, 1.0)
+                norm_val_unclipped = 2.0 * (value - min_val) / (max_val - min_val) - 1.0
+                norm_val = np.clip(norm_val_unclipped, -1.0, 1.0)
+
+                # Check if clipping occurred
+                if norm_val != norm_val_unclipped:
+                    clipped_params[key] = {
+                        "value": float(value),
+                        "range": (min_val, max_val),
+                        "normalized_unclipped": float(norm_val_unclipped),
+                        "normalized_clipped": float(norm_val),
+                    }
+                    logger.warning(
+                        "Building parameter %r clipped: value=%.2f outside range [%.2f, %.2f], "
+                        "normalized from %.3f to %.3f",
+                        key,
+                        value,
+                        min_val,
+                        max_val,
+                        norm_val_unclipped,
+                        norm_val,
+                    )
             else:
                 # Unknown parameter, just clip to reasonable range
-                norm_val = np.clip(value / 100.0, -1.0, 1.0)
+                norm_val_unclipped = value / 100.0
+                norm_val = np.clip(norm_val_unclipped, -1.0, 1.0)
+
+                if norm_val != norm_val_unclipped:
+                    clipped_params[key] = {
+                        "value": float(value),
+                        "range": "unknown",
+                        "normalized_unclipped": float(norm_val_unclipped),
+                        "normalized_clipped": float(norm_val),
+                    }
+                    logger.warning(
+                        "Unknown building parameter %r clipped: value=%.2f, "
+                        "normalized from %.3f to %.3f",
+                        key,
+                        value,
+                        norm_val_unclipped,
+                        norm_val,
+                    )
 
             normalized.append(norm_val)
+
+        # Log to Wandb if any parameters were clipped
+        if clipped_params:
+            try:
+                import wandb
+
+                if wandb.run is not None:
+                    # Log each clipped parameter with its details
+                    for param_name, details in clipped_params.items():
+                        wandb.log(
+                            {
+                                f"building_params/clipped_{param_name}_value": details[
+                                    "value"
+                                ],
+                                f"building_params/clipped_{param_name}_normalized": details[
+                                    "normalized_clipped"
+                                ],
+                            },
+                            commit=False,
+                        )
+                    # Log a summary count
+                    wandb.log(
+                        {"building_params/num_clipped_params": len(clipped_params)},
+                        commit=False,
+                    )
+            except ImportError:
+                pass  # Wandb not installed, skip logging
+            except Exception as e:
+                logger.debug("Failed to log clipped params to Wandb: %s", e)
 
         return np.array(normalized, dtype=np.float32)
 
@@ -502,6 +572,9 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         # Re-extract in case the inner env was swapped (e.g. by ResampleBuildingOnResetWrapper)
         self.building_params = self._extract_building_params(self.env)
         self.normalized_params = self._normalize_params(self.building_params)
+
+        # Log building parameters to Wandb on reset (when building changes)
+        self._log_building_params_to_wandb()
 
         # Rebuild observation space in case inner env's obs shape changed
         orig_low = self.env.observation_space.low
@@ -520,6 +593,23 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         )
 
         return self.observation(obs), info
+
+    def _log_building_params_to_wandb(self) -> None:
+        """Log building parameters to Wandb for tracking distributions."""
+        try:
+            import wandb
+
+            if wandb.run is not None:
+                # Log raw building parameter values
+                for param_name, param_value in self.building_params.items():
+                    wandb.log(
+                        {f"building_params/{param_name}": param_value},
+                        commit=False,
+                    )
+        except ImportError:
+            pass  # Wandb not installed, skip logging
+        except Exception as e:
+            logger.debug("Failed to log building params to Wandb: %s", e)
 
     def observation(self, obs: np.ndarray) -> np.ndarray:
         """Augment observation with normalized building parameters."""

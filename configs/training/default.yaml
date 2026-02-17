@@ -3,3 +3,6 @@ eval_freq: 262144
 eval_episodes: 20
 num_train_envs: 4
 cb_gradient_save_freq: 500
+
+# Optional: Number of timesteps to include in trajectory snippet logged after each PPO update
+# trajectory_snippet_length: 10

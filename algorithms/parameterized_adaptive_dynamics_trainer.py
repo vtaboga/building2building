@@ -180,6 +180,116 @@ class ActionDistributionCallback(BaseCallback):
                 )
 
 
+class TrajectorySnippetCallback(BaseCallback):
+    """Log a short trajectory snippet after every PPO update."""
+
+    def __init__(self, snippet_length: int = 10, verbose: int = 0):
+        """
+        Args:
+            snippet_length: Number of timesteps to include in each snippet
+            verbose: Verbosity level
+        """
+        super().__init__(verbose)
+        self.snippet_length = snippet_length
+        self.trajectory_buffer = []
+
+    def _on_step(self) -> bool:
+        """Collect trajectory data during rollout."""
+        # Collect data from the current step
+        if "obs_tensor" in self.locals or "new_obs" in self.locals:
+            obs = self.locals.get("new_obs", self.locals.get("obs_tensor"))
+            actions = self.locals.get("actions")
+            rewards = self.locals.get("rewards")
+            dones = self.locals.get("dones")
+
+            # Store trajectory step (only from first env to keep it simple)
+            if obs is not None and actions is not None and rewards is not None:
+                # For vectorized envs, take first environment
+                if isinstance(obs, np.ndarray) and obs.ndim > 1:
+                    obs = obs[0]
+                if isinstance(actions, np.ndarray) and actions.ndim > 1:
+                    actions = actions[0]
+                if isinstance(rewards, np.ndarray):
+                    rewards = rewards[0] if rewards.ndim > 0 else float(rewards)
+                if isinstance(dones, np.ndarray):
+                    dones = dones[0] if dones.ndim > 0 else bool(dones)
+
+                self.trajectory_buffer.append(
+                    {
+                        "obs": np.array(obs).copy(),
+                        "action": np.array(actions).copy(),
+                        "reward": float(rewards),
+                        "done": bool(dones),
+                    }
+                )
+
+        return True
+
+    def _on_rollout_end(self) -> None:
+        """Log trajectory snippet after PPO update."""
+        if len(self.trajectory_buffer) == 0:
+            return
+
+        # Take the last snippet_length steps
+        snippet = self.trajectory_buffer[-self.snippet_length :]
+
+        if wandb.run is not None:
+            # Create a table for the trajectory snippet
+            columns = ["step", "reward", "done"]
+
+            # Add action columns
+            if len(snippet) > 0 and "action" in snippet[0]:
+                action_dim = len(snippet[0]["action"])
+                for i in range(action_dim):
+                    columns.append(f"action_{i}")
+
+            # Add observation columns (limit to first 10 dims to avoid clutter)
+            if len(snippet) > 0 and "obs" in snippet[0]:
+                obs_dim = min(10, len(snippet[0]["obs"]))
+                for i in range(obs_dim):
+                    columns.append(f"obs_{i}")
+
+            table = wandb.Table(columns=columns)
+
+            for step_idx, step_data in enumerate(snippet):
+                row = [
+                    step_idx,
+                    step_data["reward"],
+                    step_data["done"],
+                ]
+
+                # Add actions
+                for action_val in step_data["action"]:
+                    row.append(float(action_val))
+
+                # Add observations (first 10 dims)
+                obs_to_log = step_data["obs"][:obs_dim]
+                for obs_val in obs_to_log:
+                    row.append(float(obs_val))
+
+                table.add_data(*row)
+
+            wandb.log(
+                {
+                    "trajectory/snippet": table,
+                    "trajectory/snippet_mean_reward": np.mean(
+                        [s["reward"] for s in snippet]
+                    ),
+                },
+                step=self.num_timesteps,
+            )
+
+            if self.verbose >= 1:
+                logger.info(
+                    "Trajectory snippet logged: %d steps, mean_reward=%.3f",
+                    len(snippet),
+                    np.mean([s["reward"] for s in snippet]),
+                )
+
+        # Clear buffer to avoid memory buildup
+        self.trajectory_buffer = []
+
+
 def _create_env_for_split_index(
     config, eplus_output_dir: str, split: str, split_index: int
 ):
@@ -435,7 +545,13 @@ def _make_callbacks(config: OmegaConf, eval_env, model_dir: Path, log_dir: Path)
     action_log_freq = config.policy.get("n_steps", 2048)
     action_dist_cb = ActionDistributionCallback(log_freq=action_log_freq, verbose=1)
 
-    return CallbackList([eval_cb, eval_histogram_cb, action_dist_cb, wandb_cb])
+    # Add trajectory snippet logging callback
+    snippet_length = config.training.get("trajectory_snippet_length", 10)
+    trajectory_cb = TrajectorySnippetCallback(snippet_length=snippet_length, verbose=1)
+
+    return CallbackList(
+        [eval_cb, eval_histogram_cb, action_dist_cb, trajectory_cb, wandb_cb]
+    )
 
 
 def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
