@@ -25,7 +25,7 @@ from omegaconf import OmegaConf
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from wandb.integration.sb3 import WandbCallback
 
 from b2b.baselines.wandb_utils import init_wandb_from_config
@@ -222,14 +222,16 @@ def _make_envs(
     split_index: int,
     *,
     norm_obs: bool,
-) -> tuple[DummyVecEnv, DummyVecEnv]:
-    """Create train and eval DummyVecEnvs for a single fixed building.
+) -> tuple[VecNormalize, VecNormalize]:
+    """Create train and eval vectorized environments for a single fixed building.
 
     Both train and eval use the SAME building (the one being trained on).
     This is correct for per-building training: we want to see how well the
     specialist performs on its own building during training.
 
     The final evaluation (after training) will test on all 100 test buildings.
+
+    Note: Uses DummyVecEnv (not SubprocVecEnv) since there's only 1 environment.
     """
 
     def _wrap(env: gym.Env) -> gym.Env:

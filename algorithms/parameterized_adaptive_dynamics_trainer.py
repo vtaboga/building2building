@@ -23,7 +23,7 @@ from omegaconf import OmegaConf
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from wandb.integration.sb3 import WandbCallback
 
 from b2b.baselines.wandb_utils import init_wandb_from_config
@@ -337,7 +337,7 @@ def _make_adaptive_dynamics_envs(
     target_obs_size: int | None,
     augment_params: bool,
     norm_obs: bool,
-) -> tuple[DummyVecEnv, DummyVecEnv]:
+) -> tuple[VecNormalize, VecNormalize]:
     """Create vectorized training and single evaluation environments.
 
     Training uses ``n_train_envs`` parallel environments (each independently
@@ -384,7 +384,8 @@ def _make_adaptive_dynamics_envs(
             **wrapper_kwargs,
         )
 
-    raw_train_env = DummyVecEnv(
+    # Use SubprocVecEnv for parallel training (runs each env in separate process)
+    raw_train_env = SubprocVecEnv(
         [lambda idx=i: _make_train_env(idx) for i in range(n_train_envs)]
     )
 
@@ -399,6 +400,7 @@ def _make_adaptive_dynamics_envs(
             **wrapper_kwargs,
         )
 
+    # Keep eval as DummyVecEnv (single env, no benefit from multiprocessing)
     raw_eval_env = DummyVecEnv([_make_eval_env])
 
     # Wrap with VecNormalize for reward normalization only.
