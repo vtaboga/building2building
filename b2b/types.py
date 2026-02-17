@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Union
+from typing import Any, Protocol, Sequence, Union
 
 
 @dataclass
@@ -35,6 +35,17 @@ class ActuatorDescription:
     upper_bound: float
 
 
+class Equipment(Protocol):
+    """This protocol is meant to describe what a 'controlled piece of equipment'
+    provides: a set of actuators that we can control (some equipments will
+    provide more than one) and a list of zones this actuator influences.
+
+    """
+
+    def actuator_descriptions(self) -> list[ActuatorDescription]: ...
+    def zones(self) -> list[str]: ...
+
+
 @dataclass
 class BuildingConfig:
     path_to_building: Path
@@ -43,7 +54,7 @@ class BuildingConfig:
     eplus_output_dir: Path
     warmup_phases: int
     area: float
-    hvac_actuators: list[ActuatorDescription]
+    hvac_equipment: Sequence[Equipment]
     # Optional metadata describing the building source/selection (e.g. dataset row id,
     # original IDF filename, weather station, etc.). This is meant for logging/debug.
     source_metadata: dict[str, Any] = field(default_factory=dict)

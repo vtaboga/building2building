@@ -4,7 +4,7 @@ import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Literal, Sequence
 
 import rdflib
 from cattrs import structure, unstructure
@@ -17,7 +17,7 @@ from b2b.store import (
     derivation,
     expression,
 )
-from b2b.types import ActuatorDescription
+from b2b.types import ActuatorDescription, Equipment
 
 
 @dataclass
@@ -96,16 +96,13 @@ def create_schedule_constant(
     return name
 
 
-class Equipment(Protocol):
-    def actuator_descriptions(self) -> list[ActuatorDescription]: ...
-    def zones(self) -> list[str]: ...
-
-
 @dataclass
 class AirloopHVAC:
     zone: str
 
     actuators: list[ActuatorDescription]
+
+    equipment_type: Literal["airloophvac"] = "airloophvac"
 
     def actuator_descriptions(self) -> list[ActuatorDescription]:
         return self.actuators
@@ -273,6 +270,8 @@ WHERE {
 class Baseboard:
     actuator: ActuatorDescription
 
+    equipment_type: Literal["baseboard"] = "baseboard"
+
     def actuator_descriptions(self) -> list[ActuatorDescription]:
         return [self.actuator]
 
@@ -282,7 +281,7 @@ class Baseboard:
 
 def make_baseboard_controllable(
     obj: dict[str, Any],
-) -> tuple[dict[str, Any], list[Baseboard]]:
+) -> tuple[dict[str, Any], Sequence[Baseboard]]:
     """Find all baseboards and for each of those, expose the availibility
     schedue as a schedule that can be controlled."""
 
@@ -331,6 +330,8 @@ SELECT ?baseboard WHERE {
 class FanOnOff:
     actuator: ActuatorDescription
 
+    equipment_type: Literal["fanonoff"] = "fanonoff"
+
     def actuator_descriptions(self) -> list[ActuatorDescription]:
         return [self.actuator]
 
@@ -340,7 +341,7 @@ class FanOnOff:
 
 def make_fanonoff_controllable(
     obj: dict[str, Any],
-) -> tuple[dict[str, Any], list[FanOnOff]]:
+) -> tuple[dict[str, Any], Sequence[FanOnOff]]:
     """Find all Fan:OnOff objects and expose the availability schedule as a
     schedule that can be controlled."""
 
@@ -390,6 +391,8 @@ SELECT ?fan WHERE {
 class WaterHeater:
     actuator: ActuatorDescription
 
+    equipment_type: Literal["waterheater"] = "waterheater"
+
     def actuator_descriptions(self) -> list[ActuatorDescription]:
         return [self.actuator]
 
@@ -399,7 +402,7 @@ class WaterHeater:
 
 def make_waterheater_controllable(
     obj: dict[str, Any],
-) -> tuple[dict[str, Any], list[WaterHeater]]:
+) -> tuple[dict[str, Any], Sequence[WaterHeater]]:
     """Find all waterheaters and for each of those, expose the availibility
     schedue as a schedule that can be controlled."""
 
@@ -455,6 +458,8 @@ def make_waterheater_controllable(
 class Pump:
     actuator: ActuatorDescription
 
+    equipment_type: Literal["pump"] = "pump"
+
     def actuator_descriptions(self) -> list[ActuatorDescription]:
         return [self.actuator]
 
@@ -466,7 +471,7 @@ def make_pump_controllable(
     obj: dict[str, Any],
     *,
     gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
+) -> tuple[dict[str, Any], Sequence[Pump]]:
     """Find all Pump:ConstantSpeed and for each of those, expose the availibility
     schedue as a schedule that can be controlled."""
 
@@ -522,6 +527,8 @@ def make_pump_controllable(
 class AirTerminal:
     actuator: ActuatorDescription
 
+    equipment_type: Literal["airterminal"] = "airterminal"
+
     def actuator_descriptions(self) -> list[ActuatorDescription]:
         return [self.actuator]
 
@@ -531,7 +538,7 @@ class AirTerminal:
 
 def make_airterminal_controllable(
     obj: dict[str, Any],
-) -> tuple[dict[str, Any], list[AirTerminal]]:
+) -> tuple[dict[str, Any], Sequence[AirTerminal]]:
     """Find all ConstantVolume:NoReheat Air Terminals and for each of those, expose the availibility
     schedue as a schedule that can be controlled."""
 
@@ -581,6 +588,8 @@ def make_airterminal_controllable(
 class OutdoorAir:
     actuator: ActuatorDescription
 
+    equipment_type: Literal["outdoorair"] = "outdoorair"
+
     def actuator_descriptions(self) -> list[ActuatorDescription]:
         return [self.actuator]
 
@@ -590,7 +599,7 @@ class OutdoorAir:
 
 def make_controller_outdoorair_controllable(
     obj: dict[str, Any],
-) -> tuple[dict[str, Any], list[OutdoorAir]]:
+) -> tuple[dict[str, Any], Sequence[OutdoorAir]]:
     """Find all Controller:OutdoorAir and for each of those, expose the availibility
     schedue as a schedule that can be controlled."""
 
@@ -645,21 +654,25 @@ def make_controller_outdoorair_controllable(
     return obj, new_devices
 
 
+# The purpose of this type (compared to types.Equipment) is to actually list all
+# the different types of things an `Equipment` can be. If we don't do that, the
+# cattrs library cant rehydrate the dataclasses correctly.
+AnyEquipment = AirloopHVAC | Baseboard | FanOnOff | AirTerminal | OutdoorAir
+
+
 def make_all_equipment(
     json_obj: dict[str, Any],
-) -> tuple[dict[str, Any], list[Equipment]]:
-    all_functions: list[
-        Callable[[dict[str, Any]], tuple[dict[str, Any], list[Equipment]]]
-    ] = [
+) -> tuple[dict[str, Any], Sequence[AnyEquipment]]:
+    all_functions = [
         lambda obj: make_airloophvac_controllable(obj, "UnitarySystem"),
         make_baseboard_controllable,
-        make_fanonoff_controllable,
+        # make_fanonoff_controllable,
         # make_waterheater_controllable,
-        make_pump_controllable,
-        make_airterminal_controllable,
-        make_controller_outdoorair_controllable,
-    ]  # type: ignore
-    all_equipment = []
+        # make_pump_controllable,
+        # make_airterminal_controllable,
+        # make_controller_outdoorair_controllable,
+    ]
+    all_equipment: list[AnyEquipment] = []
     for func in all_functions:
         json_obj, devices = func(json_obj)
         all_equipment += devices
@@ -669,40 +682,33 @@ def make_all_equipment(
 
 def make_controllable(
     input_epjson: Realizable,
-) -> Expression[tuple[Path, list[ActuatorDescription]]]:
+) -> Expression[tuple[Path, Sequence[Equipment]]]:
     @derivation("controllable-building")
     def make_controllable_builder(input: Path):
         real_out = OUTPUT.get()
         with open(input, "rb") as f:
             json_obj = json.load(f)
 
-        actuator_descriptions = []
-
         gensym.reset()
 
         json_obj, equipment = make_all_equipment(json_obj)
-
-        for e in equipment:
-            actuator_descriptions += e.actuator_descriptions()
 
         tmp_out = Path(tempfile.mkdtemp())
 
         json.dump(json_obj, open(tmp_out / "building.epjson", "w"), indent=4)
         json.dump(
-            unstructure(actuator_descriptions),
-            open(tmp_out / "actuators.json", mode="w"),
+            unstructure(equipment),
+            open(tmp_out / "equipment.json", mode="w"),
             indent=4,
         )
 
         shutil.move(tmp_out, real_out)
 
     @expression()
-    def parse_expr(folder: Path) -> tuple[Path, list[ActuatorDescription]]:
-        with open(folder / "actuators.json", mode="r") as f:
+    def parse_expr(folder: Path) -> tuple[Path, Sequence[Equipment]]:
+        with open(folder / "equipment.json", mode="r") as f:
             actuators_json = json.load(f)
 
-        return folder / "building.epjson", structure(
-            actuators_json, list[ActuatorDescription]
-        )
+        return folder / "building.epjson", structure(actuators_json, list[AnyEquipment])
 
     return parse_expr(make_controllable_builder(input_epjson))
