@@ -1,10 +1,11 @@
 """
-Analysis script to compare per-building PPO specialists vs parameterized PPO.
+Analysis script to compare per-building PPO specialists vs parameterized PPO vs baseline PPO.
 
 Pulls runs from wandb and creates comparison plots:
 1. Mean reward comparison across all test buildings
 2. Standard deviation comparison across all test buildings
 3. Per-building reward comparison (parameterized vs specialist)
+4. Three-way comparison (baseline vs parameterized vs per-building)
 
 Usage:
     python scripts/analyze_per_building_vs_parameterized.py \
@@ -34,29 +35,29 @@ def fetch_wandb_runs(
     entity: str | None,
     batch_id: str,
     max_per_building_runs: int = 10,
-) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, list[dict[str, Any]]]:
     """
-    Fetch the latest parameterized PPO run and per-building runs from wandb.
+    Fetch the latest parameterized PPO run, baseline PPO run, and per-building runs from wandb.
 
     Returns:
-        (parameterized_run, per_building_runs)
+        (parameterized_run, baseline_run, per_building_runs)
     """
     try:
         import wandb
     except ImportError:
         logger.error("wandb not installed. Install with: pip install wandb")
-        return None, []
+        return None, None, []
 
     api = wandb.Api()
 
-    # Fetch parameterized PPO run (latest with tag "algo:ppo")
-    logger.info("Fetching parameterized PPO run...")
-    filters = {"tags": {"$in": ["algo:ppo"]}}
     if entity:
         path = f"{entity}/{project}"
     else:
         path = project
 
+    # Fetch parameterized PPO run (latest with tag "algo:ppo" and augment_building_params=True)
+    logger.info("Fetching parameterized PPO run...")
+    filters = {"tags": {"$in": ["algo:ppo"]}}
     param_runs = api.runs(
         path=path,
         filters=filters,
@@ -74,6 +75,28 @@ def fetch_wandb_runs(
     if parameterized_run is None:
         logger.warning("No parameterized PPO run found")
 
+    # Fetch baseline PPO run (latest with entry point = baseline_adaptive_dynamics_main)
+    logger.info("Fetching baseline PPO run (no building params)...")
+    baseline_run = None
+    all_runs = api.runs(
+        path=path,
+        filters={"tags": {"$in": ["algo:ppo"]}},
+        order="-created_at",
+    )
+
+    for run in all_runs:
+        # Check if this is a baseline run (augment_building_params=False and correct entry point)
+        program = run.metadata.get("program", "")
+        augment_params = run.config.get("env", {}).get("augment_building_params", True)
+
+        if "baseline_adaptive_dynamics_main" in program and not augment_params:
+            baseline_run = run
+            logger.info(f"Found baseline run: {run.name} ({run.id})")
+            break
+
+    if baseline_run is None:
+        logger.warning("No baseline PPO run found")
+
     # Fetch per-building runs with the specified batch ID
     logger.info(f"Fetching per-building runs with batch={batch_id}...")
     filters = {"tags": {"$in": [f"batch={batch_id}"]}}
@@ -87,7 +110,7 @@ def fetch_wandb_runs(
 
     logger.info(f"Found {len(per_building_runs)} per-building runs")
 
-    return parameterized_run, per_building_runs
+    return parameterized_run, baseline_run, per_building_runs
 
 
 def extract_final_eval_stats(run: Any) -> dict[str, float] | None:
@@ -213,6 +236,7 @@ def _parse_jsonl_results(jsonl_path: Path) -> dict[int, float]:
 
 def plot_mean_reward_comparison(
     parameterized_stats: dict[str, float] | None,
+    baseline_stats: dict[str, float] | None,
     per_building_stats: list[dict[str, float]],
     output_path: Path,
 ) -> None:
@@ -241,9 +265,21 @@ def plot_mean_reward_comparison(
             label=f"Parameterized PPO (mean={parameterized_stats['mean']:.0f})",
         )
 
+    # Baseline run (horizontal line)
+    if baseline_stats:
+        ax.axhline(
+            y=baseline_stats["mean"],
+            color="green",
+            linestyle=":",
+            linewidth=2,
+            label=f"Baseline PPO (mean={baseline_stats['mean']:.0f})",
+        )
+
     ax.set_xlabel("Per-building run index")
     ax.set_ylabel("Mean reward across test buildings")
-    ax.set_title("Mean Reward Comparison: Per-building vs Parameterized PPO")
+    ax.set_title(
+        "Mean Reward Comparison: Per-building vs Parameterized vs Baseline PPO"
+    )
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -255,6 +291,7 @@ def plot_mean_reward_comparison(
 
 def plot_std_comparison(
     parameterized_stats: dict[str, float] | None,
+    baseline_stats: dict[str, float] | None,
     per_building_stats: list[dict[str, float]],
     output_path: Path,
 ) -> None:
@@ -283,9 +320,21 @@ def plot_std_comparison(
             label=f"Parameterized PPO (std={parameterized_stats['std']:.0f})",
         )
 
+    # Baseline run (horizontal line)
+    if baseline_stats:
+        ax.axhline(
+            y=baseline_stats["std"],
+            color="green",
+            linestyle=":",
+            linewidth=2,
+            label=f"Baseline PPO (std={baseline_stats['std']:.0f})",
+        )
+
     ax.set_xlabel("Per-building run index")
     ax.set_ylabel("Reward standard deviation across test buildings")
-    ax.set_title("Reward Std Dev Comparison: Per-building vs Parameterized PPO")
+    ax.set_title(
+        "Reward Std Dev Comparison: Per-building vs Parameterized vs Baseline PPO"
+    )
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -394,7 +443,7 @@ def main():
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     # Fetch runs from wandb
-    parameterized_run, per_building_runs = fetch_wandb_runs(
+    parameterized_run, baseline_run, per_building_runs = fetch_wandb_runs(
         project=args.project,
         entity=args.entity,
         batch_id=args.batch_id,
@@ -409,6 +458,10 @@ def main():
     parameterized_stats = None
     if parameterized_run:
         parameterized_stats = extract_final_eval_stats(parameterized_run)
+
+    baseline_stats = None
+    if baseline_run:
+        baseline_stats = extract_final_eval_stats(baseline_run)
 
     per_building_stats = []
     per_building_rewards_map = {}
@@ -431,6 +484,7 @@ def main():
     # Plot 1: Mean reward comparison
     plot_mean_reward_comparison(
         parameterized_stats,
+        baseline_stats,
         per_building_stats,
         args.output_dir / "mean_reward_comparison.png",
     )
@@ -438,6 +492,7 @@ def main():
     # Plot 2: Std comparison
     plot_std_comparison(
         parameterized_stats,
+        baseline_stats,
         per_building_stats,
         args.output_dir / "std_comparison.png",
     )
