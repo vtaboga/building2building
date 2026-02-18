@@ -45,8 +45,8 @@ def hvac_actuators_transform(
         highs.append(a.upper_bound)
 
     if not holes:
-        raise ValueError(
-            "hvac_actuators is empty; cannot build HVAC actuator action space"
+        logger.warning(
+            "hvac_actuators is empty; the environment will not make a lot of sense"
         )
 
     return TransformListToArray(
