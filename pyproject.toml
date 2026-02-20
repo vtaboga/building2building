@@ -11,7 +11,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 
 dependencies = [
-    "minergym @ git+https://github.com/vtaboga/minergym.git@actuators",
+    "minergym @ git+https://github.com/Terramorpha/minergym.git@actuators",
     "numpy>=1.24.0",
     "pandas==2.2.3",
     "geopandas==1.0.1",
