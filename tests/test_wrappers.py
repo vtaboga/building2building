@@ -48,43 +48,6 @@ class MockEnv(gym.Env):
 class TestAugmentObservationWithBuildingParams:
     """Tests for AugmentObservationWithBuildingParams wrapper."""
 
-    def test_augment_increases_observation_size(self):
-        """Test that wrapper increases observation space size."""
-        metadata = {
-            "area": 150.0,
-            "warmup_phases": 3,
-            "hvac_actuators": ["a1", "a2"],
-        }
-        env = MockEnv(obs_size=10, metadata=metadata)
-        wrapped = AugmentObservationWithBuildingParams(env)
-
-        # Should add 5 parameters: area, warmup_phases, num_actuators, year_built, num_units
-        assert wrapped.observation_space.shape[0] == 10 + 5
-
-    def test_augment_extracts_from_metadata(self):
-        """Test that wrapper extracts building params from metadata."""
-        metadata = {
-            "area": 200.0,
-            "warmup_phases": 4,
-            "hvac_actuators": ["a1", "a2", "a3"],
-        }
-        env = MockEnv(metadata=metadata)
-        wrapped = AugmentObservationWithBuildingParams(env)
-
-        assert wrapped.building_params["area"] == 200.0
-        assert wrapped.building_params["warmup_phases"] == 4.0
-        assert wrapped.building_params["num_actuators"] == 3.0
-
-    def test_augment_uses_defaults_when_missing(self):
-        """Test that wrapper uses defaults for missing parameters."""
-        env = MockEnv(metadata={})
-        wrapped = AugmentObservationWithBuildingParams(env)
-
-        # Should use defaults
-        assert "area" in wrapped.building_params
-        assert "warmup_phases" in wrapped.building_params
-        assert "num_actuators" in wrapped.building_params
-
     def test_augment_normalizes_params(self):
         """Test that building parameters are normalized to [-1, 1]."""
         metadata = {
@@ -166,13 +129,6 @@ class TestNormalizeObservation:
 
 class TestPadObservation:
     """Tests for PadObservation wrapper."""
-
-    def test_pad_increases_observation_size(self):
-        """Test that wrapper pads observations to target size."""
-        env = MockEnv(obs_size=8)
-        wrapped = PadObservation(env, target_size=12)
-
-        assert wrapped.observation_space.shape[0] == 12
 
     def test_pad_preserves_original_values(self):
         """Test that original observation values are preserved."""

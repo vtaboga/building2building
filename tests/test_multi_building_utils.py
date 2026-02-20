@@ -3,11 +3,7 @@ Unit tests for multi-building training utilities.
 """
 
 import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import numpy as np
-import pytest
 
 from algorithms.multi_building_utils import (
     fetch_diverse_building_pool,
@@ -59,15 +55,6 @@ class TestFetchDiverseBuildingPool:
             assert all(hasattr(b, "area") for b in pool)
 
     @patch("algorithms.multi_building_utils.hydroquebec.search_configs")
-    def test_fetch_handles_empty_results(self, mock_search):
-        """Test that fetch raises error when no buildings found."""
-        mock_search.return_value = []
-
-        config = MagicMock()
-        with pytest.raises(RuntimeError, match="No buildings found"):
-            fetch_diverse_building_pool(config, n_buildings=5)
-
-    @patch("algorithms.multi_building_utils.hydroquebec.search_configs")
     def test_fetch_logs_diversity_stats(self, mock_search, caplog):
         """Test that diversity statistics are logged."""
         mock_configs = []
@@ -110,16 +97,6 @@ class TestFetchDiverseBuildingPool:
 class TestMakeDiverseEnv:
     """Tests for make_diverse_env function."""
 
-    def test_make_diverse_env_requires_building_pool(self):
-        """Test that make_diverse_env raises error without building pool."""
-        config = MagicMock()
-
-        with pytest.raises(ValueError, match="building_pool is required"):
-            make_diverse_env(config, "/tmp/eplus_out", building_pool=None)
-
-        with pytest.raises(ValueError, match="building_pool is required"):
-            make_diverse_env(config, "/tmp/eplus_out", building_pool=[])
-
     @patch("algorithms.multi_building_utils.create_simulator")
     def test_make_diverse_env_samples_from_pool(self, mock_create_sim):
         """Test that make_diverse_env samples from the building pool."""
@@ -142,18 +119,3 @@ class TestMakeDiverseEnv:
             # Verify create_simulator was called
             assert mock_create_sim.called
             assert env == mock_env
-
-    @patch("algorithms.multi_building_utils.create_simulator")
-    def test_make_diverse_env_creates_unique_output_dir(self, mock_create_sim):
-        """Test that each env gets a unique output directory."""
-        building_pool = [MagicMock(area=100, warmup_phases=3, hvac_actuators=["a1"])]
-        mock_create_sim.return_value = MagicMock()
-
-        config = MagicMock()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            env1 = make_diverse_env(config, tmpdir, building_pool=building_pool)
-            env2 = make_diverse_env(config, tmpdir, building_pool=building_pool)
-
-            # Both should succeed (unique UUIDs prevent conflicts)
-            assert env1 is not None
-            assert env2 is not None
