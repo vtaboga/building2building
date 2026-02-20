@@ -9,11 +9,11 @@
 #       split=test split_index=$SLURM_ARRAY_TASK_ID
 
 defaults:
-  - _self_
   - wandb: default
   - training: default
   - policy: ppo_parameterized
   - reward: deadband
+  - _self_
 
 # Override: single env per agent (one building, no parallelism within job).
 training:

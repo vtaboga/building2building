@@ -41,7 +41,7 @@ python -m scripts.per_building_adaptive_dynamics_main \
     split=test \
     split_index="${SLURM_ARRAY_TASK_ID}" \
     seed=42 \
-    training.total_timesteps=1000000 \
+    training.total_timesteps=4000000 \
     wandb.project=building2building \
     slurm_array_job_id="${SLURM_ARRAY_JOB_ID:-none}"
 

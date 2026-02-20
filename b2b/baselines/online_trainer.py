@@ -6,14 +6,14 @@ from omegaconf import OmegaConf
 from wandb.integration.sb3 import WandbCallback
 import wandb
 
+from b2b.baselines.callbacks import TrainingEpisodeRewardCallback
+from b2b.baselines.test import test_policy
 from b2b.baselines.utils import make_dummy_vec_env, make_env, log_test_dir_graphs_wandb
 from b2b.baselines.wandb_utils import init_wandb_from_config
-from b2b.baselines.test import test_policy
 from b2b.simulator.wrappers import NormalizeObservation
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, CallbackList
 from stable_baselines3.common.utils import set_random_seed
-
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,10 @@ def _make_envs(config: OmegaConf, output_dir: Path):
     train_env = make_vec_env(
         make_env,
         n_envs=num_envs,
-        env_kwargs={'config': config,'eplus_output_dir': str(output_dir / "train_eplus_outputs")},
+        env_kwargs={
+            "config": config,
+            "eplus_output_dir": str(output_dir / "train_eplus_outputs"),
+        },
         wrapper_class=wrapper_fn,
     )
     eval_env = make_dummy_vec_env(
@@ -57,7 +60,8 @@ def _make_callbacks(config: OmegaConf, eval_env, model_dir: Path, log_dir: Path)
         n_eval_episodes=config.training.eval_episodes,
         deterministic=True,
     )
-    return CallbackList([eval_cb, wandb_cb])
+    train_ep_cb = TrainingEpisodeRewardCallback()
+    return CallbackList([eval_cb, train_ep_cb, wandb_cb])
 
 
 def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
@@ -94,10 +98,12 @@ def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
 
     # pass only valid arguments
     sig = inspect.signature(algo_cls.__init__)
-    valid_params = {k for k in sig.parameters.keys() if k not in ['self', 'env', 'policy']}
+    valid_params = {
+        k for k in sig.parameters.keys() if k not in ["self", "env", "policy"]
+    }
     kwargs = {k: v for k, v in params.items() if k in valid_params}
 
-    kwargs['tensorboard_log'] = str(tb_dir)
+    kwargs["tensorboard_log"] = str(tb_dir)
     policy = config.policy.policy_type
 
     model = algo_cls(policy, train_env, **kwargs)
@@ -131,10 +137,9 @@ def online_trainer(config: OmegaConf, output_dir: Path):
     wandb_run, _started_here = init_wandb_from_config(
         config,
         run_dir=output_dir,
-        sync_tensorboard=True,
         log_code_root=repo_root,
+        sync_tensorboard=True,
     )
-
 
     # Prepare IO dirs
     model_dir = output_dir / "models"
@@ -167,7 +172,5 @@ def online_trainer(config: OmegaConf, output_dir: Path):
 
     log_test_dir_graphs_wandb(output_dir / "test")
 
-
     if wandb_run is not None:
         wandb_run.finish()
-

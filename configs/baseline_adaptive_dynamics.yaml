@@ -5,18 +5,23 @@
 # Buildings are still resampled on each episode reset.
 
 defaults:
-  - _self_
   - wandb: default
   - training: default
   - policy: ppo_parameterized
   - reward: deadband
+  - _self_
 
 # Training overrides
 training:
   # Number of parallel training environments.  Each env independently
   # resamples buildings, so PPO's rollout buffer contains diverse building
   # experiences before each policy update.
-  num_train_envs: 4
+  num_train_envs: 16
+
+# Policy overrides
+policy:
+  batch_size: 512
+  learning_rate: 0.0001
 
 # Environment configuration
 env:

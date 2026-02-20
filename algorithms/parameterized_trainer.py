@@ -17,6 +17,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.utils import set_random_seed
 from wandb.integration.sb3 import WandbCallback
 
+from b2b.baselines.callbacks import TrainingEpisodeRewardCallback
 from b2b.baselines.test import test_policy
 from b2b.baselines.utils import log_test_dir_graphs_wandb
 from b2b.baselines.wandb_utils import init_wandb_from_config
@@ -89,7 +90,8 @@ def _make_callbacks(config: OmegaConf, eval_env, model_dir: Path, log_dir: Path)
         n_eval_episodes=config.training.eval_episodes,
         deterministic=True,
     )
-    return CallbackList([eval_cb, wandb_cb])
+    train_ep_cb = TrainingEpisodeRewardCallback()
+    return CallbackList([eval_cb, train_ep_cb, wandb_cb])
 
 
 def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
@@ -174,8 +176,8 @@ def parameterized_trainer(config: OmegaConf, output_dir: Path):
     wandb_run, _started_here = init_wandb_from_config(
         config,
         run_dir=output_dir,
-        sync_tensorboard=True,
         log_code_root=repo_root,
+        sync_tensorboard=True,
     )
 
     # Prepare IO dirs

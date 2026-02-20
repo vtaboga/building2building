@@ -2,10 +2,10 @@
 #SBATCH --job-name=ppo_baseline_adaptive
 #SBATCH --output=logs/ppo_baseline_adaptive_%j.out
 #SBATCH --error=logs/ppo_baseline_adaptive_%j.err
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH --mem=48G
 #SBATCH --partition=long-cpu
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=16
 
 # Baseline PPO training on adaptive dynamics benchmark
 # Same as parameterized variant but WITHOUT building parameter augmentation.
@@ -30,7 +30,7 @@ mkdir -p logs
 # Run training
 python -m scripts.baseline_adaptive_dynamics_main \
     seed=42 \
-    training.total_timesteps=1000000 \
+    training.total_timesteps=4000000 \
     training.eval_freq=262144 \
     wandb.project=building2building
 

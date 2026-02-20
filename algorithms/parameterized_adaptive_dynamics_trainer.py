@@ -26,6 +26,7 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from wandb.integration.sb3 import WandbCallback
 
+from b2b.baselines.callbacks import TrainingEpisodeRewardCallback
 from b2b.baselines.wandb_utils import init_wandb_from_config
 from b2b.benchmark.experiments.bm_adaptive_dynamics import log_returns_to_wandb
 from b2b.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
@@ -71,8 +72,7 @@ class EvalHistogramCallback(BaseCallback):
                             "eval/reward_std": np.std(episode_rewards),
                             "eval/reward_min": np.min(episode_rewards),
                             "eval/reward_max": np.max(episode_rewards),
-                        },
-                        step=self.num_timesteps,
+                        }
                     )
 
                     if self.verbose >= 1:
@@ -169,7 +169,7 @@ class ActionDistributionCallback(BaseCallback):
                     all_actions[:, i]
                 )
 
-            wandb.log(log_dict, step=self.num_timesteps)
+            wandb.log(log_dict)
 
             if self.verbose >= 1:
                 logger.info(
@@ -275,8 +275,7 @@ class TrajectorySnippetCallback(BaseCallback):
                     "trajectory/snippet_mean_reward": np.mean(
                         [s["reward"] for s in snippet]
                     ),
-                },
-                step=self.num_timesteps,
+                }
             )
 
             if self.verbose >= 1:
@@ -320,6 +319,10 @@ def _create_env_for_split_index(
     cfg_dict = OmegaConf.to_container(config, resolve=True)
     if not isinstance(cfg_dict, dict):
         cfg_dict = {}
+
+    # Ensure env section is preserved
+    if "env" not in cfg_dict:
+        cfg_dict["env"] = {}
 
     bldg_section = cfg_dict.setdefault("bldg", {})
     if not isinstance(bldg_section, dict):
@@ -549,8 +552,17 @@ def _make_callbacks(config: OmegaConf, eval_env, model_dir: Path, log_dir: Path)
     snippet_length = config.training.get("trajectory_snippet_length", 10)
     trajectory_cb = TrajectorySnippetCallback(snippet_length=snippet_length, verbose=1)
 
+    train_ep_cb = TrainingEpisodeRewardCallback()
+
     return CallbackList(
-        [eval_cb, eval_histogram_cb, action_dist_cb, trajectory_cb, wandb_cb]
+        [
+            eval_cb,
+            eval_histogram_cb,
+            action_dist_cb,
+            trajectory_cb,
+            train_ep_cb,
+            wandb_cb,
+        ]
     )
 
 
