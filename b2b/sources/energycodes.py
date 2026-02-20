@@ -88,6 +88,7 @@ def index_weathers(input_zip: Path):
     records.sort(key=lambda x: (x[0], x[1], x[2]))
 
     df = DataFrame(records, columns=["state", "county", "filename"])
+    df = df.reset_index(drop=False)
     df.to_parquet(str(dst))
 
 
@@ -187,12 +188,14 @@ def search_weathers(
 
 def search_config(
     building_type: BuildingType | None = None,
+    building_id: int | None = None,
     year: int | None = None,
     place: str | None = None,
     state: str | None = None,
     county: str | None = None,
 ) -> BuildingConfig:
     buildings = search_buildings(
+        index=building_id,
         building_type=building_type,
         year=year,
         place=place,
