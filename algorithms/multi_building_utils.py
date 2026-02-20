@@ -13,9 +13,9 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from building2building.simulator import create_simulator
-from building2building.simulator.observation_spaces import flat_observation_info
-from building2building.sources import hydroquebec
+from b2b.simulator import create_simulator
+from b2b.simulator.observation_spaces import flat_observation_info
+from b2b.sources import hydroquebec
 from minergym.ontology import Ontology
 
 logger = logging.getLogger(__name__)
