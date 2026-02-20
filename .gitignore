@@ -36,8 +36,3 @@ b2b_outputs/
 
 # temporary
 simulator/patched_minergym_simulation.py
-
-# Cleanup scripts (generated)
-cleanup_eplus_outputs.sh
-cleanup_old_runs.sh
-simple_cleanup.sh
