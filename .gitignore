@@ -5,6 +5,7 @@
 /.conda/
 /.idea/
 /.vscode/
+.DS_Store
 __pycache__/
 /.pytest_cache/
 *.py[cod]
