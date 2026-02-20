@@ -144,16 +144,20 @@ def _apply_wrappers(
     Order (inside → out):
         raw env → ResampleBuildingOnResetWrapper (already applied)
         → PadObservation (if target_obs_size is set)
+        → NormalizeObservation (if norm_obs) — MUST come before augmentation
         → AugmentObservationWithBuildingParams (if augment_params)
-        → NormalizeObservation (if norm_obs)
         → Monitor (SB3 episode tracking for rollout/ metrics)
+
+    IMPORTANT: NormalizeObservation must come BEFORE AugmentObservationWithBuildingParams
+    because the building params are already normalized to [-1, 1]. If we normalize
+    after augmentation, we'd be double-normalizing the building params.
     """
     if target_obs_size is not None:
         env = PadObservation(env, target_size=target_obs_size)
-    if augment_params:
-        env = AugmentObservationWithBuildingParams(env)
     if norm_obs:
         env = NormalizeObservation(env)
+    if augment_params:
+        env = AugmentObservationWithBuildingParams(env)
     env = Monitor(env)
     return env
 

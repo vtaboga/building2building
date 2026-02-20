@@ -247,18 +247,33 @@ class NormalizeObservation(gym.ObservationWrapper):
 
 
 class PadObservation(gym.ObservationWrapper):
-    """Pad observations to a fixed target size with zeros.
+    """Pad observations to a fixed target size with zone-aware padding.
 
-    When buildings produce observations of different sizes (e.g. 8, 9, or 10
-    dimensions), this wrapper zero-pads each observation so that downstream
-    consumers always see a tensor of shape ``(target_size,)``.  Padded
-    dimensions have observation-space bounds ``[0, 0]`` so that normalisation
+    When buildings produce observations of different sizes due to varying zone
+    counts, this wrapper intelligently pads the zone temperatures to a fixed
+    size while keeping all other features (outdoor temp, time, energy) in
+    consistent positions across buildings.
+
+    Observation structure (from flat_observation_info):
+        - Zone Air Temperatures (variable count) [-50°C, 50°C]
+        - Outdoor Air Temperature [-50°C, 50°C]
+        - Outdoor Air Relative Humidity [0%, 100%]
+        - Current Time of Day [1, 25]
+        - Day of Week [1, 7]
+        - Day of Year [1, 366]
+        - HVAC Electricity Consumption [0, 50] Wh/m²/15min
+        - HVAC Natural Gas Consumption [0, 50] Wh/m²/15min
+
+    The wrapper pads zone temperatures to a fixed count, ensuring that outdoor
+    temp, time features, and energy consumption are always at the same indices
+    across all buildings. This is critical for multi-building generalization.
+
+    Padded zone temperature dimensions have bounds [0, 0] so normalization
     layers treat them as constants.
-
-    On every ``reset`` the wrapper re-reads the inner environment's
-    observation space (which may have changed after a building resample) and
-    rebuilds its own bounds accordingly, keeping the shape fixed.
     """
+
+    # Number of non-zone features (outdoor temp, outdoor humid, 3 time features, 2 energy)
+    NUM_NON_ZONE_FEATURES = 7
 
     def __init__(self, env: gym.Env, target_size: int):
         super().__init__(env)
@@ -278,17 +293,30 @@ class PadObservation(gym.ObservationWrapper):
                 f"target_size ({target_size})"
             )
 
+        # Calculate max zones that can fit
+        self._max_zones = target_size - self.NUM_NON_ZONE_FEATURES
+        if self._max_zones < 1:
+            raise ValueError(
+                f"target_size ({target_size}) too small to accommodate "
+                f"at least 1 zone + {self.NUM_NON_ZONE_FEATURES} non-zone features"
+            )
+
         self._rebuild_observation_space()
 
         logger.info(
-            "PadObservation: inner obs %d → padded to %d",
+            "PadObservation: inner obs %d → padded to %d (max %d zones)",
             orig_size,
             target_size,
+            self._max_zones,
         )
 
     # ------------------------------------------------------------------
     def _rebuild_observation_space(self) -> None:
-        """Rebuild padded observation space from current inner env bounds."""
+        """Rebuild padded observation space with zone-aware padding.
+
+        Pads zone temperatures to max_zones, keeping non-zone features at
+        consistent positions across buildings.
+        """
         inner_low = self.env.observation_space.low
         inner_high = self.env.observation_space.high
         inner_size = inner_low.shape[0]
@@ -301,15 +329,40 @@ class PadObservation(gym.ObservationWrapper):
                 "Increase target_obs_size in your config."
             )
 
-        pad_size = self._target_size - inner_size
+        # Calculate current number of zones
+        current_num_zones = inner_size - self.NUM_NON_ZONE_FEATURES
 
-        if pad_size > 0:
-            pad_zeros = np.zeros(pad_size, dtype=dtype)
-            new_low = np.concatenate([inner_low, pad_zeros])
-            new_high = np.concatenate([inner_high, pad_zeros])
+        if current_num_zones < 0:
+            raise ValueError(
+                f"Inner observation size ({inner_size}) is smaller than "
+                f"expected non-zone features ({self.NUM_NON_ZONE_FEATURES})"
+            )
+
+        if current_num_zones > self._max_zones:
+            raise ValueError(
+                f"Building has {current_num_zones} zones, exceeds max_zones "
+                f"({self._max_zones}). Increase target_obs_size in your config."
+            )
+
+        # Split into zone temps and non-zone features
+        zone_low = inner_low[:current_num_zones]
+        zone_high = inner_high[:current_num_zones]
+        non_zone_low = inner_low[current_num_zones:]
+        non_zone_high = inner_high[current_num_zones:]
+
+        # Pad zone temperatures to max_zones with [0, 0] bounds
+        num_pad_zones = self._max_zones - current_num_zones
+        if num_pad_zones > 0:
+            pad_zeros = np.zeros(num_pad_zones, dtype=dtype)
+            padded_zone_low = np.concatenate([zone_low, pad_zeros])
+            padded_zone_high = np.concatenate([zone_high, pad_zeros])
         else:
-            new_low = inner_low
-            new_high = inner_high
+            padded_zone_low = zone_low
+            padded_zone_high = zone_high
+
+        # Concatenate: padded zones + non-zone features
+        new_low = np.concatenate([padded_zone_low, non_zone_low])
+        new_high = np.concatenate([padded_zone_high, non_zone_high])
 
         self.observation_space = gym.spaces.Box(low=new_low, high=new_high, dtype=dtype)
 
@@ -321,18 +374,51 @@ class PadObservation(gym.ObservationWrapper):
         return self.observation(obs), info
 
     def observation(self, obs: np.ndarray) -> np.ndarray:
+        """Apply zone-aware padding to observation.
+
+        Pads zone temperatures to max_zones, keeping non-zone features at
+        consistent positions.
+        """
         obs = np.asarray(obs, dtype=self.observation_space.dtype)
         obs_size = obs.shape[0]
+
         if obs_size > self._target_size:
             raise ValueError(
                 f"Observation size ({obs_size}) exceeds target_size "
                 f"({self._target_size}). Increase target_obs_size in "
                 "your config."
             )
-        pad_size = self._target_size - obs_size
-        if pad_size > 0:
-            return np.concatenate([obs, np.zeros(pad_size, dtype=obs.dtype)])
-        return obs
+
+        # Calculate current number of zones
+        current_num_zones = obs_size - self.NUM_NON_ZONE_FEATURES
+
+        if current_num_zones < 0:
+            raise ValueError(
+                f"Observation size ({obs_size}) is smaller than expected "
+                f"non-zone features ({self.NUM_NON_ZONE_FEATURES})"
+            )
+
+        if current_num_zones > self._max_zones:
+            raise ValueError(
+                f"Building has {current_num_zones} zones, exceeds max_zones "
+                f"({self._max_zones}). Increase target_obs_size."
+            )
+
+        # Split into zone temps and non-zone features
+        zone_temps = obs[:current_num_zones]
+        non_zone_features = obs[current_num_zones:]
+
+        # Pad zone temperatures to max_zones
+        num_pad_zones = self._max_zones - current_num_zones
+        if num_pad_zones > 0:
+            padded_zones = np.concatenate(
+                [zone_temps, np.zeros(num_pad_zones, dtype=obs.dtype)]
+            )
+        else:
+            padded_zones = zone_temps
+
+        # Concatenate: padded zones + non-zone features
+        return np.concatenate([padded_zones, non_zone_features])
 
 
 class AugmentObservationWithBuildingParams(gym.ObservationWrapper):

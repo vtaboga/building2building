@@ -130,17 +130,50 @@ class TestNormalizeObservation:
 class TestPadObservation:
     """Tests for PadObservation wrapper."""
 
-    def test_pad_preserves_original_values(self):
-        """Test that original observation values are preserved."""
-        env = MockEnv(obs_size=8)
-        wrapped = PadObservation(env, target_size=12)
+    def test_zone_aware_padding_keeps_non_zone_features_consistent(self):
+        """Test that non-zone features are at consistent positions across buildings.
 
-        obs, _ = wrapped.reset()
+        This is critical for multi-building generalization - outdoor temp, time
+        features, and energy consumption must be at the same indices regardless
+        of the number of zones.
+        """
+        # Building with 2 zones: obs = [zone1, zone2, outdoor_temp, outdoor_humid,
+        #                                time_of_day, day_of_week, day_of_year, elec, gas]
+        # = 2 zones + 7 non-zone features = 9 total
+        env_2_zones = MockEnv(obs_size=9)
+        wrapped_2_zones = PadObservation(env_2_zones, target_size=20)
+        obs_2_zones, _ = wrapped_2_zones.reset()
 
-        # First 8 values should be non-zero (from env)
-        # Last 4 values should be zero (padding)
-        assert obs.shape[0] == 12
-        np.testing.assert_array_equal(obs[8:], np.zeros(4))
+        # Building with 5 zones: obs = [zone1, ..., zone5, outdoor_temp, ..., gas]
+        # = 5 zones + 7 non-zone features = 12 total
+        env_5_zones = MockEnv(obs_size=12)
+        wrapped_5_zones = PadObservation(env_5_zones, target_size=20)
+        obs_5_zones, _ = wrapped_5_zones.reset()
+
+        # Both should be padded to 20
+        assert obs_2_zones.shape[0] == 20
+        assert obs_5_zones.shape[0] == 20
+
+        # Max zones = 20 - 7 = 13
+        # Non-zone features should start at index 13 for both buildings
+        # For 2-zone building: [zone1, zone2, 0, 0, ..., 0 (11 padded zones), outdoor_temp, ...]
+        # For 5-zone building: [zone1, ..., zone5, 0, ..., 0 (8 padded zones), outdoor_temp, ...]
+
+        # Non-zone features should be at indices 13-19 for both
+        # (outdoor_temp, outdoor_humid, time_of_day, day_of_week, day_of_year, elec, gas)
+        non_zone_start_idx = 13
+
+        # For 2-zone building: original obs[2:9] should be at padded obs[13:20]
+        # For 5-zone building: original obs[5:12] should be at padded obs[13:20]
+        # Both should have non-zero values at these positions
+        assert np.any(obs_2_zones[non_zone_start_idx:] != 0)
+        assert np.any(obs_5_zones[non_zone_start_idx:] != 0)
+
+        # Zone padding should be zeros
+        # 2-zone building: indices 2-12 should be zero (11 padded zones)
+        np.testing.assert_array_equal(obs_2_zones[2:non_zone_start_idx], np.zeros(11))
+        # 5-zone building: indices 5-12 should be zero (8 padded zones)
+        np.testing.assert_array_equal(obs_5_zones[5:non_zone_start_idx], np.zeros(8))
 
     def test_pad_raises_error_if_obs_too_large(self):
         """Test that wrapper raises error if obs exceeds target size."""
@@ -148,3 +181,22 @@ class TestPadObservation:
 
         with pytest.raises(ValueError, match="exceeds target_size"):
             PadObservation(env, target_size=10)
+
+    def test_pad_raises_error_if_too_many_zones(self):
+        """Test that wrapper raises error if building has too many zones."""
+        # obs_size = 12 means 12 - 7 = 5 zones
+        # target_size = 15 means max 15 - 7 = 8 zones
+        # Create wrapper first (this should succeed)
+        env = MockEnv(obs_size=12)
+        wrapped = PadObservation(env, target_size=15)
+
+        # Now simulate a building with too many zones by changing the env's obs space
+        # obs_size = 20 means 20 - 7 = 13 zones, which exceeds max 8 zones
+        env.observation_space = gym.spaces.Box(
+            low=-5, high=5, shape=(20,), dtype=np.float32
+        )
+
+        # This should raise an error during reset when it tries to rebuild obs space
+        # The error is caught by the size check before the zone-specific check
+        with pytest.raises(ValueError, match="exceeds target_size"):
+            wrapped.reset()
