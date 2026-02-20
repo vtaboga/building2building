@@ -190,26 +190,16 @@ class NormalizeObservation(gym.ObservationWrapper):
                 f"Expected observation space to be Box, got {type(env.observation_space)}"
             )
 
-        # Store the original observation space bounds
-        self.obs_low = self.env.observation_space.low
-        self.obs_high = self.env.observation_space.high
-
-        # Handle infinite bounds by replacing them with large finite values
-        self.obs_low = np.where(np.isinf(self.obs_low), -1e10, self.obs_low)
-        self.obs_high = np.where(np.isinf(self.obs_high), 1e10, self.obs_high)
-
-        # Calculate the range of the observation space
-        self.obs_range = self.obs_high - self.obs_low
-        # Avoid division by zero for dimensions with zero range
-        self.obs_range = np.where(self.obs_range == 0, 1.0, self.obs_range)
-
-        # Set the new observation space to be in the target range
-        target_low = np.zeros(self.obs_low.shape, dtype=dtype)
-        target_high = np.ones(self.obs_high.shape, dtype=dtype)
-
+        # Initialize observation space with the specified dtype
+        # (will be properly set by _update_bounds)
         self.observation_space = gym.spaces.Box(
-            low=target_low, high=target_high, dtype=dtype
+            low=np.zeros(env.observation_space.shape, dtype=dtype),
+            high=np.ones(env.observation_space.shape, dtype=dtype),
+            dtype=dtype,
         )
+
+        # Initialize bounds using the shared method
+        self._update_bounds()
 
     def _update_bounds(self) -> None:
         """Re-read observation space bounds from the inner env and recompute derived state."""

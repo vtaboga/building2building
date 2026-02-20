@@ -2,16 +2,12 @@
 Unit tests for multi-building training utilities.
 """
 
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-
-# Add algorithms to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from algorithms.multi_building_utils import (
     fetch_diverse_building_pool,
@@ -106,7 +102,9 @@ class TestFetchDiverseBuildingPool:
             # Check that diversity stats were logged (even if only 1 building found)
             # The function logs diversity stats regardless of pool size
             assert len(pool) >= 1
-            assert "Building pool diversity" in caplog.text or "Only found" in caplog.text
+            assert (
+                "Building pool diversity" in caplog.text or "Only found" in caplog.text
+            )
 
 
 class TestMakeDiverseEnv:

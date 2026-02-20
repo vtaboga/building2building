@@ -1,11 +1,10 @@
-import importlib
-import inspect
 import logging
 from pathlib import Path
 from omegaconf import OmegaConf
 from wandb.integration.sb3 import WandbCallback
 import wandb
 
+from algorithms.sb3_utils import build_sb3_model, load_best_model
 from b2b.baselines.callbacks import TrainingEpisodeRewardCallback
 from b2b.baselines.test import test_policy
 from b2b.baselines.utils import make_dummy_vec_env, make_env, log_test_dir_graphs_wandb
@@ -64,70 +63,6 @@ def _make_callbacks(config: OmegaConf, eval_env, model_dir: Path, log_dir: Path)
     return CallbackList([eval_cb, train_ep_cb, wandb_cb])
 
 
-def _build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
-    """Build a Stable Baselines 3 model based on the config."""
-
-    params = OmegaConf.to_container(config.policy, resolve=True)
-    algo_name = config.policy.algorithm
-
-    if not algo_name:
-        raise ValueError("The key algorithm in policy config is missing.")
-
-    # Resolve algorithm class from SB3 or SB3-Contrib (e.g. TRPO).
-    algo_upper = str(algo_name).upper()
-    module = None
-    algo_cls = None
-
-    for base_pkg in ("stable_baselines3", "sb3_contrib"):
-        try:
-            module = importlib.import_module(f"{base_pkg}.{algo_name}.{algo_name}")
-            algo_cls = getattr(module, algo_upper)
-            break
-        except ModuleNotFoundError:
-            continue
-        except AttributeError:
-            continue
-
-    if algo_cls is None:
-        raise ValueError(
-            f"Algorithm '{algo_name}' not found. "
-            "Expected it to exist as "
-            f"stable_baselines3.{algo_name}.{algo_name}.{algo_upper} "
-            f"or sb3_contrib.{algo_name}.{algo_name}.{algo_upper}."
-        )
-
-    # pass only valid arguments
-    sig = inspect.signature(algo_cls.__init__)
-    valid_params = {
-        k for k in sig.parameters.keys() if k not in ["self", "env", "policy"]
-    }
-    kwargs = {k: v for k, v in params.items() if k in valid_params}
-
-    kwargs["tensorboard_log"] = str(tb_dir)
-    policy = config.policy.policy_type
-
-    model = algo_cls(policy, train_env, **kwargs)
-
-    return model
-
-
-def _load_best_model(config: OmegaConf, model_dir: Path):
-    """Load the best saved SB3 model if available, else return None."""
-    algo_name = config.policy.algorithm
-    best_path = model_dir / "best_model.zip"
-    if not best_path.exists() or not algo_name:
-        return None
-    algo_upper = str(algo_name).upper()
-    for base_pkg in ("stable_baselines3", "sb3_contrib"):
-        try:
-            module = importlib.import_module(f"{base_pkg}.{algo_name}.{algo_name}")
-            algo_cls = getattr(module, algo_upper)
-            return algo_cls.load(str(best_path))
-        except Exception:
-            continue
-    return None
-
-
 def online_trainer(config: OmegaConf, output_dir: Path):
 
     # Stable reference to the repository root (avoid relying on Hydra's runtime cwd).
@@ -157,7 +92,7 @@ def online_trainer(config: OmegaConf, output_dir: Path):
     callbacks = _make_callbacks(config, eval_env, model_dir, log_dir)
 
     # Build model based on config
-    model = _build_sb3_model(config, train_env, tb_dir)
+    model = build_sb3_model(config, train_env, tb_dir)
 
     # Train
     model.learn(
@@ -167,7 +102,7 @@ def online_trainer(config: OmegaConf, output_dir: Path):
 
     # Test the saved/best policy for a few episodes
     test_cfg = config
-    policy_model = _load_best_model(config, model_dir) or model
+    policy_model = load_best_model(config, model_dir) or model
     test_policy(test_cfg, policy_model, output_dir)
 
     log_test_dir_graphs_wandb(output_dir / "test")
