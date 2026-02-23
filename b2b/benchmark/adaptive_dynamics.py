@@ -10,6 +10,10 @@ from typing import Any
 
 import numpy as np
 
+from collections.abc import Callable
+
+import gymnasium as gym
+
 from b2b.benchmark.runner import EpisodeResult, PolicyLike, run_rollout
 from b2b.make_env import make_env
 from b2b.utils import HydroQuebecRowIdSplits
@@ -58,7 +62,9 @@ def _with_train_selection(cfg: dict[str, Any], *, split_index: int) -> dict[str,
     return _with_selection(cfg, split="train", split_index=split_index)
 
 
-def _with_selection(cfg: dict[str, Any], *, split: str, split_index: int) -> dict[str, Any]:
+def _with_selection(
+    cfg: dict[str, Any], *, split: str, split_index: int
+) -> dict[str, Any]:
     split_s = str(split).strip().lower()
     if split_s not in ("train", "test"):
         raise ValueError(f"split must be 'train' or 'test', got {split!r}")
@@ -76,7 +82,12 @@ def _with_selection(cfg: dict[str, Any], *, split: str, split_index: int) -> dic
     return out
 
 
-def benchmark_adaptive_dynamics(config: object, policy: PolicyLike, output_dir: Path) -> list[AdaptiveDynamicsRecord]:
+def benchmark_adaptive_dynamics(
+    config: object,
+    policy: PolicyLike,
+    output_dir: Path,
+    env_wrapper: Callable[[gym.Env], gym.Env] | None = None,
+) -> list[AdaptiveDynamicsRecord]:
     """
     Sequentially evaluate a policy on the Hydro-Québec train selection list.
 
@@ -86,6 +97,11 @@ def benchmark_adaptive_dynamics(config: object, policy: PolicyLike, output_dir: 
     (intended to be one year), and collect the resulting EpisodeResult.
 
     Results are appended to `<output_dir>/adaptive_dynamics_results.jsonl`.
+
+    If *env_wrapper* is provided it is called on every freshly-created
+    environment **before** the rollout, e.g. to apply observation padding,
+    augmentation, or normalisation so that a trained RL model sees the same
+    observation space it was trained on.
     """
     cfg = _coerce_to_plain_dict(config)
     output_dir = Path(output_dir).expanduser().resolve()
@@ -143,6 +159,8 @@ def benchmark_adaptive_dynamics(config: object, policy: PolicyLike, output_dir: 
         try:
             env_cfg = _with_selection(cfg, split=split, split_index=split_index)
             env = make_env(config=env_cfg, eplus_output_dir=str(eplus_output_dir))
+            if env_wrapper is not None:
+                env = env_wrapper(env)
             try:
                 # Prefer env-selected metadata if present.
                 meta = getattr(env, "metadata", {}) or {}
@@ -152,9 +170,13 @@ def benchmark_adaptive_dynamics(config: object, policy: PolicyLike, output_dir: 
                         building_source_metadata = dict(src)
                         # ensure split/split_index are present for traceability
                         building_source_metadata.setdefault("split", str(split))
-                        building_source_metadata.setdefault("split_index", int(split_index))
+                        building_source_metadata.setdefault(
+                            "split_index", int(split_index)
+                        )
                 # Optional hook so policies can bind per-env metadata (action_names, etc.).
-                if hasattr(policy, "bind_env") and callable(getattr(policy, "bind_env")):
+                if hasattr(policy, "bind_env") and callable(
+                    getattr(policy, "bind_env")
+                ):
                     try:
                         policy.bind_env(env)  # type: ignore[no-untyped-call]
                     except Exception:
@@ -165,7 +187,7 @@ def benchmark_adaptive_dynamics(config: object, policy: PolicyLike, output_dir: 
                     if isinstance(max_steps, int) and max_steps > 0
                     else int(year_steps)
                 )
-                (results, _data) = run_rollout(
+                results, _data = run_rollout(
                     env=env,
                     policy=policy,
                     n_episodes=1,
@@ -173,7 +195,11 @@ def benchmark_adaptive_dynamics(config: object, policy: PolicyLike, output_dir: 
                     max_steps=cap,
                     record=False,
                 )
-                episode_result = results[0] if results else EpisodeResult(total_reward=0.0, n_steps=0)
+                episode_result = (
+                    results[0]
+                    if results
+                    else EpisodeResult(total_reward=0.0, n_steps=0)
+                )
             finally:
                 try:
                     env.close()
