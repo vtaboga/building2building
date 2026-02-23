@@ -401,9 +401,9 @@ def make_baseboard_controllable(
 @dataclass
 class VAVTerminal:
     zone: str
-    mass_flow_setpoint: ActuatorDescription
-    mass_flow_min_available: ActuatorDescription
-    mass_flow_max_available: ActuatorDescription
+    flow_fraction: ActuatorDescription
+    heating_setpoint: ActuatorDescription
+    cooling_setpoint: ActuatorDescription
 
 
 @dataclass
@@ -415,26 +415,129 @@ class VAVSystem:
     def actuator_descriptions(self) -> list[ActuatorDescription]:
         out = [self.supply_temp_setpoint]
         for vav in self.terminals:
-            out.append(vav.mass_flow_setpoint)
-            out.append(vav.mass_flow_min_available)
-            out.append(vav.mass_flow_max_available)
+            out.append(vav.flow_fraction)
+            out.append(vav.heating_setpoint)
+            out.append(vav.cooling_setpoint)
         return out
 
     def zones(self) -> list[str]:
         return [vav.zone for vav in self.terminals]
 
 
+def remove_thermostat_ems_overrides(obj: dict[str, Any]) -> None:
+    """Remove EMS optimum-start programs that override thermostat setpoint
+    schedules.
+
+    ASHRAE 90.1 OfficeMedium buildings include EMS programs that SET
+    CLGSETP_SCH / HTGSETP_SCH actuators at BeginTimestepBeforePredictor.
+    These fight any external setpoint control and must be removed.
+
+    Strategy: identify EMS:Actuator entries whose target schedule name
+    contains ``CLGSETP_SCH`` or ``HTGSETP_SCH``, then cascade-delete the
+    programs, calling-managers, sensors, and internal-variables that
+    reference them.
+    """
+    ems_actuators = obj.get("EnergyManagementSystem:Actuator", {})
+
+    # 1. Find EMS actuator names targeting thermostat setpoint schedules.
+    target_actuator_names: set[str] = set()
+    for name, act in list(ems_actuators.items()):
+        comp_name = act.get("actuated_component_unique_name", "")
+        if "CLGSETP_SCH" in comp_name or "HTGSETP_SCH" in comp_name:
+            target_actuator_names.add(name)
+
+    if not target_actuator_names:
+        return
+
+    # 2. Find EMS programs that SET any of these actuators.
+    ems_programs = obj.get("EnergyManagementSystem:Program", {})
+    programs_to_remove: set[str] = set()
+    for prog_name, prog in ems_programs.items():
+        lines = " ".join(
+            l.get("program_line", "") for l in prog.get("lines", [])
+        )
+        if any(act_name in lines for act_name in target_actuator_names):
+            programs_to_remove.add(prog_name)
+
+    # 3. Collect sensor / internal-variable names used by those programs.
+    sensor_names: set[str] = set()
+    ivar_names: set[str] = set()
+    for prog_name in programs_to_remove:
+        prog = ems_programs[prog_name]
+        lines = " ".join(
+            l.get("program_line", "") for l in prog.get("lines", [])
+        )
+        for sname in obj.get("EnergyManagementSystem:Sensor", {}):
+            if sname in lines:
+                sensor_names.add(sname)
+        for ivname in obj.get("EnergyManagementSystem:InternalVariable", {}):
+            if ivname in lines:
+                ivar_names.add(ivname)
+
+    # 4. Delete calling managers that reference removed programs.
+    for pcm_name in list(
+        obj.get("EnergyManagementSystem:ProgramCallingManager", {})
+    ):
+        pcm = obj["EnergyManagementSystem:ProgramCallingManager"][pcm_name]
+        progs = [p.get("program_name", "") for p in pcm.get("programs", [])]
+        if any(p in programs_to_remove for p in progs):
+            del obj["EnergyManagementSystem:ProgramCallingManager"][pcm_name]
+
+    # 5. Delete programs, actuators, sensors, internal variables.
+    for prog_name in programs_to_remove:
+        ems_programs.pop(prog_name, None)
+    for act_name in target_actuator_names:
+        ems_actuators.pop(act_name, None)
+    for sname in sensor_names:
+        obj.get("EnergyManagementSystem:Sensor", {}).pop(sname, None)
+    for ivname in ivar_names:
+        obj.get("EnergyManagementSystem:InternalVariable", {}).pop(ivname, None)
+
+    # 6. If any top-level EMS dict is now empty, remove it.
+    for ems_key in [
+        "EnergyManagementSystem:Actuator",
+        "EnergyManagementSystem:Program",
+        "EnergyManagementSystem:ProgramCallingManager",
+        "EnergyManagementSystem:Sensor",
+        "EnergyManagementSystem:InternalVariable",
+    ]:
+        if ems_key in obj and not obj[ems_key]:
+            del obj[ems_key]
+
+
 def make_vav_system_controllable(
     obj: dict[str, Any],
 ) -> tuple[dict[str, Any], Sequence[VAVSystem]]:
+    obj = deepcopy(obj)
     ontology = Ontology.from_object(obj)
     g = ontology.rdf
 
-    # Step 1: zone -> (terminal_inlet_node, terminal_outlet_node)
+    # Remove EMS optimum-start programs before any mutations — they override
+    # thermostat setpoint schedules and would fight our control.
+    remove_thermostat_ems_overrides(obj)
+
+    temp_stl_name = create_temp_stl(obj, 10.0, 55.0, name="vav supply temp stl")
+    htg_stl_name = create_temp_stl(obj, 10.0, 35.0, name="vav heating setpoint stl")
+    clg_stl_name = create_temp_stl(obj, 18.0, 40.0, name="vav cooling setpoint stl")
+    setpoint_managers = obj.setdefault("SetpointManager:Scheduled", {})
+
+    # Fraction STL for minimum air flow schedules (0-1, no unit type)
+    fraction_stl_name = f"B2B vav min flow fraction stl ({gensym()})"
+    obj.setdefault("ScheduleTypeLimits", {})[fraction_stl_name] = {
+        "lower_limit_value": 0.0,
+        "upper_limit_value": 1.0,
+        "numeric_type": "Continuous",
+    }
+
+    # Step 1: zone -> (terminal_name, terminal_inlet_node)
+    # Walk: EquipmentConnections -> EquipmentList -> ADU -> VAV:Reheat terminal
     zone_terminal_nodes: dict[str, tuple[str, str]] = {
-        str(row.zone): (str(row.terminalInletNode), str(row.terminalOutletNode))
+        str(row.zone): (
+            str(row.terminalName),
+            str(row.terminalInletNode),
+        )
         for row in g.query("""
-            SELECT ?zone ?terminalInletNode ?terminalOutletNode
+            SELECT ?zone ?terminalName ?terminalInletNode
             WHERE {
                 ?equipConn a "ZoneHVAC:EquipmentConnections" .
                 ?equipConn idf:zone_name ?zone .
@@ -450,7 +553,6 @@ def make_vav_system_controllable(
 
                 ?terminalName a "AirTerminal:SingleDuct:VAV:Reheat" .
                 ?terminalName idf:air_inlet_node_name ?terminalInletNode .
-                ?terminalName idf:air_outlet_node_name ?terminalOutletNode .
             }
         """)
     }
@@ -484,52 +586,147 @@ def make_vav_system_controllable(
 
     # Step 4: group zones by loop
     loops_dict: dict[str, tuple[str, list[tuple[str, str]]]] = {}
-    for zone, (terminal_inlet, terminal_outlet) in zone_terminal_nodes.items():
+    for zone, (
+        terminal_name,
+        terminal_inlet,
+    ) in zone_terminal_nodes.items():
         demand_node = terminal_to_loop_demand.get(terminal_inlet)
         if demand_node is None:
             continue
         loop_name, supply_outlet = loop_by_demand[demand_node]
         loops_dict.setdefault(loop_name, (supply_outlet, []))[1].append(
-            (zone, terminal_outlet)
+            (zone, terminal_name)
         )
 
-    def flow_actuator(node: str, control_type: str) -> ActuatorDescription:
+    def install_supply_temp_actuator(supply_outlet: str) -> ActuatorDescription:
+        """Remove any pre-existing setpoint managers targeting this node and
+        replace with a controllable Schedule:Constant + SetpointManager:Scheduled.
+
+        Pre-existing managers (of any type) would override an EMS node setpoint
+        actuator every timestep, making it ineffective. Replacing them with our
+        own scheduled manager gives us authoritative control.
+        """
+        for spm_type in list(obj.keys()):
+            if not spm_type.startswith("SetpointManager:"):
+                continue
+            to_delete = [
+                name
+                for name, spm in obj[spm_type].items()
+                if spm.get("setpoint_node_or_nodelist_name", "").upper()
+                == supply_outlet.upper()
+            ]
+            for name in to_delete:
+                del obj[spm_type][name]
+
+        sched_name = create_schedule_constant(
+            obj, temp_stl_name, 13, name="vav supply temp setpoint schedule"
+        )
+        spm_name = f"B2B VAV Supply Temp SPM for {supply_outlet} ({gensym()})"
+        setpoint_managers[spm_name] = {
+            "control_variable": "Temperature",
+            "schedule_name": sched_name,
+            "setpoint_node_or_nodelist_name": supply_outlet,
+        }
         return ActuatorDescription(
-            component_type="System Node Setpoint",
-            control_type=control_type,
-            component_name=node,
-            units="[kg/s]",
+            component_type="Schedule:Constant",
+            control_type="Schedule Value",
+            component_name=sched_name,
+            units="[C]",
+            lower_bound=10.0,
+            upper_bound=55.0,
+        )
+
+    def install_flow_fraction_actuator(terminal_name: str) -> ActuatorDescription:
+        """Switch the VAV terminal to schedule-based minimum flow control and
+        return a controllable flow fraction actuator.
+
+        With zone_minimum_air_flow_input_method = "Constant", EnergyPlus clamps
+        the damper at constant_minimum_air_flow_fraction regardless of what the
+        RL agent requests.  Switching to "Scheduled" with a controllable schedule
+        gives the agent full damper modulation range [0, 1].
+        """
+        terminal = obj["AirTerminal:SingleDuct:VAV:Reheat"][terminal_name]
+        sched_name = create_schedule_constant(
+            obj, fraction_stl_name, 0.3, name=f"vav flow fraction schedule"
+        )
+        terminal["zone_minimum_air_flow_input_method"] = "Scheduled"
+        terminal["minimum_air_flow_fraction_schedule_name"] = sched_name
+
+        return ActuatorDescription(
+            component_type="Schedule:Constant",
+            control_type="Schedule Value",
+            component_name=sched_name,
+            units="[frac]",
             lower_bound=0.0,
             upper_bound=1.0,
         )
 
+    def install_thermostat_actuators(
+        zone: str,
+    ) -> tuple[ActuatorDescription, ActuatorDescription]:
+        """Replace thermostat setpoint schedules for a zone with controllable
+        Schedule:Constant objects and return (heating, cooling) actuators.
+        """
+        # Find the ZoneControl:Thermostat for this zone
+        thermostat_controls = obj.get("ZoneControl:Thermostat", {})
+        tc = None
+        for _name, candidate in thermostat_controls.items():
+            if candidate.get("zone_or_zonelist_name") == zone:
+                tc = candidate
+                break
+
+        if tc is None:
+            raise ValueError(f"No ZoneControl:Thermostat found for zone {zone}")
+
+        dsp_name = tc["control_1_name"]
+        dsp = obj["ThermostatSetpoint:DualSetpoint"][dsp_name]
+
+        htg_sched = create_schedule_constant(
+            obj, htg_stl_name, 21, name=f"vav htg setpoint {zone}"
+        )
+        clg_sched = create_schedule_constant(
+            obj, clg_stl_name, 24, name=f"vav clg setpoint {zone}"
+        )
+
+        dsp["heating_setpoint_temperature_schedule_name"] = htg_sched
+        dsp["cooling_setpoint_temperature_schedule_name"] = clg_sched
+
+        htg_actuator = ActuatorDescription(
+            component_type="Schedule:Constant",
+            control_type="Schedule Value",
+            component_name=htg_sched,
+            units="[C]",
+            lower_bound=10.0,
+            upper_bound=35.0,
+        )
+        clg_actuator = ActuatorDescription(
+            component_type="Schedule:Constant",
+            control_type="Schedule Value",
+            component_name=clg_sched,
+            units="[C]",
+            lower_bound=18.0,
+            upper_bound=40.0,
+        )
+
+        return htg_actuator, clg_actuator
+
     loops = []
     for loop_name, (supply_outlet, zone_terminals) in loops_dict.items():
-        terminals = [
-            VAVTerminal(
-                zone=zone,
-                mass_flow_setpoint=flow_actuator(
-                    outlet.upper(), "Mass Flow Rate Setpoint"
-                ),
-                mass_flow_min_available=flow_actuator(
-                    outlet.upper(), "Mass Flow Rate Minimum Available Setpoint"
-                ),
-                mass_flow_max_available=flow_actuator(
-                    outlet.upper(), "Mass Flow Rate Maximum Available Setpoint"
-                ),
+        terminals = []
+        for zone, terminal_name in zone_terminals:
+            flow_act = install_flow_fraction_actuator(terminal_name)
+            htg_act, clg_act = install_thermostat_actuators(zone)
+            terminals.append(
+                VAVTerminal(
+                    zone=zone,
+                    flow_fraction=flow_act,
+                    heating_setpoint=htg_act,
+                    cooling_setpoint=clg_act,
+                )
             )
-            for zone, outlet in zone_terminals
-        ]
         loops.append(
             VAVSystem(
-                supply_temp_setpoint=ActuatorDescription(
-                    component_type="System Node Setpoint",
-                    control_type="Temperature Setpoint",
-                    component_name=supply_outlet.upper(),
-                    units="[C]",
-                    lower_bound=10.0,
-                    upper_bound=45.0,
-                ),
+                supply_temp_setpoint=install_supply_temp_actuator(supply_outlet),
                 terminals=terminals,
             )
         )
