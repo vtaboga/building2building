@@ -84,15 +84,43 @@ def make_env(config: object, eplus_output_dir: str | Path):
         # Let the pipeline copy discovery `eplusout.err` into this run folder.
         prev = os.environ.get("B2B_PIPELINE_DEBUG_DIR")
         os.environ["B2B_PIPELINE_DEBUG_DIR"] = str(out_dir)
-        configs = hydroquebec.search_configs(
-            config=config, n=1, eplus_output_dir=Path(out_dir)
-        )
-        if not configs:
-            raise RuntimeError(
-                "No building configurations found for the provided config "
-                "(see pipeline_errors.jsonl in the EnergyPlus output dir if present)."
+
+        if isinstance(cfg_any, dict):
+            bldg = cfg_any.get("bldg", {})
+            local_cfg = isinstance(bldg, dict) and bldg.get("local")
+            if isinstance(local_cfg, dict) and local_cfg.get("enabled"):
+                from b2b.sources.local import build_config_from_local
+
+                root = Path.cwd()
+                path_bldg = (root / local_cfg.get("path_to_building", "")).resolve()
+                path_weather = (root / local_cfg.get("path_to_weather", "")).resolve()
+                controls = local_cfg.get("controls")
+                env_config = build_config_from_local(
+                    path_to_building=path_bldg,
+                    path_to_weather=path_weather,
+                    eplus_output_dir=Path(out_dir),
+                    controls=controls,
+                )
+            else:
+                configs = hydroquebec.search_configs(
+                    config=config, n=1, eplus_output_dir=Path(out_dir)
+                )
+                if not configs:
+                    raise RuntimeError(
+                        "No building configurations found for the provided config "
+                        "(see pipeline_errors.jsonl in the EnergyPlus output dir if present)."
+                    )
+                env_config = configs[0]
+        else:
+            configs = hydroquebec.search_configs(
+                config=config, n=1, eplus_output_dir=Path(out_dir)
             )
-        env_config = configs[0]
+            if not configs:
+                raise RuntimeError(
+                    "No building configurations found for the provided config "
+                    "(see pipeline_errors.jsonl in the EnergyPlus output dir if present)."
+                )
+            env_config = configs[0]
         env = create_simulator(env_config)
 
         # Enforce a deterministic episode horizon when requested (e.g. full-year episodes).

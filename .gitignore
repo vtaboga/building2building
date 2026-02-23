@@ -33,6 +33,7 @@ analyze_metadata.ipynb
 data/
 b2b_outputs/
 !b2b/sources/data/
+./cursor/
 
 # temporary
 simulator/patched_minergym_simulation.py

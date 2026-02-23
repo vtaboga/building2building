@@ -94,22 +94,22 @@ def index_weathers(input_zip: Path):
 
 # Copy-pasted from set(search_buildings().building_type)
 BuildingType = Literal[
-    "RetailStripmall",
-    "HotelLarge",
+    # "RetailStripmall",
+    #"HotelLarge",
     "ApartmentMidRise",
     "Warehouse",
     "ApartmentHighRise",
     "HotelSmall",
-    "OfficeLarge",
-    "SchoolPrimary",
+    # "OfficeLarge",
+    # "SchoolPrimary",
     "RetailStandalone",
-    "SchoolSecondary",
+    #"SchoolSecondary",
     "RestaurantFastFood",
     "OfficeMedium",
-    "Hospital",
-    "OutPatientHealthCare",
+    # "Hospital",
+    # "OutPatientHealthCare",
     "OfficeSmall",
-    "RestaurantSitDown",
+    # "RestaurantSitDown",
 ]
 
 
