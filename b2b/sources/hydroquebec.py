@@ -124,7 +124,9 @@ def table_index(root_zip: Path):
 
         def _region_to_epw(region: object) -> str:
             if not isinstance(region, str):
-                raise TypeError(f"Region_Administrative must be a string, got {region!r}")
+                raise TypeError(
+                    f"Region_Administrative must be a string, got {region!r}"
+                )
             epw = mapping.get(region)
             if not isinstance(epw, str):
                 raise KeyError(f"No EPW mapping for Region_Administrative={region!r}")
@@ -294,13 +296,7 @@ def search_configs(
 
             # Get control-ready building with actuators from make_controllable()
             control_derivation = row.derivation_thunk()
-            epjson, actuator_descriptions = realize(STORE_PATH.get(), control_derivation)
-
-            if not actuator_descriptions:
-                raise RuntimeError(
-                    "No HVAC actuators were generated for this building "
-                    "(make_controllable returned an empty actuator list)."
-                )
+            epjson, hvac_equipment = realize(STORE_PATH.get(), control_derivation)
 
             metadata = realize(
                 STORE_PATH.get(),
@@ -348,7 +344,7 @@ def search_configs(
                     path_to_building=epjson,
                     path_to_weather=epw,
                     reward_config=reward_config,
-                    hvac_actuators=actuator_descriptions,
+                    hvac_equipment=hvac_equipment,
                     eplus_output_dir=eplus_output_dir,
                     warmup_phases=warmup_phases,
                     area=area,

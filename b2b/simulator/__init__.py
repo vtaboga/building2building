@@ -30,7 +30,6 @@ from b2b.types import (
     DeadbandRewardConfig,
 )
 
-from .controllable_zones import get_all_controllable_zones
 from .transform_utils import TransformInverse
 
 logger = logging.getLogger(__name__)
@@ -92,19 +91,26 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     ont = Ontology.from_object(epjson)
 
-    controlled_zones = get_all_controllable_zones(epjson)
+    controlled_zones = list(
+        set(itertools.chain(*(item.zones() for item in building_config.hvac_equipment)))
+    )
 
     # We compute the observation side stuff
     obs_info = flat_observation_info(ont, area=building_config.area)
+
+    actuators = list(
+        itertools.chain(
+            *(item.actuator_descriptions() for item in building_config.hvac_equipment)
+        )
+    )
 
     # Then the action side stuff
     # TODO: this is used for the reward functions, but come from actuatorsv1
     # setpoints = get_controllable_setpoints(ont)
 
-    action_transform = hvac_actuators_transform(building_config.hvac_actuators)
+    action_transform = hvac_actuators_transform(actuators)
     action_names = [
-        f"{a.component_type}::{a.control_type}::{a.component_name}"
-        for a in building_config.hvac_actuators
+        f"{a.component_type}::{a.control_type}::{a.component_name}" for a in actuators
     ]
 
     make_energyplus = MakeEnergyPlus(

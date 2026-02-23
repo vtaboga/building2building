@@ -18,9 +18,9 @@ from typing import Any, Literal, get_args
 
 from b2b.store import (
     ChildFile,
-    Derivation,
     DownloadFile,
     ExtractTarball,
+    FileLike,
     LocalSymlink,
     Realizable,
     realize,
@@ -58,14 +58,19 @@ def store_path() -> Path:
 STORE_PATH: ContextVar[Path] = ContextVar("STORE_PATH")
 STORE_PATH.set(store_path())
 
-Platform = Literal["linux-x86_64", "macosx-10.9-x86_64", "macosx-11.0-arm64"]
+Platform = Literal[
+    "linux-x86_64",
+    "macosx-10.9-x86_64",
+    "macosx-11.0-arm64",
+    "macosx-15.6-arm64",
+]
 GlibcVersion = Literal["2.35", "2.38"]
 
 # Note to future selves: under linux, the main constraint on the binary we use
 # is the distribution's glibc version. Because glibc is backwards-compatible, it
 # is advantageous to pick the binary compiled for the distribution with the
 # oldest glibc (in our case, ubuntu 22).
-binaries: dict[Platform, Derivation] = {
+binaries: dict[Platform, FileLike] = {
     "linux-x86_64": ChildFile(
         ExtractTarball(
             DownloadFile(
@@ -98,11 +103,11 @@ def energyplus_path() -> Realizable:
     if p := os.getenv("ENERGYPLUS_PATH"):
         path = Path(p).resolve()
         return LocalSymlink("energyplus-path", path)
-    
+
     # 2. If no manual path, then check platform for auto-download
     current_platform: str = sysconfig.get_platform()
-    
-    # If we are on Mac and didn't provide a path, this script doesn't 
+
+    # If we are on Mac and didn't provide a path, this script doesn't
     # have a download link for Mac anyway, so let's provide a clear error.
     if "macosx" in current_platform:
         raise RuntimeError(
@@ -111,8 +116,7 @@ def energyplus_path() -> Realizable:
         )
 
     assert current_platform in get_args(Platform)
-    return binaries[current_platform]
-
+    return binaries[current_platform]  # type: ignore
 
 
 def setup_energyplus_path():

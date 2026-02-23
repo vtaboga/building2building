@@ -91,9 +91,15 @@ def realize(store_path: Path, realizable: Realizable) -> Path | Result:
             try:
                 logger.info(f"building {realizable.name}")
                 realizable.builder(realized_deps)
+
                 if not tmp_output_path.exists():
+                    file_path = inspect.getsourcefile(realizable.builder)
+                    source_lines, start_line = inspect.getsourcelines(
+                        realizable.builder
+                    )
+
                     raise Exception(
-                        f"derivation {realizable.name} didn't product an output"
+                        f"derivation {realizable.name} didn't product an output. Perhaps make the builder at {file_path}:{start_line} not silently fail?"
                     )
                 # If another process finished first, keep the existing output and
                 # clean up our temp output.
@@ -489,12 +495,30 @@ def LocalSymlink(name: str, filepath: Path) -> Derivation:
     return Derivation(name, hasher.digest(), [], builder)
 
 
-def Rename(name: str, input: Realizable) -> Derivation:
-    def builder(deps):
-        dst = OUTPUT.get()
-        dst.symlink_to(deps[0])
+FileLike = Union[Derivation, Expression[Path]]
 
-    return Derivation(name, input.hash, [input], builder)
+
+def Symlink(name: str, input: FileLike) -> Derivation:
+    @derivation(name)
+    def builder(input):
+        dst = OUTPUT.get()
+        dst.symlink_to(dst)
+
+    return builder(input)
+
+
+def Rename(name: str, input: Realizable) -> Derivation:
+    @derivation(name)
+    def builder(input: Path):
+        dst = OUTPUT.get()
+        if input.is_file():
+            shutil.copy(input, dst)
+        elif input.is_dir():
+            shutil.copytree(input, dst)
+        else:
+            raise Exception(f"don't know what to do with a file like {input}")
+
+    return builder(input)
 
 
 @expression()

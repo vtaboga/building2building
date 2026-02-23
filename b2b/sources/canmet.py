@@ -3,11 +3,12 @@ from pathlib import Path
 import b2b.sources.oneclimate as oneclimate
 import duckdb
 from b2b.env import STORE_PATH, energyplus_path
-from b2b.pipeline import create_complete_pipeline
+from b2b.pipeline import ActuatorDescription, create_complete_pipeline
 from b2b.store import (
     OUTPUT,
     Constant,
     Derivation,
+    Expression,
     GitClone,
     Rename,
     derivation,
@@ -33,29 +34,46 @@ description_path = "data/tables/base_archetype_description.csv"
 
 
 def housing_archetypes_database() -> Derivation:
+    # Some of the files that are in the table are not present in the repo
+    # itself. This is the case, for instance, for the ERS-EX-10160 file. To
+    # ensure the database is well-formed, we verify each file
+
     @derivation("index.parquet")
     def index(root: Path):
         output = OUTPUT.get()
 
         df = duckdb.from_csv_auto(str(root / description_path)).to_df()
 
-        def trans(name: str) -> str:
-            p = root / idf_path / name
+        def trans(name: str) -> str | None:
+            # The names we find in the csv look like this:
+            #
+            # ERS-EX-10000.H2K
+            #
+            # To find the corresponding filename, we need to change the
+            # extension to .idf and to add -in to the name.
 
-            return str(p.with_stem(p.stem + "-in").with_suffix(".idf"))
+            p = root / idf_path / name
+            p = p.with_suffix(".idf")
+            p = p.with_stem(p.stem + "-in")
+            if p.exists():
+                return str(p)
+            else:
+                return None
 
         df = df.assign(filepath=df.filename.apply(trans))
-
+        # Some filenames are missing (don't exist). Let's remove them
+        df = df.dropna(subset=["filepath"])
+        df = df.reset_index(drop=True)
+        df["id"] = range(len(df))
         # There are two different ways québec is written. we defer to the one
         # without the accent because it's easier to work with.
         df.loc[df.region == "QUÉBEC", "region"] = "QUEBEC"
-
         duckdb.from_df(df).to_parquet(str(output))
 
     return index(housing_archetypes())
 
 
-def process(path: Path) -> Derivation:
+def process(path: Path) -> Expression[tuple[Path, list[ActuatorDescription]]]:
     return create_complete_pipeline(
         Rename("input.idf", Constant(path)),
         energyplus_path(),
@@ -64,8 +82,6 @@ def process(path: Path) -> Derivation:
 
 
 def search_buildings(**query) -> DataFrame:
-    ep = energyplus_path()
-
     db_path = realize(STORE_PATH.get(), housing_archetypes_database())
     db = duckdb.read_parquet(str(db_path)).select(duckdb.StarExpression())
 
@@ -77,21 +93,18 @@ def search_buildings(**query) -> DataFrame:
     df = db.to_df()
 
     def trans(path: str):
-        return lambda: create_complete_pipeline(
-            Constant(Path(path)),
-            ep,
-            src_version="24.2.0",
-        )
+        return lambda: process(Path(path))
 
     return df.assign(derivation_thunk=df["filepath"].apply(trans))
 
 
 def search_config(
+    id: int | None = None,
     province: str | None = None,
     city: str | None = None,
     eplus_output_dir: Path = Path("eplus_out"),
 ) -> BuildingConfig:
-    buildings = search_buildings(province=province, location=city)
+    buildings = search_buildings(id=id, province=province, location=city)
 
     matching_buildings = buildings.iloc[[0]]
 
@@ -115,7 +128,7 @@ def search_config(
 
     best_row = max(weather_df.iterrows(), key=lambda r: score(r[1].url))
     weather_path = realize(STORE_PATH.get(), best_row[1].derivation_thunk())
-    building_path = realize(
+    building_path, hvac_actuators = realize(
         STORE_PATH.get(), matching_buildings.iloc[0].derivation_thunk()
     )
 
@@ -127,5 +140,5 @@ def search_config(
         # Empirically, this works for this dataset.
         warmup_phases=1,  # TODO: handle warmup
         area=1000.0,
-        hvac_actuators=[],
+        hvac_actuators=hvac_actuators,
     )

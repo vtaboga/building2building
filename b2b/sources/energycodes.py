@@ -3,6 +3,7 @@ import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import duckdb
 from b2b.env import STORE_PATH, energyplus_path
@@ -59,6 +60,7 @@ def index_buildings(input_zip: Path):
     # Sort by building type, then year, then place for consistent ordering
     records.sort(key=lambda x: (x[0], x[1], x[2]))
     df = DataFrame(records, columns=["building_type", "year", "place", "filename"])
+    df = df.reset_index(drop=False)
     df.to_parquet(str(dst))
 
 
@@ -86,11 +88,36 @@ def index_weathers(input_zip: Path):
     records.sort(key=lambda x: (x[0], x[1], x[2]))
 
     df = DataFrame(records, columns=["state", "county", "filename"])
+    df = df.reset_index(drop=False)
     df.to_parquet(str(dst))
 
 
+# Copy-pasted from set(search_buildings().building_type)
+BuildingType = Literal[
+    "RetailStripmall",
+    "HotelLarge",
+    "ApartmentMidRise",
+    "Warehouse",
+    "ApartmentHighRise",
+    "HotelSmall",
+    "OfficeLarge",
+    "SchoolPrimary",
+    "RetailStandalone",
+    "SchoolSecondary",
+    "RestaurantFastFood",
+    "OfficeMedium",
+    "Hospital",
+    "OutPatientHealthCare",
+    "OfficeSmall",
+    "RestaurantSitDown",
+]
+
+
 def search_buildings(
-    building_type: str | None = None, year: int | None = None, place: str | None = None
+    index: int | None = None,
+    building_type: BuildingType | None = None,
+    year: int | None = None,
+    place: str | None = None,
 ) -> DataFrame:
     zip_derivation = ASHRAE901_all_zip()
 
@@ -98,6 +125,11 @@ def search_buildings(
     db = duckdb.from_parquet(str(idf_index))
 
     expr = db
+    if index is not None:
+        expr = expr.filter(
+            duckdb.ColumnExpression("index") == duckdb.ConstantExpression(index)
+        )
+
     if building_type is not None:
         expr = expr.filter(
             duckdb.ColumnExpression("building_type")
@@ -155,30 +187,32 @@ def search_weathers(
 
 
 def search_config(
-    building_type: str | None = None,
+    building_type: BuildingType | None = None,
+    building_id: int | None = None,
     year: int | None = None,
     place: str | None = None,
     state: str | None = None,
     county: str | None = None,
 ) -> BuildingConfig:
-    b, actuators = realize(
-        STORE_PATH.get(),
-        search_buildings(
-            building_type=building_type,
-            year=year,
-            place=place,
-        )
-        .iloc[0]
-        .derivation_thunk(),
+    buildings = search_buildings(
+        index=building_id,
+        building_type=building_type,
+        year=year,
+        place=place,
     )
+
+    b, equipment = realize(
+        STORE_PATH.get(),
+        buildings.iloc[0].derivation_thunk(),
+    )
+    weathers = search_weathers(
+        state=state,
+        county=county,
+    )
+
     w = realize(
         STORE_PATH.get(),
-        search_weathers(
-            state=state,
-            county=county,
-        )
-        .iloc[0]
-        .derivation_thunk(),
+        weathers.iloc[0].derivation_thunk(),
     )
 
     return BuildingConfig(
@@ -188,5 +222,9 @@ def search_config(
         eplus_output_dir=Path(tempfile.mkdtemp()),
         warmup_phases=3,
         area=1000.0,
-        hvac_actuators=actuators,
+        hvac_equipment=equipment,
+        source_metadata={
+            "building": buildings.iloc[0],
+            "weather": weathers.iloc[0],
+        },
     )
