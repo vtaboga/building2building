@@ -1,7 +1,8 @@
 selection:
-  enabled: false
-  split: train
+  enabled: true
+  split: test
   index: 0
+  controls: [unitary_hvac, baseboard, fanonoff]
 
 bldg:
   geometry_unit_type: "single-family detached"

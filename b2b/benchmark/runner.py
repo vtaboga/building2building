@@ -56,11 +56,9 @@ class RolloutData:
 
 def _maybe_bind_env(*, policy: PolicyLike, env: Any) -> None:
     if isinstance(policy, SupportsBindEnv):
-        try:
-            policy.bind_env(env)
-        except Exception:
-            # Binding is a best-effort convenience; policy may also work without it.
-            pass
+        # If a policy exposes bind_env(), failures should be surfaced: several
+        # baseline policies require env metadata/action_names to operate.
+        policy.bind_env(env)
 
 
 def _maybe_reset_policy(*, policy: PolicyLike) -> None:

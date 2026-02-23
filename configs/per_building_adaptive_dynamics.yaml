@@ -1,0 +1,50 @@
+# Per-building PPO baseline for the adaptive dynamics benchmark.
+#
+# Each SLURM array task trains a dedicated PPO agent on ONE building from
+# the test split.  No building parameter augmentation and no building
+# resampling — the agent only ever sees its own building.
+#
+# The split and split_index are injected at the command line:
+#   python -m scripts.per_building_adaptive_dynamics_main \
+#       split=test split_index=$SLURM_ARRAY_TASK_ID
+
+defaults:
+  - wandb: default
+  - training: default
+  - policy: ppo_parameterized
+  - reward: deadband
+  - _self_
+
+# Override: single env per agent (one building, no parallelism within job).
+training:
+  num_train_envs: 1
+
+# Environment configuration — minimal wrapper stack.
+env:
+  normalize_obs: true
+  augment_building_params: false
+  control_mode: hvac_actuators
+  max_steps: 35040  # One year at 15-min timesteps (365 * 24 * 4)
+
+# Building selection — will be enabled by the trainer at runtime.
+bldg:
+  bldg: {}
+  selection:
+    enabled: false
+
+# Defaults overridden by Hydra CLI
+split: test
+split_index: 0
+
+seed: 42
+
+# SLURM array job ID for grouping runs from the same batch
+# Set via CLI: slurm_array_job_id="${SLURM_ARRAY_JOB_ID}"
+slurm_array_job_id: "none"
+
+# Hydra output directory configuration
+# Use $SCRATCH to avoid disk quota issues on $HOME
+hydra:
+  run:
+    dir: ${oc.env:SCRATCH}/Building2Building/outputs/per_building_adaptive_dynamics/${policy.algorithm}/${now:%d-%m-%Y}/${now:%H-%M-%S}/building_${split_index}
+

@@ -17,6 +17,7 @@ from b2b.baselines.controllers.unitary_sat import UnitaryAirflowFirstSatPolicy
 from b2b.baselines.wandb_utils import (
     finish_wandb_if_started,
     init_wandb_from_config,
+    wandb_log_df_line_series,
 )
 from b2b.benchmark.runner import run_rollout
 
@@ -107,24 +108,101 @@ def run_baseline_rollout(
                 if i < act_arr.shape[1]:
                     df_dict[f"act::{name}"] = act_arr[:, i]
 
-            df = pd.DataFrame(df_dict)
-            df.to_csv(paths.csv_path, index=False)
+            df_plot = pd.DataFrame(df_dict)
+            df_plot.to_csv(paths.csv_path, index=False)
 
-            obs_cols = [c for c in df.columns if c.startswith("obs::")]
-            act_cols = [c for c in df.columns if c.startswith("act::")]
+            # Log a few lightweight timeseries plots to W&B (downsampled).
+            if wandb_run is not None:
+                try:
+
+                    # Temperature: zone air temps + outdoor temp if present
+                    zone_temp_cols = [
+                        c
+                        for c in df_plot.columns
+                        if c.lower().startswith("obs::zone air temperature")
+                    ]
+                    # Limit to avoid overly crowded plots
+                    zone_temp_cols = zone_temp_cols[:10]
+                    outdoor_temp_col = next(
+                        (
+                            c
+                            for c in df_plot.columns
+                            if c.lower() in ("obs::outdoor_temperature", "outdoor_temperature")
+                        ),
+                        None,
+                    )
+                    temp_cols = list(zone_temp_cols)
+                    if outdoor_temp_col is not None:
+                        temp_cols.append(outdoor_temp_col)
+
+                    if temp_cols:
+                        wandb_log_df_line_series(
+                            df=df_plot,
+                            x="global_step",
+                            y_cols=temp_cols,
+                            key_prefix="rollout/temperature",
+                            title="Temperatures",
+                        )
+
+                    # Actions: log a small subset (fan + any schedule setpoints)
+                    act_cols = [c for c in df_plot.columns if c.lower().startswith("act::")]
+                    preferred = [
+                        c
+                        for c in act_cols
+                        if ("fan air mass flow rate" in c.lower())
+                        or ("temperature" in c.lower())
+                        or ("schedule value" in c.lower())
+                    ]
+                    action_cols = (preferred + [c for c in act_cols if c not in preferred])[:12]
+                    if action_cols:
+                        wandb_log_df_line_series(
+                            df=df_plot,
+                            x="global_step",
+                            y_cols=action_cols,
+                            key_prefix="rollout/actions",
+                            title="Actions",
+                        )
+
+                    # Energy + reward
+                    energy_cols = [
+                        c
+                        for c in ("obs::energy_electricity", "obs::energy_gas")
+                        if c in df_plot.columns
+                    ]
+                    if energy_cols:
+                        wandb_log_df_line_series(
+                            df=df_plot,
+                            x="global_step",
+                            y_cols=energy_cols,
+                            key_prefix="rollout/energy",
+                            title="Energy",
+                        )
+                    if "reward" in df_plot.columns:
+                        wandb_log_df_line_series(
+                            df=df_plot,
+                            x="global_step",
+                            y_cols=["reward"],
+                            key_prefix="rollout/reward",
+                            title="Reward",
+                        )
+                except Exception as e:
+                    logger.warning("Failed to log rollout plots to wandb: %s", e)
+
+            obs_cols = [c for c in df_plot.columns if c.startswith("obs::")]
+            act_cols = [c for c in df_plot.columns if c.startswith("act::")]
             np.savez_compressed(
                 paths.npz_path,
-                episode=df["episode"].to_numpy(dtype=np.int32),
-                step=df["step"].to_numpy(dtype=np.int32),
-                reward=df["reward"].to_numpy(dtype=float),
+                episode=df_plot["episode"].to_numpy(dtype=np.int32),
+                step=df_plot["step"].to_numpy(dtype=np.int32),
+                reward=df_plot["reward"].to_numpy(dtype=float),
                 obs_names=np.asarray(obs_cols, dtype=object),
                 act_names=np.asarray(act_cols, dtype=object),
-                obs=df[obs_cols].to_numpy(dtype=float)
+                obs=df_plot[obs_cols].to_numpy(dtype=float)
                 if obs_cols
-                else np.zeros((len(df), 0)),
-                act=df[act_cols].to_numpy(dtype=float)
+                else np.zeros((len(df_plot), 0)),
+                act=df_plot[act_cols].to_numpy(dtype=float)
                 if act_cols
-                else np.zeros((len(df), 0)),
+                else np.zeros((len(df_plot), 0)),
             )
 
             # Summary scalars.
@@ -132,7 +210,7 @@ def run_baseline_rollout(
                 try:
                     import wandb  # type: ignore
 
-                    wandb.summary["rollout/mean_reward"] = float(df["reward"].mean())
+                    wandb.summary["rollout/mean_reward"] = float(df_plot["reward"].mean())
                     if results:
                         wandb.summary["rollout/episode_return_mean"] = float(
                             np.mean([r.total_reward for r in results])

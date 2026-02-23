@@ -7,7 +7,10 @@ from gymnasium.spaces import Box, Dict
 from omegaconf import OmegaConf
 
 from b2b.make_env import make_env
-from b2b.simulator.wrappers import NormalizeObservation
+from b2b.simulator.wrappers import (
+    NormalizeObservation,
+    AugmentObservationWithBuildingParams,
+)
 
 import logging
 
@@ -74,7 +77,13 @@ def test_policy(config, policy_model, output_dir: Path):
     test_dir = output_dir / "test"
     # Build a single env with a dedicated EnergyPlus output dir
     env = make_env(config=config, eplus_output_dir=str(test_dir / "eplus_outputs"))
-    # Require explicit env.normalize_obs
+
+    # Apply building parameter augmentation if configured
+    augment_params = config.env.get('augment_building_params', False)
+    if augment_params:
+        env = AugmentObservationWithBuildingParams(env)
+
+    # Apply observation normalization if configured
     norm_obs = config.env.normalize_obs
     if norm_obs:
         env = NormalizeObservation(env)

@@ -40,13 +40,13 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument(
         "--inputs-dir",
         type=str,
-        default="b2b_outputs",
+        default="outputs/hq_processing",
         help="Directory containing hydroquebec_processing_results_*.json chunk files.",
     )
     p.add_argument(
         "--pattern",
         type=str,
-        default="hydroquebec_processing_results*.json",
+        default="processing_results_chunk_*.json",
         help="Glob pattern within inputs-dir to match JSON chunk files.",
     )
     p.add_argument(
@@ -137,9 +137,7 @@ def _classify_two_actuators(actuator_names: list[str]) -> tuple[int, int, int]:
         s = str(a).strip().lower()
         if "fan" in s:
             fans += 1
-        elif "unitaryhvac schedule for node" in s:
-            nodes += 1
-        elif "node" in s and "setpoint" in s:
+        elif "outlet temp" in s:
             nodes += 1
         else:
             others += 1
@@ -149,8 +147,8 @@ def _classify_two_actuators(actuator_names: list[str]) -> tuple[int, int, int]:
 def main() -> None:
     args = _parse_args()
 
-    # scripts/processing/<this_file>.py -> repo root is two levels up
-    repo_root = Path(__file__).resolve().parents[2]
+    # Assumes this script is executed from the repo root.
+    repo_root = Path.cwd().resolve()
     inputs_dir = Path(args.inputs_dir)
     if not inputs_dir.is_absolute():
         inputs_dir = (repo_root / inputs_dir).resolve()
@@ -166,6 +164,7 @@ def main() -> None:
     total_success = 0
 
     for p in paths:
+        print(f"Processing {p}...")
         for d in _load_json_list(p):
             total_items += 1
             r = _coerce_record(d, src=p)

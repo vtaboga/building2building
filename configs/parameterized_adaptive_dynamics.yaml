@@ -1,0 +1,50 @@
+# Configuration for parameterized PPO on adaptive dynamics benchmark
+# Trains on 900 buildings from train split, evaluates on 100 from test split
+
+defaults:
+  - wandb: default
+  - training: default
+  - policy: ppo_parameterized
+  - reward: deadband
+  - _self_
+
+# Training overrides
+training:
+  # Number of parallel training environments.  Each env independently
+  # resamples buildings, so PPO's rollout buffer contains diverse building
+  # experiences before each policy update.
+  num_train_envs: 16
+
+# Policy overrides
+policy:
+  batch_size: 512
+  learning_rate: 0.0001
+
+# Environment configuration
+env:
+  normalize_obs: true
+  # Enable building parameter augmentation (area, warmup_phases, num_actuators)
+  augment_building_params: true
+  # Pad raw observations to this fixed size before augmentation/normalisation.
+  # Buildings in action_space_2_zone_1 have variable zone counts (obs = N_zones + 7).
+  # 20 accommodates up to 13 thermal zones; extra zero-padded dims are harmless.
+  target_obs_size: 20
+  control_mode: hvac_actuators
+  max_steps: 35040  # One year at 15-min timesteps (365 * 24 * 4)
+
+# Building selection - will be overridden by the trainer
+# The trainer uses bldg.selection mechanism to sample from train/test splits
+bldg:
+  bldg: {}
+  selection:
+    enabled: false  # Will be enabled by trainer
+
+# Random seed for reproducibility
+seed: 42
+
+# Hydra output directory configuration
+# Use $SCRATCH to avoid disk quota issues on $HOME
+hydra:
+  run:
+    dir: ${oc.env:SCRATCH}/Building2Building/outputs/parameterized_adaptive_dynamics/${policy.algorithm}/${now:%d-%m-%Y}/${now:%H-%M-%S}
+

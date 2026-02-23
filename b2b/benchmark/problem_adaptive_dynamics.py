@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from b2b.benchmark.adaptive_dynamics import AdaptiveDynamicsRecord, benchmark_adaptive_dynamics
+import gymnasium as gym
+
+from b2b.benchmark.adaptive_dynamics import (
+    AdaptiveDynamicsRecord,
+    benchmark_adaptive_dynamics,
+)
 from b2b.benchmark.runner import PolicyLike
 
 
@@ -50,8 +56,18 @@ class AdaptiveDynamicsProblem:
     max_steps: int | None = None
     base_config: dict[str, Any] | None = None
 
-    def run(self, policy: PolicyLike, *, output_dir: str | Path = ".") -> list[AdaptiveDynamicsRecord]:
-        cfg: dict[str, Any] = dict(self.base_config) if isinstance(self.base_config, dict) else _default_base_config()
+    def run(
+        self,
+        policy: PolicyLike,
+        *,
+        output_dir: str | Path = ".",
+        env_wrapper: Callable[[gym.Env], gym.Env] | None = None,
+    ) -> list[AdaptiveDynamicsRecord]:
+        cfg: dict[str, Any] = (
+            dict(self.base_config)
+            if isinstance(self.base_config, dict)
+            else _default_base_config()
+        )
 
         bench_section: dict[str, Any] = {
             "split": str(self.split),
@@ -64,7 +80,9 @@ class AdaptiveDynamicsProblem:
         # This matches the existing config layout used by the benchmark function.
         cfg["benchmark"] = bench_section
 
-        return benchmark_adaptive_dynamics(cfg, policy, output_dir=Path(output_dir))
+        return benchmark_adaptive_dynamics(
+            cfg, policy, output_dir=Path(output_dir), env_wrapper=env_wrapper
+        )
 
 
 def run(
@@ -76,6 +94,7 @@ def run(
     limit: int = 0,
     max_steps: int | None = None,
     base_config: dict[str, Any] | None = None,
+    env_wrapper: Callable[[gym.Env], gym.Env] | None = None,
 ) -> list[AdaptiveDynamicsRecord]:
     """
     Convenience wrapper so external code can call `problem_adaptive_dynamics.run(policy)`.
@@ -86,5 +105,4 @@ def run(
         limit=limit,
         max_steps=max_steps,
         base_config=base_config,
-    ).run(policy, output_dir=output_dir)
-
+    ).run(policy, output_dir=output_dir, env_wrapper=env_wrapper)
