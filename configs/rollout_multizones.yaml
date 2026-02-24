@@ -1,0 +1,20 @@
+defaults:
+  - _self_
+  - policy: zone_temp_21
+  - reward: deadband
+
+multizones:
+  # Building types to evaluate.
+  # null = all 6 types; or a list like [OfficeSmall, Warehouse]
+  types: null
+  # Number of buildings per type (first N by building_id).
+  n_per_type: 5
+
+env:
+  max_steps: 35040  # full year at 15-min timesteps (365 * 24 * 4)
+
+hydra:
+  run:
+    dir: outputs/rollout_multizones/${policy.type}/${now:%Y%m%d}/${now:%H%M%S}
+  job:
+    chdir: true

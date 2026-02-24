@@ -122,9 +122,9 @@ Rollout artifacts are written to the Hydra run directory (example files):
 
 ---
 
-### RL training entrypoint: `scripts/main.py`
+### RL training entrypoint: `scripts/main.py` (Hydro-Québec)
 
-`scripts/main.py` is the **Stable-Baselines3 training entrypoint**. It uses `configs/base.yaml` by default (which composes training, SB3 policy, reward, and building selection).
+`scripts/main.py` is the **Stable-Baselines3 training entrypoint** for the Hydro-Québec building set. It uses `configs/base.yaml` by default (which composes training, SB3 policy, reward, and building selection).
 
 #### Run a training job
 
@@ -158,6 +158,68 @@ Training outputs (models, logs, tensorboard, test rollouts) are written under th
 
 ---
 
+### Multizones reference buildings
+
+The **multizones_reference_buildings** dataset contains 6000 parametrically varied EnergyPlus buildings (1000 per type) across six ASHRAE 90.1-2022 prototypes:
+
+- `Warehouse`, `HotelSmall`, `RetailStandalone`, `RestaurantFastFood`, `OfficeMedium`, `OfficeSmall`
+
+Pre-generated **train/test splits** (900 / 100 per type) are stored as pickle files under `b2b/sources/data/` (e.g. `OfficeSmall_train_data`, `OfficeSmall_test_data`).
+
+Two HVAC system types are present:
+- **Unitary systems** (Warehouse, HotelSmall, RetailStandalone, RestaurantFastFood, OfficeSmall) — each zone has an independent unitary HVAC unit.
+- **VAV air-loop systems** (OfficeMedium) — zones share air loops with variable air volume terminals. Cooling setpoints are excluded from the agent action space and fixed internally.
+
+#### RL training on multizones: `scripts/train_multizones.py`
+
+Train an SB3 agent on a **single building** selected by its position in a split list. Uses `configs/train_multizones.yaml`.
+
+```bash
+# Train PPO on the 1st building of the OfficeSmall train split (default)
+PYTHONPATH=. python scripts/train_multizones.py
+
+# Train on the 3rd building of the OfficeMedium train split
+PYTHONPATH=. python scripts/train_multizones.py \
+    multizones.building_type=OfficeMedium multizones.split=train multizones.index=2
+
+# Use SAC instead of PPO
+PYTHONPATH=. python scripts/train_multizones.py policy=sac
+
+# Quick debugging run (10 days, 10k steps)
+PYTHONPATH=. python scripts/train_multizones.py \
+    training.total_timesteps=10000 env.max_steps=960
+```
+
+The `multizones.index` parameter is **0-based**: index 0 is the first building in the split list, index 2 is the third, etc.
+
+Training outputs (models, logs, tensorboard) are written under `outputs/train_multizones/<building_type>/<split>_<index>/<algorithm>/<timestamp>/`.
+
+#### Baseline rollouts on multizones: `scripts/rollout_multizones.py`
+
+Evaluate a policy across multiple buildings and types. Uses `configs/rollout_multizones.yaml`.
+
+```bash
+# Run the default baseline on all 6 types (5 buildings each)
+PYTHONPATH=. python scripts/rollout_multizones.py
+
+# Specific types and count
+PYTHONPATH=. python scripts/rollout_multizones.py \
+    'multizones.types=[OfficeSmall,Warehouse]' multizones.n_per_type=3
+
+# Different baseline controller
+PYTHONPATH=. python scripts/rollout_multizones.py policy=unitary_sat
+
+# Evaluate a trained SB3 checkpoint
+PYTHONPATH=. python scripts/rollout_multizones.py \
+    policy=sb3 policy.algorithm=ppo policy.checkpoint_path=/path/to/best_model.zip
+
+# Evaluate an arbitrary Python policy class
+PYTHONPATH=. python scripts/rollout_multizones.py \
+    policy=custom policy.module=my_package.policies policy.class_name=MyPolicy
+```
+
+---
+
 ### Repository structure (detailed)
 
 #### Top-level
@@ -186,18 +248,22 @@ Training outputs (models, logs, tensorboard, test rollouts) are written under th
   - Building preparation pipeline (parsing EDD/reports, controllable actuator discovery, schedule/surface processing, simulation steps)
 
 - **`b2b/sources/`**
-  - Dataset connectors and selectors (Hydro-Québec, NREL, OneClimate, etc.)
-  - Includes some stored selection lists under `b2b/sources/data/`
+  - Dataset connectors and selectors (Hydro-Québec, NREL, OneClimate, multizones reference buildings)
+  - `multizones_reference_buildings.py`: 6000-building dataset (6 types × 1000)
+  - Pre-generated train/test splits (900/100) stored as pickle lists under `b2b/sources/data/`
 
 - **`b2b/baselines/`**
   - **Controllers** live in `b2b/baselines/controllers/`
     - Rule-based policies expose SB3-like `predict()` and optionally `bind_env/reset/step_metrics`
-    - Any policy-specific “patches” should be implemented here (not in rollout loops)
-  - **SB3 interaction utilities** (training, callbacks, evaluation helpers)
+    - `unitary_sat.py` handles buildings with one or more unitary HVAC systems
+    - `air_loop_sat.py` handles VAV air-loop buildings (e.g. OfficeMedium)
+  - **SB3 trainers**: `online_trainer.py` (Hydro-Québec), `multizones_trainer.py` (multizones reference buildings)
+  - **SB3 interaction utilities** (callbacks, evaluation helpers)
   - `b2b/baselines/runner.py` is a thin compatibility wrapper; the rollout executor is centralized in `b2b/benchmark/`
 
 - **`b2b/benchmark/`**
   - Centralized **simulation execution** (`runner.py`) with Gymnasium-standard loops
+  - `rollout_multizones.py`: multizones rollout driver supporting baselines, SB3 checkpoints (`policy=sb3`), and custom policies (`policy=custom`)
   - Problem definitions (e.g. `problem_adaptive_dynamics.py`)
   - Experiment/Hydra wrappers under `b2b/benchmark/experiments/`
   - Baseline rollout implementation used by `scripts/baselines.py` (`baseline_rollout.py`)

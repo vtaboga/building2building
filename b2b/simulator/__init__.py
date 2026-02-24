@@ -12,7 +12,7 @@ from minergym.ontology import Ontology
 from minergym.simulation import EnergyPlusSimulation
 
 from b2b.simulator.action_spaces import (
-    hvac_actuators_transform,
+    hvac_action_space,
 )
 from b2b.simulator.observation_spaces import (
     dict_observation_info,
@@ -30,7 +30,6 @@ from b2b.types import (
     DeadbandRewardConfig,
 )
 
-from .transform_utils import TransformInverse
 
 logger = logging.getLogger(__name__)
 
@@ -104,20 +103,17 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         )
     )
 
-    # Then the action side stuff
-    # TODO: this is used for the reward functions, but come from actuatorsv1
-    # setpoints = get_controllable_setpoints(ont)
-
-    action_transform = hvac_actuators_transform(actuators)
+    action_space_info = hvac_action_space(actuators)
     action_names = [
-        f"{a.component_type}::{a.control_type}::{a.component_name}" for a in actuators
+        f"{a.component_type}::{a.control_type}::{a.component_name}"
+        for a in action_space_info.agent_actuators
     ]
 
     make_energyplus = MakeEnergyPlus(
         building_config.path_to_building,
         building_config.path_to_weather,
         obs_info.template,
-        action_transform.domain(),
+        action_space_info.full_transform.domain(),
         verbose=False,
         log_dir=eplus_output_dir,
         warmup_phases=building_config.warmup_phases,
@@ -155,8 +151,8 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         reward_function,
         obs_info.space,
         obs_info.flatten,
-        action_transform.codomain(),
-        TransformInverse(action_transform),
+        action_space_info.agent_transform.codomain(),
+        action_space_info.assemble_full_action,
     )
 
     gymenv.metadata = {
@@ -164,7 +160,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         "uncontrolled_zones": uncontrolled_zones,
         "observation_names": obs_info.slot_names,
         "action_names": action_names,
-        "hvac_actuators": building_config.hvac_actuators,
+        "hvac_equipment": building_config.hvac_equipment,
         "area": building_config.area,
         "warmup_phases": building_config.warmup_phases,
         "building_source_metadata": dict(building_config.source_metadata)
