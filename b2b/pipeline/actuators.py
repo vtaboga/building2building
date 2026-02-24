@@ -56,12 +56,7 @@ temp_stl_upper_bound = 50.0
 
 
 def create_temp_stl(
-    obj: dict[str, Any],
-    *,
-    name: str = "Temperature",
-    gensym: Gensym | None = None,
-    lower_limit_value: float = temp_stl_lower_bound,
-    upper_limit_value: float = temp_stl_upper_bound,
+    obj: dict[str, Any], lower: float, upper: float, *, name: str = "Temperature"
 ) -> str:
     """Create a continuous ScheduleTypeLimits for temperatures and return its
     name.
@@ -71,8 +66,8 @@ def create_temp_stl(
 
     name = f"B2B {name} ({gensym()})"
     schedule_type_limits[name] = {
-        "lower_limit_value": float(lower_limit_value),
-        "upper_limit_value": float(upper_limit_value),
+        "lower_limit_value": lower,
+        "upper_limit_value": upper,
         "numeric_type": "Continuous",
         "unit_type": "Temperature",
     }
@@ -83,7 +78,7 @@ def create_temp_stl(
 def create_schedule_constant(
     obj: dict[str, Any],
     stl_name: str,
-    hourly_value: float,
+    hourly_value: int,
     *,
     name: str = "constant schedule",
 ) -> str:
@@ -97,29 +92,11 @@ def create_schedule_constant(
     return name
 
 
-def make_unitary_hvac_controllable(
-    obj: dict[str, Any],
-    only_outlet_nodes: bool = False,
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
-    """Find all unitary air loops and expose the relevant
-    node setpoints as schedules that can be controlled by minergym.
-
-    This is done in many steps:
-
-    1. We create the relevant schedule type descriptors (ScheduleTypeLimits)
-       that will be used by all generated schedules. Those consist of
-
-       1. an OnOff type which will be used by the system fan's schedule
-          ("supply_air_fan_operating_mode_schedule_name").
-
-       2. a Temperature type which will be used by all schedules we use for
-          controlling temperature.
-
-    2. We query the ontology and look for unitary air loops
-       ("AirLoopHVAC:UnitarySystem" and "AirLoopHVAC:UnitaryHeatPump:AirToAir").
-       For each of those, we do the following:
+@dataclass
+class UnitarySystem:
+    zone: str
+    actuators: list[ActuatorDescription]
+    equipment_type: Literal["unitarysystem"] = "unitarysystem"
 
     def actuator_descriptions(self) -> list[ActuatorDescription]:
         return self.actuators
@@ -168,80 +145,30 @@ def make_unitary_controllable(
         obj, 5.0, 50.0, name="unitaryhvac temperature setpoints stl"
     )
 
-    # Note: I wrapped each coil section in OPTIONAL blocks because not all
-    # unitary systems have all three coil types (e.g., cooling-only systems
-    # won't have heating coils).
-    #
-    # TODO: actually handle cases where some of these are None.
-    all_loops_query = """# -*- mode: sparql-*-
-SELECT ?loop ?loop_type ?outlet_node ?cooling_coil ?cooling_coil_node ?heating_coil ?heating_coil_node ?supplemental_coil ?supplemental_coil_node
-WHERE {
-  VALUES ?loop_type { "AirLoopHVAC:UnitarySystem" "AirLoopHVAC:UnitaryHeatPump:AirToAir" } .
-  ?loop a ?loop_type .
-  ?loop idf:air_outlet_node_name ?outlet_node .
+    # Step 1: zone -> terminal_inlet_node
+    # Walk: EquipmentConnections -> EquipmentList -> ADU -> NoReheat terminal
+    zone_to_terminal_inlet: dict[str, str] = {
+        str(row.zone): str(row.terminalInletNode)
+        for row in g.query("""
+            SELECT ?zone ?terminalInletNode
+            WHERE {
+                ?equipConn a "ZoneHVAC:EquipmentConnections" .
+                ?equipConn idf:zone_name ?zone .
+                ?equipConn idf:zone_conditioning_equipment_list_name ?equipList .
 
-  # Cooling coil outlet
-  OPTIONAL {
-    ?loop idf:cooling_coil_name ?cooling_coil .
-    ?loop idf:cooling_coil_object_type ?cooling_coil_type .
-    ?cooling_coil a ?cooling_coil_type .
+                ?equipList a "ZoneHVAC:EquipmentList" .
+                ?equipList idf:equipment ?equipHead .
+                ?equipHead rdf:rest*/rdf:first ?equipItem .
+                ?equipItem idf:zone_equipment_name ?aduName .
 
-    # Try both possible outlet field names
-    { ?cooling_coil idf:air_outlet_node_name ?cooling_coil_node }
-    UNION
-    { ?cooling_coil idf:outlet_node_name ?cooling_coil_node }
-  }
+                ?aduName a "ZoneHVAC:AirDistributionUnit" .
+                ?aduName idf:air_terminal_name ?terminalName .
 
-  # Heating coil outlet
-  OPTIONAL {
-    ?loop idf:heating_coil_name ?heating_coil .
-    ?loop idf:heating_coil_object_type ?heating_coil_type .
-    ?heating_coil a ?heating_coil_type .
-
-    { ?heating_coil idf:air_outlet_node_name ?heating_coil_node }
-    UNION
-    { ?heating_coil idf:outlet_node_name ?heating_coil_node }
-  }
-
-  # Supplemental heating coil outlet
-  OPTIONAL {
-    ?loop idf:supplemental_heating_coil_name ?supplemental_coil .
-    ?loop idf:supplemental_heating_coil_object_type ?supplemental_coil_type .
-    ?supplemental_coil a ?supplemental_coil_type .
-
-    { ?supplemental_coil idf:air_outlet_node_name ?supplemental_coil_node }
-    UNION
-    { ?supplemental_coil idf:outlet_node_name ?supplemental_coil_node }
-  }
-}
-
-
-"""
-    # loop, outlet, cooling_coil, cooling_coil_node
-    for (
-        loop,
-        loop_type,
-        outlet_node,
-        cooling_coil,
-        cooling_coil_node,
-        heating_coil,
-        heating_coil_node,
-        supplemental_coil,
-        supplemental_coil_node,
-    ) in ont.rdf.query(all_loops_query):
-        loop_type_name = str(loop_type)
-        unitary_system = obj[loop_type_name][str(loop)]
-
-        unitary_system["control_type"] = "SetPoint"
-
-        # Set up the fan mode. It should be always on
-        fan_mode_schedule_name = create_schedule_constant(
-            obj,
-            onoff_stl_name,
-            1,
-            name="unitaryhvac fan mode schedule",
-            gensym=gensym,
-        )
+                ?terminalName a "AirTerminal:SingleDuct:ConstantVolume:NoReheat" .
+                ?terminalName idf:air_inlet_node_name ?terminalInletNode .
+            }
+        """)
+    }
 
     # Step 2: terminal_inlet_node -> splitter_inlet_node
     terminal_to_splitter_inlet: dict[str, str] = {}
@@ -309,43 +236,23 @@ WHERE {
         )
     }
 
-        # UnitaryHeatPump:AirToAir uses "supply_air_fan_name", while UnitarySystem
-        # uses "supply_fan_name".
-        if loop_type_name == "AirLoopHVAC:UnitaryHeatPump:AirToAir":
-            supply_fan_name = unitary_system.get("supply_air_fan_name")
-        else:
-            supply_fan_name = unitary_system.get("supply_fan_name")
-
-        if not isinstance(supply_fan_name, str) or not supply_fan_name.strip():
-            # Keep going: setpoints can still be created even if fan name is missing.
-            supply_fan_name = None
+    # Assemble and mutate
+    for zone, terminal_inlet in zone_to_terminal_inlet.items():
+        splitter_inlet = terminal_to_splitter_inlet.get(terminal_inlet)
+        if splitter_inlet is None:
+            continue
+        loop_name = splitter_inlet_to_loop.get(splitter_inlet)
+        if loop_name is None:
+            continue
+        unitary_entry = loop_to_unitary.get(loop_name)
+        if unitary_entry is None:
+            continue
+        unitary_name, outlet_node = unitary_entry
 
         system = obj[epjson_type][unitary_name]
 
-        if supply_fan_name is not None:
-            fan_air_mass_flow_rate = ActuatorDescription(
-                "Fan",
-                "Fan Air Mass Flow Rate",
-                supply_fan_name,
-                "[kg/s]",
-                0,
-                100,
-            )
-            new_actuators.append(fan_air_mass_flow_rate)
-
-        # Some buildings legitimately have missing coil outlet nodes or explicit
-        # "NONE" placeholders in node fields. Never create setpoint managers for
-        # such nodes, otherwise EnergyPlus errors out with:
-        #   Node Connection Error, Node="NONE", Setpoint node did not find a matching node...
-        if only_outlet_nodes:
-            raw_nodes = [("outlet", outlet_node)]
-        else:
-            raw_nodes = [
-                ("outlet", outlet_node),
-                ("cooling", cooling_coil_node),
-                ("heating", heating_coil_node),
-                ("reheat", supplemental_coil_node),
-            ]
+        if set_control_type:
+            system["control_type"] = "SetPoint"
 
         new_actuators = []
 
@@ -513,18 +420,8 @@ class VAVSystem:
             out.append(vav.cooling_setpoint)
         return out
 
-    ont = Ontology.from_object(obj)
-    
-    # Water heater setpoints are typically higher than space HVAC setpoints.
-    # Align ScheduleTypeLimits bounds with the actuator bounds to avoid E+ fatal
-    # errors during ProcessScheduleInput.
-    temp_stl_name = create_temp_stl(
-        obj,
-        name="water heater temperature stl",
-        gensym=gensym,
-        lower_limit_value=40.0,
-        upper_limit_value=70.0,
-    )
+    def zones(self) -> list[str]:
+        return [vav.zone for vav in self.terminals]
 
 
 def remove_thermostat_ems_overrides(obj: dict[str, Any]) -> None:
@@ -535,13 +432,29 @@ def remove_thermostat_ems_overrides(obj: dict[str, Any]) -> None:
     CLGSETP_SCH / HTGSETP_SCH actuators at BeginTimestepBeforePredictor.
     These fight any external setpoint control and must be removed.
 
-        # Create a new controllable schedule for the setpoint 
-        sched_name = create_schedule_constant(
-            obj,
-            temp_stl_name,
-            60.0,
-            name=f"controllable setpoint for {wh_name}",
-            gensym=gensym,
+    Strategy: identify EMS:Actuator entries whose target schedule name
+    contains ``CLGSETP_SCH`` or ``HTGSETP_SCH``, then cascade-delete the
+    programs, calling-managers, sensors, and internal-variables that
+    reference them.
+    """
+    ems_actuators = obj.get("EnergyManagementSystem:Actuator", {})
+
+    # 1. Find EMS actuator names targeting thermostat setpoint schedules.
+    target_actuator_names: set[str] = set()
+    for name, act in list(ems_actuators.items()):
+        comp_name = act.get("actuated_component_unique_name", "")
+        if "CLGSETP_SCH" in comp_name or "HTGSETP_SCH" in comp_name:
+            target_actuator_names.add(name)
+
+    if not target_actuator_names:
+        return
+
+    # 2. Find EMS programs that SET any of these actuators.
+    ems_programs = obj.get("EnergyManagementSystem:Program", {})
+    programs_to_remove: set[str] = set()
+    for prog_name, prog in ems_programs.items():
+        lines = " ".join(
+            l.get("program_line", "") for l in prog.get("lines", [])
         )
         if any(act_name in lines for act_name in target_actuator_names):
             programs_to_remove.add(prog_name)
@@ -844,339 +757,18 @@ def make_all_equipment(
     return json_obj, all_equipment
 
 
-'''def make_waterheater_controllable(
-    obj: dict[str, Any],
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
-     """Find all waterheaters and for each of those, expose the availibility
-        schedue as a schedule that can be controlled."""
-     
-     obj = deepcopy(obj)
-
-     ont = Ontology.from_object(obj)
-
-     binary_stl = create_onoff_availability_stl(obj, name="baseboard availibility")
-'''
-
-
-def make_waterheater_controllable(
-    obj: dict[str, Any],
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
-    """Find all waterheaters and for each of those, expose the availibility
-    schedue as a schedule that can be controlled."""
-
-    obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym
-
-    ont = Ontology.from_object(obj)
-
-    # Water heater setpoints are typically higher than space HVAC setpoints.
-    # Align ScheduleTypeLimits bounds with the actuator bounds to avoid E+ fatal
-    # errors during ProcessScheduleInput.
-    temp_stl_name = create_temp_stl(
-        obj,
-        name="water heater temperature stl",
-        gensym=gensym,
-        lower_limit_value=40.0,
-        upper_limit_value=70.0,
-    )
-
-    # SPARQL query for Water Heaters
-    all_waterheaters_query = """# -*- mode: sparql -*-
-    SELECT ?wh WHERE {
-      ?wh a "WaterHeater:Mixed" .
-    }"""
-
-    new_actuators = []
-
-    for (wh_id,) in ont.rdf.query(all_waterheaters_query):
-        wh_name = str(wh_id)
-        wh_entry = obj["WaterHeater:Mixed"][wh_name]
-
-        # Create a new controllable schedule for the setpoint
-        sched_name = create_schedule_constant(
-            obj,
-            temp_stl_name,
-            60.0,
-            name=f"controllable setpoint for {wh_name}",
-            gensym=gensym,
-        )
-
-        # Override the original schedule
-        wh_entry["setpoint_temperature_schedule_name"] = sched_name
-
-        new_actuators.append(
-            ActuatorDescription(
-                component_type="Schedule:Constant",
-                control_type="Schedule Value",
-                component_name=sched_name,
-                units="Temperature",
-                lower_bound=40.0,
-                upper_bound=70.0,
-            )
-        )
-
-    return obj, new_actuators
-
-
-def make_pump_controllable(
-    obj: dict[str, Any],
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
-    """Find all Pump:ConstantSpeed and for each of those, expose the availibility
-    schedue as a schedule that can be controlled."""
-
-    obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym
-
-    new_actuators = []
-
-    ont = Ontology.from_object(obj)
-
-    binary_stl = create_onoff_availability_stl(
-        obj, name="pump availability stl", gensym=gensym
-    )
-
-    # SPARQL query for Constant Speed Pumps
-    pump_query = """# -*- mode: sparql -*-
-    SELECT ?pump WHERE {
-      ?pump a "Pump:ConstantSpeed" .
-    }"""
-
-    for (pump_id,) in ont.rdf.query(pump_query):
-        pump_name = str(pump_id)
-        # In EnergyPlus pumps are often controlled via availability schedules
-        new_schedule_name = create_schedule_constant(
-            obj,
-            binary_stl,
-            1,
-            name=f"controllable schedule for pump {pump_name}",
-            gensym=gensym,
-        )
-
-        # Set the pump to use this new schedule (Adding field if not present)
-        obj["Pump:ConstantSpeed"][pump_name][
-            "pump_scheduling_control_scheme"
-        ] = "Schedule"
-        obj["Pump:ConstantSpeed"][pump_name][
-            "availability_schedule_name"
-        ] = new_schedule_name
-
-        new_actuators.append(
-            ActuatorDescription(
-                component_type="Schedule:Constant",
-                control_type="Schedule Value",
-                component_name=new_schedule_name,
-                units="Availability",
-                lower_bound=0.0,
-                upper_bound=1.0,
-            )
-        )
-
-    return obj, new_actuators
-
-
-def make_airterminal_controllable(
-    obj: dict[str, Any],
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
-    """Find all ConstantVolume:NoReheat Air Terminals and for each of those, expose the availibility
-    schedue as a schedule that can be controlled."""
-
-    obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym
-
-    new_actuators = []
-
-    ont = Ontology.from_object(obj)
-
-    binary_stl = create_onoff_availability_stl(
-        obj, name="terminal availability stl", gensym=gensym
-    )
-
-    terminal_query = """# -*- mode: sparql -*-
-    SELECT ?terminal WHERE {
-      ?terminal a "AirTerminal:SingleDuct:ConstantVolume:NoReheat" .
-    }"""
-
-    for (term_id,) in ont.rdf.query(terminal_query):
-        term_name = str(term_id)
-        new_schedule_name = create_schedule_constant(
-            obj,
-            binary_stl,
-            1,
-            name=f"controllable schedule for terminal {term_name}",
-            gensym=gensym,
-        )
-
-        obj["AirTerminal:SingleDuct:ConstantVolume:NoReheat"][term_name][
-            "availability_schedule_name"
-        ] = new_schedule_name
-
-        new_actuators.append(
-            ActuatorDescription(
-                component_type="Schedule:Constant",
-                control_type="Schedule Value",
-                component_name=new_schedule_name,
-                units="Availability",
-                lower_bound=0.0,
-                upper_bound=1.0,
-            )
-        )
-
-    return obj, new_actuators
-
-
-def make_controller_outdoorair_controllable(
-    obj: dict[str, Any],
-    *,
-    gensym: Gensym | None = None,
-) -> tuple[dict[str, Any], list[ActuatorDescription]]:
-    """Find all Controller:OutdoorAir and for each of those, expose the availibility
-    schedue as a schedule that can be controlled."""
-
-    obj = deepcopy(obj)
-    gensym = Gensym() if gensym is None else gensym
-
-    new_actuators = []
-
-    ont = Ontology.from_object(obj)
-
-    fraction_stl = obj.get("ScheduleTypeLimits", {}).get("Fraction", None)
-    if not fraction_stl:
-        # Create a fraction STL if it doesn't exist for the controller
-        schedule_type_limits = obj.setdefault("ScheduleTypeLimits", {})
-        fraction_stl = f"B2B Fraction STL ({gensym()})"
-        schedule_type_limits[fraction_stl] = {
-            "lower_limit_value": 0,
-            "upper_limit_value": 1,
-            "numeric_type": "Continuous",
-        }
-
-    oa_controller_query = """# -*- mode: sparql -*-
-    SELECT ?controller WHERE {
-      ?controller a "Controller:OutdoorAir" .
-    }"""
-
-    for (ctrl_id,) in ont.rdf.query(oa_controller_query):
-        ctrl_name = str(ctrl_id)
-        new_schedule_name = create_schedule_constant(
-            obj,
-            str(fraction_stl),
-            1,
-            name=f"controllable OA fraction for {ctrl_name}",
-            gensym=gensym,
-        )
-
-        obj["Controller:OutdoorAir"][ctrl_name][
-            "minimum_outdoor_air_schedule_name"
-        ] = new_schedule_name
-
-        new_actuators.append(
-            ActuatorDescription(
-                component_type="Schedule:Constant",
-                control_type="Schedule Value",
-                component_name=new_schedule_name,
-                units="Fraction",
-                lower_bound=0.0,
-                upper_bound=1.0,
-            )
-        )
-
-    return obj, new_actuators
-
-
 def make_controllable(
     input_epjson: Realizable,
     *,
-    controls: (
-        Sequence[
-            Literal[
-                "unitary_hvac",
-                "baseboard",
-                "fanonoff",
-                "waterheater",
-                "pump",
-                "airterminal",
-                "controller_outdoorair",
-            ]
-        ]
-        | None
-    ) = None,
-) -> Expression[tuple[Path, list[ActuatorDescription]]]:
-    # By default, we enable all controls.
-    # Keep the controls argument for backwards compatibility until code is stable
-    selected_controls = (
-        list(controls)
-        if controls is not None
-        else [
-            "unitary_hvac",
-            "baseboard",
-            "fanonoff",
-            "waterheater",
-            "pump",
-            "airterminal",
-            "controller_outdoorair",
-        ]
-    )
-
+    controls: Sequence[str] | None = None,
+) -> Expression[tuple[Path, Sequence[Equipment]]]:
     @derivation("controllable-building")
-    def make_controllable_builder(input: Path, controls: list[str]):
+    def make_controllable_builder(input: Path):
         real_out = OUTPUT.get()
         with open(input, "rb") as f:
             json_obj = json.load(f)
 
-        gensym = Gensym()
-        # IMPORTANT: `controls` must be a derivation argument (not a closure),
-        # so it is included in the derivation hash and caching is correct.
-        selected = set(controls)
-        all_actuators: list[ActuatorDescription] = []
-
-        def _enabled(name: str) -> bool:
-            return name in selected
-
-        if _enabled("unitary_hvac"):
-            json_obj, hvac_actuators = make_unitary_hvac_controllable(
-                json_obj, only_outlet_nodes=True, gensym=gensym
-            )
-            all_actuators.extend(hvac_actuators)
-
-        if _enabled("baseboard"):
-            json_obj, baseboard_actuators = make_baseboard_controllable(
-                json_obj, gensym=gensym
-            )
-            all_actuators.extend(baseboard_actuators)
-
-        if _enabled("fanonoff"):
-            json_obj, fanonoff_actuators = make_fanonoff_controllable(
-                json_obj, gensym=gensym
-            )
-            all_actuators.extend(fanonoff_actuators)
-
-        if _enabled("waterheater"):
-            json_obj, waterheater_actuators = make_waterheater_controllable(
-                json_obj, gensym=gensym
-            )
-            all_actuators.extend(waterheater_actuators)
-
-        if _enabled("pump"):
-            json_obj, pump_actuators = make_pump_controllable(json_obj, gensym=gensym)
-            all_actuators.extend(pump_actuators)
-
-        if _enabled("airterminal"):
-            json_obj, airterminal_actuators = make_airterminal_controllable(
-                json_obj, gensym=gensym
-            )
-            all_actuators.extend(airterminal_actuators)
-
-        if _enabled("controller_outdoorair"):
-            json_obj, controller_outdoorair_actuators = (
-                make_controller_outdoorair_controllable(json_obj, gensym=gensym)
-            )
-            all_actuators.extend(controller_outdoorair_actuators)
+        gensym.reset()
 
         json_obj, equipment = make_all_equipment(json_obj)
 
@@ -1184,8 +776,8 @@ def make_controllable(
 
         json.dump(json_obj, open(tmp_out / "building.epjson", "w"), indent=4)
         json.dump(
-            unstructure(all_actuators),
-            open(tmp_out / "actuators.json", mode="w"),
+            unstructure(equipment),
+            open(tmp_out / "equipment.json", mode="w"),
             indent=4,
         )
 
@@ -1198,4 +790,4 @@ def make_controllable(
 
         return folder / "building.epjson", structure(actuators_json, list[AnyEquipment])
 
-    return parse_expr(make_controllable_builder(input_epjson, selected_controls))
+    return parse_expr(make_controllable_builder(input_epjson))

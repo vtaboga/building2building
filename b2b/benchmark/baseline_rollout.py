@@ -14,6 +14,7 @@ from b2b.baselines.common import RolloutPaths, make_rollout_paths
 from b2b.baselines.controllers.fan_coil_constant import FanCoilConstantPolicy
 from b2b.baselines.controllers.unitary_pi import UnitaryPIPolicy
 from b2b.baselines.controllers.unitary_sat import UnitaryAirflowFirstSatPolicy
+from b2b.baselines.controllers.zone_temp_21 import ZoneTemp21Policy
 from b2b.baselines.wandb_utils import (
     finish_wandb_if_started,
     init_wandb_from_config,
@@ -39,6 +40,8 @@ def _build_controller_policy(cfg: DictConfig) -> Any:
         return UnitaryPIPolicy(cfg.policy)
     if policy_type in ("unitary_airflow_first_sat", "unitary_sat"):
         return UnitaryAirflowFirstSatPolicy(cfg.policy)
+    if policy_type == "zone_temp_21":
+        return ZoneTemp21Policy(cfg.policy)
     raise NotImplementedError(f"Unsupported baseline policy.type={policy_type!r}")
 
 

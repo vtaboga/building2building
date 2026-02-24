@@ -34,7 +34,7 @@ def base_reward_function(
         current_temp = obs["temperature"][zone]
         temp_error += (current_temp - target_temp) ** 2
 
-    temp_error = temp_error / max(len(controlled_zones), 1)
+    temp_error = temp_error / len(controlled_zones)
 
     # Combine rewards (negative values represent penalties)
     # Equal weighting between temperature tracking and energy consumption

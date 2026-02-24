@@ -1,0 +1,9 @@
+{
+    "networkPolicy": {
+      "default": "allow"
+    },
+    "additionalReadwritePaths": [
+      "/usr/local/EnergyPlus-24-2-0",
+      "/home/vtab/.local"
+    ]
+  }
