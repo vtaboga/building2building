@@ -10,9 +10,10 @@ from b2b.baselines.test import test_policy
 from b2b.baselines.utils import make_dummy_vec_env, make_env, log_test_dir_graphs_wandb
 from b2b.baselines.wandb_utils import init_wandb_from_config
 from b2b.simulator.wrappers import NormalizeObservation
+from stable_baselines3.common.callbacks import CallbackList, EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.callbacks import EvalCallback, CallbackList
 from stable_baselines3.common.utils import set_random_seed
+from stable_baselines3.common.vec_env import SubprocVecEnv
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ def _make_envs(config: OmegaConf, output_dir: Path):
         return env
 
     num_envs = int(config.training.num_train_envs)
+    vec_cls = SubprocVecEnv if num_envs > 1 else None
     train_env = make_vec_env(
         make_env,
         n_envs=num_envs,
@@ -36,6 +38,7 @@ def _make_envs(config: OmegaConf, output_dir: Path):
             "eplus_output_dir": str(output_dir / "train_eplus_outputs"),
         },
         wrapper_class=wrapper_fn,
+        vec_env_cls=vec_cls,
     )
     eval_env = make_dummy_vec_env(
         config=config,

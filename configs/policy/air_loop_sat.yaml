@@ -1,0 +1,35 @@
+type: air_loop_sat
+
+target_temp: 21.0
+deadband: 0.5
+
+# SAT control (per air loop)
+sat_neutral: 21.0
+sat_kp: 4.0
+sat_min: 10.0
+sat_max: 60.0
+sat_rate_limit: 2.0
+outdoor_sat_gain: 0.2
+sat_cold_bias: 0.6
+
+# Flow control (per zone)
+flow_base: 0.35
+flow_kp: 0.15
+flow_ki: 0.025
+flow_min: 0.0
+flow_max: 1.0
+flow_rate_limit: 0.08
+integral_max: 30.0
+integral_decay: 0.997
+
+# Thermostat setpoints (per zone)
+htg_sp_base: 21.0
+clg_sp_base: 24.0
+sp_kp: 2.5
+sp_rate_limit: 0.5
+htg_sp_min: 10.0
+htg_sp_max: 30.0
+clg_sp_min: 18.0
+clg_sp_max: 40.0
+
+error_ema_alpha: 0.5
