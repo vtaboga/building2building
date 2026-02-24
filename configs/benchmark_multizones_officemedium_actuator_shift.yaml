@@ -1,0 +1,65 @@
+defaults:
+  - _self_
+  - benchmark_interface: single_type
+
+benchmark_interface:
+  mode: single_type
+  building_type: OfficeMedium
+  train:
+    selection:
+      mode: random
+      n: 3
+      seed: 42
+      replace: false
+      indices: []
+      queries: []
+    config:
+      reward:
+        reward_type: BarrierRewardConfig
+        energy_weight: 0.1
+        deadband_c: 0.5
+        violation_penalty: 100.0
+      task:
+        run_period: winter
+        target_temperature_mode: occupancy
+        default_zone_target_temperature:
+          occupied_c: 21.0
+          unoccupied_c: 18.0
+        zone_target_temperatures: {}
+      actuator_access:
+        # Train without zone heating setpoints.
+        include_zone_heating_setpoints: false
+  test:
+    selection:
+      mode: random
+      n: 3
+      seed: 7
+      replace: false
+      indices: []
+      queries: []
+    config:
+      reward:
+        reward_type: DeadbandRewardConfig
+        energy_weight: 0.05
+        target_temp: 21.0
+        dT: 0.5
+      task:
+        run_period: summer
+        target_temperature_mode: constant
+        default_zone_target_temperature:
+          occupied_c: 22.0
+          unoccupied_c: 22.0
+        zone_target_temperatures: {}
+      actuator_access:
+        # Test with all actuators including zone heating setpoints.
+        include_zone_heating_setpoints: true
+
+output:
+  resolve_configs: true
+  summary_file: benchmark_officemedium_actuator_shift_summary.json
+
+hydra:
+  run:
+    dir: outputs/benchmarks/officemedium_actuator_shift/${now:%Y%m%d}/${now:%H%M%S}
+  job:
+    chdir: true

@@ -18,12 +18,11 @@ dependencies = [
     "shapely==2.0.5",
     "rdflib==7.1.4",
     "requests==2.32.3",
-    "pytest==8.3.5",
     "duckdb==1.3.1",
     "pyarrow>=20.0.0",
     "rich>=14.1.0",
     "gitpython>=3.1.45",
-    "bs4",
+    "beautifulsoup4",
     "lxml>=6.0.2",
     "wandb>=0.22.3",
     "hydra-core>=1.3.2",
@@ -37,13 +36,12 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "deepdiff",
-    "pytest",
+    "pytest==8.3.5",
     "pytest-mock",
 ]
 dev = [
+    "black",
     "pyright",
-    "nodeenv",
-    # ... your dev dependencies
 ]
 
 all = ["b2b[test,dev]"]
@@ -53,3 +51,14 @@ all = ["b2b[test,dev]"]
 where = ["."]
 include = ["b2b*"]
 exclude = ["tests*"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "quick: fast tests that do not require EnergyPlus simulation",
+    "long: slower tests that rely on simulation or heavy data processing",
+]

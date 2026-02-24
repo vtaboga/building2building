@@ -7,8 +7,6 @@ The building is identified by (building_type, split, index) where *index* is the
 from __future__ import annotations
 
 import logging
-import pickle
-import uuid
 from pathlib import Path
 from typing import Any, Literal
 
@@ -25,29 +23,26 @@ from b2b.baselines.wandb_utils import (
     finish_wandb_if_started,
     init_wandb_from_config,
 )
-from b2b.benchmark.rollout_multizones import build_config
-from b2b.simulator import create_simulator
+from b2b.api import make_multizones_env as make_multizones_env_api
 from b2b.simulator.wrappers import NormalizeObservation
+from b2b.sources import multizones_reference_buildings as mz_source
 from b2b.sources.multizones_reference_buildings import (
     BuildingType,
-    search_buildings,
+    SPLIT_DATA_DIR,
 )
+from b2b.types import TaskConfig
 
 logger = logging.getLogger(__name__)
-
-SPLIT_DATA_DIR = Path(__file__).resolve().parent.parent / "sources" / "data"
-
 
 def load_split_ids(
     building_type: BuildingType,
     split: Literal["train", "test"],
 ) -> list[int]:
-    """Load the pre-generated list of building IDs for a split."""
-    path = SPLIT_DATA_DIR / f"{building_type}_{split}_data"
-    if not path.exists():
-        raise FileNotFoundError(f"Split file not found: {path}")
-    ids: list[int] = pickle.loads(path.read_bytes())
-    return ids
+    return mz_source.load_split_ids(
+        building_type=building_type,
+        split=split,
+        split_data_dir=SPLIT_DATA_DIR,
+    )
 
 
 def _resolve_building_id(
@@ -61,16 +56,7 @@ def _resolve_building_id(
             f"Index {index} out of range for {building_type}/{split} "
             f"(has {len(ids)} buildings, valid: 0..{len(ids) - 1})"
         )
-    return ids[index]
-
-
-def _get_building_row(building_type: BuildingType, building_id: int) -> dict[str, Any]:
-    df = search_buildings(building_type=building_type, building_id=building_id)
-    if df.empty:
-        raise ValueError(
-            f"No building found: type={building_type}, id={building_id}"
-        )
-    return dict(df.iloc[0])
+    return int(ids[index])
 
 
 def make_multizones_env(
@@ -78,7 +64,8 @@ def make_multizones_env(
     split: Literal["train", "test"],
     index: int,
     eplus_output_dir: str | Path,
-    energy_weight: float = 0.0,
+    reward_section: dict[str, Any] | None = None,
+    task_section: dict[str, Any] | None = None,
     max_steps: int | None = None,
 ) -> gym.Env:
     """Create a Gymnasium env for a single multizones building.
@@ -98,19 +85,15 @@ def make_multizones_env(
     max_steps:
         If given, wrap the env with ``TimeLimit``.
     """
-    building_id = _resolve_building_id(building_type, split, index)
-    row = _get_building_row(building_type, building_id)
-
-    out_dir = Path(eplus_output_dir) / str(uuid.uuid4())
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    bldg_config = build_config(row, out_dir, energy_weight=energy_weight)
-    env = create_simulator(bldg_config)
-
-    if max_steps is not None:
-        env = gym.wrappers.TimeLimit(env, max_episode_steps=max_steps)
-
-    return env
+    return make_multizones_env_api(
+        building_type=building_type,
+        split=split,
+        split_index=index,
+        eplus_output_dir=eplus_output_dir,
+        task=task_section,
+        reward=reward_section,
+        max_steps=max_steps,
+    )
 
 
 # ------------------------------------------------------------------
@@ -123,7 +106,8 @@ def _make_single_env(
     split: Literal["train", "test"],
     index: int,
     eplus_root: str,
-    energy_weight: float,
+    reward_section: dict[str, Any],
+    task_section: dict[str, Any],
     max_steps: int | None,
     norm_obs: bool,
 ) -> gym.Env:
@@ -133,7 +117,8 @@ def _make_single_env(
         split=split,
         index=index,
         eplus_output_dir=eplus_root,
-        energy_weight=energy_weight,
+        reward_section=reward_section,
+        task_section=task_section,
         max_steps=max_steps,
     )
     env = Monitor(env)
@@ -148,7 +133,8 @@ def _make_envs(
     building_type: BuildingType,
     split: Literal["train", "test"],
     index: int,
-    energy_weight: float,
+    reward_section: dict[str, Any],
+    task_section: dict[str, Any],
     max_steps: int | None,
 ) -> tuple[DummyVecEnv | SubprocVecEnv, DummyVecEnv]:
     norm_obs: bool = config.env.normalize_obs
@@ -156,7 +142,8 @@ def _make_envs(
         building_type=building_type,
         split=split,
         index=index,
-        energy_weight=energy_weight,
+        reward_section=reward_section,
+        task_section=task_section,
         max_steps=max_steps,
         norm_obs=norm_obs,
     )
@@ -234,9 +221,24 @@ def multizones_trainer(config: OmegaConf, output_dir: Path) -> None:
         building_type, split, index, building_id,
     )
 
-    energy_weight = float(getattr(config.reward, "energy_weight", 0.0))
+    reward_raw = OmegaConf.to_container(config.reward, resolve=True)
+    reward_section = reward_raw if isinstance(reward_raw, dict) else {}
+    task_node = config.get("task", {})
+    if OmegaConf.is_config(task_node):
+        task_raw = OmegaConf.to_container(task_node, resolve=True)
+        task_section = task_raw if isinstance(task_raw, dict) else {}
+    elif isinstance(task_node, dict):
+        task_section = task_node
+    else:
+        task_section = {}
+    task_cfg = TaskConfig.from_dict(task_section)
+
     max_steps_raw = getattr(config.env, "max_steps", None)
-    max_steps = int(max_steps_raw) if max_steps_raw is not None else None
+    max_steps = (
+        int(max_steps_raw)
+        if max_steps_raw is not None
+        else task_cfg.run_period.expected_steps()
+    )
 
     # ---- wandb ----
     wandb_run, started_here = init_wandb_from_config(
@@ -257,7 +259,14 @@ def multizones_trainer(config: OmegaConf, output_dir: Path) -> None:
 
     # ---- environments ----
     train_env, eval_env = _make_envs(
-        config, output_dir, building_type, split, index, energy_weight, max_steps,
+        config,
+        output_dir,
+        building_type,
+        split,
+        index,
+        reward_section,
+        task_section,
+        max_steps,
     )
 
     # ---- callbacks ----

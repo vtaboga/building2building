@@ -6,17 +6,17 @@ the 0-based position in the pre-generated split ID list.
 
 Usage::
 
-    PYTHONPATH=. python scripts/train_multizones.py
+    python scripts/train_multizones.py
 
     # Train PPO on the 3rd building of the OfficeMedium train split
-    PYTHONPATH=. python scripts/train_multizones.py \\
+    python scripts/train_multizones.py \\
         multizones.building_type=OfficeMedium multizones.split=train multizones.index=2
 
     # Use SAC instead of PPO
-    PYTHONPATH=. python scripts/train_multizones.py policy=sac
+    python scripts/train_multizones.py policy=sac
 
     # Short run for debugging
-    PYTHONPATH=. python scripts/train_multizones.py \\
+    python scripts/train_multizones.py \\
         training.total_timesteps=10000 env.max_steps=960
 """
 
@@ -25,9 +25,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
-from b2b.baselines.multizones_trainer import multizones_trainer
+from b2b.training import run_multizones_training
 
 
 @hydra.main(
@@ -37,7 +37,9 @@ from b2b.baselines.multizones_trainer import multizones_trainer
 )
 def main(cfg: DictConfig) -> None:
     output_dir = Path.cwd()
-    multizones_trainer(config=cfg, output_dir=output_dir)
+    cfg_dict_any = OmegaConf.to_container(cfg, resolve=True)
+    cfg_dict = cfg_dict_any if isinstance(cfg_dict_any, dict) else {}
+    run_multizones_training(config=cfg_dict, output_dir=output_dir)
 
 
 if __name__ == "__main__":

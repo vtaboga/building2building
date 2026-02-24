@@ -95,7 +95,12 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     )
 
     # We compute the observation side stuff
-    obs_info = flat_observation_info(ont, area=building_config.area)
+    obs_info = flat_observation_info(
+        ont,
+        area=building_config.area,
+        controlled_zones=controlled_zones,
+        task_config=building_config.task_config,
+    )
 
     actuators = list(
         itertools.chain(
@@ -124,6 +129,8 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
             area=building_config.area,
             controlled_zones=controlled_zones,
             energy_weight=building_config.reward_config.energy_weight,
+            deadband_c=building_config.reward_config.deadband_c,
+            violation_penalty=building_config.reward_config.violation_penalty,
         )
     elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
@@ -166,6 +173,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         "building_source_metadata": dict(building_config.source_metadata)
         if isinstance(building_config.source_metadata, dict)
         else {},
+        "target_temperature_mode": building_config.task_config.target_temperature_mode,
     }
 
     return gymenv

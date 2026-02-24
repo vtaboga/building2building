@@ -1,0 +1,14 @@
+run_period: full_year  # full_year | winter | summer
+target_temperature_mode: constant  # constant | occupancy
+
+default_zone_target_temperature:
+  occupied_c: 21.0
+  unoccupied_c: 21.0
+
+# Optional per-zone overrides (keys are EnergyPlus zone names).
+# Example:
+# zone_target_temperatures:
+#   ZONE ONE:
+#     occupied_c: 21.0
+#     unoccupied_c: 18.0
+zone_target_temperatures: {}

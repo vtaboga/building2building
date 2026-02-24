@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""Train an SB3 policy on single-zone houses.
+
+This is the main single-zone training entrypoint using `configs/base.yaml`.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,4 +22,3 @@ def main(cfg: DictConfig) -> None:
 
 if __name__ == "__main__":
     main()
-

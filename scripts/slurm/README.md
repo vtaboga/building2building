@@ -35,7 +35,7 @@ sbatch scripts/slurm/run_ppo.sh
 ```
 
 **What it does:**
-- Uses `scripts/main.py` with `configs/base.yaml`
+- Uses `scripts/train_single_zone_houses.py` with `configs/base.yaml`
 - Trains a PPO agent with default hyperparameters
 - Runs for 1M timesteps by default
 - Logs to WandB and TensorBoard
@@ -56,7 +56,7 @@ sbatch scripts/slurm/run_sac.sh
 ```
 
 **What it does:**
-- Uses `scripts/main.py` with `configs/base.yaml` + SAC policy override
+- Uses `scripts/train_single_zone_houses.py` with `configs/base.yaml` + SAC policy override
 - Trains a SAC agent with default hyperparameters
 - Runs for 1M timesteps by default
 - Logs to WandB and TensorBoard
@@ -74,13 +74,13 @@ You can override any configuration parameter using Hydra's command-line syntax:
 
 ```bash
 # Change training timesteps
-sbatch --wrap="python scripts/main.py policy=ppo training.total_timesteps=2000000"
+sbatch --wrap="python scripts/train_single_zone_houses.py policy=ppo training.total_timesteps=2000000"
 
 # Change number of parallel environments
-sbatch --wrap="python scripts/main.py policy=sac training.num_train_envs=8"
+sbatch --wrap="python scripts/train_single_zone_houses.py policy=sac training.num_train_envs=8"
 
 # Change learning rate
-sbatch --wrap="python scripts/main.py policy=ppo policy.learning_rate=0.0001"
+sbatch --wrap="python scripts/train_single_zone_houses.py policy=ppo policy.learning_rate=0.0001"
 
 # Run baseline with more episodes
 sbatch --wrap="python scripts/baselines.py n_episodes=5"

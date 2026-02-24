@@ -20,6 +20,7 @@ from b2b.pipeline import (
     extract_discovery_metadata,
     link_in_schedule,
     make_controllable,
+    modify_run_period,
     prepare_building,
 )
 from b2b.store import (
@@ -35,10 +36,9 @@ from b2b.store import (
     realize,
 )
 from b2b.types import (
-    BarrierRewardConfig,
-    BaseRewardConfig,
     BuildingConfig,
-    DeadbandRewardConfig,
+    TaskConfig,
+    reward_config_from_dict,
 )
 from pandas import DataFrame
 
@@ -159,7 +159,12 @@ def table_index(root_zip: Path):
 
 
 def _build_control_derivation(
-    root_zip: Realizable, idf_filename: str, schedule_filename: str, ep: Realizable, controls: list[str]
+    root_zip: Realizable,
+    idf_filename: str,
+    schedule_filename: str,
+    ep: Realizable,
+    controls: list[str],
+    run_period_name: str,
 ):
     """
     Build control-ready epJSON from IDF (hydroquebec-specific).
@@ -171,6 +176,14 @@ def _build_control_derivation(
 
     # Step 1: Prepare epJSON (upgrade, convert, add meters, set timestep)
     epjson = prepare_building(idf_derivation, ep, src_version="24.2.0")
+    run_period = TaskConfig.from_dict({"run_period": run_period_name}).run_period
+    epjson = modify_run_period(
+        epjson,
+        begin_day_of_month=run_period.begin_day_of_month,
+        begin_month=run_period.begin_month,
+        end_day_of_month=run_period.end_day_of_month,
+        end_month=run_period.end_month,
+    )
 
     schedule_derivation = ExtractFromZip(root_zip, schedule_filename)
     # Step 2: Link schedule data (hydroquebec-specific)
@@ -180,7 +193,7 @@ def _build_control_derivation(
     return make_controllable(epjson, controls=controls)
 
 
-def search_buildings(**query) -> DataFrame:
+def search_buildings(run_period: str = "full_year", **query) -> DataFrame:
     root_zip = dataset_zip()
     index = realize(STORE_PATH.get(), table_index(root_zip))
     ep = energyplus_path()
@@ -188,7 +201,12 @@ def search_buildings(**query) -> DataFrame:
 
     def trans(idf_filename, schedule_filename):
         return lambda: _build_control_derivation(
-            root_zip, idf_filename, schedule_filename, ep, controls
+            root_zip,
+            idf_filename,
+            schedule_filename,
+            ep,
+            controls,
+            run_period_name=run_period,
         )
 
     db = duckdb.from_parquet(str(index))
@@ -236,6 +254,11 @@ def search_configs(
         cfg = cfg_any
 
     config_nn = cfg.get("bldg", {})
+    task_section = cfg.get("task", {}) if isinstance(cfg, dict) else {}
+    if not isinstance(task_section, dict):
+        task_section = {}
+    task_config = TaskConfig.from_dict(task_section)
+
     # Our bldg group configs are nested like: bldg: { bldg: {...} }
     if (
         isinstance(config_nn, dict)
@@ -261,7 +284,7 @@ def search_configs(
             # query dict and forwards it to `_build_control_derivation()`.
             config_nn["controls"] = controls
 
-    rows = search_buildings(**config_nn)
+    rows = search_buildings(run_period=task_config.run_period.name, **config_nn)
     # Heuristic: when no explicit filters are provided, prioritize simpler
     # buildings first to avoid long sequences of E+ fatals during discovery.
     try:
@@ -311,33 +334,10 @@ def search_configs(
             reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
             if not isinstance(reward_section, dict):
                 reward_section = {}
-            reward_type = reward_section.get("reward_type")
-
-            if reward_type == "DeadbandRewardConfig":
-                energy_weight = reward_section.get("energy_weight")
-                target_temp = reward_section.get("target_temp")
-                dT = reward_section.get("dT")
-                reward_config = DeadbandRewardConfig(
-                    area=area,
-                    energy_weight=energy_weight,
-                    target_temp=target_temp,
-                    dT=dT,
-                )
-            elif reward_type == "BaseRewardConfig":
-                energy_weight = reward_section.get("energy_weight")
-                reward_config = BaseRewardConfig(
-                    energy_weight=energy_weight,
-                )
-            elif reward_type == "BarrierRewardConfig":
-                energy_weight = reward_section.get("energy_weight")
-                reward_config = BarrierRewardConfig(
-                    energy_weight=energy_weight,
-                )
-            elif reward_type is None:
-                # Back-compat / convenience: allow callers to omit reward config entirely.
-                reward_config = BaseRewardConfig(energy_weight=0.0)
-            else:
-                raise ValueError(f"Unknown reward type: {reward_type}")
+            reward_config = reward_config_from_dict(
+                reward_section,
+                area=area,
+            )
 
             configs.append(
                 BuildingConfig(
@@ -349,6 +349,7 @@ def search_configs(
                     warmup_phases=warmup_phases,
                     area=area,
                     source_metadata=source_meta,
+                    task_config=task_config,
                 )
             )
         except Exception as e:
@@ -376,3 +377,13 @@ def search_configs(
             continue
 
     return configs
+
+
+def search_config(
+    config: dict | object | None = None,
+    eplus_output_dir: Path = Path("eplus_out"),
+) -> BuildingConfig:
+    configs = search_configs(config=config, n=1, eplus_output_dir=eplus_output_dir)
+    if not configs:
+        raise RuntimeError("No Hydro-Quebec building configuration found")
+    return configs[0]

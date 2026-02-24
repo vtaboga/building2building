@@ -21,11 +21,7 @@ from b2b.baselines.multizones_trainer import (
     _resolve_building_id,
     load_split_ids,
 )
-from b2b.benchmark.rollout_multizones import (
-    _load_custom_policy,
-    _load_sb3_policy,
-    make_policy_from_cfg,
-)
+from b2b.baselines.policies import make_policy_from_config
 from b2b.sources.multizones_reference_buildings import BuildingType
 
 ALL_TYPES: list[BuildingType] = [
@@ -93,7 +89,7 @@ class TestResolveBuildingId:
             _resolve_building_id("OfficeSmall", "train", 9999)
 
 
-# ── make_policy_from_cfg ─────────────────────────────────────────
+# ── make_policy_from_config ──────────────────────────────────────
 
 
 class _DummyPolicy:
@@ -118,7 +114,7 @@ class TestMakePolicyCustom:
                 }
             }
         )
-        policy = make_policy_from_cfg(cfg)
+        policy = make_policy_from_config(OmegaConf.to_container(cfg, resolve=True))
         action, state = policy.predict(np.zeros(4))
         assert action is not None
 
@@ -133,7 +129,7 @@ class TestMakePolicyCustom:
                 }
             }
         )
-        policy = make_policy_from_cfg(cfg)
+        policy = make_policy_from_config(OmegaConf.to_container(cfg, resolve=True))
         assert hasattr(policy, "predict")
 
     def test_custom_rejects_class_without_predict(self) -> None:
@@ -147,7 +143,7 @@ class TestMakePolicyCustom:
             }
         )
         with pytest.raises(TypeError, match="predict"):
-            make_policy_from_cfg(cfg)
+            make_policy_from_config(OmegaConf.to_container(cfg, resolve=True))
 
     def test_custom_missing_module_raises(self) -> None:
         cfg = OmegaConf.create(
@@ -160,7 +156,7 @@ class TestMakePolicyCustom:
             }
         )
         with pytest.raises(ValueError, match="module"):
-            make_policy_from_cfg(cfg)
+            make_policy_from_config(OmegaConf.to_container(cfg, resolve=True))
 
     def test_custom_missing_class_name_raises(self) -> None:
         cfg = OmegaConf.create(
@@ -173,7 +169,7 @@ class TestMakePolicyCustom:
             }
         )
         with pytest.raises(ValueError, match="class_name"):
-            make_policy_from_cfg(cfg)
+            make_policy_from_config(OmegaConf.to_container(cfg, resolve=True))
 
 
 class TestMakePolicySb3:
@@ -188,7 +184,7 @@ class TestMakePolicySb3:
             }
         )
         with pytest.raises(ValueError, match="algorithm"):
-            make_policy_from_cfg(cfg)
+            make_policy_from_config(OmegaConf.to_container(cfg, resolve=True))
 
     def test_sb3_missing_checkpoint_raises(self) -> None:
         cfg = OmegaConf.create(
@@ -201,7 +197,7 @@ class TestMakePolicySb3:
             }
         )
         with pytest.raises(ValueError, match="checkpoint_path"):
-            make_policy_from_cfg(cfg)
+            make_policy_from_config(OmegaConf.to_container(cfg, resolve=True))
 
     def test_sb3_nonexistent_file_raises(self) -> None:
         cfg = OmegaConf.create(
@@ -214,7 +210,7 @@ class TestMakePolicySb3:
             }
         )
         with pytest.raises(FileNotFoundError):
-            make_policy_from_cfg(cfg)
+            make_policy_from_config(OmegaConf.to_container(cfg, resolve=True))
 
     def test_sb3_loads_model_from_checkpoint(self, tmp_path: Path) -> None:
         ckpt = tmp_path / "model.zip"
@@ -236,7 +232,7 @@ class TestMakePolicySb3:
                     }
                 }
             )
-            policy = make_policy_from_cfg(cfg)
+            policy = make_policy_from_config(OmegaConf.to_container(cfg, resolve=True))
             assert policy is mock_model
             mock_cls.load.assert_called_once_with(str(ckpt))
 
@@ -245,35 +241,25 @@ class TestMakePolicyUnknown:
     def test_unsupported_type_raises(self) -> None:
         cfg = OmegaConf.create({"policy": {"type": "nonexistent_policy"}})
         with pytest.raises(NotImplementedError):
-            make_policy_from_cfg(cfg)
+            make_policy_from_config(OmegaConf.to_container(cfg, resolve=True))
 
 
 # ── make_multizones_env ──────────────────────────────────────────
 
 
 class TestMakeMultizonesEnv:
-    @patch("b2b.baselines.multizones_trainer.create_simulator")
-    @patch("b2b.baselines.multizones_trainer.build_config")
-    @patch("b2b.baselines.multizones_trainer.search_buildings")
+    @patch("b2b.baselines.multizones_trainer.make_multizones_env_api")
     def test_creates_env_for_valid_index(
         self,
-        mock_search: MagicMock,
-        mock_build: MagicMock,
-        mock_sim: MagicMock,
+        mock_make_env_api: MagicMock,
         tmp_path: Path,
     ) -> None:
-        import pandas as pd
-
         from b2b.baselines.multizones_trainer import make_multizones_env
 
-        mock_search.return_value = pd.DataFrame(
-            [{"building_id": 42, "building_type": "OfficeSmall", "place": "Montreal"}]
-        )
         mock_env = MagicMock()
         mock_env.observation_space = MagicMock()
         mock_env.action_space = MagicMock()
-        mock_sim.return_value = mock_env
-        mock_build.return_value = MagicMock()
+        mock_make_env_api.return_value = mock_env
 
         env = make_multizones_env(
             building_type="OfficeSmall",
@@ -282,8 +268,7 @@ class TestMakeMultizonesEnv:
             eplus_output_dir=tmp_path,
         )
 
-        mock_build.assert_called_once()
-        mock_sim.assert_called_once()
+        mock_make_env_api.assert_called_once()
         assert env is not None
 
     def test_out_of_range_index_raises(self, tmp_path: Path) -> None:

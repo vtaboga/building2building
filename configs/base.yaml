@@ -5,12 +5,13 @@ defaults:
   - training: default
   - policy: ppo
   - reward: deadband
+  - task: default
   - bldg: single_family
   - rollout: default
 
 env:
   normalize_obs: true
-  max_steps: 35040
+  max_steps: null
 
 n_episodes: 1
 

@@ -22,5 +22,5 @@ export PYTHONPATH="${SLURM_SUBMIT_DIR}:${PYTHONPATH}"
 
 # Run SAC training with the online trainer
 # Override the default PPO policy with SAC
-python scripts/main.py policy=sac
+python scripts/train_single_zone_houses.py policy=sac
 

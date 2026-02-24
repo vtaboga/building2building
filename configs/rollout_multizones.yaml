@@ -2,6 +2,7 @@ defaults:
   - _self_
   - policy: zone_temp_21
   - reward: deadband
+  - task: default
 
 multizones:
   # Building types to evaluate.
@@ -11,7 +12,7 @@ multizones:
   n_per_type: 5
 
 env:
-  max_steps: 35040  # full year at 15-min timesteps (365 * 24 * 4)
+  max_steps: null
 
 hydra:
   run:

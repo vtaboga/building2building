@@ -3,6 +3,10 @@ from b2b.env import STORE_PATH, binaries
 from b2b.sources import hydroquebec
 from b2b.store import realize
 
+import pytest
+
+pytestmark = pytest.mark.long
+
 
 def test_binary():
     realize(STORE_PATH.get(), binaries["linux-x86_64"])

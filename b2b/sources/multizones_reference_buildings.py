@@ -24,9 +24,11 @@ import io
 import logging
 import traceback
 import json
+import pickle
+import random
 import zipfile
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Sequence
 
 import duckdb
 from pandas import DataFrame
@@ -51,10 +53,7 @@ from b2b.store import (
     derivation,
     realize,
 )
-from b2b.types import (
-    BaseRewardConfig,
-    BuildingConfig,
-)
+from b2b.types import BuildingConfig, TaskConfig, reward_config_from_dict
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +65,70 @@ BuildingType = Literal[
     "OfficeMedium",
     "OfficeSmall",
 ]
+
+SPLIT_DATA_DIR = Path(__file__).resolve().parent / "data"
+
+
+def load_split_ids(
+    building_type: BuildingType,
+    split: Literal["train", "test"],
+    *,
+    split_data_dir: Path | None = None,
+) -> list[int]:
+    base_dir = split_data_dir if split_data_dir is not None else SPLIT_DATA_DIR
+    path = base_dir / f"{building_type}_{split}_data"
+    if not path.exists():
+        raise FileNotFoundError(f"Split file not found: {path}")
+    ids: list[int] = pickle.loads(path.read_bytes())
+    return ids
+
+
+def building_id_from_split_index(
+    building_type: BuildingType,
+    split: Literal["train", "test"],
+    split_index: int,
+) -> int:
+    ids = load_split_ids(building_type, split)
+    if split_index < 0 or split_index >= len(ids):
+        raise IndexError(
+            f"Index {split_index} out of range for {building_type}/{split} "
+            f"(has {len(ids)} buildings, valid: 0..{len(ids) - 1})"
+        )
+    return int(ids[split_index])
+
+
+def building_ids_from_split_indices(
+    building_type: BuildingType,
+    split: Literal["train", "test"],
+    split_indices: Sequence[int],
+) -> list[int]:
+    return [
+        building_id_from_split_index(building_type, split, int(idx))
+        for idx in split_indices
+    ]
+
+
+def sample_building_ids(
+    building_type: BuildingType,
+    split: Literal["train", "test"],
+    n: int,
+    *,
+    seed: int | None = None,
+    replace: bool = False,
+) -> list[int]:
+    if not isinstance(n, int) or n < 0:
+        raise ValueError(f"n must be int >= 0, got {n!r}")
+    ids = load_split_ids(building_type, split)
+    rng = random.Random(seed)
+    if n == 0:
+        return []
+    if replace:
+        return [int(rng.choice(ids)) for _ in range(n)]
+    if n > len(ids):
+        raise ValueError(
+            f"Cannot sample n={n} without replacement from only {len(ids)} ids"
+        )
+    return [int(x) for x in rng.sample(ids, k=n)]
 
 
 def dataset_zip() -> Derivation:
@@ -101,6 +164,7 @@ def table_index(root_zip: Path) -> None:
 def _build_control_derivation(
     root_zip: Realizable,
     epjson_filename: str,
+    run_period_name: str,
 ) -> Any:
     """Build a control-ready epJSON from a raw dataset epJSON.
 
@@ -111,10 +175,13 @@ def _build_control_derivation(
     current = add_hvac_meters(current)
     current = add_outdoor_air_meters(current)
     current = modify_timestep(current, timesteps_per_hour=4)
+    run_period = TaskConfig.from_dict({"run_period": run_period_name}).run_period
     current = modify_run_period(
         current,
-        begin_day_of_month=1, begin_month=1,
-        end_day_of_month=31, end_month=12,
+        begin_day_of_month=run_period.begin_day_of_month,
+        begin_month=run_period.begin_month,
+        end_day_of_month=run_period.end_day_of_month,
+        end_month=run_period.end_month,
     )
     current = Rename("building.epjson", current)
     return make_controllable(current)
@@ -124,6 +191,7 @@ def search_buildings(
     building_type: BuildingType | None = None,
     place: str | None = None,
     building_id: int | None = None,
+    run_period: str = "full_year",
     **query: Any,
 ) -> DataFrame:
     root_zip = dataset_zip()
@@ -158,7 +226,11 @@ def search_buildings(
     df = db.to_df()
 
     def trans(epjson_filename: str):
-        return lambda: _build_control_derivation(root_zip, epjson_filename)
+        return lambda: _build_control_derivation(
+            root_zip,
+            epjson_filename,
+            run_period_name=run_period,
+        )
 
     return df.assign(derivation_thunk=df["epjson_filename"].apply(trans))
 
@@ -186,7 +258,15 @@ def search_configs(
     if isinstance(bldg_query, dict) and "bldg" in bldg_query and isinstance(bldg_query["bldg"], dict):
         bldg_query = bldg_query["bldg"]
 
-    rows = search_buildings(**bldg_query)
+    task_section = cfg.get("task", {}) if isinstance(cfg, dict) else {}
+    if not isinstance(task_section, dict):
+        task_section = {}
+    task_config = TaskConfig.from_dict(task_section)
+
+    rows = search_buildings(
+        run_period=task_config.run_period.name,
+        **bldg_query,
+    )
     root_zip = dataset_zip()
 
     configs: list[BuildingConfig] = []
@@ -217,18 +297,22 @@ def search_configs(
             reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
             if not isinstance(reward_section, dict):
                 reward_section = {}
-            energy_weight = reward_section.get("energy_weight", 0.0)
+            reward_config = reward_config_from_dict(
+                reward_section,
+                area=metadata.net_conditioned_area,
+            )
 
             configs.append(
                 BuildingConfig(
                     path_to_building=epjson,
                     path_to_weather=epw,
-                    reward_config=BaseRewardConfig(energy_weight=energy_weight),
+                    reward_config=reward_config,
                     hvac_equipment=hvac_equipment,
                     eplus_output_dir=eplus_output_dir,
                     warmup_phases=metadata.warmup_phases,
                     area=metadata.net_conditioned_area,
                     source_metadata=source_meta,
+                    task_config=task_config,
                 )
             )
         except Exception as e:
@@ -254,3 +338,13 @@ def search_configs(
             continue
 
     return configs
+
+
+def search_config(
+    config: dict | object | None = None,
+    eplus_output_dir: Path = Path("eplus_out"),
+) -> BuildingConfig:
+    configs = search_configs(config=config, n=1, eplus_output_dir=eplus_output_dir)
+    if not configs:
+        raise RuntimeError("No multizones building configuration found")
+    return configs[0]

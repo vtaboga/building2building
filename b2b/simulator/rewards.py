@@ -60,6 +60,8 @@ def barrier_reward_function(
     area: float,
     controlled_zones: list[str],
     energy_weight=1.0,
+    deadband_c: float = 0.5,
+    violation_penalty: float = 100.0,
 ) -> float:
     """Calculate a reward combining temperature tracking and energy consumption.
 
@@ -73,24 +75,22 @@ def barrier_reward_function(
     """
 
     # Energy consumption penalty (in Wh/floor area)
-    energy_penalty = (
-        obs["energy"]["HVAC_electricity"] + obs["energy"]["HVAC_natural_gas"]
-    )
+    energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
     energy_penalty = energy_penalty / 3600.0 / area
 
-    # Calculate temperature tracking error for controlled zones
-    temp_error = 0
-    target_temp = 21.0  # Target temperature in °C
-    delta_temp = 1.5  # Deadband in °C
-    penalty = 1000  # Penalty for temperature error outside of deadband
-
+    # Barrier on comfort around a (possibly zone-specific, occupancy-aware) target.
+    has_violation = False
     for zone in controlled_zones:
-        current_temp = obs["temperature"][zone]
-        if abs(current_temp - target_temp) > delta_temp:
-            temp_error += penalty
+        current_temp = float(obs["temperature"][zone])
+        target_temp = 21.0
+        if "target_temperature" in obs and zone in obs["target_temperature"]:
+            target_temp = float(obs["target_temperature"][zone])
+        if abs(current_temp - target_temp) > deadband_c:
+            has_violation = True
+            break
 
-    # Combine rewards (negative values represent penalties)
-    total_reward = -(temp_error + energy_weight * energy_penalty)
+    comfort_penalty = violation_penalty if has_violation else 0.0
+    total_reward = -(comfort_penalty + energy_weight * energy_penalty)
 
     return total_reward
 
@@ -100,10 +100,17 @@ class BarrierReward:
     area: float
     controlled_zones: list[str]
     energy_weight: float
+    deadband_c: float
+    violation_penalty: float
 
     def __call__(self, obs):
         return barrier_reward_function(
-            obs, self.area, self.controlled_zones, self.energy_weight
+            obs,
+            self.area,
+            self.controlled_zones,
+            self.energy_weight,
+            self.deadband_c,
+            self.violation_penalty,
         )
 
 

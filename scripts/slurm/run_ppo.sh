@@ -22,5 +22,5 @@ export PYTHONPATH="${SLURM_SUBMIT_DIR}:${PYTHONPATH}"
 
 # Run PPO training with the online trainer
 # Uses configs/base.yaml which defaults to PPO
-python scripts/main.py
+python scripts/train_single_zone_houses.py
 
