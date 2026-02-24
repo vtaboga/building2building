@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate a dataset of parametrically varied EnergyPlus IDF files.
+"""Generate a dataset of parametrically varied EnergyPlus epJSON files.
 
 Uses Latin Hypercube Sampling (as in BTAP) to sample building parameter
-combinations.  For each of the 8 supported building types, the LHS samples
+combinations.  For each of the 6 supported building types, the LHS samples
 are distributed across the 16 available climate locations (ASHRAE 90.1 2022
 vintage), giving diverse base envelopes and HVAC sizing *before* the
 parametric modifications are applied.
@@ -14,10 +14,10 @@ Output structure::
         weather/
             USA_AK_Fairbanks.Intl.AP.702610_TMY3.epw
             ...
-        1.idf
-        2.idf
+        1.epJSON
+        2.epJSON
         ...
-        8000.idf
+        6000.epJSON
 
 Usage (all types, sequential)::
 
@@ -42,8 +42,6 @@ import csv
 import json
 import logging
 import shutil
-import subprocess
-import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
@@ -75,9 +73,7 @@ log = logging.getLogger(__name__)
 
 
 BUILDING_TYPES: list[BuildingType] = [
-    "ApartmentMidRise",
     "Warehouse",
-    "ApartmentHighRise",
     "HotelSmall",
     "RetailStandalone",
     "RestaurantFastFood",
@@ -142,28 +138,6 @@ def sample_modifications(
             kwargs[pr.name] = float(pr.low + row[j] * (pr.high - pr.low))
         modifications.append(BuildingModification(**kwargs))
     return modifications
-
-
-def epjson_to_idf(
-    ep_dir: Path, epjson_path: Path, dst_idf: Path
-) -> None:
-    """Convert an epJSON file to IDF using EnergyPlus ConvertInputFormat."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp = Path(tmpdir)
-        tmp_epjson = tmp / "in.epJSON"
-        shutil.copy(epjson_path, tmp_epjson)
-
-        subprocess.run(
-            [str(ep_dir / "ConvertInputFormat"), str(tmp_epjson)],
-            check=True,
-            capture_output=True,
-            cwd=tmpdir,
-        )
-
-        tmp_idf = tmp / "in.idf"
-        if not tmp_idf.exists():
-            raise RuntimeError(f"ConvertInputFormat failed to produce {tmp_idf}")
-        shutil.copy(tmp_idf, dst_idf)
 
 
 @dataclass
@@ -293,7 +267,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--type-index", type=int, default=None,
-        help="If set, process only BUILDING_TYPES[type-index] (0..7). "
+        help="If set, process only BUILDING_TYPES[type-index] (0..5). "
              "Writes a partial metadata_<idx>.csv instead of metadata.csv.",
     )
     parser.add_argument(
@@ -324,9 +298,6 @@ def main() -> None:
         id_offset = 0
 
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    store = STORE_PATH.get()
-    ep_dir = realize(store, energyplus_path())
 
     n_types = len(types_to_process)
     total = samples_per_type * n_types
@@ -384,13 +355,9 @@ def main() -> None:
                 epjson_obj = deepcopy(base.epjson)
                 apply_modifications(epjson_obj, mod)
 
-                tmp_epjson = output_dir / f"{building_id}.epJSON"
-                with open(tmp_epjson, "w") as f:
+                epjson_path = output_dir / f"{building_id}.epJSON"
+                with open(epjson_path, "w") as f:
                     json.dump(epjson_obj, f, indent=2)
-
-                dst_idf = output_dir / f"{building_id}.idf"
-                epjson_to_idf(ep_dir, tmp_epjson, dst_idf)
-                tmp_epjson.unlink()
 
                 row: dict[str, Any] = {
                     "building_id": building_id,
@@ -406,7 +373,7 @@ def main() -> None:
                 if building_id % 100 == 0:
                     log.info("  %d / %d files written", building_id - id_offset, total)
 
-    log.info("Done. %d IDF files written to %s (%s)", total, output_dir, csv_path.name)
+    log.info("Done. %d epJSON files written to %s (%s)", total, output_dir, csv_path.name)
 
 
 if __name__ == "__main__":

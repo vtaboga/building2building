@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=b2b-generate
-#SBATCH --array=0-7
+#SBATCH --array=0-5
 #SBATCH --time=4:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
@@ -8,7 +8,7 @@
 #SBATCH --error=logs/generate_%a.err
 #
 # Generate the building dataset on a SLURM cluster.
-# Submits 8 parallel array tasks, one per building type.
+# Submits 6 parallel array tasks, one per building type.
 #
 # Usage:
 #   mkdir -p logs

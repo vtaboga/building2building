@@ -31,6 +31,7 @@ dependencies = [
     "sb3-contrib>=2.7.0",
     "tensorboard>=2.20.0",
     "cattrs>=25.3.0",
+    "scipy>=1.11.0",
 ]
 
 [project.optional-dependencies]
