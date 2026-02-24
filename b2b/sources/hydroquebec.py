@@ -377,3 +377,13 @@ def search_configs(
             continue
 
     return configs
+
+
+def search_config(
+    config: dict | object | None = None,
+    eplus_output_dir: Path = Path("eplus_out"),
+) -> BuildingConfig:
+    configs = search_configs(config=config, n=1, eplus_output_dir=eplus_output_dir)
+    if not configs:
+        raise RuntimeError("No Hydro-Quebec building configuration found")
+    return configs[0]

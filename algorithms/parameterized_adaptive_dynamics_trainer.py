@@ -34,7 +34,7 @@ from b2b.simulator.wrappers import (
     PadObservation,
     ResampleBuildingOnResetWrapper,
 )
-from b2b.utils import HydroQuebecRowIdSplits
+from b2b.sources.single_zone_houses import SingleZoneHouseRowIdSplits
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ def make_adaptive_dynamics_env(
     """
     # Build available indices from the split
     if split_indices is None:
-        splits = HydroQuebecRowIdSplits.load_from_action_space_2_zone_1()
+        splits = SingleZoneHouseRowIdSplits.load_from_action_space_2_zone_1()
         row_ids = splits.train_row_ids if split == "train" else splits.test_row_ids
         split_indices = list(range(len(row_ids)))
 
@@ -220,7 +220,7 @@ def _make_adaptive_dynamics_envs(
     n_train_envs: int = int(config.training.num_train_envs)
 
     # Load splits to get sizes
-    splits = HydroQuebecRowIdSplits.load_from_action_space_2_zone_1()
+    splits = SingleZoneHouseRowIdSplits.load_from_action_space_2_zone_1()
     train_indices = list(range(len(splits.train_row_ids)))
     test_indices = list(range(len(splits.test_row_ids)))
 

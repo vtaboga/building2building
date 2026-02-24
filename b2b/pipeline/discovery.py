@@ -11,7 +11,7 @@ from b2b.pipeline.parse_reports import (
     get_net_conditioned_area,
     get_warmup_days,
 )
-from b2b.pipeline.steps.outputs import add_all_outputs
+from b2b.pipeline.steps.outputs import add_all_outputs, modify_run_period
 from b2b.store import (
     OUTPUT,
     Expression,
@@ -117,6 +117,7 @@ def DiscoveryMetadata(epjson: Path, epw: Path):
 def extract_discovery_metadata(
     epjson: Realizable,
     epw: Realizable,
+    discovery_run_days: int = 1,
 ) -> Expression[Metadata]:
     """
     Prepare epJSON for discovery simulation and extract all metadata.
@@ -142,8 +143,20 @@ def extract_discovery_metadata(
         Uses pyenergyplus.api which requires setup_energyplus_path() to be called first.
     """
 
-    # Add all output configurations needed for discovery simulation
+    # Add all output configurations needed for discovery simulation and keep
+    # the run period intentionally short to speed up metadata extraction.
+    if discovery_run_days < 1 or discovery_run_days > 31:
+        raise ValueError(
+            f"discovery_run_days must be in [1, 31], got {discovery_run_days}"
+        )
     epjson_with_outputs = add_all_outputs(epjson)
+    epjson_with_outputs = modify_run_period(
+        epjson_with_outputs,
+        begin_day_of_month=1,
+        begin_month=1,
+        end_day_of_month=discovery_run_days,
+        end_month=1,
+    )
 
     @expression()
     def parse_metadata(base_path: Path) -> Metadata:

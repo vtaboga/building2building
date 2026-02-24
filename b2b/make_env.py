@@ -13,11 +13,13 @@ from omegaconf import OmegaConf
 
 from b2b.simulator import create_simulator
 from b2b.sources import hydroquebec
-from b2b.types import TaskConfig
-from b2b.utils import (
-    hydroquebec_building_id_from_split_index,
-    hydroquebec_filenames_for_building_id,
+from b2b.sources.single_zone_houses import (
+    building_id_from_split_index as hydroquebec_building_id_from_split_index,
 )
+from b2b.sources.single_zone_houses import (
+    filenames_for_building_id as hydroquebec_filenames_for_building_id,
+)
+from b2b.types import TaskConfig
 
 logger = logging.getLogger(__name__)
 

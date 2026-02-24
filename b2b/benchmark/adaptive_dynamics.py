@@ -16,7 +16,7 @@ import gymnasium as gym
 
 from b2b.benchmark.runner import EpisodeResult, PolicyLike, run_rollout
 from b2b.make_env import make_env
-from b2b.utils import HydroQuebecRowIdSplits
+from b2b.sources.single_zone_houses import SingleZoneHouseRowIdSplits
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ def benchmark_adaptive_dynamics(
     if start < 0:
         start = 0
 
-    splits = HydroQuebecRowIdSplits.load_from_action_space_2_zone_1()
+    splits = SingleZoneHouseRowIdSplits.load_from_action_space_2_zone_1()
     row_indices = (
         list(map(int, splits.train_row_ids))
         if split == "train"

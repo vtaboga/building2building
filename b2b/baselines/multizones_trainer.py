@@ -7,7 +7,6 @@ The building is identified by (building_type, split, index) where *index* is the
 from __future__ import annotations
 
 import logging
-import pickle
 import uuid
 from pathlib import Path
 from typing import Any, Literal
@@ -28,27 +27,25 @@ from b2b.baselines.wandb_utils import (
 from b2b.benchmark.rollout_multizones import build_config
 from b2b.simulator import create_simulator
 from b2b.simulator.wrappers import NormalizeObservation
+from b2b.sources import multizones_reference_buildings as mz_source
 from b2b.sources.multizones_reference_buildings import (
     BuildingType,
+    SPLIT_DATA_DIR,
     search_buildings,
 )
 from b2b.types import TaskConfig
 
 logger = logging.getLogger(__name__)
 
-SPLIT_DATA_DIR = Path(__file__).resolve().parent.parent / "sources" / "data"
-
-
 def load_split_ids(
     building_type: BuildingType,
     split: Literal["train", "test"],
 ) -> list[int]:
-    """Load the pre-generated list of building IDs for a split."""
-    path = SPLIT_DATA_DIR / f"{building_type}_{split}_data"
-    if not path.exists():
-        raise FileNotFoundError(f"Split file not found: {path}")
-    ids: list[int] = pickle.loads(path.read_bytes())
-    return ids
+    return mz_source.load_split_ids(
+        building_type=building_type,
+        split=split,
+        split_data_dir=SPLIT_DATA_DIR,
+    )
 
 
 def _resolve_building_id(
@@ -62,7 +59,7 @@ def _resolve_building_id(
             f"Index {index} out of range for {building_type}/{split} "
             f"(has {len(ids)} buildings, valid: 0..{len(ids) - 1})"
         )
-    return ids[index]
+    return int(ids[index])
 
 
 def _get_building_row(

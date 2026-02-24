@@ -2,7 +2,7 @@
 Process a subset of Hydro-Québec buildings defined by stored selection lists.
 
 These lists live in `b2b/sources/data/` and are loaded through
-`b2b.utils.HydroQuebecRowIdSplits`.
+`b2b.sources.single_zone_houses.SingleZoneHouseRowIdSplits`.
 
 For each processed building, we store:
 - building id
@@ -207,13 +207,13 @@ def main() -> None:
     from b2b.env import energyplus_path  # noqa: WPS433
     from b2b.sources import hydroquebec  # noqa: WPS433
     from b2b.store import realize  # noqa: WPS433
-    from b2b.utils import (  # noqa: WPS433
-        HydroQuebecRowIdSplits,
+    from b2b.sources.single_zone_houses import (  # noqa: WPS433
+        SingleZoneHouseRowIdSplits,
     )
 
     STORE_PATH.set(store_path)
 
-    splits = HydroQuebecRowIdSplits.load_from_action_space_2_zone_1()
+    splits = SingleZoneHouseRowIdSplits.load_from_action_space_2_zone_1()
     split: Literal["train", "test", "all"] = args.split
     if split == "train":
         row_indices: list[int] = list(splits.train_row_ids)

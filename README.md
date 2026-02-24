@@ -9,6 +9,19 @@ Building2Building is a **reinforcement-learning framework for EnergyPlus buildin
 
 ---
 
+### Recent feature highlights
+
+- **Task-configurable environments** (Hydra): run periods, target-temperature modes, zone-level target overrides.
+- **New reward mode**: barrier reward with large comfort-violation penalty + linear energy penalty.
+- **Expanded observations**: zone occupancy and target temperatures are now part of the observation vector.
+- **Unified building-access API**: sample/select/search buildings across `single_zone_houses` and `multizones_reference_buildings`.
+- **New split benchmark interfaces** for multizones:
+  - single type train/test split benchmark
+  - multi-type train/test split benchmark
+  - dedicated OfficeMedium actuator-access shift setting.
+
+---
+
 ### Quick start
 
 #### Prerequisites
@@ -47,6 +60,53 @@ source .venv/bin/activate
 
 ---
 
+### Task, reward, and observation features
+
+#### Run periods (15-minute EnergyPlus timestep)
+
+Run period is configured via `task.run_period`:
+
+- `full_year` (35040 steps)
+- `winter` (Jan 1 → Mar 31)
+- `summer` (Jun 1 → Aug 31)
+
+When `env.max_steps` is `null`, episode length defaults to the selected run period.
+
+#### Reward functions
+
+Reward configs live in `configs/reward/`:
+
+- `deadband` (`configs/reward/deadband.yaml`)
+- `barrier` (`configs/reward/barrier.yaml`)
+
+Barrier reward behavior:
+
+- linear energy penalty term
+- strong penalty when **any controlled zone** violates comfort around its target temperature
+
+#### Target-temperature modes
+
+Task configs live in `configs/task/`:
+
+- `target_temperature_mode=constant`
+- `target_temperature_mode=occupancy` (occupied/unoccupied targets)
+
+You can set:
+
+- global default target temperatures
+- per-zone target overrides in `task.zone_target_temperatures`
+
+#### Observation space additions
+
+The environment observation now includes:
+
+- per-zone occupancy (`zone_occupancy ...`)
+- per-zone target temperatures (`target_temperature ...`)
+
+These values are bounded and compatible with normalization wrappers.
+
+---
+
 ### Benchmark: adaptive dynamics (Hydro-Québec building set)
 
 This benchmark evaluates a **controller policy** (e.g. `unitary_sat`) across a fixed list of Hydro-Québec buildings. The default script config is `configs/bm_adaptive_dynamics.yaml`.
@@ -79,6 +139,14 @@ Outputs are stored under:
 The benchmark also writes incremental results to:
 
 - `adaptive_dynamics_results.jsonl`
+
+---
+
+### Discovery simulation speed-up
+
+Discovery metadata extraction (`extract_discovery_metadata`) now uses a **short run period by default** (1 day in January) to speed up `.edd`/metadata generation.
+
+This affects discovery/preparation only; train/test task run periods remain controlled by `task.run_period`.
 
 ---
 
@@ -188,6 +256,11 @@ PYTHONPATH=. python scripts/train_multizones.py policy=sac
 # Quick debugging run (10 days, 10k steps)
 PYTHONPATH=. python scripts/train_multizones.py \
     training.total_timesteps=10000 env.max_steps=960
+
+# Use occupancy-driven targets + barrier reward
+PYTHONPATH=. python scripts/train_multizones.py \
+    task.target_temperature_mode=occupancy \
+    reward=barrier
 ```
 
 The `multizones.index` parameter is **0-based**: index 0 is the first building in the split list, index 2 is the third, etc.
@@ -216,6 +289,98 @@ PYTHONPATH=. python scripts/rollout_multizones.py \
 # Evaluate an arbitrary Python policy class
 PYTHONPATH=. python scripts/rollout_multizones.py \
     policy=custom policy.module=my_package.policies policy.class_name=MyPolicy
+```
+
+---
+
+### Unified building access API
+
+Use `b2b.sources.building_access` to select buildings in a dataset-agnostic way:
+
+- sample one or many building IDs from split
+- pick one or many by split-index position
+- resolve one `BuildingConfig` via metadata query (`search_config`)
+
+Datasets currently supported:
+
+- `single_zone_houses` (Hydro-Québec split lists)
+- `multizones_reference_buildings`
+
+---
+
+### Split benchmark interfaces (multizones)
+
+New benchmark interfaces are implemented in `b2b/benchmark/problem_multizones_splits.py` and exposed through:
+
+- script: `scripts/benchmark_multizones_splits.py`
+- configs:
+  - `configs/benchmark_multizones_splits.yaml`
+  - `configs/benchmark_interface/single_type.yaml`
+  - `configs/benchmark_interface/multi_type.yaml`
+
+#### 1) Single-type train/test split benchmark
+
+Select train buildings from the `train` split and test buildings from the `test` split of the **same type**.
+
+```bash
+PYTHONPATH=. python scripts/benchmark_multizones_splits.py \
+  benchmark_interface=single_type \
+  benchmark_interface.building_type=OfficeSmall
+```
+
+#### 2) Multi-type train/test split benchmark
+
+Select train buildings from `n` types and test buildings from `m` types.
+
+```bash
+PYTHONPATH=. python scripts/benchmark_multizones_splits.py \
+  benchmark_interface=multi_type \
+  'benchmark_interface.train.types=[OfficeSmall,Warehouse]' \
+  'benchmark_interface.test.types=[OfficeMedium,RetailStandalone]'
+```
+
+#### Selection modes (both train and test)
+
+Each side supports:
+
+- `mode=random` (sample IDs)
+- `mode=indices` (split-index list)
+- `mode=search_config` (metadata query then split-filter)
+
+#### Different task/reward from train to test
+
+Each side has its own config block:
+
+- `benchmark_interface.train.config`
+- `benchmark_interface.test.config`
+
+You can assign different `task` and `reward` settings to evaluate task shift.
+
+#### OfficeMedium actuator-access shift setting
+
+Dedicated config:
+
+- `configs/benchmark_multizones_officemedium_actuator_shift.yaml`
+
+Default behavior:
+
+- **Train**: all actuators except zone heating setpoints
+- **Test**: includes zone heating setpoints
+
+Run:
+
+```bash
+PYTHONPATH=. python scripts/benchmark_multizones_splits.py \
+  --config-name benchmark_multizones_officemedium_actuator_shift
+```
+
+Reverse direction (vice versa):
+
+```bash
+PYTHONPATH=. python scripts/benchmark_multizones_splits.py \
+  --config-name benchmark_multizones_officemedium_actuator_shift \
+  benchmark_interface.train.config.actuator_access.include_zone_heating_setpoints=true \
+  benchmark_interface.test.config.actuator_access.include_zone_heating_setpoints=false
 ```
 
 ---
@@ -249,6 +414,8 @@ PYTHONPATH=. python scripts/rollout_multizones.py \
 
 - **`b2b/sources/`**
   - Dataset connectors and selectors (Hydro-Québec, NREL, OneClimate, multizones reference buildings)
+  - `single_zone_houses.py`: Hydro-Québec split helpers and sampling utilities
+  - `building_access.py`: unified selection/search API across datasets
   - `multizones_reference_buildings.py`: 6000-building dataset (6 types × 1000)
   - Pre-generated train/test splits (900/100) stored as pickle lists under `b2b/sources/data/`
 
@@ -264,6 +431,7 @@ PYTHONPATH=. python scripts/rollout_multizones.py \
 - **`b2b/benchmark/`**
   - Centralized **simulation execution** (`runner.py`) with Gymnasium-standard loops
   - `rollout_multizones.py`: multizones rollout driver supporting baselines, SB3 checkpoints (`policy=sb3`), and custom policies (`policy=custom`)
+  - `problem_multizones_splits.py`: split benchmark interfaces (single-type and multi-type)
   - Problem definitions (e.g. `problem_adaptive_dynamics.py`)
   - Experiment/Hydra wrappers under `b2b/benchmark/experiments/`
   - Baseline rollout implementation used by `scripts/baselines.py` (`baseline_rollout.py`)

@@ -1,0 +1,22 @@
+mode: single_type
+building_type: OfficeSmall
+
+train:
+  selection:
+    mode: random
+    n: 2
+    seed: 42
+    replace: false
+    indices: []
+    queries: []
+  config: {}
+
+test:
+  selection:
+    mode: random
+    n: 2
+    seed: 7
+    replace: false
+    indices: []
+    queries: []
+  config: {}
