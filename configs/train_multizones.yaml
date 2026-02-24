@@ -4,6 +4,7 @@ defaults:
   - training: default
   - policy: ppo
   - reward: deadband
+  - task: default
 
 multizones:
   building_type: OfficeSmall   # Warehouse, HotelSmall, RetailStandalone, RestaurantFastFood, OfficeMedium, OfficeSmall
@@ -12,7 +13,7 @@ multizones:
 
 env:
   normalize_obs: true
-  max_steps: 35040             # full year at 15-min timesteps (365 * 24 * 4)
+  max_steps: null              # defaults to task.run_period horizon
 
 seed: 42
 

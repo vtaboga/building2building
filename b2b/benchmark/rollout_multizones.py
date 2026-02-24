@@ -33,7 +33,7 @@ from b2b.sources.multizones_reference_buildings import (
     search_buildings,
 )
 from b2b.store import Constant, ExtractFromZip, realize
-from b2b.types import BaseRewardConfig, BuildingConfig
+from b2b.types import BuildingConfig, TaskConfig, reward_config_from_dict
 
 logger = logging.getLogger(__name__)
 
@@ -198,9 +198,10 @@ def make_policy_from_cfg(cfg: DictConfig) -> PolicyLike:
 def select_buildings(
     building_type: BuildingType,
     n: int,
+    run_period: str = "full_year",
 ) -> list[dict[str, Any]]:
     """Return the first *n* buildings of *building_type*, sorted by building_id."""
-    df = search_buildings(building_type=building_type)
+    df = search_buildings(building_type=building_type, run_period=run_period)
     df = df.sort_values("building_id").head(n).reset_index(drop=True)
     rows: list[dict[str, Any]] = []
     for _, row in df.iterrows():
@@ -211,7 +212,8 @@ def select_buildings(
 def build_config(
     row: dict[str, Any],
     eplus_output_dir: Path,
-    energy_weight: float = 0.0,
+    reward_section: dict[str, Any] | None = None,
+    task_section: dict[str, Any] | None = None,
 ) -> BuildingConfig:
     """Run the pipeline for a single building and return a BuildingConfig."""
     store = STORE_PATH.get()
@@ -228,10 +230,16 @@ def build_config(
         extract_discovery_metadata(Constant(epjson_path), epw_derivation),
     )
 
+    task_cfg = TaskConfig.from_dict(task_section or {})
+    reward_cfg = reward_config_from_dict(
+        reward_section or {},
+        area=metadata.net_conditioned_area,
+    )
+
     return BuildingConfig(
         path_to_building=epjson_path,
         path_to_weather=epw_path,
-        reward_config=BaseRewardConfig(energy_weight=energy_weight),
+        reward_config=reward_cfg,
         hvac_equipment=hvac_equipment,
         eplus_output_dir=eplus_output_dir,
         warmup_phases=metadata.warmup_phases,
@@ -242,6 +250,7 @@ def build_config(
             "building_type": str(row["building_type"]),
             "place": str(row["place"]),
         },
+        task_config=task_cfg,
     )
 
 
@@ -277,12 +286,17 @@ def run_multizones_rollout(
         max_steps_raw = max_steps_raw.get("max_steps", None)
     else:
         max_steps_raw = None
-    max_steps = int(max_steps_raw) if max_steps_raw is not None else 365 * 24 * 4
-
-    energy_weight = 0.0
     reward_sect = cfg_dict.get("reward", {})
-    if isinstance(reward_sect, dict):
-        energy_weight = float(reward_sect.get("energy_weight", 0.0))
+    reward_section = reward_sect if isinstance(reward_sect, dict) else {}
+
+    task_sect = cfg_dict.get("task", {})
+    task_section = task_sect if isinstance(task_sect, dict) else {}
+    task_cfg = TaskConfig.from_dict(task_section)
+    max_steps = (
+        int(max_steps_raw)
+        if max_steps_raw is not None
+        else task_cfg.run_period.expected_steps()
+    )
 
     results_path = output_dir / "rollout_results.jsonl"
     errors_dir = output_dir / "errors"
@@ -299,7 +313,7 @@ def run_multizones_rollout(
 
     for btype in types_to_eval:
         logger.info("Selecting first %d %s buildings ...", n_per_type, btype)
-        rows = select_buildings(btype, n_per_type)
+        rows = select_buildings(btype, n_per_type, run_period=task_cfg.run_period.name)
         logger.info("  selected %d buildings", len(rows))
 
         for idx, row in enumerate(rows, 1):
@@ -319,7 +333,12 @@ def run_multizones_rollout(
                 eplus_dir.mkdir(parents=True, exist_ok=True)
 
                 logger.info("  building pipeline ...")
-                bldg_config = build_config(row, eplus_dir, energy_weight)
+                bldg_config = build_config(
+                    row,
+                    eplus_dir,
+                    reward_section=reward_section,
+                    task_section=task_section,
+                )
 
                 logger.info("  creating environment ...")
                 env = create_simulator(bldg_config)

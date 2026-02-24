@@ -19,6 +19,7 @@ from b2b.simulator.transform_utils import (
     TransformScalarToArray,
     transform_flatten,
 )
+from b2b.types import TaskConfig, ZoneTargetTemperatureConfig
 
 
 # We redefine those methods as toplevel functions so that pickle is able to
@@ -104,7 +105,53 @@ class DynamicMeter:
                 return 0.0
 
 
-def flat_observation_info(ont: Ontology, *, area: float) -> ObservationInfo:
+@dataclass
+class DynamicZoneVariable:
+    """Return a zone variable if present, otherwise zero."""
+
+    variable_name: str
+    zone_name: str
+    state: None | StateZero | StateHandle = None
+
+    def __call__(self, state: c_void_p) -> float:
+        if self.state is None:
+            han = api.exchange.get_variable_handle(
+                state, self.variable_name, self.zone_name
+            )
+            if han < 0:
+                self.state = StateZero()
+            else:
+                self.state = StateHandle(han)
+
+        match self.state:
+            case StateHandle(han):
+                return float(api.exchange.get_variable_value(state, han))
+            case StateZero():
+                return 0.0
+
+
+@dataclass
+class DynamicTargetTemperature:
+    occupancy_reader: DynamicZoneVariable
+    mode: str
+    zone_target: ZoneTargetTemperatureConfig
+
+    def __call__(self, state: c_void_p) -> float:
+        if self.mode == "occupancy":
+            occupancy = float(self.occupancy_reader(state))
+            if occupancy > 0.0:
+                return self.zone_target.occupied_c
+            return self.zone_target.unoccupied_c
+        return self.zone_target.occupied_c
+
+
+def flat_observation_info(
+    ont: Ontology,
+    *,
+    area: float,
+    controlled_zones: list[str],
+    task_config: TaskConfig,
+) -> ObservationInfo:
     """Create the observation transform with codomain a box with appropriate
     bounds for each variable type.
 
@@ -120,6 +167,30 @@ def flat_observation_info(ont: Ontology, *, area: float) -> ObservationInfo:
 
     """
 
+    occupancy_template = {}
+    target_template = {}
+    for zone_name in controlled_zones:
+        occupancy_reader = DynamicZoneVariable(
+            "Zone People Occupant Count", zone_name
+        )
+        zone_target = task_config.target_for_zone(zone_name)
+        occupancy_template[zone_name] = (
+            f"zone_occupancy {zone_name}",
+            FunctionHole(occupancy_reader),
+            (0.0, 20.0),
+        )
+        target_template[zone_name] = (
+            f"target_temperature {zone_name}",
+            FunctionHole(
+                DynamicTargetTemperature(
+                    occupancy_reader=occupancy_reader,
+                    mode=task_config.target_temperature_mode,
+                    zone_target=zone_target,
+                )
+            ),
+            (10.0, 35.0),
+        )
+
     template = {
         "temperature": {
             z.toPython(): (
@@ -129,6 +200,8 @@ def flat_observation_info(ont: Ontology, *, area: float) -> ObservationInfo:
             )
             for z in ont.zones()
         },
+        "zone_occupancy": occupancy_template,
+        "target_temperature": target_template,
         "time": {
             "time_of_day": (
                 "time_of_day",

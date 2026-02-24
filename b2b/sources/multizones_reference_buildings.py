@@ -51,10 +51,7 @@ from b2b.store import (
     derivation,
     realize,
 )
-from b2b.types import (
-    BaseRewardConfig,
-    BuildingConfig,
-)
+from b2b.types import BuildingConfig, TaskConfig, reward_config_from_dict
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +98,7 @@ def table_index(root_zip: Path) -> None:
 def _build_control_derivation(
     root_zip: Realizable,
     epjson_filename: str,
+    run_period_name: str,
 ) -> Any:
     """Build a control-ready epJSON from a raw dataset epJSON.
 
@@ -111,10 +109,13 @@ def _build_control_derivation(
     current = add_hvac_meters(current)
     current = add_outdoor_air_meters(current)
     current = modify_timestep(current, timesteps_per_hour=4)
+    run_period = TaskConfig.from_dict({"run_period": run_period_name}).run_period
     current = modify_run_period(
         current,
-        begin_day_of_month=1, begin_month=1,
-        end_day_of_month=31, end_month=12,
+        begin_day_of_month=run_period.begin_day_of_month,
+        begin_month=run_period.begin_month,
+        end_day_of_month=run_period.end_day_of_month,
+        end_month=run_period.end_month,
     )
     current = Rename("building.epjson", current)
     return make_controllable(current)
@@ -124,6 +125,7 @@ def search_buildings(
     building_type: BuildingType | None = None,
     place: str | None = None,
     building_id: int | None = None,
+    run_period: str = "full_year",
     **query: Any,
 ) -> DataFrame:
     root_zip = dataset_zip()
@@ -158,7 +160,11 @@ def search_buildings(
     df = db.to_df()
 
     def trans(epjson_filename: str):
-        return lambda: _build_control_derivation(root_zip, epjson_filename)
+        return lambda: _build_control_derivation(
+            root_zip,
+            epjson_filename,
+            run_period_name=run_period,
+        )
 
     return df.assign(derivation_thunk=df["epjson_filename"].apply(trans))
 
@@ -186,7 +192,15 @@ def search_configs(
     if isinstance(bldg_query, dict) and "bldg" in bldg_query and isinstance(bldg_query["bldg"], dict):
         bldg_query = bldg_query["bldg"]
 
-    rows = search_buildings(**bldg_query)
+    task_section = cfg.get("task", {}) if isinstance(cfg, dict) else {}
+    if not isinstance(task_section, dict):
+        task_section = {}
+    task_config = TaskConfig.from_dict(task_section)
+
+    rows = search_buildings(
+        run_period=task_config.run_period.name,
+        **bldg_query,
+    )
     root_zip = dataset_zip()
 
     configs: list[BuildingConfig] = []
@@ -217,18 +231,22 @@ def search_configs(
             reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
             if not isinstance(reward_section, dict):
                 reward_section = {}
-            energy_weight = reward_section.get("energy_weight", 0.0)
+            reward_config = reward_config_from_dict(
+                reward_section,
+                area=metadata.net_conditioned_area,
+            )
 
             configs.append(
                 BuildingConfig(
                     path_to_building=epjson,
                     path_to_weather=epw,
-                    reward_config=BaseRewardConfig(energy_weight=energy_weight),
+                    reward_config=reward_config,
                     hvac_equipment=hvac_equipment,
                     eplus_output_dir=eplus_output_dir,
                     warmup_phases=metadata.warmup_phases,
                     area=metadata.net_conditioned_area,
                     source_metadata=source_meta,
+                    task_config=task_config,
                 )
             )
         except Exception as e:

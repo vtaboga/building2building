@@ -272,7 +272,8 @@ class PadObservation(gym.ObservationWrapper):
     layers treat them as constants.
     """
 
-    # Number of non-zone features (outdoor temp, outdoor humid, 3 time features, 2 energy)
+    # Fallback number of non-zone features (legacy layout):
+    # outdoor temp, outdoor humid, 3 time features, 2 energy.
     NUM_NON_ZONE_FEATURES = 7
 
     def __init__(self, env: gym.Env, target_size: int):
@@ -311,6 +312,38 @@ class PadObservation(gym.ObservationWrapper):
         )
 
     # ------------------------------------------------------------------
+    def _zone_air_temperature_indices(self, obs_size: int) -> list[int]:
+        meta = getattr(self.env, "metadata", None)
+        if not isinstance(meta, dict):
+            return list(range(max(0, obs_size - self.NUM_NON_ZONE_FEATURES)))
+        names = meta.get("observation_names")
+        if not isinstance(names, list) or len(names) != obs_size:
+            return list(range(max(0, obs_size - self.NUM_NON_ZONE_FEATURES)))
+
+        idx: list[int] = []
+        for i, name in enumerate(names):
+            if str(name).strip().lower().startswith("zone air temperature"):
+                idx.append(i)
+        if idx:
+            return idx
+
+        return list(range(max(0, obs_size - self.NUM_NON_ZONE_FEATURES)))
+
+    def _split_zone_non_zone(
+        self, values: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        obs_size = values.shape[0]
+        zone_idx = self._zone_air_temperature_indices(obs_size)
+        if any(i < 0 or i >= obs_size for i in zone_idx):
+            raise ValueError("Invalid zone index inferred from observation names")
+
+        zone_mask = np.zeros(obs_size, dtype=bool)
+        zone_mask[np.array(zone_idx, dtype=int)] = True
+        zone_vals = values[zone_mask]
+        non_zone_vals = values[~zone_mask]
+        return zone_vals, non_zone_vals, zone_mask
+
+    # ------------------------------------------------------------------
     def _rebuild_observation_space(self) -> None:
         """Rebuild padded observation space with zone-aware padding.
 
@@ -329,26 +362,16 @@ class PadObservation(gym.ObservationWrapper):
                 "Increase target_obs_size in your config."
             )
 
-        # Calculate current number of zones
-        current_num_zones = inner_size - self.NUM_NON_ZONE_FEATURES
-
-        if current_num_zones < 0:
-            raise ValueError(
-                f"Inner observation size ({inner_size}) is smaller than "
-                f"expected non-zone features ({self.NUM_NON_ZONE_FEATURES})"
-            )
+        zone_low, non_zone_low, zone_mask = self._split_zone_non_zone(inner_low)
+        zone_high = inner_high[zone_mask]
+        non_zone_high = inner_high[~zone_mask]
+        current_num_zones = zone_low.shape[0]
 
         if current_num_zones > self._max_zones:
             raise ValueError(
                 f"Building has {current_num_zones} zones, exceeds max_zones "
                 f"({self._max_zones}). Increase target_obs_size in your config."
             )
-
-        # Split into zone temps and non-zone features
-        zone_low = inner_low[:current_num_zones]
-        zone_high = inner_high[:current_num_zones]
-        non_zone_low = inner_low[current_num_zones:]
-        non_zone_high = inner_high[current_num_zones:]
 
         # Pad zone temperatures to max_zones with [0, 0] bounds
         num_pad_zones = self._max_zones - current_num_zones
@@ -389,24 +412,14 @@ class PadObservation(gym.ObservationWrapper):
                 "your config."
             )
 
-        # Calculate current number of zones
-        current_num_zones = obs_size - self.NUM_NON_ZONE_FEATURES
-
-        if current_num_zones < 0:
-            raise ValueError(
-                f"Observation size ({obs_size}) is smaller than expected "
-                f"non-zone features ({self.NUM_NON_ZONE_FEATURES})"
-            )
+        zone_temps, non_zone_features, _zone_mask = self._split_zone_non_zone(obs)
+        current_num_zones = zone_temps.shape[0]
 
         if current_num_zones > self._max_zones:
             raise ValueError(
                 f"Building has {current_num_zones} zones, exceeds max_zones "
                 f"({self._max_zones}). Increase target_obs_size."
             )
-
-        # Split into zone temps and non-zone features
-        zone_temps = obs[:current_num_zones]
-        non_zone_features = obs[current_num_zones:]
 
         # Pad zone temperatures to max_zones
         num_pad_zones = self._max_zones - current_num_zones

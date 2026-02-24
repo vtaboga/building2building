@@ -13,6 +13,7 @@ from omegaconf import OmegaConf
 
 from b2b.simulator import create_simulator
 from b2b.sources import hydroquebec
+from b2b.types import TaskConfig
 from b2b.utils import (
     hydroquebec_building_id_from_split_index,
     hydroquebec_filenames_for_building_id,
@@ -123,8 +124,14 @@ def make_env(config: object, eplus_output_dir: str | Path):
             env_config = configs[0]
         env = create_simulator(env_config)
 
-        # Enforce a deterministic episode horizon when requested (e.g. full-year episodes).
+        # Enforce a deterministic episode horizon. When env.max_steps is not
+        # provided, derive it from task.run_period.
         max_steps = getattr(getattr(config, "env", None), "max_steps", None)
+        if max_steps is None and isinstance(cfg_any, dict):
+            task_cfg = TaskConfig.from_dict(
+                cfg_any.get("task", {}) if isinstance(cfg_any.get("task", {}), dict) else {}
+            )
+            max_steps = task_cfg.run_period.expected_steps()
         if max_steps is not None:
             env = gym.wrappers.TimeLimit(env, max_episode_steps=int(max_steps))
 
