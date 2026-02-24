@@ -6,17 +6,17 @@ Thin Hydra entry point.  All logic lives in
 
 Usage::
 
-    PYTHONPATH=. python scripts/rollout_multizones.py
+    python scripts/rollout_multizones.py
 
     # Override building types and count
-    PYTHONPATH=. python scripts/rollout_multizones.py \\
+    python scripts/rollout_multizones.py \\
         'multizones.types=[OfficeSmall,Warehouse]' multizones.n_per_type=3
 
     # Different policy
-    PYTHONPATH=. python scripts/rollout_multizones.py policy=fan_coil_constant
+    python scripts/rollout_multizones.py policy=fan_coil_constant
 
     # Shorter episodes
-    PYTHONPATH=. python scripts/rollout_multizones.py env.max_steps=672
+    python scripts/rollout_multizones.py env.max_steps=672
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 
 @hydra.main(
@@ -33,7 +33,9 @@ from omegaconf import DictConfig
 def main(cfg: DictConfig) -> int:
     from b2b.benchmark.rollout_multizones import run_multizones_rollout
 
-    records = run_multizones_rollout(cfg, output_dir=Path.cwd())
+    cfg_dict_any = OmegaConf.to_container(cfg, resolve=True)
+    cfg_dict = cfg_dict_any if isinstance(cfg_dict_any, dict) else {}
+    records = run_multizones_rollout(cfg_dict, output_dir=Path.cwd())
     n_fail = sum(1 for r in records if not r.success)
     return 1 if n_fail > 0 else 0
 

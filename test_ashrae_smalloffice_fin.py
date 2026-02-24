@@ -4,10 +4,10 @@ import sys
 import json
 
 from pathlib import Path
-from building2building.env import STORE_PATH, energyplus_path
-from building2building.simulator import create_simulator
-from building2building.pipeline.actuators import make_controllable
-from building2building.store import realize, LocalFile, Constant
+from b2b.env import STORE_PATH, energyplus_path
+from b2b.simulator import create_simulator
+from b2b.pipeline.actuators import make_controllable
+from b2b.store import realize, LocalFile, Constant
 
 logging.basicConfig(level=logging.INFO)
 

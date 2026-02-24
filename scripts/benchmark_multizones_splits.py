@@ -9,11 +9,11 @@ By default it only selects building IDs and writes a summary JSON.
 Set `output.resolve_configs=true` to resolve full BuildingConfig objects.
 
 Example (OfficeMedium actuator-shift benchmark):
-    PYTHONPATH=. python scripts/benchmark_multizones_splits.py \\
+    python scripts/benchmark_multizones_splits.py \\
         --config-name benchmark_multizones_officemedium_actuator_shift
 
 Reverse the train/test actuator access:
-    PYTHONPATH=. python scripts/benchmark_multizones_splits.py \\
+    python scripts/benchmark_multizones_splits.py \\
         --config-name benchmark_multizones_officemedium_actuator_shift \\
         benchmark_interface.train.config.actuator_access.include_zone_heating_setpoints=true \\
         benchmark_interface.test.config.actuator_access.include_zone_heating_setpoints=false
@@ -28,10 +28,10 @@ from typing import Any
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
+from b2b.benchmarks import build_multizones_split_benchmark
 from b2b.benchmark.problem_multizones_splits import (
     MultiTypeTrainTestBenchmark,
     SingleTypeTrainTestBenchmark,
-    build_interface_from_cfg,
 )
 
 
@@ -42,7 +42,9 @@ from b2b.benchmark.problem_multizones_splits import (
 )
 def main(cfg: DictConfig) -> int:
     output_dir = Path.cwd()
-    iface = build_interface_from_cfg(cfg)
+    cfg_dict_any = OmegaConf.to_container(cfg, resolve=True)
+    cfg_dict = cfg_dict_any if isinstance(cfg_dict_any, dict) else {}
+    iface = build_multizones_split_benchmark(cfg_dict)
     train_ids, test_ids = iface.select_building_ids()
 
     summary: dict[str, Any] = {

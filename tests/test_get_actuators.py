@@ -7,6 +7,11 @@ from b2b.pipeline import get_hvac_actuators
 from b2b.env import STORE_PATH, energyplus_path
 from b2b.store import realize
 
+import pytest
+
+
+pytestmark = pytest.mark.quick
+
 
 def test_get_hvac_actuators_from_edd():
     """Test parsing existing .edd file"""
@@ -42,6 +47,7 @@ def test_get_hvac_actuators_from_edd():
     assert any("Fan" in ct for ct in component_types)
 
 
+@pytest.mark.long
 def test_get_hvac_actuators_with_simulation():
     """Test with bldg1.epjson by running a simulation to generate .edd file"""
     import subprocess

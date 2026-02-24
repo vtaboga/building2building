@@ -28,6 +28,8 @@ from b2b.sources.energycodes import (
 )
 from b2b.store import ExtractFromZip, realize
 
+pytestmark = pytest.mark.long
+
 BUILDING_TYPES: list[BuildingType] = [
     "ApartmentMidRise",
     "Warehouse",

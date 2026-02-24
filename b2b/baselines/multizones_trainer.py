@@ -7,7 +7,6 @@ The building is identified by (building_type, split, index) where *index* is the
 from __future__ import annotations
 
 import logging
-import uuid
 from pathlib import Path
 from typing import Any, Literal
 
@@ -24,14 +23,12 @@ from b2b.baselines.wandb_utils import (
     finish_wandb_if_started,
     init_wandb_from_config,
 )
-from b2b.benchmark.rollout_multizones import build_config
-from b2b.simulator import create_simulator
+from b2b.api import make_multizones_env as make_multizones_env_api
 from b2b.simulator.wrappers import NormalizeObservation
 from b2b.sources import multizones_reference_buildings as mz_source
 from b2b.sources.multizones_reference_buildings import (
     BuildingType,
     SPLIT_DATA_DIR,
-    search_buildings,
 )
 from b2b.types import TaskConfig
 
@@ -62,24 +59,6 @@ def _resolve_building_id(
     return int(ids[index])
 
 
-def _get_building_row(
-    building_type: BuildingType,
-    building_id: int,
-    *,
-    run_period: str,
-) -> dict[str, Any]:
-    df = search_buildings(
-        building_type=building_type,
-        building_id=building_id,
-        run_period=run_period,
-    )
-    if df.empty:
-        raise ValueError(
-            f"No building found: type={building_type}, id={building_id}"
-        )
-    return dict(df.iloc[0])
-
-
 def make_multizones_env(
     building_type: BuildingType,
     split: Literal["train", "test"],
@@ -106,29 +85,15 @@ def make_multizones_env(
     max_steps:
         If given, wrap the env with ``TimeLimit``.
     """
-    task_cfg = TaskConfig.from_dict(task_section or {})
-    building_id = _resolve_building_id(building_type, split, index)
-    row = _get_building_row(
-        building_type,
-        building_id,
-        run_period=task_cfg.run_period.name,
+    return make_multizones_env_api(
+        building_type=building_type,
+        split=split,
+        split_index=index,
+        eplus_output_dir=eplus_output_dir,
+        task=task_section,
+        reward=reward_section,
+        max_steps=max_steps,
     )
-
-    out_dir = Path(eplus_output_dir) / str(uuid.uuid4())
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    bldg_config = build_config(
-        row,
-        out_dir,
-        reward_section=reward_section,
-        task_section=task_section,
-    )
-    env = create_simulator(bldg_config)
-
-    if max_steps is not None:
-        env = gym.wrappers.TimeLimit(env, max_episode_steps=max_steps)
-
-    return env
 
 
 # ------------------------------------------------------------------

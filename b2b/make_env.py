@@ -2,144 +2,102 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import traceback
 import uuid
 from pathlib import Path
 from typing import Any
 
-import gymnasium as gym
 from omegaconf import OmegaConf
 
-from b2b.simulator import create_simulator
-from b2b.sources import hydroquebec
-from b2b.sources.single_zone_houses import (
-    building_id_from_split_index as hydroquebec_building_id_from_split_index,
-)
-from b2b.sources.single_zone_houses import (
-    filenames_for_building_id as hydroquebec_filenames_for_building_id,
-)
-from b2b.types import TaskConfig
+from b2b.api import make_env as make_env_typed
+from b2b.config.models import DatasetSelectionConfig, EnvBuildConfig
+from b2b.types import TaskConfig, reward_config_from_dict
 
 logger = logging.getLogger(__name__)
 
 
+def _to_plain_dict(config: object) -> dict[str, Any]:
+    if isinstance(config, dict):
+        return dict(config)
+    try:
+        raw = OmegaConf.to_container(config, resolve=True)
+        if isinstance(raw, dict):
+            return dict(raw)
+    except Exception:
+        pass
+    return {}
+
+
+def _infer_dataset_selection(cfg: dict[str, Any]) -> DatasetSelectionConfig:
+    bldg = cfg.get("bldg", {})
+    if not isinstance(bldg, dict):
+        bldg = {}
+    raw_query = bldg.get("bldg", {})
+    if not isinstance(raw_query, dict):
+        raw_query = {}
+    selection = bldg.get("selection", {})
+    if not isinstance(selection, dict):
+        selection = {}
+
+    if "building_type" in raw_query:
+        if selection.get("enabled"):
+            return DatasetSelectionConfig(
+                dataset="multizones_reference_buildings",
+                building_type=str(raw_query["building_type"]),  # type: ignore[arg-type]
+                split=str(selection.get("split", "train")),  # type: ignore[arg-type]
+                mode="split_index",
+                split_index=int(selection.get("index", 0)),
+            )
+        return DatasetSelectionConfig(
+            dataset="multizones_reference_buildings",
+            building_type=str(raw_query["building_type"]),  # type: ignore[arg-type]
+            split="train",
+            mode="metadata_query",
+            metadata_query=dict(raw_query),
+            sample_size=1,
+        )
+
+    if selection.get("enabled"):
+        return DatasetSelectionConfig(
+            dataset="single_zone_houses",
+            split=str(selection.get("split", "train")),  # type: ignore[arg-type]
+            mode="split_index",
+            split_index=int(selection.get("index", 0)),
+        )
+
+    return DatasetSelectionConfig(
+        dataset="single_zone_houses",
+        split="train",
+        mode="metadata_query",
+        metadata_query=dict(raw_query),
+        sample_size=1,
+    )
+
+
 def make_env(config: object, eplus_output_dir: str | Path):
-    """
-    Create a single Building2Building Gymnasium environment from a config.
-
-    This is the centralized environment factory used by both:
-    - Stable-Baselines training/eval code
-    - Benchmarks/experiments that evaluate policies on datasets
-
-    Notes
-    -----
-    - EnergyPlus needs a unique output dir per run. We create a UUID subfolder.
-    - If `bldg.selection.enabled` is true, we deterministically pick a building from
-      the stored Hydro-Québec split lists by injecting `idf_filename` and
-      `schedule_filename` into `bldg.bldg`.
-    """
-    # EnergyPlus needs a unique output dir for each run
     out_dir = Path(eplus_output_dir) / str(uuid.uuid4())
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    # Fetch exactly one BuildingConfig and build a single simulator env
     try:
-        cfg_any: object = config
-        if not isinstance(cfg_any, dict):
-            try:
-                cfg_any = OmegaConf.to_container(cfg_any, resolve=True)
-            except Exception:
-                cfg_any = config
-
-        if isinstance(cfg_any, dict):
-            bldg_section = cfg_any.get("bldg")
-            if isinstance(bldg_section, dict):
-                sel = bldg_section.get("selection")
-                if isinstance(sel, dict) and sel.get("enabled"):
-                    split = str(sel.get("split", "train")).strip().lower()
-                    if split not in ("train", "test"):
-                        raise ValueError(
-                            f"bldg.selection.split must be 'train' or 'test', got {split!r}"
-                        )
-                    split_idx_raw = sel.get("index", 0)
-                    if not isinstance(split_idx_raw, int):
-                        raise TypeError(
-                            "bldg.selection.index must be int, got "
-                            f"{type(split_idx_raw).__name__}"
-                        )
-
-                    building_id = hydroquebec_building_id_from_split_index(
-                        split=split, split_index=split_idx_raw
-                    )
-                    idf_filename, schedule_filename = hydroquebec_filenames_for_building_id(
-                        building_id
-                    )
-
-                    # Override any existing building query: pick exactly this building.
-                    bldg_section["bldg"] = {
-                        "idf_filename": idf_filename,
-                        "schedule_filename": schedule_filename,
-                    }
-                    cfg_any["bldg"] = bldg_section
-                    config = cfg_any
-
-        # Let the pipeline copy discovery `eplusout.err` into this run folder.
-        prev = os.environ.get("B2B_PIPELINE_DEBUG_DIR")
-        os.environ["B2B_PIPELINE_DEBUG_DIR"] = str(out_dir)
-
-        if isinstance(cfg_any, dict):
-            bldg = cfg_any.get("bldg", {})
-            local_cfg = isinstance(bldg, dict) and bldg.get("local")
-            if isinstance(local_cfg, dict) and local_cfg.get("enabled"):
-                from b2b.sources.local import build_config_from_local
-
-                root = Path.cwd()
-                path_bldg = (root / local_cfg.get("path_to_building", "")).resolve()
-                path_weather = (root / local_cfg.get("path_to_weather", "")).resolve()
-                controls = local_cfg.get("controls")
-                env_config = build_config_from_local(
-                    path_to_building=path_bldg,
-                    path_to_weather=path_weather,
-                    eplus_output_dir=Path(out_dir),
-                    controls=controls,
-                )
-            else:
-                configs = hydroquebec.search_configs(
-                    config=config, n=1, eplus_output_dir=Path(out_dir)
-                )
-                if not configs:
-                    raise RuntimeError(
-                        "No building configurations found for the provided config "
-                        "(see pipeline_errors.jsonl in the EnergyPlus output dir if present)."
-                    )
-                env_config = configs[0]
-        else:
-            configs = hydroquebec.search_configs(
-                config=config, n=1, eplus_output_dir=Path(out_dir)
-            )
-            if not configs:
-                raise RuntimeError(
-                    "No building configurations found for the provided config "
-                    "(see pipeline_errors.jsonl in the EnergyPlus output dir if present)."
-                )
-            env_config = configs[0]
-        env = create_simulator(env_config)
-
-        # Enforce a deterministic episode horizon. When env.max_steps is not
-        # provided, derive it from task.run_period.
-        max_steps = getattr(getattr(config, "env", None), "max_steps", None)
-        if max_steps is None and isinstance(cfg_any, dict):
-            task_cfg = TaskConfig.from_dict(
-                cfg_any.get("task", {}) if isinstance(cfg_any.get("task", {}), dict) else {}
-            )
-            max_steps = task_cfg.run_period.expected_steps()
-        if max_steps is not None:
-            env = gym.wrappers.TimeLimit(env, max_episode_steps=int(max_steps))
-
-        return env
+        cfg = _to_plain_dict(config)
+        task_section = cfg.get("task", {}) if isinstance(cfg.get("task"), dict) else {}
+        reward_section = (
+            cfg.get("reward", {}) if isinstance(cfg.get("reward"), dict) else {}
+        )
+        env_section = cfg.get("env", {}) if isinstance(cfg.get("env"), dict) else {}
+        task = TaskConfig.from_dict(task_section)
+        reward = reward_config_from_dict(reward_section, area=1.0)
+        build = EnvBuildConfig(
+            dataset_selection=_infer_dataset_selection(cfg),
+            task=task,
+            reward=reward,
+            env_max_steps=(
+                int(env_section["max_steps"])
+                if env_section.get("max_steps") is not None
+                else None
+            ),
+        )
+        return make_env_typed(build, eplus_output_dir=out_dir)
     except Exception as e:
-        # Persist a structured error record to make batch runs debuggable.
         err_path = Path(out_dir) / "env_creation_error.json"
         record: dict[str, Any] = {
             "error_type": type(e).__name__,
@@ -152,11 +110,4 @@ def make_env(config: object, eplus_output_dir: str | Path):
         except Exception:
             logger.exception("Failed to write env creation error to %s", err_path)
         raise
-    finally:
-        # Restore previous value to avoid leaking run-specific state.
-        if "prev" in locals():
-            if prev is None:
-                os.environ.pop("B2B_PIPELINE_DEBUG_DIR", None)
-            else:
-                os.environ["B2B_PIPELINE_DEBUG_DIR"] = prev
 

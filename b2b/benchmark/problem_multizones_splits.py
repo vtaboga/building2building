@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from b2b.config import parse_benchmark_config
+from b2b.config.models import MultiTypeBenchmarkConfig, SingleTypeBenchmarkConfig
 from b2b.sources import building_access, multizones_reference_buildings as mz
 from b2b.sources.multizones_reference_buildings import BuildingType
 from b2b.types import ActuatorDescription, BuildingConfig, Equipment
@@ -357,85 +359,53 @@ class MultiTypeTrainTestBenchmark:
         )
 
 
-def _as_dict(cfg: object) -> dict[str, Any]:
-    if isinstance(cfg, dict):
-        return dict(cfg)
-    try:
-        from omegaconf import OmegaConf  # type: ignore
-
-        c = OmegaConf.to_container(cfg, resolve=True)
-        if isinstance(c, dict):
-            return dict(c)
-    except Exception:
-        pass
-    return {}
-
-
 def build_interface_from_cfg(
-    cfg: object,
+    cfg: dict[str, Any],
 ) -> SingleTypeTrainTestBenchmark | MultiTypeTrainTestBenchmark:
-    data = _as_dict(cfg)
-    bench = data.get("benchmark_interface", {})
-    if not isinstance(bench, dict):
-        raise TypeError("benchmark_interface must be a mapping")
-
-    mode = str(bench.get("mode", "single_type")).strip().lower()
-    train_raw = bench.get("train", {})
-    test_raw = bench.get("test", {})
-    if not isinstance(train_raw, dict) or not isinstance(test_raw, dict):
-        raise TypeError("benchmark_interface.train/test must be mappings")
-
-    train_selection = SelectionSpec.from_dict(
-        train_raw.get("selection", {})
-        if isinstance(train_raw.get("selection", {}), dict)
-        else {}
-    )
-    test_selection = SelectionSpec.from_dict(
-        test_raw.get("selection", {})
-        if isinstance(test_raw.get("selection", {}), dict)
-        else {}
-    )
-    train_cfg = (
-        train_raw.get("config", {}) if isinstance(train_raw.get("config", {}), dict) else {}
-    )
-    test_cfg = (
-        test_raw.get("config", {}) if isinstance(test_raw.get("config", {}), dict) else {}
-    )
-
-    if mode == "single_type":
-        bt = str(bench.get("building_type", "OfficeSmall"))
+    benchmark_cfg = parse_benchmark_config(cfg.get("benchmark_interface", {}))
+    if isinstance(benchmark_cfg, SingleTypeBenchmarkConfig):
         return SingleTypeTrainTestBenchmark(
-            building_type=cast(BuildingType, bt),
-            train_selection=train_selection,
-            test_selection=test_selection,
-            train_config=train_cfg,
-            test_config=test_cfg,
+            building_type=cast(BuildingType, benchmark_cfg.building_type),
+            train_selection=SelectionSpec(
+                mode=benchmark_cfg.train.selection.mode,
+                n=benchmark_cfg.train.selection.n,
+                seed=benchmark_cfg.train.selection.seed,
+                replace=benchmark_cfg.train.selection.replace,
+                indices=list(benchmark_cfg.train.selection.indices),
+                queries=list(benchmark_cfg.train.selection.queries),
+            ),
+            test_selection=SelectionSpec(
+                mode=benchmark_cfg.test.selection.mode,
+                n=benchmark_cfg.test.selection.n,
+                seed=benchmark_cfg.test.selection.seed,
+                replace=benchmark_cfg.test.selection.replace,
+                indices=list(benchmark_cfg.test.selection.indices),
+                queries=list(benchmark_cfg.test.selection.queries),
+            ),
+            train_config=dict(benchmark_cfg.train.raw),
+            test_config=dict(benchmark_cfg.test.raw),
         )
-
-    if mode == "multi_type":
-        train_types_raw = train_raw.get("types", [])
-        test_types_raw = test_raw.get("types", [])
-        if not isinstance(train_types_raw, list) or not all(
-            isinstance(x, str) for x in train_types_raw
-        ):
-            raise TypeError("benchmark_interface.train.types must be list[str]")
-        if not isinstance(test_types_raw, list) or not all(
-            isinstance(x, str) for x in test_types_raw
-        ):
-            raise TypeError("benchmark_interface.test.types must be list[str]")
-        if len(train_types_raw) < 1 or len(test_types_raw) < 1:
-            raise ValueError(
-                "multi_type benchmark requires at least one train type and one test type"
-            )
+    if isinstance(benchmark_cfg, MultiTypeBenchmarkConfig):
         return MultiTypeTrainTestBenchmark(
-            train_types=cast(list[BuildingType], list(train_types_raw)),
-            test_types=cast(list[BuildingType], list(test_types_raw)),
-            train_selection=train_selection,
-            test_selection=test_selection,
-            train_config=train_cfg,
-            test_config=test_cfg,
+            train_types=cast(list[BuildingType], list(benchmark_cfg.train_types)),
+            test_types=cast(list[BuildingType], list(benchmark_cfg.test_types)),
+            train_selection=SelectionSpec(
+                mode=benchmark_cfg.train.selection.mode,
+                n=benchmark_cfg.train.selection.n,
+                seed=benchmark_cfg.train.selection.seed,
+                replace=benchmark_cfg.train.selection.replace,
+                indices=list(benchmark_cfg.train.selection.indices),
+                queries=list(benchmark_cfg.train.selection.queries),
+            ),
+            test_selection=SelectionSpec(
+                mode=benchmark_cfg.test.selection.mode,
+                n=benchmark_cfg.test.selection.n,
+                seed=benchmark_cfg.test.selection.seed,
+                replace=benchmark_cfg.test.selection.replace,
+                indices=list(benchmark_cfg.test.selection.indices),
+                queries=list(benchmark_cfg.test.selection.queries),
+            ),
+            train_config=dict(benchmark_cfg.train.raw),
+            test_config=dict(benchmark_cfg.test.raw),
         )
-
-    raise ValueError(
-        "benchmark_interface.mode must be one of {'single_type', 'multi_type'}"
-    )
+    raise TypeError(f"Unsupported benchmark config: {type(benchmark_cfg).__name__}")
