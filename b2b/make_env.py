@@ -85,7 +85,7 @@ def make_env(config: object, eplus_output_dir: str | Path):
         )
         env_section = cfg.get("env", {}) if isinstance(cfg.get("env"), dict) else {}
         task = TaskConfig.from_dict(task_section)
-        reward = reward_config_from_dict(reward_section, area=1.0)
+        reward = reward_config_from_dict(reward_section)
         build = EnvBuildConfig(
             dataset_selection=_infer_dataset_selection(cfg),
             task=task,

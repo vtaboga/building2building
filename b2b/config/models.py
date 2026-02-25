@@ -187,7 +187,7 @@ class BenchmarkSideConfig:
         task_raw = _require_mapping("benchmark side task", config.get("task", {}))
         reward_raw = _require_mapping("benchmark side reward", config.get("reward", {}))
         task = TaskConfig.from_dict(task_raw)
-        reward = reward_config_from_dict(reward_raw, area=1.0)
+        reward = reward_config_from_dict(reward_raw)
         actuator_access = ActuatorAccessConfig.from_dict(config.get("actuator_access", {}))
         return cls(
             selection=selection,
@@ -239,7 +239,6 @@ class EnvBuildConfig:
         task = TaskConfig.from_dict(_require_mapping("task", raw.get("task", {})))
         reward = reward_config_from_dict(
             _require_mapping("reward", raw.get("reward", {})),
-            area=1.0,
         )
         actuator_access = ActuatorAccessConfig.from_dict(raw.get("actuator_access", {}))
         max_steps_raw = raw.get("env_max_steps")
@@ -293,7 +292,6 @@ def reward_to_dict(reward: RewardConfig) -> dict[str, Any]:
     if isinstance(reward, DeadbandRewardConfig):
         return {
             "reward_type": "DeadbandRewardConfig",
-            "area": reward.area,
             "energy_weight": reward.energy_weight,
             "target_temp": reward.target_temp,
             "dT": reward.dT,

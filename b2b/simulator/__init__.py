@@ -126,7 +126,6 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
-            area=building_config.area,
             controlled_zones=controlled_zones,
             energy_weight=building_config.reward_config.energy_weight,
             deadband_c=building_config.reward_config.deadband_c,
@@ -134,13 +133,11 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         )
     elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
-            area=building_config.area,
             controlled_zones=controlled_zones,
             energy_weight=building_config.reward_config.energy_weight,
         )
     elif isinstance(building_config.reward_config, DeadbandRewardConfig):
         reward_function = DeadbandReward(
-            area=building_config.area,
             controlled_zones=controlled_zones,
             energy_weight=building_config.reward_config.energy_weight,
             target_temp=building_config.reward_config.target_temp,

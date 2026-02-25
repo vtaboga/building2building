@@ -99,7 +99,7 @@ cfg = EnvBuildConfig(
         split_index=0,
     ),
     task=TaskConfig.from_dict({"run_period": "winter"}),
-    reward=reward_config_from_dict({"reward_type": "BarrierRewardConfig"}, area=1.0),
+    reward=reward_config_from_dict({"reward_type": "BarrierRewardConfig"}),
 )
 env = make_env(cfg, eplus_output_dir=Path("outputs/eplus"))
 ```

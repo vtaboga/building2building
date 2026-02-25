@@ -23,7 +23,7 @@ def make_single_zone_env(
     max_steps: int | None = None,
 ) -> gym.Env:
     task_cfg = TaskConfig.from_dict(task or {})
-    reward_cfg = reward_config_from_dict(reward or {}, area=1.0)
+    reward_cfg = reward_config_from_dict(reward or {})
     return make_env_from_config(
         EnvBuildConfig(
             dataset_selection=DatasetSelectionConfig(
@@ -51,7 +51,7 @@ def make_multizones_env(
     max_steps: int | None = None,
 ) -> gym.Env:
     task_cfg = TaskConfig.from_dict(task or {})
-    reward_cfg = reward_config_from_dict(reward or {}, area=1.0)
+    reward_cfg = reward_config_from_dict(reward or {})
     return make_env_from_config(
         EnvBuildConfig(
             dataset_selection=DatasetSelectionConfig(

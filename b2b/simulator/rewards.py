@@ -2,29 +2,24 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from b2b.simulator.action_spaces import ThermostatSetpoint
-
 
 def base_reward_function(
     obs,
-    area: float,
     controlled_zones: list[str],
     energy_weight=1.0,
 ) -> float:
     """Calculate a reward combining temperature tracking and energy consumption.
 
     Args:
-        obs: Dictionary containing observations
-        setpoints: Dictionary mapping zones to their setpoint configurations
-        building_characteristics: Dictionary containing building characteristics
+        obs: Dictionary containing observations (energy values in Wh/m²)
+        controlled_zones: List of controlled zone names
         energy_weight: Weight for the energy consumption penalty
     Returns:
         float: Combined reward (negative values represent penalties)
     """
 
-    # Energy consumption penalty (in Wh/floor area)
+    # Energy observations are already in Wh/m² (converted in observation_spaces.py)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
-    energy_penalty = energy_penalty / 3600.0 / area
 
     # Calculate temperature tracking error for controlled zones
     temp_error = 0
@@ -45,19 +40,17 @@ def base_reward_function(
 
 @dataclass
 class BaseReward:
-    area: float
     controlled_zones: list[str]
     energy_weight: float
 
     def __call__(self, obs):
         return base_reward_function(
-            obs, self.area, self.controlled_zones, self.energy_weight
+            obs, self.controlled_zones, self.energy_weight
         )
 
 
 def barrier_reward_function(
     obs,
-    area: float,
     controlled_zones: list[str],
     energy_weight=1.0,
     deadband_c: float = 0.5,
@@ -66,17 +59,18 @@ def barrier_reward_function(
     """Calculate a reward combining temperature tracking and energy consumption.
 
     Args:
-        obs: Dictionary containing observations
-        setpoints: Dictionary mapping zones to their setpoint configurations
-        building_characteristics: Dictionary containing building characteristics
+        obs: Dictionary containing observations (energy values in Wh/m²)
+        controlled_zones: List of controlled zone names
+        energy_weight: Weight for the energy consumption penalty
+        deadband_c: Comfort deadband in °C
+        violation_penalty: Penalty for comfort violations
 
     Returns:
         float: Combined reward (negative values represent penalties)
     """
 
-    # Energy consumption penalty (in Wh/floor area)
+    # Energy observations are already in Wh/m² (converted in observation_spaces.py)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
-    energy_penalty = energy_penalty / 3600.0 / area
 
     # Barrier on comfort around a (possibly zone-specific, occupancy-aware) target.
     has_violation = False
@@ -97,7 +91,6 @@ def barrier_reward_function(
 
 @dataclass
 class BarrierReward:
-    area: float
     controlled_zones: list[str]
     energy_weight: float
     deadband_c: float
@@ -106,7 +99,6 @@ class BarrierReward:
     def __call__(self, obs):
         return barrier_reward_function(
             obs,
-            self.area,
             self.controlled_zones,
             self.energy_weight,
             self.deadband_c,
@@ -116,15 +108,13 @@ class BarrierReward:
 
 def deadband_reward_function(
     obs,
-    area: float,
     controlled_zones: list[str],
     energy_weight=1.0,
     target_temp: float = 21.0,
     dT: float = 0.5,
 ) -> float:
-    # Energy consumption penalty (in Wh/floor area)
+    # Energy observations are already in Wh/m² (converted in observation_spaces.py)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
-    energy_penalty = energy_penalty / 3600.0 / area
 
     # Comfort: temperature error for controlled zones
     temp_error = 0
@@ -144,7 +134,6 @@ def deadband_reward_function(
 
 @dataclass
 class DeadbandReward:
-    area: float
     controlled_zones: list[str]
     energy_weight: float
     target_temp: float
@@ -153,7 +142,6 @@ class DeadbandReward:
     def __call__(self, obs):
         return deadband_reward_function(
             obs=obs,
-            area=self.area,
             controlled_zones=self.controlled_zones,
             energy_weight=self.energy_weight,
             target_temp=self.target_temp,

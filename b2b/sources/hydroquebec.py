@@ -334,10 +334,7 @@ def search_configs(
             reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
             if not isinstance(reward_section, dict):
                 reward_section = {}
-            reward_config = reward_config_from_dict(
-                reward_section,
-                area=area,
-            )
+            reward_config = reward_config_from_dict(reward_section)
 
             configs.append(
                 BuildingConfig(

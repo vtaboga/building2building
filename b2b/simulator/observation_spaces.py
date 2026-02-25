@@ -162,8 +162,8 @@ def flat_observation_info(
     -    - Current Time of Day [0, 24]
     -    - Day of Week [1, 7]  (1=Sunday, ..., 7=Saturday)
     -    - Day of Year [1, 366]
-    -    - HVAC Electricity Consumption [0, 50]  Wh / m2 / 15min timestep
-    -    - HVAC Natural Gas Consumption [0, 50]  Wh / m2 / 15min timestep
+    -    - HVAC Electricity Consumption [0, 50]  Wh/m² per timestep
+    -    - HVAC Natural Gas Consumption [0, 50]  Wh/m² per timestep
 
     """
 
@@ -237,12 +237,16 @@ def flat_observation_info(
         "energy": {
             "natural_gas": (
                 "energy_gas",
-                FunctionHole(DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area)),
+                FunctionHole(
+                    DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area * 3600.0)
+                ),
                 (0.0, 50.0),
             ),
             "electricity": (
                 "energy_electricity",
-                FunctionHole(DivideBy(DynamicMeter(["Electricity:HVAC"]), area)),
+                FunctionHole(
+                    DivideBy(DynamicMeter(["Electricity:HVAC"]), area * 3600.0)
+                ),
                 (0.0, 50.0),
             ),
         },
@@ -313,13 +317,19 @@ def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
             "energy": TransformDictSpace(
                 {
                     "natural_gas": TransformScalarToArray(
-                        FunctionHole(DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area)),
+                        FunctionHole(
+                            DivideBy(
+                                DynamicMeter(["NaturalGas:HVAC"]), area * 3600.0
+                            )
+                        ),
                         0.0,
                         50.0,
                     ),
                     "electricity": TransformScalarToArray(
                         FunctionHole(
-                            DivideBy(DynamicMeter(["Electricity:HVAC"]), area)
+                            DivideBy(
+                                DynamicMeter(["Electricity:HVAC"]), area * 3600.0
+                            )
                         ),
                         0.0,
                         50.0,
