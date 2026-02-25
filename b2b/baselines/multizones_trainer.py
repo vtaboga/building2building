@@ -7,6 +7,7 @@ The building is identified by (building_type, split, index) where *index* is the
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Any, Literal
 
@@ -112,15 +113,31 @@ def _make_single_env(
     norm_obs: bool,
 ) -> gym.Env:
     """Create one wrapped env instance (top-level for picklability by SubprocVecEnv)."""
-    env = make_multizones_env(
-        building_type=building_type,
-        split=split,
-        index=index,
-        eplus_output_dir=eplus_root,
-        reward_section=reward_section,
-        task_section=task_section,
-        max_steps=max_steps,
-    )
+    retries = 3
+    last_error: RuntimeError | None = None
+    for attempt in range(retries):
+        try:
+            env = make_multizones_env(
+                building_type=building_type,
+                split=split,
+                index=index,
+                eplus_output_dir=eplus_root,
+                reward_section=reward_section,
+                task_section=task_section,
+                max_steps=max_steps,
+            )
+            break
+        except RuntimeError as exc:
+            if "No multizones building configuration found" not in str(exc):
+                raise
+            last_error = exc
+            if attempt == retries - 1:
+                raise
+            # Parallel workers can race while populating cached building artifacts.
+            time.sleep(0.5 * (attempt + 1))
+    else:
+        raise RuntimeError("Failed to create multizones environment") from last_error
+
     env = Monitor(env)
     if norm_obs:
         env = NormalizeObservation(env)
@@ -149,23 +166,28 @@ def _make_envs(
     )
 
     num_envs = int(config.training.num_train_envs)
-    train_root = str(output_dir / "train_eplus_outputs")
+    train_root = output_dir / "train_eplus_outputs"
+    train_root.mkdir(parents=True, exist_ok=True)
 
     if num_envs <= 1:
         train_env: DummyVecEnv | SubprocVecEnv = DummyVecEnv(
-            [lambda: _make_single_env(eplus_root=train_root, **common_kwargs)]
+            [lambda r=str(train_root / "worker_0"): _make_single_env(eplus_root=r, **common_kwargs)]
         )
     else:
         train_env = SubprocVecEnv(
             [
-                lambda r=train_root: _make_single_env(eplus_root=r, **common_kwargs)
-                for _ in range(num_envs)
+                lambda r=str(train_root / f"worker_{i}"): _make_single_env(
+                    eplus_root=r,
+                    **common_kwargs,
+                )
+                for i in range(num_envs)
             ]
         )
 
-    eval_root = str(output_dir / "eval_eplus_outputs")
+    eval_root = output_dir / "eval_eplus_outputs"
+    eval_root.mkdir(parents=True, exist_ok=True)
     eval_env = DummyVecEnv(
-        [lambda: _make_single_env(eplus_root=eval_root, **common_kwargs)]
+        [lambda r=str(eval_root / "worker_0"): _make_single_env(eplus_root=r, **common_kwargs)]
     )
 
     return train_env, eval_env
