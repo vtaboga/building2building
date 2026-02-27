@@ -197,7 +197,7 @@ def flat_observation_info(
             z.toPython(): (
                 f"ZONE AIR TEMPERATURE {z.toPython()}",
                 VariableHole("ZONE AIR TEMPERATURE", z.toPython()),
-                (-50.0, 50.0),
+                (10.0, 45.0),
             )
             for z in ont.zones()
         },
@@ -227,7 +227,7 @@ def flat_observation_info(
                     "SITE OUTDOOR AIR DRYBULB TEMPERATURE",
                     "ENVIRONMENT",
                 ),
-                (-50.0, 50.0),
+                (-30.0, 50.0),
             ),
             "humidity": (
                 "outdoor_humidity",
@@ -277,8 +277,8 @@ def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
                 {
                     z.toPython(): TransformScalarToArray(
                         VariableHole("ZONE AIR TEMPERATURE", z.toPython()),
-                        -50.0,
-                        50.0,
+                        10.0,
+                        45.0,
                     )
                     for z in ont.zones()
                 }
@@ -303,7 +303,7 @@ def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
                             "SITE OUTDOOR AIR DRYBULB TEMPERATURE",
                             "ENVIRONMENT",
                         ),
-                        -50.0,
+                        -30.0,
                         50.0,
                     ),
                     "humidity": TransformScalarToArray(

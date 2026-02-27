@@ -144,7 +144,6 @@ class BarrierRewardConfig:
 @dataclass
 class DeadbandRewardConfig:
     energy_weight: float
-    target_temp: float
     dT: float
 
 
@@ -158,7 +157,6 @@ def reward_config_from_dict(
     if reward_type == "DeadbandRewardConfig":
         return DeadbandRewardConfig(
             energy_weight=float(reward_section.get("energy_weight", 0.0)),
-            target_temp=float(reward_section.get("target_temp", 21.0)),
             dT=float(reward_section.get("dT", 0.5)),
         )
     if reward_type == "BarrierRewardConfig":
