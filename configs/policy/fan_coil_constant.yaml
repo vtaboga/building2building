@@ -4,15 +4,12 @@ type: fan_coil_constant
 target_temp_c: 21.0
 deadband_c: 0.5
 
-# Force HVAC system available while commanding airflow + setpoints.
-# EnergyPlus availability override values:
-# 1=ForceOff, 2=CycleOn, 3=CycleOnZoneFansOnly
 availability_on: 2.0
 
-# Fan control
+# Fan control [kg/s]
 fan_mass_flow_kg_s: 4.0
 
-# Coil control via System Node Setpoint (Temperature Setpoint) [C]
+# Coil control via System Node Setpoint (Temperature Setpoint) [°C]
 heating_coil_setpoint_c: 45.0
 supplemental_coil_setpoint_c: 45.0
 cooling_coil_setpoint_c: 18.0

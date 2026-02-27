@@ -1,3 +1,9 @@
+"""Configuration models for datasets, benchmarks, and environment building.
+
+All configs are frozen dataclasses with ``from_dict`` class methods that
+validate and normalise raw dictionaries (e.g. from YAML / JSON files).
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -42,6 +48,24 @@ def _require_mapping(name: str, value: Any) -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class DatasetSelectionConfig:
+    """Specifies which building(s) to select from a dataset.
+
+    Attributes:
+        dataset: Name of the target dataset.
+        split: Train / test split (``None`` to ignore splits).
+        mode: Selection strategy (e.g. by index, random sample, …).
+        split_index: Index when ``mode="split_index"``.
+        split_indices: Indices when ``mode="split_indices"``.
+        building_id: Explicit building id when ``mode="building_id"``.
+        sample_size: Number of buildings to sample when
+            ``mode="random"``.
+        seed: RNG seed for reproducible random selection.
+        replace: Whether to sample with replacement.
+        metadata_query: Filter dict when ``mode="metadata_query"``.
+        building_type: Building archetype filter for multi-zone
+            datasets.
+    """
+
     dataset: DatasetName
     split: SplitName | None = "train"
     mode: SelectionMode = "split_index"
@@ -56,6 +80,18 @@ class DatasetSelectionConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "DatasetSelectionConfig":
+        """Parse and validate from a raw dictionary.
+
+        Args:
+            data: Mapping with dataset-selection parameters.
+
+        Returns:
+            A validated ``DatasetSelectionConfig``.
+
+        Raises:
+            ValueError: On invalid dataset, split, or mode values.
+            TypeError: On wrong-typed fields.
+        """
         raw = _require_mapping("dataset_selection", data)
         dataset = str(raw.get("dataset", "single_zone_houses")).strip().lower()
         if dataset not in {"single_zone_houses", "multizones_reference_buildings"}:
@@ -121,10 +157,25 @@ class DatasetSelectionConfig:
 
 @dataclass(frozen=True)
 class ActuatorAccessConfig:
+    """Controls which actuators the agent is allowed to manipulate.
+
+    Attributes:
+        include_zone_heating_setpoints: If ``True``, zone-level heating
+            setpoint actuators are included in the action space.
+    """
+
     include_zone_heating_setpoints: bool = True
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "ActuatorAccessConfig":
+        """Parse from a raw dictionary (``None`` yields defaults).
+
+        Args:
+            data: Optional mapping with actuator-access flags.
+
+        Returns:
+            A validated ``ActuatorAccessConfig``.
+        """
         raw = _require_mapping("actuator_access", data or {})
         return cls(
             include_zone_heating_setpoints=bool(
@@ -135,6 +186,19 @@ class ActuatorAccessConfig:
 
 @dataclass(frozen=True)
 class BenchmarkSelectionConfig:
+    """How buildings are selected within a benchmark split.
+
+    Attributes:
+        mode: Selection strategy (``"random"``, ``"indices"``, or
+            ``"search_config"``).
+        n: Number of buildings to select when ``mode="random"``.
+        seed: RNG seed for reproducibility.
+        replace: Sample with replacement when ``mode="random"``.
+        indices: Explicit building indices when ``mode="indices"``.
+        queries: Search-config filter dicts when
+            ``mode="search_config"``.
+    """
+
     mode: Literal["random", "indices", "search_config"] = "random"
     n: int = 1
     seed: int | None = None
@@ -144,6 +208,18 @@ class BenchmarkSelectionConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "BenchmarkSelectionConfig":
+        """Parse and validate from a raw dictionary.
+
+        Args:
+            data: Optional mapping with selection parameters.
+
+        Returns:
+            A validated ``BenchmarkSelectionConfig``.
+
+        Raises:
+            ValueError: On invalid mode or negative *n*.
+            TypeError: On wrong-typed ``indices`` or ``queries``.
+        """
         raw = _require_mapping("benchmark selection", data or {})
         mode = str(raw.get("mode", "random")).strip().lower()
         if mode not in {"random", "indices", "search_config"}:
@@ -173,6 +249,16 @@ class BenchmarkSelectionConfig:
 
 @dataclass(frozen=True)
 class BenchmarkSideConfig:
+    """Configuration for one side (train or test) of a benchmark.
+
+    Attributes:
+        selection: Building selection strategy.
+        task: Task specification (run period, target temperatures, …).
+        reward: Reward function configuration.
+        actuator_access: Which actuators the agent may control.
+        raw: Original un-parsed config dict, kept for round-tripping.
+    """
+
     selection: BenchmarkSelectionConfig
     task: TaskConfig
     reward: RewardConfig
@@ -181,6 +267,15 @@ class BenchmarkSideConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "BenchmarkSideConfig":
+        """Parse a benchmark side from a raw dictionary.
+
+        Args:
+            data: Optional mapping with ``"selection"`` and ``"config"``
+                sub-sections.
+
+        Returns:
+            A validated ``BenchmarkSideConfig``.
+        """
         raw = _require_mapping("benchmark side", data or {})
         selection = BenchmarkSelectionConfig.from_dict(raw.get("selection", {}))
         config = _require_mapping("benchmark side config", raw.get("config", {}))
@@ -204,6 +299,15 @@ def _default_benchmark_side() -> BenchmarkSideConfig:
 
 @dataclass(frozen=True)
 class SingleTypeBenchmarkConfig:
+    """Benchmark that trains and tests on a single building archetype.
+
+    Attributes:
+        mode: Always ``"single_type"``.
+        building_type: The reference-building archetype to use.
+        train: Training-side configuration.
+        test: Test-side configuration.
+    """
+
     mode: Literal["single_type"] = "single_type"
     building_type: BuildingType = "OfficeSmall"
     train: BenchmarkSideConfig = field(default_factory=_default_benchmark_side)
@@ -212,6 +316,16 @@ class SingleTypeBenchmarkConfig:
 
 @dataclass(frozen=True)
 class MultiTypeBenchmarkConfig:
+    """Benchmark spanning multiple building archetypes.
+
+    Attributes:
+        mode: Always ``"multi_type"``.
+        train_types: Building archetypes used for training.
+        test_types: Building archetypes used for testing.
+        train: Training-side configuration.
+        test: Test-side configuration.
+    """
+
     mode: Literal["multi_type"] = "multi_type"
     train_types: list[BuildingType] = field(default_factory=list)
     test_types: list[BuildingType] = field(default_factory=list)
@@ -224,6 +338,17 @@ BenchmarkConfig = SingleTypeBenchmarkConfig | MultiTypeBenchmarkConfig
 
 @dataclass(frozen=True)
 class EnvBuildConfig:
+    """Complete specification for building a Gymnasium environment.
+
+    Attributes:
+        dataset_selection: Which building(s) to load.
+        task: Task specification (run period, target temperatures, …).
+        reward: Reward function configuration.
+        actuator_access: Actuator access restrictions.
+        env_max_steps: Optional hard cap on episode length. When
+            ``None``, the run period's expected step count is used.
+    """
+
     dataset_selection: DatasetSelectionConfig
     task: TaskConfig
     reward: RewardConfig
@@ -232,6 +357,16 @@ class EnvBuildConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "EnvBuildConfig":
+        """Parse and validate from a raw dictionary.
+
+        Args:
+            data: Mapping with top-level keys ``"dataset_selection"``,
+                ``"task"``, ``"reward"``, ``"actuator_access"``, and
+                optionally ``"env_max_steps"``.
+
+        Returns:
+            A validated ``EnvBuildConfig``.
+        """
         raw = _require_mapping("env build config", data)
         dataset_selection = DatasetSelectionConfig.from_dict(
             _require_mapping("dataset_selection", raw.get("dataset_selection", {}))
@@ -253,6 +388,24 @@ class EnvBuildConfig:
 
 
 def parse_benchmark_config(data: dict[str, Any]) -> BenchmarkConfig:
+    """Parse a benchmark configuration from a raw dictionary.
+
+    The ``"mode"`` key selects the concrete config type:
+
+    * ``"single_type"`` -> :class:`SingleTypeBenchmarkConfig`
+    * ``"multi_type"``  -> :class:`MultiTypeBenchmarkConfig`
+
+    Args:
+        data: Top-level benchmark configuration mapping.
+
+    Returns:
+        A ``SingleTypeBenchmarkConfig`` or ``MultiTypeBenchmarkConfig``.
+
+    Raises:
+        ValueError: If ``"mode"`` is not recognised or required fields
+            are missing.
+        TypeError: If building-type lists have wrong element types.
+    """
     raw = _require_mapping("benchmark_interface", data)
     mode = str(raw.get("mode", "single_type")).strip().lower()
     train = BenchmarkSideConfig.from_dict(raw.get("train", {}))
@@ -289,11 +442,22 @@ def parse_benchmark_config(data: dict[str, Any]) -> BenchmarkConfig:
 
 
 def reward_to_dict(reward: RewardConfig) -> dict[str, Any]:
+    """Serialise a reward config back to a plain dictionary.
+
+    Args:
+        reward: Any ``RewardConfig`` variant.
+
+    Returns:
+        A dictionary suitable for JSON / YAML serialisation,
+        including a ``"reward_type"`` discriminator key.
+
+    Raises:
+        TypeError: If *reward* is not a known ``RewardConfig`` type.
+    """
     if isinstance(reward, DeadbandRewardConfig):
         return {
             "reward_type": "DeadbandRewardConfig",
             "energy_weight": reward.energy_weight,
-            "target_temp": reward.target_temp,
             "dT": reward.dT,
         }
     if isinstance(reward, BarrierRewardConfig):

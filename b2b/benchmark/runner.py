@@ -1,3 +1,9 @@
+"""Rollout runner and policy protocols for benchmark evaluation.
+
+Provides :func:`run_rollout` and :func:`run_episode` which execute a
+:class:`PolicyLike` on a Gymnasium environment and record results.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -28,7 +28,7 @@ outputs/
 uv.lock
 multirun/
 jobs_logs/
-docs/ 
+site/
 analyze_metadata.ipynb
 data/
 b2b_outputs/

@@ -280,6 +280,27 @@ Repository data prep utilities remain available in `scripts/processing/` and `sc
 
 ---
 
+## Documentation
+
+The project documentation is built with [MkDocs](https://www.mkdocs.org/) and [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/). It covers the full API reference, user guide, benchmark tasks, baselines, and training workflows.
+
+### Viewing the docs locally
+
+```bash
+# Install docs dependencies (one-time, from the venv)
+uv pip install -e ".[docs]"
+
+# Live preview with auto-reload (http://localhost:8000)
+mkdocs serve
+
+# Or build a static site to site/
+mkdocs build
+```
+
+The documentation source lives in `docs/` (Markdown) and `mkdocs.yml` (config). API reference pages are auto-generated from Python docstrings.
+
+---
+
 ## Notes
 
 - Hydra run directories are enabled in script configs (`hydra.run.dir`), so output files are typically written under `outputs/...`.

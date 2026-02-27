@@ -1,3 +1,10 @@
+"""Action space construction for EnergyPlus environments.
+
+Translates :class:`~b2b.types.ActuatorDescription` lists into Gymnasium
+``Box`` action spaces, splitting fixed actuators (e.g. VAV cooling
+setpoints) from agent-controlled ones.
+"""
+
 import logging
 import urllib.parse
 from dataclasses import dataclass
@@ -31,8 +38,16 @@ ThermostatSetpoint = Any
 def hvac_actuators_transform(
     hvac_actuators: Sequence[ActuatorDescription],
 ) -> Transform[list, Box]:
-    """
-    Build an action transform from a list of ActuatorDescription instances.
+    """Build an action transform from a list of actuator descriptions.
+
+    Args:
+        hvac_actuators: Ordered sequence of actuator descriptions.
+            An empty sequence produces a valid but degenerate transform
+            (a warning is logged).
+
+    Returns:
+        A ``TransformListToArray`` whose codomain ``Box`` has per-
+        actuator bounds.
     """
 
     holes: list[ActuatorHole] = []
@@ -73,6 +88,15 @@ class HvacActionSpace:
 
     Cooling setpoints are removed from the agent-facing space and pinned
     to ``FIXED_CLG_SP_VALUE`` (40 °C), following the OfficeRL convention.
+
+    Attributes:
+        full_transform: Transform covering *all* EnergyPlus actuators.
+        agent_transform: Transform covering only the actuators the
+            agent is allowed to control.
+        agent_actuators: Descriptions of agent-controlled actuators.
+        fixed_indices: Positions in the full vector occupied by fixed
+            actuators.
+        fixed_values: Constant values assigned to fixed actuators.
     """
 
     full_transform: TransformListToArray
@@ -82,7 +106,18 @@ class HvacActionSpace:
     fixed_values: list[float]
 
     def assemble_full_action(self, agent_action: np.ndarray | Sequence[float]) -> list[float]:
-        """Expand an agent action vector into the full EnergyPlus actuator vector."""
+        """Expand an agent action vector into the full EnergyPlus actuator vector.
+
+        Args:
+            agent_action: Action array of length
+                ``len(self.agent_actuators)``.
+
+        Returns:
+            Full-length actuator list with fixed slots filled in.
+
+        Raises:
+            ValueError: If *agent_action* has the wrong length.
+        """
         agent_list: list[float] = (
             agent_action.tolist()
             if hasattr(agent_action, "tolist")
@@ -118,6 +153,15 @@ def hvac_action_space(
     Returns an ``HvacActionSpace`` whose ``agent_transform`` exposes only
     non-fixed actuators to the agent, while ``full_transform`` covers all
     actuators for EnergyPlus.
+
+    Args:
+        hvac_actuators: Complete ordered sequence of HVAC actuator
+            descriptions. Cooling-setpoint actuators (identified by
+            ``"b2b vav clg setpoint"`` in the component name) are
+            removed from the agent-facing space.
+
+    Returns:
+        An ``HvacActionSpace`` with both full and agent transforms.
     """
     full_transform = hvac_actuators_transform(hvac_actuators)
 

@@ -62,19 +62,18 @@ class MakeEnergyPlus:
 
 
 def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
-    """
-    Create a simulator for a given building and weather file.
+    """Create an EnergyPlus Gymnasium environment from a building config.
+
+    Reads the epJSON building file, constructs observation and action spaces
+    from the building's zones and HVAC equipment, selects the appropriate
+    reward function, and returns a ready-to-use Gymnasium environment.
 
     Args:
-        path_to_building: Path to the building file (epJSON)
-        path_to_weather: Path to the weather file (epw)
-        building_characteristics: Dictionary with building characteristics
-        reward_type: Type of reward function to use
-        energy_weight: Energy weight for reward calculation
-        eplus_output_dir: Optional directory for EnergyPlus outputs
+        building_config: Complete building configuration including paths,
+            reward settings, HVAC equipment, and task specification.
 
     Returns:
-        gym.Env: EnergyPlus environment
+        A Gymnasium-compatible ``EnergyPlusEnvironment``.
     """
 
     if not isinstance(building_config, BuildingConfig):
