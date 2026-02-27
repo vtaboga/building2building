@@ -3,6 +3,11 @@ from dataclasses import dataclass
 import numpy as np
 
 
+def _zone_target(obs, zone: str) -> float:
+    """Read the per-zone target temperature from the observation dict."""
+    return float(obs["target_temperature"][zone])
+
+
 def base_reward_function(
     obs,
     controlled_zones: list[str],
@@ -21,18 +26,14 @@ def base_reward_function(
     # Energy observations are already in Wh/m² (converted in observation_spaces.py)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
 
-    # Calculate temperature tracking error for controlled zones
-    temp_error = 0
-    target_temp = 21.0  # Target temperature in °C
-
+    temp_error = 0.0
     for zone in controlled_zones:
-        current_temp = obs["temperature"][zone]
+        current_temp = float(obs["temperature"][zone])
+        target_temp = _zone_target(obs, zone)
         temp_error += (current_temp - target_temp) ** 2
 
     temp_error = temp_error / len(controlled_zones)
 
-    # Combine rewards (negative values represent penalties)
-    # Equal weighting between temperature tracking and energy consumption
     total_reward = -(temp_error + energy_weight * energy_penalty)
 
     return total_reward
@@ -72,18 +73,18 @@ def barrier_reward_function(
     # Energy observations are already in Wh/m² (converted in observation_spaces.py)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
 
-    # Barrier on comfort around a (possibly zone-specific, occupancy-aware) target.
-    has_violation = False
+    # Barrier on comfort around a per-zone, occupancy-aware target.
+    comfort_penalty = 0.0
     for zone in controlled_zones:
         current_temp = float(obs["temperature"][zone])
-        target_temp = 21.0
-        if "target_temperature" in obs and zone in obs["target_temperature"]:
-            target_temp = float(obs["target_temperature"][zone])
-        if abs(current_temp - target_temp) > deadband_c:
-            has_violation = True
-            break
+        target_temp = _zone_target(obs, zone)
+        deviation = abs(current_temp - target_temp)
+        if deviation > deadband_c:
+            comfort_penalty += violation_penalty * (deviation - deadband_c)
+        else:
+            comfort_penalty += (current_temp - target_temp) ** 2
 
-    comfort_penalty = violation_penalty if has_violation else 0.0
+    comfort_penalty = comfort_penalty / len(controlled_zones)
     total_reward = -(comfort_penalty + energy_weight * energy_penalty)
 
     return total_reward
@@ -110,24 +111,32 @@ def deadband_reward_function(
     obs,
     controlled_zones: list[str],
     energy_weight=1.0,
-    target_temp: float = 21.0,
     dT: float = 0.5,
 ) -> float:
+    """Calculate a reward combining temperature tracking and energy consumption.
+
+    Inside deadband (|T - target| <= dT):  -(T - target)^2
+    Outside deadband (|T - target| > dT):  -|T - target|
+
+    The quadratic term in the deadband avoid bang-bang behavior.
+    """
     # Energy observations are already in Wh/m² (converted in observation_spaces.py)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
 
     # Comfort: temperature error for controlled zones
-    temp_error = 0
-
+    temp_error = 0.0
     for zone in controlled_zones:
-        current_temp = obs["temperature"][zone]
-        temp_error += np.max([0, np.abs(current_temp - target_temp) - dT])
+        current_temp = float(obs["temperature"][zone])
+        target_temp = _zone_target(obs, zone)
+        dev = abs(current_temp - target_temp)
+        if dev <= dT:
+            temp_error += (current_temp - target_temp) ** 2
+        else:
+            temp_error += -dev
 
     temp_error = temp_error / len(controlled_zones)
 
-    comfort_penalty = temp_error
-
-    total_reward = -(comfort_penalty + energy_weight * energy_penalty)
+    total_reward = -(temp_error + energy_weight * energy_penalty)
 
     return total_reward
 
@@ -136,14 +145,14 @@ def deadband_reward_function(
 class DeadbandReward:
     controlled_zones: list[str]
     energy_weight: float
-    target_temp: float
     dT: float
+
 
     def __call__(self, obs):
         return deadband_reward_function(
             obs=obs,
             controlled_zones=self.controlled_zones,
             energy_weight=self.energy_weight,
-            target_temp=self.target_temp,
             dT=self.dT,
         )
+
