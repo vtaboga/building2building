@@ -1,0 +1,40 @@
+type: unitary_sat
+
+# Warehouse-specific tuning.
+# Large zones with high thermal mass need wider deadband, higher SAT,
+# and more aggressive PI gains than the small-building defaults.
+
+# Control objective
+target_temp_c: 21.0
+deadband_c: 1.5
+
+target_schedule:
+  enabled: true
+  weekend_days: [1, 7]
+  weekend_target_c: 18.0
+  weekday_target_c: 21.0
+  weekday_setback_target_c: 18.0
+  weekday_setback_start_hour: 8.0
+  weekday_setback_end_hour: 18.0
+
+availability_on: 2.0
+
+# Higher heating SAT for gas-fired coils in large spaces [°C]
+outlet_temp_heating_c: 60.0
+outlet_temp_cooling_c: 14.0
+
+# Fan PI — higher base and gains for large airflow [kg/s]
+fan_base_kg_s: 0.5
+kp: 0.5
+ki: 0.001
+integral_limit: 500.0
+
+fan_min_kg_s: null
+fan_max_kg_s: null
+
+# SAT trim/reset — faster response for large thermal mass
+sat_min_c: 10.0
+sat_max_c: 80.0
+sat_step_c: 1.0
+sat_rate_limit_c_per_step: 1.0
+sat_saturation_steps: 2
