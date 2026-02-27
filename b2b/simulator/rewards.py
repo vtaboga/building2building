@@ -156,7 +156,7 @@ def deadband_reward_function(
         if dev <= dT:
             temp_error += (current_temp - target_temp) ** 2
         else:
-            temp_error += -dev
+            temp_error += dev
 
     temp_error = temp_error / len(controlled_zones)
 
