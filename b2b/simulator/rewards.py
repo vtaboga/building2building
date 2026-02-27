@@ -1,35 +1,47 @@
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
+from b2b.types import TaskConfig
 
-def _zone_target(obs, zone: str) -> float:
-    """Read the per-zone target temperature from the observation dict."""
-    return float(obs["target_temperature"][zone])
+
+def _zone_target(obs: dict[str, Any], zone: str, task_config: TaskConfig) -> float:
+    """Return the target temperature for *zone*.
+
+    When the observation contains a dynamic ``target_temperature`` group
+    (occupancy mode), read it from there.  Otherwise fall back to the
+    constant target stored in *task_config*.
+    """
+    target_temps = obs.get("target_temperature", {})
+    if zone in target_temps:
+        return float(target_temps[zone])
+    return task_config.target_for_zone(zone).occupied_c
 
 
 def base_reward_function(
-    obs,
+    obs: dict[str, Any],
     controlled_zones: list[str],
-    energy_weight=1.0,
+    task_config: TaskConfig,
+    energy_weight: float = 1.0,
 ) -> float:
     """Calculate a reward combining temperature tracking and energy consumption.
 
     Args:
         obs: Dictionary containing observations (energy values in Wh/m²)
         controlled_zones: List of controlled zone names
+        task_config: Task configuration with target temperature info
         energy_weight: Weight for the energy consumption penalty
     Returns:
         float: Combined reward (negative values represent penalties)
     """
 
-    # Energy observations are already in Wh/m² (converted in observation_spaces.py)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
 
     temp_error = 0.0
     for zone in controlled_zones:
         current_temp = float(obs["temperature"][zone])
-        target_temp = _zone_target(obs, zone)
+        target_temp = _zone_target(obs, zone, task_config)
         temp_error += (current_temp - target_temp) ** 2
 
     temp_error = temp_error / len(controlled_zones)
@@ -43,17 +55,19 @@ def base_reward_function(
 class BaseReward:
     controlled_zones: list[str]
     energy_weight: float
+    task_config: TaskConfig
 
-    def __call__(self, obs):
+    def __call__(self, obs: dict[str, Any]) -> float:
         return base_reward_function(
-            obs, self.controlled_zones, self.energy_weight
+            obs, self.controlled_zones, self.task_config, self.energy_weight
         )
 
 
 def barrier_reward_function(
-    obs,
+    obs: dict[str, Any],
     controlled_zones: list[str],
-    energy_weight=1.0,
+    task_config: TaskConfig,
+    energy_weight: float = 1.0,
     deadband_c: float = 0.5,
     violation_penalty: float = 100.0,
 ) -> float:
@@ -62,6 +76,7 @@ def barrier_reward_function(
     Args:
         obs: Dictionary containing observations (energy values in Wh/m²)
         controlled_zones: List of controlled zone names
+        task_config: Task configuration with target temperature info
         energy_weight: Weight for the energy consumption penalty
         deadband_c: Comfort deadband in °C
         violation_penalty: Penalty for comfort violations
@@ -70,14 +85,12 @@ def barrier_reward_function(
         float: Combined reward (negative values represent penalties)
     """
 
-    # Energy observations are already in Wh/m² (converted in observation_spaces.py)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
 
-    # Barrier on comfort around a per-zone, occupancy-aware target.
     comfort_penalty = 0.0
     for zone in controlled_zones:
         current_temp = float(obs["temperature"][zone])
-        target_temp = _zone_target(obs, zone)
+        target_temp = _zone_target(obs, zone, task_config)
         deviation = abs(current_temp - target_temp)
         if deviation > deadband_c:
             comfort_penalty += violation_penalty * (deviation - deadband_c)
@@ -96,11 +109,13 @@ class BarrierReward:
     energy_weight: float
     deadband_c: float
     violation_penalty: float
+    task_config: TaskConfig
 
-    def __call__(self, obs):
+    def __call__(self, obs: dict[str, Any]) -> float:
         return barrier_reward_function(
             obs,
             self.controlled_zones,
+            self.task_config,
             self.energy_weight,
             self.deadband_c,
             self.violation_penalty,
@@ -108,9 +123,10 @@ class BarrierReward:
 
 
 def deadband_reward_function(
-    obs,
+    obs: dict[str, Any],
     controlled_zones: list[str],
-    energy_weight=1.0,
+    task_config: TaskConfig,
+    energy_weight: float = 1.0,
     dT: float = 0.5,
 ) -> float:
     """Calculate a reward combining temperature tracking and energy consumption.
@@ -120,14 +136,12 @@ def deadband_reward_function(
 
     The quadratic term in the deadband avoid bang-bang behavior.
     """
-    # Energy observations are already in Wh/m² (converted in observation_spaces.py)
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
 
-    # Comfort: temperature error for controlled zones
     temp_error = 0.0
     for zone in controlled_zones:
         current_temp = float(obs["temperature"][zone])
-        target_temp = _zone_target(obs, zone)
+        target_temp = _zone_target(obs, zone, task_config)
         dev = abs(current_temp - target_temp)
         if dev <= dT:
             temp_error += (current_temp - target_temp) ** 2
@@ -146,13 +160,13 @@ class DeadbandReward:
     controlled_zones: list[str]
     energy_weight: float
     dT: float
+    task_config: TaskConfig
 
-
-    def __call__(self, obs):
+    def __call__(self, obs: dict[str, Any]) -> float:
         return deadband_reward_function(
             obs=obs,
             controlled_zones=self.controlled_zones,
+            task_config=self.task_config,
             energy_weight=self.energy_weight,
             dT=self.dT,
         )
-

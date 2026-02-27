@@ -75,13 +75,11 @@ class DivideBy:
 
 @dataclass
 class DynamicMeter:
-    """Return the value of the first present meter in its candidate list, or
-    zero.
+    """Return the value of the first present meter in its candidate list, or zero.
 
     When no gas consuming equipment is connected to the HVAC system of a
     building, the NaturalGas:HVAC meter is unavailable (even if we explicitely
-    add it to the epJSON file). In that case, it makes sense to return zero. In the future,
-
+    add it to the epJSON file). In that case, it makes sense to return zero.
     """
 
     candidates: list[str]
@@ -167,29 +165,32 @@ def flat_observation_info(
 
     """
 
-    occupancy_template = {}
-    target_template = {}
-    for zone_name in controlled_zones:
-        occupancy_reader = DynamicZoneVariable(
-            "Zone People Occupant Count", zone_name
-        )
-        zone_target = task_config.target_for_zone(zone_name)
-        occupancy_template[zone_name] = (
-            f"zone_occupancy {zone_name}",
-            FunctionHole(occupancy_reader),
-            (0.0, 20.0),
-        )
-        target_template[zone_name] = (
-            f"target_temperature {zone_name}",
-            FunctionHole(
-                DynamicTargetTemperature(
-                    occupancy_reader=occupancy_reader,
-                    mode=task_config.target_temperature_mode,
-                    zone_target=zone_target,
-                )
-            ),
-            (10.0, 35.0),
-        )
+    joules_to_watthours = 3600.0
+
+    occupancy_template: dict[str, Any] = {}
+    target_template: dict[str, Any] = {}
+    if task_config.target_temperature_mode == "occupancy":
+        for zone_name in controlled_zones:
+            occupancy_reader = DynamicZoneVariable(
+                "Zone People Occupant Count", zone_name
+            )
+            zone_target = task_config.target_for_zone(zone_name)
+            occupancy_template[zone_name] = (
+                f"zone_occupancy {zone_name}",
+                FunctionHole(occupancy_reader),
+                (0.0, 20.0),
+            )
+            target_template[zone_name] = (
+                f"target_temperature {zone_name}",
+                FunctionHole(
+                    DynamicTargetTemperature(
+                        occupancy_reader=occupancy_reader,
+                        mode=task_config.target_temperature_mode,
+                        zone_target=zone_target,
+                    )
+                ),
+                (10.0, 35.0),
+            )
 
     template = {
         "temperature": {
@@ -238,14 +239,14 @@ def flat_observation_info(
             "natural_gas": (
                 "energy_gas",
                 FunctionHole(
-                    DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area * 3600.0)
+                    DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area * joules_to_watthours)
                 ),
                 (0.0, 50.0),
             ),
             "electricity": (
                 "energy_electricity",
                 FunctionHole(
-                    DivideBy(DynamicMeter(["Electricity:HVAC"]), area * 3600.0)
+                    DivideBy(DynamicMeter(["Electricity:HVAC"]), area * joules_to_watthours)
                 ),
                 (0.0, 50.0),
             ),
