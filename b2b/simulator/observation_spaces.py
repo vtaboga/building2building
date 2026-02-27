@@ -1,3 +1,10 @@
+"""Observation space construction for EnergyPlus environments.
+
+Builds flat (``Box``) or dict-based observation spaces that expose zone
+air temperatures, outdoor weather, time features, energy meters, and
+optional occupancy / target-temperature signals.
+"""
+
 from ctypes import c_void_p
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -39,14 +46,34 @@ def lifted_day_of_week(state):
 
 @dataclass
 class ObservationFlattener:
+    """Callable that flattens a nested observation into a 1-D NumPy array.
+
+    Attributes:
+        flatten_transform: The transform that maps a nested observation
+            template to a flat sequence of scalars.
+    """
+
     flatten_transform: Transform
 
     def __call__(self, obs) -> np.ndarray:
+        """Flatten *obs* into a 1-D ``np.ndarray``."""
         return np.array(self.flatten_transform(obs))
 
 
 @dataclass
 class ObservationInfo:
+    """Bundle of observation-space metadata and flattening logic.
+
+    Attributes:
+        template: Nested template consumable by minergym to read
+            EnergyPlus variables at each timestep.
+        slot_names: Human-readable names for each slot in the flat
+            observation vector (same order as ``space``).
+        flatten: Callable that converts a raw nested observation into a
+            flat ``np.ndarray``.
+        space: Gymnasium ``Box`` space with per-slot bounds.
+    """
+
     template: Any
     slot_names: list[str]
     flatten: Callable[[Any], np.ndarray]
@@ -130,6 +157,20 @@ class DynamicZoneVariable:
 
 @dataclass
 class DynamicTargetTemperature:
+    """Return the target temperature for a zone, optionally occupancy-aware.
+
+    In ``"occupancy"`` mode, returns the occupied setpoint when
+    occupancy > 0 and the unoccupied setpoint otherwise.  In any other
+    mode, always returns the occupied setpoint.
+
+    Attributes:
+        occupancy_reader: Reader that queries zone occupancy from the
+            EnergyPlus runtime state.
+        mode: ``"occupancy"`` for occupancy-dependent behaviour,
+            anything else for a constant setpoint.
+        zone_target: Target temperature configuration for this zone.
+    """
+
     occupancy_reader: DynamicZoneVariable
     mode: str
     zone_target: ZoneTargetTemperatureConfig
@@ -271,6 +312,20 @@ def flat_observation_info(
 
 
 def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
+    """Build a dict-based observation transform (non-flattened).
+
+    Unlike :func:`flat_observation_info`, this returns a nested
+    ``Dict`` space suitable for agents that consume structured
+    observations.
+
+    Args:
+        ont: Building ontology providing zone metadata.
+        area: Building conditioned floor area (m²), used to normalise
+            energy readings.
+
+    Returns:
+        A ``Transform`` whose codomain is a Gymnasium ``Dict`` space.
+    """
     return TransformDictSpace(
         {
             "temperature": TransformDictSpace(

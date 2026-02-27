@@ -1,3 +1,9 @@
+"""Factory for creating Gymnasium environments from build configs.
+
+Bridges the configuration layer (:mod:`b2b.config.models`) with the
+dataset access and EnergyPlus simulator layers.
+"""
+
 from __future__ import annotations
 
 import gymnasium as gym
@@ -23,6 +29,25 @@ def _build_query_for_selection(selection: DatasetSelectionConfig, building_id: i
 
 
 def make_env_from_config(config: EnvBuildConfig, eplus_output_dir: str | Path) -> gym.Env:
+    """Construct a time-limited Gymnasium environment from an ``EnvBuildConfig``.
+
+    The function selects a building from the configured dataset, builds a
+    search config for the dataset access layer, creates an EnergyPlus
+    simulator, and wraps it in a :class:`gymnasium.wrappers.TimeLimit`.
+
+    Args:
+        config: Fully specified environment build configuration.
+        eplus_output_dir: Directory where EnergyPlus writes simulation
+            artefacts. Created if it does not exist.
+
+    Returns:
+        A :class:`gymnasium.wrappers.TimeLimit`-wrapped EnergyPlus
+        environment.
+
+    Raises:
+        RuntimeError: If the dataset selection yields zero buildings.
+        ValueError: If the configured dataset is not supported.
+    """
     out_dir = Path(eplus_output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 

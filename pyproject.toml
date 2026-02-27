@@ -44,7 +44,12 @@ dev = [
     "pyright",
 ]
 
-all = ["b2b[test,dev]"]
+docs = [
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "pymdown-extensions",
+]
+all = ["b2b[test,dev,docs]"]
 
 
 [tool.setuptools.packages.find]

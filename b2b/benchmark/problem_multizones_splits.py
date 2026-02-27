@@ -1,3 +1,11 @@
+"""Multi-zone train/test split benchmark problems.
+
+Defines :class:`SingleTypeTrainTestBenchmark` and
+:class:`MultiTypeTrainTestBenchmark` which select buildings from the
+``multizones_reference_buildings`` dataset and produce
+:class:`~b2b.types.BuildingConfig` lists for train and test sides.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

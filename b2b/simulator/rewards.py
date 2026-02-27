@@ -1,3 +1,13 @@
+"""Reward functions for HVAC control environments.
+
+Provides three reward variants that trade off thermal comfort against
+energy consumption:
+
+* :class:`BaseReward` -- MSE temperature tracking + weighted energy penalty.
+* :class:`BarrierReward` -- deadband with steep violation penalty.
+* :class:`DeadbandReward` -- quadratic inside deadband, linear outside.
+"""
+
 from dataclasses import dataclass
 from typing import Any
 

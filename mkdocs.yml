@@ -1,0 +1,117 @@
+site_name: Building2Building
+site_description: >-
+  A large-scale RL benchmark for HVAC control targeting transfer,
+  multi-task, and meta-learning research.
+repo_url: https://github.com/placeholder/Building2Building
+repo_name: Building2Building
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            docstring_style: google
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+  - tables
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - User Guide:
+      - Installation: guide/installation.md
+      - Environment Overview: guide/environments.md
+      - Building Types & Climate Zones: guide/buildings.md
+      - HVAC System Types: guide/hvac-systems.md
+      - Observation Space: guide/observations.md
+      - Action Space: guide/actions.md
+      - Reward Functions: guide/rewards.md
+      - Wrappers: guide/wrappers.md
+      - Configuration (Hydra): guide/configuration.md
+      - Using Custom Policies: guide/custom-policies.md
+  - Benchmark Tasks:
+      - Overview: benchmarks/overview.md
+      - Multi-Task Learning: benchmarks/multi-task.md
+      - Cross-Environment Generalization: benchmarks/cross-env.md
+      - Action-Space Shift: benchmarks/action-shift.md
+      - Adaptive Dynamics: benchmarks/adaptive-dynamics.md
+  - Baselines:
+      - Overview: baselines/overview.md
+      - PI Controller: baselines/unitary-pi.md
+      - SAT Controller: baselines/unitary-sat.md
+      - G36 Controller: baselines/unitary-g36.md
+      - Fan Coil Constant: baselines/fan-coil-constant.md
+  - Training:
+      - Single-Zone Training: training/single-zone.md
+      - Multizone Training: training/multizone.md
+      - RL Algorithms (PPO, SAC): training/algorithms.md
+      - SLURM Cluster Execution: training/slurm.md
+      - W&B Integration: training/wandb.md
+  - API Reference:
+      - b2b.api: api/api.md
+      - b2b.config: api/config.md
+      - b2b.types: api/types.md
+      - b2b.simulator: api/simulator.md
+      - b2b.pipeline: api/pipeline.md
+      - b2b.benchmark: api/benchmark.md
+      - b2b.baselines: api/baselines.md
+      - b2b.envs: api/envs.md
+      - b2b.datasets: api/datasets.md
+  - Developer Guide:
+      - Contributing: dev/contributing.md
+      - Code Style: dev/code-style.md
+      - Testing: dev/testing.md
+      - Adding Building Types: dev/new-buildings.md
+      - Adding HVAC Systems: dev/new-hvac.md
+  - About:
+      - Citing B2B: about/citing.md
+      - License: about/license.md

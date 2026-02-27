@@ -1,3 +1,13 @@
+"""Benchmark orchestration for evaluating RL policies across buildings.
+
+Exposes benchmark problem classes that define train/test splits over the
+building dataset:
+
+* :class:`SingleTypeTrainTestBenchmark` -- within a single building type.
+* :class:`MultiTypeTrainTestBenchmark` -- across different building types.
+* :class:`AdaptiveDynamicsProblem` -- parametric dynamics variation.
+"""
+
 from __future__ import annotations
 
 from b2b.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
