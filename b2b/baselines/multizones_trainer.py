@@ -111,6 +111,7 @@ def _make_single_env(
     task_section: dict[str, Any],
     max_steps: int | None,
     norm_obs: bool,
+    norm_action: bool = False,
 ) -> gym.Env:
     """Create one wrapped env instance (top-level for picklability by SubprocVecEnv)."""
     retries = 3
@@ -138,6 +139,8 @@ def _make_single_env(
     else:
         raise RuntimeError("Failed to create multizones environment") from last_error
 
+    if norm_action:
+        env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
     env = Monitor(env)
     if norm_obs:
         env = NormalizeObservation(env)
@@ -155,6 +158,7 @@ def _make_envs(
     max_steps: int | None,
 ) -> tuple[DummyVecEnv | SubprocVecEnv, DummyVecEnv]:
     norm_obs: bool = config.env.normalize_obs
+    norm_action: bool = getattr(config.env, "normalize_action", False)
     common_kwargs = dict(
         building_type=building_type,
         split=split,
@@ -163,6 +167,7 @@ def _make_envs(
         task_section=task_section,
         max_steps=max_steps,
         norm_obs=norm_obs,
+        norm_action=norm_action,
     )
 
     num_envs = int(config.training.num_train_envs)

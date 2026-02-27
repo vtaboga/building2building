@@ -78,6 +78,12 @@ def test_policy(config, policy_model, output_dir: Path):
     # Build a single env with a dedicated EnergyPlus output dir
     env = make_env(config=config, eplus_output_dir=str(test_dir / "eplus_outputs"))
 
+    # Apply action rescaling if the model was trained with normalized actions
+    norm_action = getattr(config.env, "normalize_action", False)
+    if norm_action:
+        import gymnasium as gym
+        env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
+
     # Apply building parameter augmentation if configured
     augment_params = config.env.get('augment_building_params', False)
     if augment_params:

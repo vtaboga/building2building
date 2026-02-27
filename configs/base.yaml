@@ -11,6 +11,7 @@ defaults:
 
 env:
   normalize_obs: true
+  normalize_action: false
   max_steps: null
 
 n_episodes: 1

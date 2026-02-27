@@ -138,11 +138,13 @@ def _apply_wrappers(
     target_obs_size: int | None,
     augment_params: bool,
     norm_obs: bool,
+    norm_action: bool = False,
 ) -> gym.Env:
     """Apply the standard wrapper stack for adaptive dynamics envs.
 
     Order (inside → out):
         raw env → ResampleBuildingOnResetWrapper (already applied)
+        → RescaleAction (if norm_action) — agent sees [-1, 1]
         → PadObservation (if target_obs_size is set)
         → NormalizeObservation (if norm_obs) — MUST come before augmentation
         → AugmentObservationWithBuildingParams (if augment_params)
@@ -152,6 +154,8 @@ def _apply_wrappers(
     because the building params are already normalized to [-1, 1]. If we normalize
     after augmentation, we'd be double-normalizing the building params.
     """
+    if norm_action:
+        env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
     if target_obs_size is not None:
         env = PadObservation(env, target_size=target_obs_size)
     if norm_obs:
@@ -171,6 +175,7 @@ def _make_single_wrapped_env(
     target_obs_size: int | None,
     augment_params: bool,
     norm_obs: bool,
+    norm_action: bool = False,
     wandb_prefix: str,
 ) -> gym.Env:
     """Create one fully-wrapped adaptive dynamics env.
@@ -178,9 +183,10 @@ def _make_single_wrapped_env(
     The wrapper stack (inside → out) is:
         raw EnergyPlus env
         → ResampleBuildingOnResetWrapper
+        → RescaleAction (if norm_action)
         → PadObservation
-        → AugmentObservationWithBuildingParams
         → NormalizeObservation
+        → AugmentObservationWithBuildingParams
     """
     env = make_adaptive_dynamics_env(
         config=config,
@@ -194,6 +200,7 @@ def _make_single_wrapped_env(
         target_obs_size=target_obs_size,
         augment_params=augment_params,
         norm_obs=norm_obs,
+        norm_action=norm_action,
     )
 
 
@@ -204,6 +211,7 @@ def _make_adaptive_dynamics_envs(
     target_obs_size: int | None,
     augment_params: bool,
     norm_obs: bool,
+    norm_action: bool = False,
 ) -> tuple[VecNormalize, VecNormalize]:
     """Create vectorized training and single evaluation environments.
 
@@ -238,6 +246,7 @@ def _make_adaptive_dynamics_envs(
         "target_obs_size": target_obs_size,
         "augment_params": augment_params,
         "norm_obs": norm_obs,
+        "norm_action": norm_action,
     }
 
     # --- Vectorized training environments ---
@@ -314,6 +323,7 @@ def parameterized_adaptive_dynamics_trainer(config: OmegaConf, output_dir: Path)
         # Read wrapper config once — used for both training envs and
         # the post-training benchmark.
         norm_obs: bool = config.env.normalize_obs
+        norm_action: bool = config.env.get("normalize_action", False)
         augment_params: bool = config.env.get("augment_building_params", True)
         target_obs_size: int | None = config.env.get("target_obs_size", None)
 
@@ -327,6 +337,7 @@ def parameterized_adaptive_dynamics_trainer(config: OmegaConf, output_dir: Path)
             target_obs_size=target_obs_size,
             augment_params=augment_params,
             norm_obs=norm_obs,
+            norm_action=norm_action,
         )
 
         # Log observation space info
@@ -401,6 +412,7 @@ def parameterized_adaptive_dynamics_trainer(config: OmegaConf, output_dir: Path)
                 target_obs_size=target_obs_size,
                 augment_params=augment_params,
                 norm_obs=norm_obs,
+                norm_action=norm_action,
             ),
         )
 

@@ -81,6 +81,7 @@ def _make_envs(
     split_index: int,
     *,
     norm_obs: bool,
+    norm_action: bool = False,
 ) -> tuple[VecNormalize, VecNormalize]:
     """Create train and eval vectorized environments for a single fixed building.
 
@@ -94,6 +95,8 @@ def _make_envs(
     """
 
     def _wrap(env: gym.Env) -> gym.Env:
+        if norm_action:
+            env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
         if norm_obs:
             env = NormalizeObservation(env)
         env = Monitor(env)
@@ -193,10 +196,12 @@ def per_building_adaptive_dynamics_trainer(
         set_random_seed(config.seed)
 
         norm_obs: bool = config.env.normalize_obs
+        norm_action: bool = config.env.get("normalize_action", False)
 
         # Create envs for this single building
         train_env, eval_env = _make_envs(
-            config, output_dir, split, split_index, norm_obs=norm_obs
+            config, output_dir, split, split_index,
+            norm_obs=norm_obs, norm_action=norm_action,
         )
 
         logger.info(
@@ -257,6 +262,8 @@ def per_building_adaptive_dynamics_trainer(
         cfg_dict["env"]["normalize_obs"] = False  # we normalize via wrapper
 
         def _eval_wrapper(env: gym.Env) -> gym.Env:
+            if norm_action:
+                env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
             if norm_obs:
                 env = NormalizeObservation(env)
             return env

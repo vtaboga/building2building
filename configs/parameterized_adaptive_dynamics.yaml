@@ -23,6 +23,7 @@ policy:
 # Environment configuration
 env:
   normalize_obs: true
+  normalize_action: false
   # Enable building parameter augmentation (area, warmup_phases, num_actuators)
   augment_building_params: true
   # Pad raw observations to this fixed size before augmentation/normalisation.

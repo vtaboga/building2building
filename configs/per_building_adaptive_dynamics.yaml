@@ -22,6 +22,7 @@ training:
 # Environment configuration — minimal wrapper stack.
 env:
   normalize_obs: true
+  normalize_action: false
   augment_building_params: false
   control_mode: hvac_actuators
   max_steps: 35040  # One year at 15-min timesteps (365 * 24 * 4)

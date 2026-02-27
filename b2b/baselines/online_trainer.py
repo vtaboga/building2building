@@ -1,5 +1,7 @@
 import logging
 from pathlib import Path
+
+import gymnasium as gym
 from omegaconf import OmegaConf
 from wandb.integration.sb3 import WandbCallback
 import wandb
@@ -22,8 +24,11 @@ def _make_envs(config: OmegaConf, output_dir: Path):
 
     # Read required config without providing defaults; raise if missing
     norm_obs = config.env.normalize_obs  # expect under env
+    norm_action = getattr(config.env, "normalize_action", False)
 
     def wrapper_fn(env):
+        if norm_action:
+            env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
         if norm_obs:
             env = NormalizeObservation(env)
         return env
