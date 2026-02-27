@@ -94,12 +94,14 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         set(itertools.chain(*(item.zones() for item in building_config.hvac_equipment)))
     )
 
+    task_config = building_config.task_config
+
     # We compute the observation side stuff
     obs_info = flat_observation_info(
         ont,
         area=building_config.area,
         controlled_zones=controlled_zones,
-        task_config=building_config.task_config,
+        task_config=task_config,
     )
 
     actuators = list(
@@ -126,25 +128,24 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
-            area=building_config.area,
             controlled_zones=controlled_zones,
             energy_weight=building_config.reward_config.energy_weight,
             deadband_c=building_config.reward_config.deadband_c,
             violation_penalty=building_config.reward_config.violation_penalty,
+            task_config=task_config,
         )
     elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
-            area=building_config.area,
             controlled_zones=controlled_zones,
             energy_weight=building_config.reward_config.energy_weight,
+            task_config=task_config,
         )
     elif isinstance(building_config.reward_config, DeadbandRewardConfig):
         reward_function = DeadbandReward(
-            area=building_config.area,
             controlled_zones=controlled_zones,
             energy_weight=building_config.reward_config.energy_weight,
-            target_temp=building_config.reward_config.target_temp,
             dT=building_config.reward_config.dT,
+            task_config=task_config,
         )
     else:
         raise ValueError(f"Invalid reward type: {building_config.reward_config}")
@@ -173,7 +174,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         "building_source_metadata": dict(building_config.source_metadata)
         if isinstance(building_config.source_metadata, dict)
         else {},
-        "target_temperature_mode": building_config.task_config.target_temperature_mode,
+        "target_temperature_mode": task_config.target_temperature_mode,
     }
 
     return gymenv

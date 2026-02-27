@@ -143,9 +143,7 @@ class BarrierRewardConfig:
 
 @dataclass
 class DeadbandRewardConfig:
-    area: float
     energy_weight: float
-    target_temp: float
     dT: float
 
 
@@ -154,15 +152,11 @@ RewardConfig = Union[DeadbandRewardConfig, BaseRewardConfig, BarrierRewardConfig
 
 def reward_config_from_dict(
     reward_section: dict[str, Any],
-    *,
-    area: float,
 ) -> RewardConfig:
     reward_type = reward_section.get("reward_type")
     if reward_type == "DeadbandRewardConfig":
         return DeadbandRewardConfig(
-            area=area,
             energy_weight=float(reward_section.get("energy_weight", 0.0)),
-            target_temp=float(reward_section.get("target_temp", 21.0)),
             dT=float(reward_section.get("dT", 0.5)),
         )
     if reward_type == "BarrierRewardConfig":

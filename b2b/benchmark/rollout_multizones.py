@@ -151,7 +151,7 @@ def run_multizones_rollout(
             try:
                 logger.info("  creating environment ...")
                 task_cfg_typed = TaskConfig.from_dict(task_section)
-                reward_cfg_typed = reward_config_from_dict(reward_section, area=1.0)
+                reward_cfg_typed = reward_config_from_dict(reward_section)
                 env = make_env(
                     EnvBuildConfig(
                         dataset_selection=DatasetSelectionConfig(

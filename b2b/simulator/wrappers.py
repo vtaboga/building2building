@@ -8,168 +8,6 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-class SetpointDeltaActionWrapper(gym.Wrapper):
-    """
-    Interpret Zone Temperature Control setpoint actions as *deltas* from the current zone air temperature.
-
-    Motivation: we want actions to be "add ΔT to current temperature" rather than absolute setpoints.
-    This keeps policies invariant to absolute temperature scales and avoids hardcoding setpoint ranges.
-    """
-
-    _ABS_SETPOINT_MIN_C = 0.0
-    _ABS_SETPOINT_MAX_C = 50.0
-    _MIN_DEADBAND_C = 0.5
-    _DELTA_MIN_C = -10.0
-    _DELTA_MAX_C = 10.0
-
-    def __init__(self, env: gym.Env):
-        super().__init__(env)
-
-        if not hasattr(env, "metadata") or not isinstance(env.metadata, dict):
-            raise RuntimeError(
-                "env.metadata missing; required for setpoint delta mapping"
-            )
-        obs_names = env.metadata.get("observation_names")
-        act_names = env.metadata.get("action_names")
-        if not isinstance(obs_names, list) or not all(
-            isinstance(x, str) for x in obs_names
-        ):
-            raise RuntimeError("env.metadata['observation_names'] must be a list[str]")
-        if not isinstance(act_names, list) or not all(
-            isinstance(x, str) for x in act_names
-        ):
-            raise RuntimeError("env.metadata['action_names'] must be a list[str]")
-
-        self._obs_names = obs_names
-        self._act_names = act_names
-        self._last_obs: np.ndarray | None = None
-
-        # Per-zone mapping so we can enforce heating/cooling ordering.
-        # zone_name -> {"obs_idx": int, "heat_act_idx": int?, "cool_act_idx": int?}
-        self._zones: dict[str, dict[str, int]] = {}
-        for i, name in enumerate(act_names):
-            parts = str(name).split("::")
-            if len(parts) < 3:
-                continue
-            component_type = parts[0].strip().lower()
-            control_type = parts[1].strip().lower()
-            zone_name = parts[2].strip()
-            if component_type != "zone temperature control":
-                continue
-            if control_type not in ("heating setpoint", "cooling setpoint"):
-                continue
-            obs_idx = self._find_zone_air_temp_index(zone_name)
-            z = self._zones.setdefault(zone_name, {"obs_idx": int(obs_idx)})
-            if control_type == "heating setpoint":
-                z["heat_act_idx"] = int(i)
-            else:
-                z["cool_act_idx"] = int(i)
-
-        # Narrow the delta action bounds for setpoint actuators to make random sampling safe.
-        if isinstance(getattr(env, "action_space", None), gym.spaces.Box):
-            low = np.asarray(env.action_space.low, dtype=float).reshape(-1).copy()
-            high = np.asarray(env.action_space.high, dtype=float).reshape(-1).copy()
-
-            for z in self._zones.values():
-                for k in ("heat_act_idx", "cool_act_idx"):
-                    if k in z:
-                        idx = int(z[k])
-                        low[idx] = self._DELTA_MIN_C
-                        high[idx] = self._DELTA_MAX_C
-
-            self.action_space = gym.spaces.Box(
-                low=low.astype(env.action_space.dtype),
-                high=high.astype(env.action_space.dtype),
-                dtype=env.action_space.dtype,
-            )
-
-        # Keep metadata visible on the wrapper (gymnasium uses env.metadata for rendering, etc).
-        self.metadata = getattr(env, "metadata", {})
-
-    def _find_zone_air_temp_index(self, zone_name: str) -> int:
-        zn = zone_name.strip().lower()
-        prefix = "zone air temperature"
-
-        # Exact-ish match: "Zone Air Temperature {ZONE}"
-        for j, n in enumerate(self._obs_names):
-            s = str(n).strip()
-            sl = s.lower()
-            if not sl.startswith(prefix):
-                continue
-            zone_part = sl[len(prefix) :].strip()
-            if zone_part == zn:
-                return int(j)
-
-        # Substring match fallback (EnergyPlus sometimes decorates names).
-        for j, n in enumerate(self._obs_names):
-            sl = str(n).strip().lower()
-            if not sl.startswith(prefix):
-                continue
-            zone_part = sl[len(prefix) :].strip()
-            if zn in zone_part or zone_part in zn:
-                return int(j)
-
-        raise RuntimeError(
-            f"Could not map Zone Temperature Control zone '{zone_name}' to a Zone Air Temperature obs"
-        )
-
-    def reset(self, **kwargs):  # type: ignore[override]
-        obs, info = self.env.reset(**kwargs)
-        self._last_obs = np.asarray(obs, dtype=float).reshape(-1)
-        return obs, info
-
-    def step(self, action):  # type: ignore[override]
-        if self._last_obs is None:
-            raise RuntimeError("SetpointDeltaActionWrapper.step called before reset()")
-
-        act = np.asarray(action, dtype=float).reshape(-1).copy()
-        obs_arr = self._last_obs
-
-        for z in self._zones.values():
-            tz = float(obs_arr[int(z["obs_idx"])])
-            heat_idx = z.get("heat_act_idx")
-            cool_idx = z.get("cool_act_idx")
-
-            heat_abs: float | None = None
-            cool_abs: float | None = None
-
-            if heat_idx is not None:
-                heat_abs = float(
-                    np.clip(
-                        tz + float(act[int(heat_idx)]),
-                        self._ABS_SETPOINT_MIN_C,
-                        self._ABS_SETPOINT_MAX_C,
-                    )
-                )
-            if cool_idx is not None:
-                cool_abs = float(
-                    np.clip(
-                        tz + float(act[int(cool_idx)]),
-                        self._ABS_SETPOINT_MIN_C,
-                        self._ABS_SETPOINT_MAX_C,
-                    )
-                )
-
-            if heat_abs is not None and cool_abs is not None:
-                if cool_abs < heat_abs + self._MIN_DEADBAND_C:
-                    cool_abs = min(
-                        heat_abs + self._MIN_DEADBAND_C, self._ABS_SETPOINT_MAX_C
-                    )
-                    if cool_abs < heat_abs + self._MIN_DEADBAND_C:
-                        heat_abs = max(
-                            cool_abs - self._MIN_DEADBAND_C, self._ABS_SETPOINT_MIN_C
-                        )
-
-            if heat_idx is not None and heat_abs is not None:
-                act[int(heat_idx)] = heat_abs
-            if cool_idx is not None and cool_abs is not None:
-                act[int(cool_idx)] = cool_abs
-
-        obs, reward, terminated, truncated, info = self.env.step(act)
-        self._last_obs = np.asarray(obs, dtype=float).reshape(-1)
-        return obs, reward, terminated, truncated, info
-
-
 class NormalizeObservation(gym.ObservationWrapper):
     """
     Observation wrapper that normalizes observations to a [0, 1] range according to the observation space bounds.
@@ -206,11 +44,10 @@ class NormalizeObservation(gym.ObservationWrapper):
         self.obs_low = self.env.observation_space.low
         self.obs_high = self.env.observation_space.high
 
-        self.obs_low = np.where(np.isinf(self.obs_low), -1e10, self.obs_low)
-        self.obs_high = np.where(np.isinf(self.obs_high), 1e10, self.obs_high)
-
         self.obs_range = self.obs_high - self.obs_low
-        self.obs_range = np.where(self.obs_range == 0, 1.0, self.obs_range)
+        
+        if (self.obs_range == 0).any():
+            raise ValueError("Observation space range is zero for at least one feature")
 
         dtype = self.observation_space.dtype
         target_low = np.zeros(self.obs_low.shape, dtype=dtype)
@@ -573,23 +410,14 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         }
 
         normalized = []
-        clipped_params = {}  # Track which params were clipped for logging
 
         for key, value in params.items():
             if key in param_ranges:
                 min_val, max_val = param_ranges[key]
-                # Normalize to [-1, 1]
                 norm_val_unclipped = 2.0 * (value - min_val) / (max_val - min_val) - 1.0
                 norm_val = np.clip(norm_val_unclipped, -1.0, 1.0)
 
-                # Check if clipping occurred
                 if norm_val != norm_val_unclipped:
-                    clipped_params[key] = {
-                        "value": float(value),
-                        "range": (min_val, max_val),
-                        "normalized_unclipped": float(norm_val_unclipped),
-                        "normalized_clipped": float(norm_val),
-                    }
                     logger.warning(
                         "Building parameter %r clipped: value=%.2f outside range [%.2f, %.2f], "
                         "normalized from %.3f to %.3f",
@@ -606,12 +434,6 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
                 norm_val = np.clip(norm_val_unclipped, -1.0, 1.0)
 
                 if norm_val != norm_val_unclipped:
-                    clipped_params[key] = {
-                        "value": float(value),
-                        "range": "unknown",
-                        "normalized_unclipped": float(norm_val_unclipped),
-                        "normalized_clipped": float(norm_val),
-                    }
                     logger.warning(
                         "Unknown building parameter %r clipped: value=%.2f, "
                         "normalized from %.3f to %.3f",
@@ -623,35 +445,6 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
 
             normalized.append(norm_val)
 
-        # Log to Wandb if any parameters were clipped
-        if clipped_params:
-            try:
-                import wandb
-
-                if wandb.run is not None:
-                    # Log each clipped parameter with its details
-                    for param_name, details in clipped_params.items():
-                        wandb.log(
-                            {
-                                f"building_params/clipped_{param_name}_value": details[
-                                    "value"
-                                ],
-                                f"building_params/clipped_{param_name}_normalized": details[
-                                    "normalized_clipped"
-                                ],
-                            },
-                            commit=False,
-                        )
-                    # Log a summary count
-                    wandb.log(
-                        {"building_params/num_clipped_params": len(clipped_params)},
-                        commit=False,
-                    )
-            except ImportError:
-                pass  # Wandb not installed, skip logging
-            except Exception as e:
-                logger.debug("Failed to log clipped params to Wandb: %s", e)
-
         return np.array(normalized, dtype=np.float32)
 
     def reset(self, **kwargs):  # type: ignore[override]
@@ -661,9 +454,6 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         # Re-extract in case the inner env was swapped (e.g. by ResampleBuildingOnResetWrapper)
         self.building_params = self._extract_building_params(self.env)
         self.normalized_params = self._normalize_params(self.building_params)
-
-        # Log building parameters to Wandb on reset (when building changes)
-        self._log_building_params_to_wandb()
 
         # Rebuild observation space in case inner env's obs shape changed
         orig_low = self.env.observation_space.low
@@ -682,23 +472,6 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         )
 
         return self.observation(obs), info
-
-    def _log_building_params_to_wandb(self) -> None:
-        """Log building parameters to Wandb for tracking distributions."""
-        try:
-            import wandb
-
-            if wandb.run is not None:
-                # Log raw building parameter values
-                for param_name, param_value in self.building_params.items():
-                    wandb.log(
-                        {f"building_params/{param_name}": param_value},
-                        commit=False,
-                    )
-        except ImportError:
-            pass  # Wandb not installed, skip logging
-        except Exception as e:
-            logger.debug("Failed to log building params to Wandb: %s", e)
 
     def observation(self, obs: np.ndarray) -> np.ndarray:
         """Augment observation with normalized building parameters."""
@@ -817,47 +590,22 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
             logger.warning("wandb episode log failed: %s", exc)
 
     def _log_building_params(self) -> None:
-        """Log the current building's environment parameters to wandb."""
+        """Log the current building index to wandb."""
         if not self._wandb_is_active():
             return
         try:
             import wandb  # type: ignore[import-untyped]
 
             meta = getattr(self.env, "metadata", None)
-            if not isinstance(meta, dict):
-                return
+            src = meta.get("building_source_metadata", {}) if isinstance(meta, dict) else {}
 
             p = self._wandb_prefix
             payload: dict[str, Any] = {
                 f"{p}/building/split_index": self._current_index,
             }
-
-            # Core building parameters
-            for key in ("area", "warmup_phases"):
-                if key in meta:
-                    payload[f"{p}/building/{key}"] = float(meta[key])
-
-            if "hvac_actuators" in meta:
-                payload[f"{p}/building/num_actuators"] = len(meta["hvac_actuators"])
-
-            if "controlled_zones" in meta:
-                payload[f"{p}/building/num_controlled_zones"] = len(
-                    meta["controlled_zones"]
-                )
-
-            # Source metadata (year_built, num_units, …)
-            src = meta.get("building_source_metadata")
-            if isinstance(src, dict):
-                for src_key in (
-                    "year_built",
-                    "geometry_building_num_units",
-                ):
-                    val = src.get(src_key)
-                    if val is not None:
-                        try:
-                            payload[f"{p}/building/{src_key}"] = float(val)
-                        except (TypeError, ValueError):
-                            pass
+            bid = src.get("building_id")
+            if bid is not None:
+                payload[f"{p}/building/id"] = int(bid)
 
             wandb.log(payload)
         except Exception as exc:
