@@ -6,7 +6,7 @@ from omegaconf import OmegaConf
 from wandb.integration.sb3 import WandbCallback
 import wandb
 
-from algorithms.sb3_utils import build_sb3_model, load_best_model
+from b2b.training.sb3_utils import build_sb3_model, load_best_model
 from b2b.baselines.callbacks import TrainingEpisodeRewardCallback
 from b2b.baselines.test import test_policy
 from b2b.baselines.utils import make_dummy_vec_env, make_env, log_test_dir_graphs_wandb

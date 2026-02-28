@@ -13,12 +13,12 @@ from typing import Any, Literal
 
 import gymnasium as gym
 from omegaconf import OmegaConf
-from stable_baselines3.common.callbacks import CallbackList, EvalCallback
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
-from algorithms.sb3_utils import build_sb3_model, load_best_model
+from b2b.training.sb3_utils import build_sb3_model, load_best_model
 from b2b.baselines.callbacks import TrainingEpisodeRewardCallback
 from b2b.baselines.wandb_utils import (
     finish_wandb_if_started,
@@ -206,15 +206,25 @@ def _make_callbacks(
 ) -> CallbackList:
     callbacks: list[Any] = []
 
+    eval_freq = int(config.training.eval_freq)
+
     eval_cb = EvalCallback(
         eval_env,
         log_path=str(log_dir),
-        eval_freq=config.training.eval_freq,
+        eval_freq=eval_freq,
         best_model_save_path=str(model_dir),
         n_eval_episodes=config.training.eval_episodes,
         deterministic=True,
     )
     callbacks.append(eval_cb)
+
+    checkpoint_cb = CheckpointCallback(
+        save_freq=eval_freq,
+        save_path=str(model_dir),
+        name_prefix="checkpoint",
+    )
+    callbacks.append(checkpoint_cb)
+
     callbacks.append(TrainingEpisodeRewardCallback())
 
     try:
