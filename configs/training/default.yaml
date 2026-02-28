@@ -1,7 +1,7 @@
 total_timesteps: 1000000
-eval_freq: 262144
-eval_episodes: 20
-num_train_envs: 4
+eval_freq: 1000000
+eval_episodes: 1
+num_train_envs: 14
 cb_gradient_save_freq: 500
 
 # Optional: Number of timesteps to include in trajectory snippet logged after each PPO update
