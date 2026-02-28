@@ -107,7 +107,7 @@ class UnitaryPIPolicy:
             )
         )
 
-        # Fan PI config
+        # Fan PI config [kg/s]
         self.fan_base_kg_s = float(getattr(policy_cfg, "fan_base_kg_s", 1.0))
         self.kp = float(getattr(policy_cfg, "kp", 0.0))
         self.ki = float(getattr(policy_cfg, "ki", 0.0))

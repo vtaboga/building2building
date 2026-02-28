@@ -37,6 +37,7 @@ b2b_outputs/
 
 dataset/
 *.zip
+scrap/
 
 # temporary
 simulator/patched_minergym_simulation.py

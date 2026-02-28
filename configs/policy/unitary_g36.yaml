@@ -4,9 +4,9 @@ type: unitary_g36
 # Two PI loops (heating / cooling) produce [0, 1] demand signals.
 # Fan speed and SAT are mapped directly from those signals.
 
-# Zone setpoints [°C]
-heating_setpoint_c: 21.0
-cooling_setpoint_c: 24.0
+# Zone setpoints [°C] — aligned with reward deadband [20, 22]°C.
+heating_setpoint_c: 20.0
+cooling_setpoint_c: 22.0
 
 # PI gains — tuned for 15-min timesteps.
 # kp=2.0 means 0.5 °C error → full demand; reaches max heating/cooling faster

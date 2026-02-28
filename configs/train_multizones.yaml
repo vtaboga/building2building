@@ -13,7 +13,7 @@ multizones:
 
 env:
   normalize_obs: true
-  normalize_action: false
+  normalize_action: true
   max_steps: 35040             # full year at 15-min timesteps
 
 seed: 42
