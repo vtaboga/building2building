@@ -1,21 +1,12 @@
 type: unitary_g36
-
-# Tuned G36 parameters for RetailStandalone buildings.
-# Placeholder — will be overwritten by scripts/tune_g36.py.
-
 heating_setpoint_c: 20.0
 cooling_setpoint_c: 22.0
-
-kp: 2.0
-ki: 0.1
-
-min_fan_fraction: 0.70
-med_fan_fraction: 0.85
-
-sat_min_c: 13.0
+kp: 4.7803
+ki: 0.012705
+min_fan_fraction: 0.8853
+med_fan_fraction: 0.9971
+sat_min_c: 11.28
 sat_max_c: null
-
 availability_on: 2.0
-
 target_schedule:
   enabled: false

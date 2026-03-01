@@ -1,8 +1,13 @@
-total_timesteps: 20000000
+total_timesteps: 10000000
 eval_freq: 200000
 eval_episodes: 1
 num_train_envs: 10
 cb_gradient_save_freq: 500
+
+# Recycle SubprocVecEnv workers every N vectorised steps to reclaim
+# leaked EnergyPlus C memory.  Set to 0 to disable.
+# 35040 ≈ one full-year episode at 15-min timesteps.
+recycle_every: 350400
 
 # Optional: Number of timesteps to include in trajectory snippet logged after each PPO update
 # trajectory_snippet_length: 10

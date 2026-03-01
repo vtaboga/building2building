@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 HEATING_SP = 20.0
 COOLING_SP = 22.0
 
-BuildingType = Literal["Warehouse", "RetailStandalone", "RestaurantFastFood"]
+BuildingType = Literal["OfficeSmall"]
 
 
 def _zone_temp_indices(
@@ -263,7 +263,7 @@ def main() -> None:
     parser.add_argument(
         "--building-type",
         required=True,
-        choices=["Warehouse", "RetailStandalone", "RestaurantFastFood"],
+        choices=["Warehouse", "RetailStandalone", "RestaurantFastFood", "OfficeSmall"],
     )
     parser.add_argument("--n-trials", type=int, default=50)
     parser.add_argument(
@@ -275,7 +275,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("output/tune_g36"),
+        default=Path("outputs/tune_g36"),
     )
     args = parser.parse_args()
 

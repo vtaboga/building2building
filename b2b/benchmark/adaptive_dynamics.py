@@ -92,7 +92,7 @@ def benchmark_adaptive_dynamics(
     Sequentially evaluate a policy on the Hydro-Québec train selection list.
 
     For each dataset row index stored in:
-      `b2b/sources/data/action_space_2_zone_1_train_data`
+      `b2b/sources/data/action_space_2_zone_1_train_data.json`
     we build the corresponding EnergyPlus environment, run a full episode
     (intended to be one year), and collect the resulting EpisodeResult.
 
