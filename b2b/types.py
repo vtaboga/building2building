@@ -6,11 +6,13 @@ used across the simulation and RL pipeline.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol, Sequence, Union
+from typing import Any, ClassVar, Literal, Protocol, Sequence, Union
 
 
 RunPeriodName = Literal["full_year", "winter", "summer"]
 TargetTemperatureMode = Literal["constant", "occupancy"]
+
+DEFAULT_TIMESTEPS_PER_HOUR: int = 12
 
 
 @dataclass(frozen=True)
@@ -75,12 +77,13 @@ class RunPeriodConfig:
             )
         return mapping[normalized]
 
-    def expected_steps(self, timesteps_per_hour: int = 4) -> int:
+    def expected_steps(self, timesteps_per_hour: int = DEFAULT_TIMESTEPS_PER_HOUR) -> int:
         """Return the expected number of simulation steps for this period.
 
         Args:
             timesteps_per_hour: Number of simulation steps per hour.
-                Defaults to 4 (15-minute intervals).
+                Defaults to ``DEFAULT_TIMESTEPS_PER_HOUR`` (5-minute
+                intervals).
 
         Returns:
             Total number of simulation steps.
@@ -88,7 +91,6 @@ class RunPeriodConfig:
         Raises:
             ValueError: If *timesteps_per_hour* is not positive.
         """
-        # 15-minute simulation step is the default in this repository.
         if timesteps_per_hour <= 0:
             raise ValueError("timesteps_per_hour must be > 0")
         day_counts: dict[RunPeriodName, int] = {
@@ -144,6 +146,10 @@ class TaskConfig:
             used for zones without a zone-specific override.
         zone_target_temperatures: Per-zone target temperature overrides,
             keyed by lower-cased zone name.
+        timesteps_per_hour: Number of EnergyPlus simulation timesteps
+            per hour.  Determines the control resolution (e.g. 4 → 15 min,
+            12 → 5 min).  Must be a divisor of 60 accepted by EnergyPlus
+            (1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60).
     """
 
     run_period: RunPeriodConfig
@@ -151,6 +157,11 @@ class TaskConfig:
     default_zone_target_temperature: ZoneTargetTemperatureConfig
     zone_target_temperatures: dict[str, ZoneTargetTemperatureConfig] = field(
         default_factory=dict
+    )
+    timesteps_per_hour: int = DEFAULT_TIMESTEPS_PER_HOUR
+
+    VALID_TIMESTEPS_PER_HOUR: ClassVar[frozenset[int]] = frozenset(
+        {1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60}
     )
 
     @classmethod
@@ -160,15 +171,17 @@ class TaskConfig:
         Args:
             task_section: Dictionary with optional keys ``"run_period"``,
                 ``"target_temperature_mode"``,
-                ``"default_zone_target_temperature"``, and
-                ``"zone_target_temperatures"``.
+                ``"default_zone_target_temperature"``,
+                ``"zone_target_temperatures"``, and
+                ``"timesteps_per_hour"``.
 
         Returns:
             A fully validated ``TaskConfig``.
 
         Raises:
             ValueError: If ``"target_temperature_mode"`` has an invalid
-                value.
+                value, or ``"timesteps_per_hour"`` is not an accepted
+                EnergyPlus divisor of 60.
             TypeError: If ``"zone_target_temperatures"`` is not a
                 mapping or contains non-string keys.
         """
@@ -204,12 +217,31 @@ class TaskConfig:
                 fallback_temperature_c=default_temp.occupied_c,
             )
 
+        timesteps_per_hour = int(
+            task_section.get("timesteps_per_hour", DEFAULT_TIMESTEPS_PER_HOUR)
+        )
+        if timesteps_per_hour not in cls.VALID_TIMESTEPS_PER_HOUR:
+            raise ValueError(
+                f"task.timesteps_per_hour must be a divisor of 60 accepted by "
+                f"EnergyPlus {sorted(cls.VALID_TIMESTEPS_PER_HOUR)}, "
+                f"got {timesteps_per_hour}"
+            )
+
         return cls(
             run_period=run_period,
             target_temperature_mode=mode,
             default_zone_target_temperature=default_temp,
             zone_target_temperatures=zone_targets,
+            timesteps_per_hour=timesteps_per_hour,
         )
+
+    def expected_steps(self) -> int:
+        """Return the expected number of simulation steps for this task.
+
+        Delegates to ``run_period.expected_steps`` using the configured
+        :attr:`timesteps_per_hour`.
+        """
+        return self.run_period.expected_steps(self.timesteps_per_hour)
 
     def target_for_zone(self, zone_name: str) -> ZoneTargetTemperatureConfig:
         """Return the target temperature config for a given zone.

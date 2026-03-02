@@ -17,7 +17,7 @@ Usage::
 
     # Short run for debugging
     python scripts/train_multizones.py \\
-        training.total_timesteps=10000 env.max_steps=960
+        training.total_timesteps=10000 env.max_steps=2880
 """
 
 from __future__ import annotations

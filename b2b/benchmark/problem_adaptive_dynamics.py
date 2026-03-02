@@ -50,7 +50,7 @@ class AdaptiveDynamicsProblem:
     ```
     """
 
-    split: Literal["train", "test"] = "train"
+    split: Literal["train", "test", "test_small"] = "train"
     start: int = 0
     limit: int = 0
     max_steps: int | None = None
@@ -89,7 +89,7 @@ def run(
     policy: PolicyLike,
     *,
     output_dir: str | Path = ".",
-    split: Literal["train", "test"] = "train",
+    split: Literal["train", "test", "test_small"] = "train",
     start: int = 0,
     limit: int = 0,
     max_steps: int | None = None,

@@ -30,7 +30,7 @@ defaults:
 multizones:
   building_type: OfficeSmall   # Warehouse, HotelSmall, RetailStandalone,
                                # RestaurantFastFood, OfficeMedium, OfficeSmall
-  split: train                 # train or test
+  split: train                 # train, test, or test_small
   index: 0                     # 0-based position in the split's ID list
 
 env:
@@ -72,7 +72,7 @@ python scripts/train_multizones.py policy=sac
 
 # Short run for debugging
 python scripts/train_multizones.py \
-    training.total_timesteps=10000 env.max_steps=960
+    training.total_timesteps=10000 env.max_steps=2880
 
 # Winter-only training
 python scripts/train_multizones.py task.run_period=winter

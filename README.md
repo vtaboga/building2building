@@ -156,7 +156,7 @@ Config root: `configs/train_multizones.yaml`
 python scripts/train_multizones.py
 python scripts/train_multizones.py multizones.building_type=OfficeMedium multizones.split=train multizones.index=2
 python scripts/train_multizones.py policy=sac
-python scripts/train_multizones.py training.total_timesteps=10000 env.max_steps=960
+python scripts/train_multizones.py training.total_timesteps=10000 env.max_steps=2880
 ```
 
 ---

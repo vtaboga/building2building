@@ -19,7 +19,7 @@ from b2b.types import (
 )
 
 DatasetName = Literal["single_zone_houses", "multizones_reference_buildings"]
-SplitName = Literal["train", "test"]
+SplitName = Literal["train", "test", "test_small"]
 BuildingType = Literal[
     "Warehouse",
     "HotelSmall",

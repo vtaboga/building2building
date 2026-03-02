@@ -16,26 +16,28 @@ The default observation mode produces a flat `Box` space. The observation vector
 | Time of Day | 1 | [1, 25] | hours |
 | Day of Week | 1 | [1, 7] | day (1=Sun, 7=Sat) |
 | Day of Year | 1 | [1, 366] | day |
-| HVAC Electricity | 1 | [0, 50] | Wh/m² per timestep |
-| HVAC Natural Gas | 1 | [0, 50] | Wh/m² per timestep |
+| HVAC Electricity | 1 | [0, *E*] | Wh/m² per timestep |
+| HVAC Natural Gas | 1 | [0, *E*] | Wh/m² per timestep |
+
+where *E* = 200 / `timesteps_per_hour` (≈ 16.7 at the default 5-min step, 50.0 at 15-min).
 
 ### Fixed Features (7 dimensions)
 
 These features are always present and always in the same relative order:
 
-| Feature | Bounds | Description |
+| Feature | Bounds (default 5-min step) | Description |
 |---|---|---|
 | Outdoor Air Temperature | [-30°C, 50°C] | Site dry-bulb temperature |
 | Outdoor Air Relative Humidity | [0%, 100%] | Site relative humidity |
 | Time of Day | [1, 25] | Current simulation hour (EnergyPlus convention) |
 | Day of Week | [1, 7] | 1=Sunday through 7=Saturday |
 | Day of Year | [1, 366] | Julian day |
-| HVAC Electricity | [0, 50] Wh/m² | Electricity consumption normalized by floor area |
-| HVAC Natural Gas | [0, 50] Wh/m² | Gas consumption normalized by floor area |
+| HVAC Electricity | [0, 16.7] Wh/m² | Electricity consumption normalized by floor area |
+| HVAC Natural Gas | [0, 16.7] Wh/m² | Gas consumption normalized by floor area |
 
 !!! info "Energy normalization"
 
-    Energy meters report raw Joules from EnergyPlus. B2B divides by the building's floor area and converts to Wh (÷ 3,600) to produce comparable, area-normalized values across buildings of different sizes.
+    Energy meters report raw Joules from EnergyPlus. B2B divides by the building's floor area and converts to Wh (÷ 3,600) to produce comparable, area-normalized values across buildings of different sizes. The energy upper bound scales with the simulation timestep: it equals 200 W/m² (assumed peak HVAC power) divided by `timesteps_per_hour`.
 
 ### Variable Features (zone temperatures)
 

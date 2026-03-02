@@ -111,33 +111,110 @@ class ParameterRange:
     high: float
 
 
-PARAMETER_RANGES: list[ParameterRange] = [
-    ParameterRange("envelope_conductivity_scale", 0.5, 2.0),
-    ParameterRange("window_u_factor", 0.8, 5.0),
-    ParameterRange("window_shgc", 0.1, 0.8),
-    ParameterRange("infiltration_scale", 0.5, 2.0),
-    ParameterRange("north_axis", 0.0, 360.0),
-    ParameterRange("scale_x", 0.5, 2.0),
-    ParameterRange("scale_y", 0.5, 2.0),
+# ---------------------------------------------------------------------------
+# ASHRAE 90.1-2022 prescriptive maximums (Tables 5.5-1 … 5.5-8)
+# for nonresidential fixed fenestration and steel-framed walls.
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ASHRAEFenestration:
+    u_max: float  # window U-factor [W/m²K]
+    shgc_max: float
+    wall_u: float  # steel-framed wall U-factor [W/m²K]
+
+
+ASHRAE_BY_CZ: dict[int, ASHRAEFenestration] = {
+    1: ASHRAEFenestration(u_max=0.50, shgc_max=0.23, wall_u=0.124),
+    2: ASHRAEFenestration(u_max=0.45, shgc_max=0.25, wall_u=0.084),
+    3: ASHRAEFenestration(u_max=0.42, shgc_max=0.25, wall_u=0.077),
+    4: ASHRAEFenestration(u_max=0.36, shgc_max=0.36, wall_u=0.064),
+    5: ASHRAEFenestration(u_max=0.36, shgc_max=0.38, wall_u=0.055),
+    6: ASHRAEFenestration(u_max=0.34, shgc_max=0.38, wall_u=0.049),
+    7: ASHRAEFenestration(u_max=0.29, shgc_max=0.40, wall_u=0.049),
+    8: ASHRAEFenestration(u_max=0.26, shgc_max=0.40, wall_u=0.037),
+}
+
+PLACE_TO_CLIMATE_ZONE: dict[str, int] = {
+    "Miami": 1,
+    "Houston": 2,
+    "Tampa": 2,
+    "Tucson": 2,
+    "Atlanta": 3,
+    "ElPaso": 3,
+    "SanDiego": 3,
+    "SanFrancisco": 3,
+    "Albuquerque": 4,
+    "Baltimore": 4,
+    "NewYork": 4,
+    "PortAngeles": 4,
+    "Seattle": 4,
+    "Buffalo": 5,
+    "Chicago": 5,
+    "Denver": 5,
+    "Vancouver": 5,
+    "GreatFalls": 6,
+    "Rochester": 6,
+    "Duluth": 7,
+    "InternationalFalls": 7,
+    "Fairbanks": 8,
+}
+
+_CZ1_WALL_U = ASHRAE_BY_CZ[1].wall_u
+
+PARAMETER_NAMES: list[str] = [
+    "envelope_conductivity_scale",
+    "window_u_factor",
+    "window_shgc",
+    "infiltration_scale",
+    "north_axis",
+    "scale_x",
+    "scale_y",
 ]
 
-N_PARAMS = len(PARAMETER_RANGES)
+N_PARAMS = len(PARAMETER_NAMES)
 
 
-def sample_modifications(
-    n_samples: int, seed: int
-) -> list[BuildingModification]:
-    """Generate *n_samples* BuildingModification instances via LHS."""
+def get_parameter_ranges(climate_zone: int) -> list[ParameterRange]:
+    """Return climate-dependent parameter ranges for all 7 building parameters."""
+    a = ASHRAE_BY_CZ[climate_zone]
+
+    envelope_max = min(2.0, a.wall_u / _CZ1_WALL_U * 2.0)
+
+    if climate_zone <= 3:
+        infiltration_max = 2.0
+    elif climate_zone <= 5:
+        infiltration_max = 1.5
+    else:
+        infiltration_max = 1.2
+
+    shgc_high = min(0.80, a.shgc_max + 0.10)
+    shgc_low = 0.15
+
+    return [
+        ParameterRange("envelope_conductivity_scale", 0.5, round(envelope_max, 3)),
+        ParameterRange("window_u_factor", round(0.8 * a.u_max, 3), round(1.3 * a.u_max, 3)),
+        ParameterRange("window_shgc", shgc_low, round(shgc_high, 3)),
+        ParameterRange("infiltration_scale", 0.5, infiltration_max),
+        ParameterRange("north_axis", 0.0, 360.0),
+        ParameterRange("scale_x", 0.7, 1.5),
+        ParameterRange("scale_y", 0.7, 1.5),
+    ]
+
+
+def sample_unit_lhs(n_samples: int, seed: int) -> np.ndarray:
+    """Return an (n_samples × N_PARAMS) array of LHS unit samples in [0, 1]."""
     sampler = LatinHypercube(d=N_PARAMS, seed=seed)
-    unit_samples = sampler.random(n=n_samples)
+    return sampler.random(n=n_samples)
 
-    modifications: list[BuildingModification] = []
-    for row in unit_samples:
-        kwargs: dict[str, float] = {}
-        for j, pr in enumerate(PARAMETER_RANGES):
-            kwargs[pr.name] = float(pr.low + row[j] * (pr.high - pr.low))
-        modifications.append(BuildingModification(**kwargs))
-    return modifications
+
+def unit_to_modification(
+    unit_row: np.ndarray, ranges: list[ParameterRange]
+) -> BuildingModification:
+    """Map a single [0, 1] unit row to a BuildingModification via *ranges*."""
+    kwargs: dict[str, float] = {}
+    for j, pr in enumerate(ranges):
+        kwargs[pr.name] = float(pr.low + unit_row[j] * (pr.high - pr.low))
+    return BuildingModification(**kwargs)
 
 
 @dataclass
@@ -213,7 +290,7 @@ def _metadata_fieldnames() -> list[str]:
         "place",
         "source_idf",
         "weather_file",
-        *(pr.name for pr in PARAMETER_RANGES),
+        *PARAMETER_NAMES,
     ]
 
 
@@ -316,8 +393,8 @@ def main() -> None:
     for b in all_bases:
         bases_by_type.setdefault(b.building_type, []).append(b)
 
-    log.info("Sampling %d parameter vectors via LHS (seed=%d) ...", samples_per_type, seed)
-    modifications = sample_modifications(samples_per_type, seed)
+    log.info("Sampling %d unit LHS vectors (seed=%d) ...", samples_per_type, seed)
+    unit_samples = sample_unit_lhs(samples_per_type, seed)
 
     if type_index is not None:
         csv_path = output_dir / f"metadata_{type_index}.csv"
@@ -348,9 +425,13 @@ def main() -> None:
             base_indices = np.arange(samples_per_type) % n_bases
             rng.shuffle(base_indices)
 
-            for i, mod in enumerate(modifications):
+            for i, unit_row in enumerate(unit_samples):
                 building_id += 1
                 base = type_bases[base_indices[i]]
+
+                cz = PLACE_TO_CLIMATE_ZONE[base.place]
+                ranges = get_parameter_ranges(cz)
+                mod = unit_to_modification(unit_row, ranges)
 
                 epjson_obj = deepcopy(base.epjson)
                 apply_modifications(epjson_obj, mod)
@@ -366,8 +447,8 @@ def main() -> None:
                     "source_idf": base.source_idf,
                     "weather_file": f"weather/{base.weather_file}",
                 }
-                for pr in PARAMETER_RANGES:
-                    row[pr.name] = getattr(mod, pr.name)
+                for pname in PARAMETER_NAMES:
+                    row[pname] = getattr(mod, pname)
                 writer.writerow(row)
 
                 if building_id % 100 == 0:

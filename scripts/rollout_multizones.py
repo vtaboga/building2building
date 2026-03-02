@@ -16,7 +16,7 @@ Usage::
     python scripts/rollout_multizones.py policy=unitary_g36
 
     # Shorter episodes
-    python scripts/rollout_multizones.py env.max_steps=672
+    python scripts/rollout_multizones.py env.max_steps=2016
 """
 
 from __future__ import annotations

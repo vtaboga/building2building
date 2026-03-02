@@ -8,7 +8,7 @@ defaults:
 
 multizones:
   building_type: OfficeSmall   # Warehouse, HotelSmall, RetailStandalone, RestaurantFastFood, OfficeMedium, OfficeSmall
-  split: train                 # train or test
+  split: train                 # train, test, or test_small
   index: 0                     # 0-based position in the split's ID list
 
 env:

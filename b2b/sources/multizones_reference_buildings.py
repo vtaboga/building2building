@@ -70,7 +70,7 @@ SPLIT_DATA_DIR = Path(__file__).resolve().parent / "data"
 
 def load_split_ids(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     *,
     split_data_dir: Path | None = None,
 ) -> list[int]:
@@ -84,7 +84,7 @@ def load_split_ids(
 
 def building_id_from_split_index(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     split_index: int,
 ) -> int:
     ids = load_split_ids(building_type, split)
@@ -98,7 +98,7 @@ def building_id_from_split_index(
 
 def building_ids_from_split_indices(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     split_indices: Sequence[int],
 ) -> list[int]:
     return [
@@ -109,7 +109,7 @@ def building_ids_from_split_indices(
 
 def sample_building_ids(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     n: int,
     *,
     seed: int | None = None,
@@ -135,7 +135,7 @@ def dataset_zip() -> Derivation:
         "multizones_reference_buildings.zip",
         "https://huggingface.co/datasets/vtaboga/multizones_reference_buildings/resolve/main/multizones_reference_buildings.zip",
         bytes.fromhex(
-            "85e437d1fbbd095edd5ba3d4206fa8036e5043ba937318b9f3725d97e9d1eb4e"
+            "66b94393c129d78a8271e70da805ca48a8af9fdecb1204d2d9fb95398d3786de"
         ),
     )
 
@@ -164,6 +164,7 @@ def _build_control_derivation(
     root_zip: Realizable,
     epjson_filename: str,
     run_period_name: str,
+    timesteps_per_hour: int = 12,
 ) -> Any:
     """Build a control-ready epJSON from a raw dataset epJSON.
 
@@ -173,7 +174,7 @@ def _build_control_derivation(
     current: Derivation = ExtractFromZip(root_zip, epjson_filename)
     current = add_hvac_meters(current)
     current = add_outdoor_air_meters(current)
-    current = modify_timestep(current, timesteps_per_hour=4)
+    current = modify_timestep(current, timesteps_per_hour=timesteps_per_hour)
     run_period = TaskConfig.from_dict({"run_period": run_period_name}).run_period
     current = modify_run_period(
         current,
@@ -191,6 +192,7 @@ def search_buildings(
     place: str | None = None,
     building_id: int | None = None,
     run_period: str = "full_year",
+    timesteps_per_hour: int = 12,
     **query: Any,
 ) -> DataFrame:
     root_zip = dataset_zip()
@@ -229,6 +231,7 @@ def search_buildings(
             root_zip,
             epjson_filename,
             run_period_name=run_period,
+            timesteps_per_hour=timesteps_per_hour,
         )
 
     return df.assign(derivation_thunk=df["epjson_filename"].apply(trans))
@@ -266,6 +269,7 @@ def search_configs(
 
     rows = search_buildings(
         run_period=task_config.run_period.name,
+        timesteps_per_hour=task_config.timesteps_per_hour,
         **bldg_query,
     )
     root_zip = dataset_zip()

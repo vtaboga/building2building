@@ -165,6 +165,7 @@ def _build_control_derivation(
     ep: Realizable,
     controls: list[str],
     run_period_name: str,
+    timesteps_per_hour: int = 12,
 ):
     """
     Build control-ready epJSON from IDF (hydroquebec-specific).
@@ -175,7 +176,10 @@ def _build_control_derivation(
     idf_derivation = ExtractFromZip(root_zip, idf_filename)
 
     # Step 1: Prepare epJSON (upgrade, convert, add meters, set timestep)
-    epjson = prepare_building(idf_derivation, ep, src_version="24.2.0")
+    epjson = prepare_building(
+        idf_derivation, ep, src_version="24.2.0",
+        timesteps_per_hour=timesteps_per_hour,
+    )
     run_period = TaskConfig.from_dict({"run_period": run_period_name}).run_period
     epjson = modify_run_period(
         epjson,
@@ -193,7 +197,11 @@ def _build_control_derivation(
     return make_controllable(epjson, controls=controls)
 
 
-def search_buildings(run_period: str = "full_year", **query) -> DataFrame:
+def search_buildings(
+    run_period: str = "full_year",
+    timesteps_per_hour: int = 12,
+    **query,
+) -> DataFrame:
     root_zip = dataset_zip()
     index = realize(STORE_PATH.get(), table_index(root_zip))
     ep = energyplus_path()
@@ -207,6 +215,7 @@ def search_buildings(run_period: str = "full_year", **query) -> DataFrame:
             ep,
             controls,
             run_period_name=run_period,
+            timesteps_per_hour=timesteps_per_hour,
         )
 
     db = duckdb.from_parquet(str(index))
@@ -284,7 +293,11 @@ def search_configs(
             # query dict and forwards it to `_build_control_derivation()`.
             config_nn["controls"] = controls
 
-    rows = search_buildings(run_period=task_config.run_period.name, **config_nn)
+    rows = search_buildings(
+        run_period=task_config.run_period.name,
+        timesteps_per_hour=task_config.timesteps_per_hour,
+        **config_nn,
+    )
     # Heuristic: when no explicit filters are provided, prioritize simpler
     # buildings first to avoid long sequences of E+ fatals during discovery.
     try:

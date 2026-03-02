@@ -62,6 +62,7 @@ def make_env_from_config(config: EnvBuildConfig, eplus_output_dir: str | Path) -
         "task": {
             "run_period": config.task.run_period.name,
             "target_temperature_mode": config.task.target_temperature_mode,
+            "timesteps_per_hour": config.task.timesteps_per_hour,
             "default_zone_target_temperature": {
                 "occupied_c": config.task.default_zone_target_temperature.occupied_c,
                 "unoccupied_c": config.task.default_zone_target_temperature.unoccupied_c,
@@ -93,5 +94,5 @@ def make_env_from_config(config: EnvBuildConfig, eplus_output_dir: str | Path) -
     env = create_simulator(built)
     max_steps = config.env_max_steps
     if max_steps is None:
-        max_steps = config.task.run_period.expected_steps()
+        max_steps = config.task.expected_steps()
     return gym.wrappers.TimeLimit(env, max_episode_steps=int(max_steps))

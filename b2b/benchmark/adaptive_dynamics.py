@@ -17,6 +17,7 @@ import gymnasium as gym
 from b2b.benchmark.runner import EpisodeResult, PolicyLike, run_rollout
 from b2b.make_env import make_env
 from b2b.sources.single_zone_houses import SingleZoneHouseRowIdSplits
+from b2b.types import RunPeriodConfig
 
 logger = logging.getLogger(__name__)
 
@@ -181,11 +182,15 @@ def benchmark_adaptive_dynamics(
                         policy.bind_env(env)  # type: ignore[no-untyped-call]
                     except Exception:
                         pass
-                year_steps = 365 * 24 * 4
+                fallback = (
+                    env.spec.max_episode_steps
+                    if env.spec and env.spec.max_episode_steps
+                    else RunPeriodConfig.from_name("full_year").expected_steps()
+                )
                 cap = (
                     int(max_steps)
                     if isinstance(max_steps, int) and max_steps > 0
-                    else int(year_steps)
+                    else int(fallback)
                 )
                 results, _data = run_rollout(
                     env=env,

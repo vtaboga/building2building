@@ -20,6 +20,7 @@ import numpy as np
 from b2b.api import make_multizones_env
 from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
 from b2b.benchmark.runner import run_rollout
+from b2b.types import RunPeriodConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -141,7 +142,11 @@ def run_one_building(
         })
         policy = UnitaryG36Policy(policy_cfg)
 
-        max_steps = env.spec.max_episode_steps if env.spec and env.spec.max_episode_steps else 90 * 24 * 4
+        max_steps = (
+            env.spec.max_episode_steps
+            if env.spec and env.spec.max_episode_steps
+            else RunPeriodConfig.from_name("winter").expected_steps()
+        )
 
         log.info("  Running rollout for %d steps ...", max_steps)
         results, data = run_rollout(

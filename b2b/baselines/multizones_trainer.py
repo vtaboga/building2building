@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 def load_split_ids(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
 ) -> list[int]:
     return mz_source.load_split_ids(
         building_type=building_type,
@@ -49,7 +49,7 @@ def load_split_ids(
 
 def _resolve_building_id(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     index: int,
 ) -> int:
     ids = load_split_ids(building_type, split)
@@ -63,7 +63,7 @@ def _resolve_building_id(
 
 def make_multizones_env(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     index: int,
     eplus_output_dir: str | Path,
     reward_section: dict[str, Any] | None = None,
@@ -105,7 +105,7 @@ def make_multizones_env(
 
 def _make_single_env(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     index: int,
     eplus_root: str,
     reward_section: dict[str, Any],
@@ -152,7 +152,7 @@ def _make_envs(
     config: OmegaConf,
     output_dir: Path,
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     index: int,
     reward_section: dict[str, Any],
     task_section: dict[str, Any],
@@ -253,7 +253,7 @@ def multizones_trainer(config: OmegaConf, output_dir: Path) -> None:
     # ---- read multizones selection from config ----
     mz = config.multizones
     building_type: BuildingType = str(mz.building_type)  # type: ignore[assignment]
-    split: Literal["train", "test"] = str(mz.split)  # type: ignore[assignment]
+    split: Literal["train", "test", "test_small"] = str(mz.split)  # type: ignore[assignment]
     index = int(mz.index)
 
     building_id = _resolve_building_id(building_type, split, index)
@@ -278,7 +278,7 @@ def multizones_trainer(config: OmegaConf, output_dir: Path) -> None:
     max_steps = (
         int(max_steps_raw)
         if max_steps_raw is not None
-        else task_cfg.run_period.expected_steps()
+        else task_cfg.expected_steps()
     )
 
     # ---- wandb ----

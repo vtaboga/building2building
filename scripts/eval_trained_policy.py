@@ -37,6 +37,7 @@ from b2b.benchmark.plot_rollout import plot_rollout_df
 from b2b.benchmark.runner import run_rollout
 from b2b.env import setup_energyplus_path
 from b2b.simulator.wrappers import NormalizeObservation
+from b2b.types import RunPeriodConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -92,7 +93,12 @@ def evaluate_run(
 
     rp = run_period or str(getattr(cfg.task, "run_period", "full_year"))
     if max_steps is None:
-        max_steps = int(getattr(cfg.env, "max_steps", 35040))
+        max_steps = int(
+            getattr(
+                cfg.env, "max_steps",
+                RunPeriodConfig.from_name(rp).expected_steps(),
+            )
+        )
 
     norm_obs = bool(getattr(cfg.env, "normalize_obs", False))
     norm_action = bool(getattr(cfg.env, "normalize_action", False))

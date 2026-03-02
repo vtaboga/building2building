@@ -213,7 +213,7 @@ def add_sqlite_output(input: Path):
 @derivation("timestep.epjson")
 def modify_timestep(
     input: Path,
-    timesteps_per_hour: int = 4,
+    timesteps_per_hour: int = 12,
 ):
     """Modify simulation timestep."""
     dst = OUTPUT.get()
