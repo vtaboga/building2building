@@ -12,10 +12,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from b2b.baselines.common import RolloutPaths, make_rollout_paths
 from b2b.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
-from b2b.baselines.controllers.fan_coil_constant import FanCoilConstantPolicy
 from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
-from b2b.baselines.controllers.unitary_pi import UnitaryPIPolicy
-from b2b.baselines.controllers.unitary_sat import UnitaryAirflowFirstSatPolicy
 from b2b.baselines.wandb_utils import (
     derive_wandb_run_name,
     finish_wandb_if_started,
@@ -36,13 +33,7 @@ def _require_list_str(meta: dict[str, Any], key: str) -> list[str]:
 
 
 def _build_controller_policy(cfg: DictConfig) -> Any:
-    policy_type = str(getattr(cfg.policy, "type", "fan_coil_constant")).strip()
-    if policy_type == "fan_coil_constant":
-        return FanCoilConstantPolicy(cfg.policy)
-    if policy_type == "unitary_pi":
-        return UnitaryPIPolicy(cfg.policy)
-    if policy_type in ("unitary_airflow_first_sat", "unitary_sat"):
-        return UnitaryAirflowFirstSatPolicy(cfg.policy)
+    policy_type = str(getattr(cfg.policy, "type", "unitary_g36")).strip()
     if policy_type == "unitary_g36":
         return UnitaryG36Policy(cfg.policy)
     if policy_type == "ashrae_air_loop":

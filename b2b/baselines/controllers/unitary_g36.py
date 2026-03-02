@@ -1,15 +1,16 @@
 """
-ASHRAE Guideline 36 (Section 5.18) controller for single-zone unitary systems.
+ASHRAE Guideline 36 inspired controller for single-zone unitary systems.
 
-Each conditioned zone has an independent PSZ with two actuators:
+Each conditioned zone has an independent Packaged Single Zone (PSZ) with two
+actuators:
   - Fan Air Mass Flow Rate [kg/s]
-  - Supply Air Temperature setpoint [°C]
+  - Supply Air Temperature setpoint [C]
 
-Control strategy per G36 §5.18.4:
-  1. Two PI controllers produce normalised heating (uHeat) and cooling (uCool)
-     demand signals in [0, 1].
-  2. Fan flow and SAT are mapped *directly* from those signals via
-     piecewise-linear functions — no trim-and-respond delay.
+Control strategy (G36-like supervisory approximation):
+  1. Zone temperature PI loop modulates fan airflow as a capacity proxy.
+  2. Trim-and-Respond SAT reset adjusts supply temperature based on zone
+     demand: zone too warm -> respond down (lower SAT), zone too cold ->
+     respond up (raise SAT), zone satisfied -> trim toward neutral.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from b2b.baselines.common import (
 logger = logging.getLogger(__name__)
 
 
-# ── tiny PI with back-calculation anti-windup ──────────────────────────
+# -- PI controller ---------------------------------------------------------
 
 
 @dataclass
@@ -38,86 +39,21 @@ class _PIState:
     integral: float = 0.0
 
 
-def _pi_signal(error: float, state: _PIState, kp: float, ki: float) -> float:
-    """PI controller producing a signal clamped to [0, 1].
-
-    *error* should be non-negative (caller selects the sign convention).
-    Back-calculation anti-windup with a non-negative floor on the integral
-    prevents the deep wind-down that causes output to collapse when a
-    large error decreases slightly.
-    """
-    state.integral += error
-    raw = kp * error + ki * state.integral
-    output = max(0.0, min(1.0, raw))
-    if ki > 0.0 and raw != output:
-        state.integral = max(0.0, (output - kp * error) / ki)
-    return output
-
-
-# ── G36 §5.18.4 piecewise mappings ────────────────────────────────────
-
-
-def _fan_fraction(u_heat: float, u_cool: float, min_f: float, med_f: float) -> float:
-    """Return fan speed as a fraction of design-max [0, 1].
-
-    Breakpoints follow G36 Table 5.18.4:
-      Heating  0–50 %  → min_f
-      Heating 50–100 % → min_f … 1.0
-      Cooling  0–25 %  → min_f
-      Cooling 25–50 %  → min_f … med_f
-      Cooling 50–75 %  → med_f
-      Cooling 75–100 % → med_f … 1.0
-      Deadband          → min_f
-    """
-    if u_heat > 0.0:
-        if u_heat <= 0.5:
-            return min_f
-        return min_f + (1.0 - min_f) * (u_heat - 0.5) / 0.5
-    if u_cool > 0.0:
-        if u_cool <= 0.25:
-            return min_f
-        if u_cool <= 0.50:
-            return min_f + (med_f - min_f) * (u_cool - 0.25) / 0.25
-        if u_cool <= 0.75:
-            return med_f
-        return med_f + (1.0 - med_f) * (u_cool - 0.75) / 0.25
-    return min_f
-
-
-def _sat_setpoint(
-    u_heat: float,
-    u_cool: float,
-    sat_min_c: float,
-    sat_max_c: float,
-    sat_dead_c: float,
+def _pi_step(
+    error: float, state: _PIState, kp: float, ki: float, i_max: float
 ) -> float:
-    """Return supply-air temperature setpoint [°C].
+    """PI controller with integral anti-windup clamp.
 
-    Breakpoints follow G36 Table 5.18.4:
-      Heating  0–50 %  → sat_dead … sat_max
-      Heating 50–100 % → sat_max
-      Cooling  0–25 %  → sat_dead
-      Cooling 25–75 %  → sat_dead … sat_min
-      Cooling 75–100 % → sat_min
-      Deadband          → sat_dead
+    *error* must be non-negative (caller selects sign convention).
+    Returns raw (unclamped) output.
     """
-    if u_heat > 0.0:
-        if u_heat <= 0.5:
-            return sat_dead_c + (sat_max_c - sat_dead_c) * u_heat / 0.5
-        return sat_max_c
-    if u_cool > 0.0:
-        if u_cool <= 0.25:
-            return sat_dead_c
-        if u_cool <= 0.75:
-            return sat_dead_c + (sat_min_c - sat_dead_c) * (u_cool - 0.25) / 0.5
-        return sat_min_c
-    return sat_dead_c
+    state.integral = min(state.integral + error, i_max)
+    return kp * error + ki * state.integral
 
 
-# ── per-zone state ─────────────────────────────────────────────────────
+# -- per-zone state --------------------------------------------------------
 
-
-_WARMUP_JUMP_C = 3.0  # °C jump that indicates an EnergyPlus warmup reset
+_WARMUP_JUMP_C = 3.0
 
 
 @dataclass
@@ -126,13 +62,12 @@ class _ZoneState:
     sat_idx: int
     temp_obs_idx: int
     fan_max: float  # design-max kg/s (from action space upper bound)
-    sat_high: float  # max SAT from action space [°C]
-    heat_pi: _PIState = field(default_factory=_PIState)
-    cool_pi: _PIState = field(default_factory=_PIState)
+    air_pi: _PIState = field(default_factory=_PIState)
+    sat_sp: float = 14.0  # current SAT setpoint [C], evolved by T&R
     prev_temp: float | None = None
 
 
-# ── policy ─────────────────────────────────────────────────────────────
+# -- policy ----------------------------------------------------------------
 
 
 def _match_actuator_index(
@@ -149,36 +84,60 @@ def _match_actuator_index(
 
 
 class UnitaryG36Policy:
-    """ASHRAE G36 §5.18 piecewise-linear controller for single-zone VAV."""
+    """G36-inspired PI airflow + Trim-and-Respond SAT controller for PSZ."""
 
     def __init__(self, policy_cfg: Any) -> None:
-        self.heating_sp_c: float = float(getattr(policy_cfg, "heating_setpoint_c", 21.0))
-        self.cooling_sp_c: float = float(getattr(policy_cfg, "cooling_setpoint_c", 24.0))
-        self.kp: float = float(getattr(policy_cfg, "kp", 1.0))
-        self.ki: float = float(getattr(policy_cfg, "ki", 0.05))
-        self.min_fan_frac: float = float(getattr(policy_cfg, "min_fan_fraction", 0.15))
-        self.med_fan_frac: float = float(getattr(policy_cfg, "med_fan_fraction", 0.50))
-        self.sat_min_c: float = float(getattr(policy_cfg, "sat_min_c", 13.0))
-        self._sat_max_override: float | None = _opt_float(policy_cfg, "sat_max_c")
-        self.availability_on: float = float(getattr(policy_cfg, "availability_on", 2.0))
+        self.heating_sp_c: float = float(
+            getattr(policy_cfg, "heating_setpoint_c")
+        )
+        self.cooling_sp_c: float = float(
+            getattr(policy_cfg, "cooling_setpoint_c")
+        )
 
-        # schedule (reuse same structure as unitary_sat)
+        # PI gains for zone-temp -> airflow loop
+        self.kp: float = float(getattr(policy_cfg, "kp"))
+        self.ki: float = float(getattr(policy_cfg, "ki"))
+        self.integral_max: float = float(
+            getattr(policy_cfg, "integral_max")
+        )
+
+        # Fan flow limits (fraction of design max)
+        self.min_fan_frac: float = float(
+            getattr(policy_cfg, "min_fan_fraction")
+        )
+
+        # SAT Trim-and-Respond parameters
+        self.sat_min_c: float = float(getattr(policy_cfg, "sat_min_c"))
+        self.sat_max_c: float = float(getattr(policy_cfg, "sat_max_c"))
+        self.sat_initial_c: float = float(
+            getattr(policy_cfg, "sat_initial_c")
+        )
+        self.sat_trim: float = float(getattr(policy_cfg, "sat_trim"))
+        self.sat_respond: float = float(getattr(policy_cfg, "sat_respond"))
+        self.demand_deadband: float = float(
+            getattr(policy_cfg, "demand_deadband")
+        )
+
+        self.availability_on: float = float(
+            getattr(policy_cfg, "availability_on")
+        )
+
         sched_cfg = getattr(policy_cfg, "target_schedule", None)
         self._sched_enabled: bool = (
-            bool(getattr(sched_cfg, "enabled", False))
+            bool(getattr(sched_cfg, "enabled"))
             if sched_cfg is not None
             else False
         )
         if self._sched_enabled and sched_cfg is not None:
-            wkd = getattr(sched_cfg, "weekend_days", [1, 7])
+            wkd = getattr(sched_cfg, "weekend_days")
             self._weekend_days: set[int] = (
                 {int(x) for x in wkd} if isinstance(wkd, (list, tuple)) else {1, 7}
             )
-            self._weekend_c: float = float(getattr(sched_cfg, "weekend_target_c", self.heating_sp_c))
-            self._weekday_c: float = float(getattr(sched_cfg, "weekday_target_c", self.heating_sp_c))
-            self._setback_c: float = float(getattr(sched_cfg, "weekday_setback_target_c", self.heating_sp_c))
-            self._setback_start: float = float(getattr(sched_cfg, "weekday_setback_start_hour", 9.0))
-            self._setback_end: float = float(getattr(sched_cfg, "weekday_setback_end_hour", 16.0))
+            self._weekend_c: float = float(getattr(sched_cfg, "weekend_target_c"))
+            self._weekday_c: float = float(getattr(sched_cfg, "weekday_target_c"))
+            self._setback_c: float = float(getattr(sched_cfg, "weekday_setback_target_c"))
+            self._setback_start: float = float(getattr(sched_cfg, "weekday_setback_start_hour"))
+            self._setback_end: float = float(getattr(sched_cfg, "weekday_setback_end_hour"))
         else:
             self._weekend_days = {1, 7}
             self._weekend_c = self.heating_sp_c
@@ -193,16 +152,15 @@ class UnitaryG36Policy:
         self._tod_idx: int | None = None
         self._dow_idx: int | None = None
 
-    # ── env binding ────────────────────────────────────────────────────
+    # -- env binding -------------------------------------------------------
 
     def bind_env(self, env: Any) -> None:
         obs_names = require_env_metadata_list_str(env, "observation_names")
         act_names = require_env_metadata_list_str(env, "action_names")
 
-        lows = highs = None
+        highs = None
         try:
             if hasattr(env, "action_space") and hasattr(env.action_space, "low"):
-                lows = np.asarray(env.action_space.low, dtype=float).reshape(-1)
                 highs = np.asarray(env.action_space.high, dtype=float).reshape(-1)
         except Exception:
             pass
@@ -242,10 +200,10 @@ class UnitaryG36Policy:
             if fan_idx is None or sat_idx is None:
                 continue
 
-            temp_idx = find_zone_air_temp_index_for_zone(obs_names, zone_name=sys.zone)
-
+            temp_idx = find_zone_air_temp_index_for_zone(
+                obs_names, zone_name=sys.zone
+            )
             fan_max = float(highs[fan_idx]) if highs is not None else 1.0
-            sat_high = float(highs[sat_idx]) if highs is not None else 80.0
 
             self._zones.append(
                 _ZoneState(
@@ -253,12 +211,15 @@ class UnitaryG36Policy:
                     sat_idx=sat_idx,
                     temp_obs_idx=temp_idx,
                     fan_max=fan_max,
-                    sat_high=sat_high,
+                    sat_sp=self.sat_initial_c,
                 )
             )
 
         if not self._zones:
-            logger.warning("UnitaryG36Policy: no unitary systems discovered — policy is a no-op")
+            logger.warning(
+                "UnitaryG36Policy: no unitary systems discovered"
+                " -- policy is a no-op"
+            )
 
         if self._sched_enabled:
             try:
@@ -271,12 +232,12 @@ class UnitaryG36Policy:
         self._n_act = len(act_names)
         self.reset()
 
-    # ── reset / schedule ───────────────────────────────────────────────
+    # -- reset / schedule --------------------------------------------------
 
     def reset(self) -> None:
         for z in self._zones:
-            z.heat_pi = _PIState()
-            z.cool_pi = _PIState()
+            z.air_pi = _PIState()
+            z.sat_sp = self.sat_initial_c
             z.prev_temp = None
 
     def _current_setpoints(self, obs_arr: np.ndarray) -> tuple[float, float]:
@@ -297,15 +258,62 @@ class UnitaryG36Policy:
         gap = self.cooling_sp_c - self.heating_sp_c
         return sp, sp + gap
 
-    # ── predict ────────────────────────────────────────────────────────
+    # -- control logic -----------------------------------------------------
 
-    def predict(self, obs: Any, deterministic: bool = True) -> tuple[np.ndarray, None]:
+    def _airflow_command(
+        self, z: _ZoneState, t_zone: float, heat_sp: float, cool_sp: float
+    ) -> float:
+        """PI loop: zone temperature error -> fan mass flow rate [kg/s].
+
+        In the deadband the integrator decays toward zero and the fan
+        holds minimum flow, matching G36 minimum-ventilation behaviour.
+        """
+        m_dot_min = self.min_fan_frac * z.fan_max
+
+        if t_zone > cool_sp:
+            err = t_zone - cool_sp
+        elif t_zone < heat_sp:
+            err = heat_sp - t_zone
+        else:
+            z.air_pi.integral *= 0.8
+            return m_dot_min
+
+        u = _pi_step(err, z.air_pi, self.kp, self.ki, self.integral_max)
+        m_dot = m_dot_min + u * (z.fan_max - m_dot_min)
+        return float(np.clip(m_dot, m_dot_min, z.fan_max))
+
+    def _sat_trim_and_respond(
+        self, z: _ZoneState, t_zone: float, heat_sp: float, cool_sp: float
+    ) -> float:
+        """Trim-and-Respond SAT reset (heating + cooling).
+
+        Zone too warm  -> respond down (lower SAT, more cooling).
+        Zone too cold  -> respond up   (raise SAT, more heating).
+        Zone satisfied -> trim toward sat_initial_c (neutral).
+        """
+        if t_zone - cool_sp > self.demand_deadband:
+            z.sat_sp -= self.sat_respond
+        elif heat_sp - t_zone > self.demand_deadband:
+            z.sat_sp += self.sat_respond
+        elif z.sat_sp < self.sat_initial_c:
+            z.sat_sp = min(z.sat_sp + self.sat_trim, self.sat_initial_c)
+        elif z.sat_sp > self.sat_initial_c:
+            z.sat_sp = max(z.sat_sp - self.sat_trim, self.sat_initial_c)
+        z.sat_sp = float(np.clip(z.sat_sp, self.sat_min_c, self.sat_max_c))
+        return z.sat_sp
+
+    # -- predict -----------------------------------------------------------
+
+    def predict(
+        self, obs: Any, deterministic: bool = True
+    ) -> tuple[np.ndarray, None]:
         if not self._zones:
-            raise RuntimeError("Policy not bound to an env; call bind_env() first.")
+            raise RuntimeError(
+                "Policy not bound to an env; call bind_env() first."
+            )
 
         obs_arr = np.asarray(obs, dtype=float).reshape(-1)
         heat_sp, cool_sp = self._current_setpoints(obs_arr)
-        sat_dead = max(21.0, min(24.0, (heat_sp + cool_sp) / 2.0))
 
         action = np.zeros(self._n_act, dtype=float)
 
@@ -316,27 +324,15 @@ class UnitaryG36Policy:
             tz = float(obs_arr[z.temp_obs_idx])
 
             if z.prev_temp is not None and abs(tz - z.prev_temp) > _WARMUP_JUMP_C:
-                z.heat_pi = _PIState()
-                z.cool_pi = _PIState()
+                z.air_pi = _PIState()
             z.prev_temp = tz
 
-            heat_err = max(0.0, heat_sp - tz)
-            cool_err = max(0.0, tz - cool_sp)
-
-            u_heat = _pi_signal(heat_err, z.heat_pi, self.kp, self.ki)
-            u_cool = _pi_signal(cool_err, z.cool_pi, self.kp, self.ki)
-
-            frac = _fan_fraction(u_heat, u_cool, self.min_fan_frac, self.med_fan_frac)
-            action[z.fan_idx] = frac * z.fan_max
-
-            sat_max = self._sat_max_override if self._sat_max_override is not None else z.sat_high
-            action[z.sat_idx] = _sat_setpoint(
-                u_heat, u_cool, self.sat_min_c, sat_max, sat_dead,
-            )
+            action[z.fan_idx] = self._airflow_command(z, tz, heat_sp, cool_sp)
+            action[z.sat_idx] = self._sat_trim_and_respond(z, tz, heat_sp, cool_sp)
 
         return action, None
 
-    # ── metrics ────────────────────────────────────────────────────────
+    # -- metrics -----------------------------------------------------------
 
     def step_metrics(self, obs: Any, *, action: np.ndarray) -> dict[str, float]:
         obs_arr = np.asarray(obs, dtype=float).reshape(-1)
@@ -354,13 +350,3 @@ class UnitaryG36Policy:
             metrics["min_zone_temp_c"] = float(np.min(temps))
             metrics["max_zone_temp_c"] = float(np.max(temps))
         return metrics
-
-
-# ── helpers ────────────────────────────────────────────────────────────
-
-
-def _opt_float(cfg: Any, key: str) -> float | None:
-    v = getattr(cfg, key, None)
-    if v is None:
-        return None
-    return float(v)

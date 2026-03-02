@@ -176,8 +176,8 @@ python scripts/bm_adaptive_dynamics.py benchmark.limit=1 benchmark.max_steps=1
 python scripts/bm_adaptive_dynamics.py benchmark.split=train benchmark.start=0 benchmark.limit=0
 
 # change baseline policy
-python scripts/bm_adaptive_dynamics.py policy=unitary_pi
-python scripts/bm_adaptive_dynamics.py policy=fan_coil_constant
+python scripts/bm_adaptive_dynamics.py policy=unitary_g36
+python scripts/bm_adaptive_dynamics.py policy=ashrae_air_loop
 ```
 
 ### 2) Multizones Split Benchmark Interface
@@ -240,8 +240,8 @@ Config: `configs/baseline.yaml`
 
 ```bash
 python scripts/baselines.py
-python scripts/baselines.py policy=unitary_sat
-python scripts/baselines.py policy=unitary_pi
+python scripts/baselines.py policy=unitary_g36
+python scripts/baselines.py policy=ashrae_air_loop
 python scripts/baselines.py env.max_steps=672 n_episodes=1
 ```
 

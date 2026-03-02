@@ -60,8 +60,7 @@ def make_policy_from_config(cfg: dict[str, Any]) -> PolicyLike:
 
     Supported ``policy.type`` values:
 
-    * ``"zone_temp_21"`` / ``"fan_coil_constant"`` / ``"unitary_pi"`` /
-      ``"unitary_sat"`` / ``"air_loop_sat"`` / ``"ashrae_air_loop"``
+    * ``"unitary_g36"`` / ``"air_loop_sat"`` / ``"ashrae_air_loop"``
       – built-in controllers.
     * ``"sb3"`` – loads a Stable-Baselines3 checkpoint (requires
       ``policy.algorithm`` and ``policy.checkpoint_path``).
@@ -88,22 +87,10 @@ def make_policy_from_config(cfg: dict[str, Any]) -> PolicyLike:
     if not isinstance(policy_cfg, dict):
         policy_cfg = {}
     policy_type = str(policy_cfg.get("type", "")).strip()
-    if policy_type == "zone_temp_21":
-        from b2b.baselines.controllers.zone_temp_21 import ZoneTemp21Policy
+    if policy_type == "unitary_g36":
+        from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
 
-        return ZoneTemp21Policy(OmegaConf.create(policy_cfg))
-    if policy_type == "fan_coil_constant":
-        from b2b.baselines.controllers.fan_coil_constant import FanCoilConstantPolicy
-
-        return FanCoilConstantPolicy(OmegaConf.create(policy_cfg))
-    if policy_type == "unitary_pi":
-        from b2b.baselines.controllers.unitary_pi import UnitaryPIPolicy
-
-        return UnitaryPIPolicy(OmegaConf.create(policy_cfg))
-    if policy_type in ("unitary_sat", "unitary_airflow_first_sat"):
-        from b2b.baselines.controllers.unitary_sat import UnitaryAirflowFirstSatPolicy
-
-        return UnitaryAirflowFirstSatPolicy(OmegaConf.create(policy_cfg))
+        return UnitaryG36Policy(OmegaConf.create(policy_cfg))
     if policy_type == "air_loop_sat":
         from b2b.baselines.controllers.air_loop_sat import AirLoopSatPolicy
 

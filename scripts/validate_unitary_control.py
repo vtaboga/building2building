@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Validate UnitaryG36 baseline SAT control on Warehouse, RetailStandalone, RestaurantFastFood.
+"""Validate UnitaryG36 baseline on Warehouse, RetailStandalone, RestaurantFastFood.
 
 For each building type, loads one building from the test split, runs the
-G36 piecewise-linear controller for a winter period, and prints per-zone
-temperature statistics relative to the heating/cooling setpoints.
+G36-inspired PI airflow + T&R SAT controller for a winter period, and prints
+per-zone temperature statistics relative to the heating/cooling setpoints.
 """
 
 from __future__ import annotations
@@ -128,11 +128,16 @@ def run_one_building(
         policy_cfg = OmegaConf.create({
             "heating_setpoint_c": heating_sp,
             "cooling_setpoint_c": cooling_sp,
-            "kp": 1.0,
-            "ki": 0.05,
+            "kp": 0.25,
+            "ki": 0.02,
+            "integral_max": 200.0,
             "min_fan_fraction": 0.15,
-            "med_fan_fraction": 0.50,
-            "sat_min_c": 13.0,
+            "sat_min_c": 12.0,
+            "sat_max_c": 35.0,
+            "sat_initial_c": 21.0,
+            "sat_trim": 0.5,
+            "sat_respond": 1.0,
+            "demand_deadband": 0.3,
         })
         policy = UnitaryG36Policy(policy_cfg)
 

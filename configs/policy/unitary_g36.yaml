@@ -1,33 +1,27 @@
 type: unitary_g36
 
-# ASHRAE G36 §5.18 — single-zone VAV piecewise-linear controller.
-# Two PI loops (heating / cooling) produce [0, 1] demand signals.
-# Fan speed and SAT are mapped directly from those signals.
+# G36-inspired PI airflow + Trim-and-Respond SAT controller for PSZ.
+# Zone temperature PI loop modulates fan airflow; T&R adjusts SAT.
 
-# Zone setpoints [°C] — aligned with reward deadband [20, 22]°C.
+# Zone setpoints [C] -- aligned with reward deadband [20, 22] C.
 heating_setpoint_c: 20.0
 cooling_setpoint_c: 22.0
 
-# PI gains — tuned for 15-min timesteps.
-# kp=2.0 means 0.5 °C error → full demand; reaches max heating/cooling faster
-# for small persistent errors.  ki=0.1 accelerates integral wind-up.
-kp: 2.0
-ki: 0.1
+# PI gains for zone-temp -> airflow loop.
+kp: 0.25
+ki: 0.02
+integral_max: 200.0
 
-# Fan speed fractions (of design-max from action space).
-# min_fan_fraction must stay above ~58% to ensure the heating coil can
-# overcome outdoor-air dilution at design heating conditions.  At lower
-# fan speeds the fixed minimum ventilation volume becomes a larger
-# fraction of total airflow, chilling the mixed air and starving
-# heat delivery.
-min_fan_fraction: 0.70
-med_fan_fraction: 0.85
+# Minimum fan speed (fraction of design-max from action space).
+min_fan_fraction: 0.15
 
-# SAT bounds [°C]
-# sat_min_c: minimum cooling SAT
-# sat_max_c: null → read from action space (building-specific)
-sat_min_c: 13.0
-sat_max_c: null
+# SAT Trim-and-Respond parameters [C].
+sat_min_c: 12.0
+sat_max_c: 35.0
+sat_initial_c: 21.0
+sat_trim: 0.5
+sat_respond: 1.0
+demand_deadband: 0.5
 
 availability_on: 2.0
 

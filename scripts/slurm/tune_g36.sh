@@ -5,20 +5,20 @@
 #SBATCH --time=14:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --array=0-4
+#SBATCH --array=0-2
 
 # Load conda
 source .venv/bin/activate   
 export PYTHONPATH=.
 
-BUILDING_TYPES=("OfficeSmall" "RetailStandalone" "RestaurantFastFood" "Warehouse")
+BUILDING_TYPES=("OfficeSmall" "RetailStandalone" "RestaurantFastFood")
 BUILDING_TYPE=${BUILDING_TYPES[$SLURM_ARRAY_TASK_ID]}
 
 echo "Running building type: ${BUILDING_TYPE}"
 
 python scripts/tune_g36.py \
     --building-type ${BUILDING_TYPE} \
-    --n-trials 100 \
+    --n-trials 200 \
     --run-period full_year \
     --n-buildings 20 \
     --output-dir outputs/tune_g36/${BUILDING_TYPE}

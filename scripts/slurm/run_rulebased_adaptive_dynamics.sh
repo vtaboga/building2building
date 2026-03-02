@@ -7,8 +7,8 @@
 #SBATCH --cpus-per-task=8
 
 # Rule-based controller evaluation on adaptive dynamics benchmark
-# Runs the unitary_sat controller on all buildings in both train and test splits.
-# Override the policy with: --export=POLICY=unitary_pi
+# Runs the unitary_g36 controller on all buildings in both train and test splits.
+# Override the policy with: --export=POLICY=ashrae_air_loop
 
 # Load modules
 module load python/3.10
@@ -25,8 +25,8 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 # Create logs directory
 mkdir -p logs
 
-# Allow overriding the policy via environment variable (default: unitary_sat)
-POLICY=${POLICY:-unitary_sat}
+# Allow overriding the policy via environment variable (default: unitary_g36)
+POLICY=${POLICY:-unitary_g36}
 
 echo "Running rule-based controller (${POLICY}) on adaptive dynamics benchmark"
 

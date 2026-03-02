@@ -25,7 +25,7 @@ def test_multizones_pipeline_baseline_execution_per_type(
     _requires_long_runtime()
     cfg = OmegaConf.create(
         {
-            "policy": {"type": "air_loop_sat" if building_type == "OfficeMedium" else "unitary_sat"},
+            "policy": {"type": "air_loop_sat" if building_type == "OfficeMedium" else "unitary_g36"},
             "multizones": {"types": [building_type], "n_per_type": 1},
             "env": {"max_steps": 8},
             "task": {"run_period": "winter"},

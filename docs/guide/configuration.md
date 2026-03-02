@@ -186,10 +186,9 @@ kwargs: {}                  # Constructor keyword arguments
 ### Baseline Controllers
 
 ```yaml
-# configs/policy/fan_coil_constant.yaml
-# configs/policy/unitary_pi.yaml
-# configs/policy/unitary_sat.yaml
 # configs/policy/unitary_g36.yaml
+# configs/policy/ashrae_air_loop.yaml
+# configs/policy/air_loop_sat.yaml
 ```
 
 ### CLI Override Examples

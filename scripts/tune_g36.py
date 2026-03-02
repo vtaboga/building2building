@@ -102,10 +102,14 @@ def evaluate_params(
             "cooling_setpoint_c": COOLING_SP,
             "kp": params["kp"],
             "ki": params["ki"],
+            "integral_max": params["integral_max"],
             "min_fan_fraction": params["min_fan_fraction"],
-            "med_fan_fraction": params["med_fan_fraction"],
             "sat_min_c": params["sat_min_c"],
-            "sat_max_c": params.get("sat_max_c"),
+            "sat_max_c": params["sat_max_c"],
+            "sat_initial_c": params["sat_initial_c"],
+            "sat_trim": params["sat_trim"],
+            "sat_respond": params["sat_respond"],
+            "demand_deadband": params["demand_deadband"],
             "availability_on": 2.0,
         }
     )
@@ -178,24 +182,28 @@ def make_objective(
     """Create an Optuna objective closure."""
 
     def objective(trial: optuna.Trial) -> float:
-        kp = trial.suggest_float("kp", 0.5, 5.0)
-        ki = trial.suggest_float("ki", 0.01, 0.5, log=True)
-        min_fan_fraction = trial.suggest_float("min_fan_fraction", 0.15, 0.90)
-        med_fan_fraction = trial.suggest_float(
-            "med_fan_fraction", min_fan_fraction, 1.0
-        )
-        sat_min_c = trial.suggest_float("sat_min_c", 10.0, 18.0)
-        sat_max_raw = trial.suggest_float("sat_max_c", 35.0, 80.0)
-        use_null_sat_max = trial.suggest_categorical("sat_max_null", [True, False])
-        sat_max_c: float | None = None if use_null_sat_max else sat_max_raw
+        kp = trial.suggest_float("kp", 0.05, 1.0)
+        ki = trial.suggest_float("ki", 0.005, 0.1, log=True)
+        integral_max = trial.suggest_float("integral_max", 50.0, 500.0)
+        min_fan_fraction = trial.suggest_float("min_fan_fraction", 0.10, 0.50)
+        sat_min_c = trial.suggest_float("sat_min_c", 10.0, 16.0)
+        sat_max_c = trial.suggest_float("sat_max_c", 25.0, 45.0)
+        sat_initial_c = trial.suggest_float("sat_initial_c", sat_min_c, sat_max_c)
+        sat_trim = trial.suggest_float("sat_trim", 0.1, 1.5)
+        sat_respond = trial.suggest_float("sat_respond", 0.5, 3.0)
+        demand_deadband = trial.suggest_float("demand_deadband", 0.1, 1.0)
 
         params = {
             "kp": kp,
             "ki": ki,
+            "integral_max": integral_max,
             "min_fan_fraction": min_fan_fraction,
-            "med_fan_fraction": med_fan_fraction,
             "sat_min_c": sat_min_c,
             "sat_max_c": sat_max_c,
+            "sat_initial_c": sat_initial_c,
+            "sat_trim": sat_trim,
+            "sat_respond": sat_respond,
+            "demand_deadband": demand_deadband,
         }
 
         trial_dir = eplus_base_dir / f"trial_{trial.number}"
@@ -223,24 +231,24 @@ def make_objective(
 
 
 def write_best_config(
-    best_params: dict[str, float | bool | None],
+    best_params: dict[str, float],
     output_path: Path,
 ) -> None:
     """Write the best trial parameters to a YAML config file."""
-    sat_max_null = best_params.pop("sat_max_null", False)
-    sat_max_val = best_params.pop("sat_max_c", None)
-    sat_max: float | None = None if sat_max_null else sat_max_val
-
     config = {
         "type": "unitary_g36",
         "heating_setpoint_c": HEATING_SP,
         "cooling_setpoint_c": COOLING_SP,
         "kp": round(float(best_params["kp"]), 4),
         "ki": round(float(best_params["ki"]), 6),
+        "integral_max": round(float(best_params["integral_max"]), 1),
         "min_fan_fraction": round(float(best_params["min_fan_fraction"]), 4),
-        "med_fan_fraction": round(float(best_params["med_fan_fraction"]), 4),
         "sat_min_c": round(float(best_params["sat_min_c"]), 2),
-        "sat_max_c": round(sat_max, 2) if sat_max is not None else None,
+        "sat_max_c": round(float(best_params["sat_max_c"]), 2),
+        "sat_initial_c": round(float(best_params["sat_initial_c"]), 2),
+        "sat_trim": round(float(best_params["sat_trim"]), 3),
+        "sat_respond": round(float(best_params["sat_respond"]), 3),
+        "demand_deadband": round(float(best_params["demand_deadband"]), 3),
         "availability_on": 2.0,
         "target_schedule": {"enabled": False},
     }

@@ -151,10 +151,8 @@ env.close()
 B2B includes several hand-crafted baseline controllers. You can run them via Hydra:
 
 ```bash
-python -m b2b.benchmark.baseline_rollout policy=fan_coil_constant \
-    bldg=single_family \
-    task.run_period=winter \
-    reward=barrier
+python scripts/baselines.py policy=unitary_g36 \
+    bldg=single_family
 ```
 
 Baseline controllers follow the same `predict(obs, deterministic) -> (action, state)` interface as SB3 policies, so they integrate seamlessly with the rollout infrastructure.

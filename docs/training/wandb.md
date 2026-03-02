@@ -39,7 +39,7 @@ from the run configuration for easier filtering:
 | Tag format | Source |
 |---|---|
 | `algo:<algorithm>` | `policy.algorithm` (e.g. `algo:ppo`) |
-| `policy:<type>` | `policy.type` (e.g. `policy:unitary_pi`) |
+| `policy:<type>` | `policy.type` (e.g. `policy:unitary_g36`) |
 | `split:<split>` | `benchmark.split` (e.g. `split:train`) |
 | `building:<type>` | `bldg.bldg.building_type` (e.g. `building:OfficeSmall`) |
 
@@ -53,7 +53,7 @@ W&B run names are auto-generated with a descriptive format:
 <building_type>_id<building_id>_<algorithm>_<6-char-uuid>
 ```
 
-For example: `OfficeSmall_id42_unitary_pi_a3f2c1`
+For example: `OfficeSmall_id42_unitary_g36_a3f2c1`
 
 ## Logged Config
 
