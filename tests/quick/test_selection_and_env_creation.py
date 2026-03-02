@@ -91,8 +91,9 @@ def test_make_env_uses_typed_canonical_path(mock_search_configs: MagicMock, tmp_
                 "reward": {"reward_type": "BaseRewardConfig"},
                 "task": {"run_period": "winter"},
                 "bldg": {
-                    "selection": {"enabled": True, "split": "train", "index": 0},
-                    "bldg": {},
+                    "dataset": "single_zone_houses",
+                    "split": "train",
+                    "index": 0,
                 },
             },
             eplus_output_dir=tmp_path,

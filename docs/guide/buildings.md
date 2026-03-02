@@ -12,7 +12,7 @@ B2B includes 6 ASHRAE 90.1-2022 commercial reference building prototypes plus si
 |---|---|---|---|
 | **OfficeSmall** | 5 | Unitary | Small office building with perimeter and core zones |
 | **OfficeMedium** | 15+ | VAV | Medium office with multiple floors, VAV with reheat |
-| **Warehouse** | 3 | Unitary + Baseboard | Large open warehouse with office and fine-storage zones |
+| **Warehouse** | 3 | Unitary + Heating-Only | Large open warehouse with office, fine-storage, and bulk-storage zones |
 | **HotelSmall** | 10+ | Unitary | Small hotel with guest rooms, lobby, and mechanical rooms |
 | **RetailStandalone** | 4 | Unitary | Standalone retail store with back/core/entry zones |
 | **RestaurantFastFood** | 2 | Unitary | Fast-food restaurant with kitchen and dining zones |
@@ -89,7 +89,7 @@ The pipeline processes each building through:
 1. **Upgrade**: Convert legacy IDF format to EnergyPlus 24.1
 2. **Convert**: Transform IDF to the JSON-based epJSON format
 3. **Modify**: Apply parametric modifications (envelope, fenestration, geometry, infiltration)
-4. **Instrument**: Add HVAC energy meters, set 15-minute timestep, discover equipment, and install controllable actuators
+4. **Instrument**: Add HVAC energy meters, set simulation timestep (default: 5 minutes), discover equipment, and install controllable actuators
 
 ---
 
@@ -110,7 +110,7 @@ Single-family detached residential houses with one thermal zone each.
 Multi-zone ASHRAE 90.1 commercial reference buildings with varying zone counts.
 
 - **6 building types** × ~1,000 buildings each ≈ 6,000 buildings
-- **HVAC**: VAV (OfficeMedium), Unitary (most types), Baseboard (Warehouse supplemental)
+- **HVAC**: VAV (OfficeMedium), Unitary (most types), Heating-Only (Warehouse bulk storage)
 - **Zone count**: 2–15+ zones depending on building type
 - **Use cases**: Multi-task learning, cross-environment transfer, action-space shift
 
@@ -197,6 +197,7 @@ Each dataset is pre-split into training and test sets:
 
 - **Train split**: Used for policy training and hyperparameter tuning
 - **Test split**: Held out for evaluation — never used during training
+- **Test-small split** *(multizones only)*: A compact subset of the test split with exactly one building per ASHRAE climate zone (8 buildings total). Useful for quick evaluation sweeps across all climates.
 
 This enables rigorous evaluation of cross-building generalization. A policy trained on the train split should be evaluated on unseen buildings from the test split to measure true transfer performance.
 
@@ -206,6 +207,9 @@ train_env = make_single_zone_env(split="train", split_index=0, ...)
 
 # Evaluation (different buildings)
 test_env = make_single_zone_env(split="test", split_index=0, ...)
+
+# Quick evaluation across all climate zones (multizones only)
+test_small_env = make_multizones_env(split="test_small", index=0, ...)
 ```
 
 ---

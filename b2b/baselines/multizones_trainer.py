@@ -13,12 +13,13 @@ from typing import Any, Literal
 
 import gymnasium as gym
 from omegaconf import OmegaConf
-from stable_baselines3.common.callbacks import CallbackList, EvalCallback
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnv
 
-from algorithms.sb3_utils import build_sb3_model, load_best_model
+from b2b.baselines.recycling_vec_env import RecyclingSubprocVecEnv
+from b2b.training.sb3_utils import build_sb3_model, load_best_model
 from b2b.baselines.callbacks import TrainingEpisodeRewardCallback
 from b2b.baselines.wandb_utils import (
     finish_wandb_if_started,
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 def load_split_ids(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
 ) -> list[int]:
     return mz_source.load_split_ids(
         building_type=building_type,
@@ -48,7 +49,7 @@ def load_split_ids(
 
 def _resolve_building_id(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     index: int,
 ) -> int:
     ids = load_split_ids(building_type, split)
@@ -62,7 +63,7 @@ def _resolve_building_id(
 
 def make_multizones_env(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     index: int,
     eplus_output_dir: str | Path,
     reward_section: dict[str, Any] | None = None,
@@ -104,7 +105,7 @@ def make_multizones_env(
 
 def _make_single_env(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     index: int,
     eplus_root: str,
     reward_section: dict[str, Any],
@@ -151,12 +152,12 @@ def _make_envs(
     config: OmegaConf,
     output_dir: Path,
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     index: int,
     reward_section: dict[str, Any],
     task_section: dict[str, Any],
     max_steps: int | None,
-) -> tuple[DummyVecEnv | SubprocVecEnv, DummyVecEnv]:
+) -> tuple[VecEnv, DummyVecEnv]:
     norm_obs: bool = config.env.normalize_obs
     norm_action: bool = getattr(config.env, "normalize_action", False)
     common_kwargs = dict(
@@ -175,19 +176,22 @@ def _make_envs(
     train_root.mkdir(parents=True, exist_ok=True)
 
     if num_envs <= 1:
-        train_env: DummyVecEnv | SubprocVecEnv = DummyVecEnv(
+        train_env: VecEnv = DummyVecEnv(
             [lambda r=str(train_root / "worker_0"): _make_single_env(eplus_root=r, **common_kwargs)]
         )
     else:
-        train_env = SubprocVecEnv(
-            [
-                lambda r=str(train_root / f"worker_{i}"): _make_single_env(
-                    eplus_root=r,
-                    **common_kwargs,
-                )
-                for i in range(num_envs)
-            ]
-        )
+        env_fns = [
+            lambda r=str(train_root / f"worker_{i}"): _make_single_env(
+                eplus_root=r,
+                **common_kwargs,
+            )
+            for i in range(num_envs)
+        ]
+        recycle_every = int(getattr(config.training, "recycle_every", 0))
+        if recycle_every > 0:
+            train_env = RecyclingSubprocVecEnv(env_fns, recycle_every=recycle_every)
+        else:
+            train_env = SubprocVecEnv(env_fns)
 
     eval_root = output_dir / "eval_eplus_outputs"
     eval_root.mkdir(parents=True, exist_ok=True)
@@ -206,15 +210,25 @@ def _make_callbacks(
 ) -> CallbackList:
     callbacks: list[Any] = []
 
+    eval_freq = int(config.training.eval_freq)
+
     eval_cb = EvalCallback(
         eval_env,
         log_path=str(log_dir),
-        eval_freq=config.training.eval_freq,
+        eval_freq=eval_freq,
         best_model_save_path=str(model_dir),
         n_eval_episodes=config.training.eval_episodes,
         deterministic=True,
     )
     callbacks.append(eval_cb)
+
+    checkpoint_cb = CheckpointCallback(
+        save_freq=eval_freq,
+        save_path=str(model_dir),
+        name_prefix="checkpoint",
+    )
+    callbacks.append(checkpoint_cb)
+
     callbacks.append(TrainingEpisodeRewardCallback())
 
     try:
@@ -236,10 +250,10 @@ def multizones_trainer(config: OmegaConf, output_dir: Path) -> None:
     """Train an SB3 agent on a single multizones_reference_buildings building."""
     repo_root = Path(__file__).resolve().parents[2]
 
-    # ---- read multizones selection from config ----
-    mz = config.multizones
+    # ---- read building selection from config ----
+    mz = config.bldg
     building_type: BuildingType = str(mz.building_type)  # type: ignore[assignment]
-    split: Literal["train", "test"] = str(mz.split)  # type: ignore[assignment]
+    split: Literal["train", "test", "test_small"] = str(mz.split)  # type: ignore[assignment]
     index = int(mz.index)
 
     building_id = _resolve_building_id(building_type, split, index)
@@ -264,7 +278,7 @@ def multizones_trainer(config: OmegaConf, output_dir: Path) -> None:
     max_steps = (
         int(max_steps_raw)
         if max_steps_raw is not None
-        else task_cfg.run_period.expected_steps()
+        else task_cfg.expected_steps()
     )
 
     # ---- wandb ----

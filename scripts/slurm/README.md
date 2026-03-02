@@ -4,27 +4,7 @@ This directory contains SLURM batch scripts for running experiments on the clust
 
 ## Available Scripts
 
-### 1. Rule-Based Control Baseline
-**Script:** `run_baseline_unitary_pi.sh`
-
-Runs a rule-based PI (Proportional-Integral) controller baseline. This is a traditional HVAC control strategy that doesn't use machine learning.
-
-**Usage:**
-```bash
-sbatch scripts/slurm/run_baseline_unitary_pi.sh
-```
-
-**What it does:**
-- Uses `scripts/baselines.py` with `configs/baseline.yaml`
-- Implements PI control on fan mass flow rate
-- Sets fixed outlet temperature setpoints based on heating/cooling mode
-- Useful as a performance baseline to compare against RL methods
-
-**Configuration:** `configs/policy/unitary_pi.yaml`
-
----
-
-### 2. PPO Training
+### 1. PPO Training
 **Script:** `run_ppo.sh`
 
 Trains a Proximal Policy Optimization (PPO) agent using the online trainer.
@@ -45,7 +25,7 @@ sbatch scripts/slurm/run_ppo.sh
 
 ---
 
-### 3. SAC Training
+### 2. SAC Training
 **Script:** `run_sac.sh`
 
 Trains a Soft Actor-Critic (SAC) agent using the online trainer.
@@ -102,7 +82,7 @@ Edit the `#SBATCH` directives at the top of each script:
 ### Baselines
 Outputs are saved to: `outputs/<policy_type>/<date>/<time>/`
 
-Example: `outputs/unitary_pi/02-02-2026/14-30-00/`
+Example: `outputs/unitary_g36/02-02-2026/14-30-00/`
 
 Contains:
 - `rollout.csv`: Full rollout data

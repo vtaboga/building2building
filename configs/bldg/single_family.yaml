@@ -1,10 +1,3 @@
-selection:
-  enabled: true
-  split: test
-  index: 0
-  controls: [unitary_hvac, baseboard, fanonoff]
-
-bldg:
-  geometry_unit_type: "single-family detached"
-  geometry_building_num_units: 1
-  year_built: 2015
+dataset: single_zone_houses
+split: test
+index: 0

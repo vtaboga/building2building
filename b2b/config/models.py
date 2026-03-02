@@ -19,7 +19,7 @@ from b2b.types import (
 )
 
 DatasetName = Literal["single_zone_houses", "multizones_reference_buildings"]
-SplitName = Literal["train", "test"]
+SplitName = Literal["train", "test", "test_small"]
 BuildingType = Literal[
     "Warehouse",
     "HotelSmall",
@@ -354,6 +354,7 @@ class EnvBuildConfig:
     reward: RewardConfig
     actuator_access: ActuatorAccessConfig = field(default_factory=ActuatorAccessConfig)
     env_max_steps: int | None = None
+    expose_heating_only_zones: bool = True
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "EnvBuildConfig":
@@ -378,12 +379,16 @@ class EnvBuildConfig:
         actuator_access = ActuatorAccessConfig.from_dict(raw.get("actuator_access", {}))
         max_steps_raw = raw.get("env_max_steps")
         env_max_steps = int(max_steps_raw) if max_steps_raw is not None else None
+        expose_heating_only_zones = bool(
+            raw.get("expose_heating_only_zones", True)
+        )
         return cls(
             dataset_selection=dataset_selection,
             task=task,
             reward=reward,
             actuator_access=actuator_access,
             env_max_steps=env_max_steps,
+            expose_heating_only_zones=expose_heating_only_zones,
         )
 
 

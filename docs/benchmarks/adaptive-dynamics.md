@@ -59,7 +59,7 @@ The script `scripts/bm_adaptive_dynamics.py` drives the benchmark using
 defaults:
   - base
   - _self_
-  - override /policy: unitary_sat
+  - override /policy: unitary_g36
 
 env:
   normalize_obs: false
@@ -92,8 +92,8 @@ python scripts/bm_adaptive_dynamics.py benchmark.split=test
 # Evaluate only the first 5 buildings
 python scripts/bm_adaptive_dynamics.py benchmark.limit=5
 
-# Use the PI controller instead of SAT
-python scripts/bm_adaptive_dynamics.py policy=unitary_pi
+# Use the ASHRAE air-loop controller instead of G36
+python scripts/bm_adaptive_dynamics.py policy=ashrae_air_loop
 ```
 
 ## Policy Evaluation Across Building Variants
@@ -113,12 +113,6 @@ provided policy.  Results include:
 Run the benchmark with different policies and compare aggregate performance:
 
 ```bash
-# Baseline: SAT controller
-python scripts/bm_adaptive_dynamics.py policy=unitary_sat
-
-# Baseline: PI controller
-python scripts/bm_adaptive_dynamics.py policy=unitary_pi
-
 # Baseline: G36 controller
 python scripts/bm_adaptive_dynamics.py policy=unitary_g36
 

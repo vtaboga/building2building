@@ -21,24 +21,29 @@ via `configs/train_multizones.yaml`.
 ```yaml title="configs/train_multizones.yaml"
 defaults:
   - _self_
+  - bldg: multi_zone
   - wandb: default
   - training: default
   - policy: ppo
   - reward: deadband
   - task: default
 
-multizones:
-  building_type: OfficeSmall   # Warehouse, HotelSmall, RetailStandalone,
-                               # RestaurantFastFood, OfficeMedium, OfficeSmall
-  split: train                 # train or test
-  index: 0                     # 0-based position in the split's ID list
-
 env:
   normalize_obs: true
-  normalize_action: false
-  max_steps: null              # defaults to task.run_period horizon
+  normalize_action: true
+  max_steps: 35040              # full year at 15-min timesteps
 
 seed: 42
+```
+
+Building selection is configured via `configs/bldg/multi_zone.yaml`:
+
+```yaml title="configs/bldg/multi_zone.yaml"
+dataset: multizones_reference_buildings
+building_type: OfficeSmall   # Warehouse, HotelSmall, RetailStandalone,
+                             # RestaurantFastFood, OfficeMedium, OfficeSmall
+split: train                 # train, test, or test_small
+index: 0                     # 0-based position in the split's ID list
 ```
 
 ### Building Types
@@ -59,20 +64,20 @@ seed: 42
 python scripts/train_multizones.py
 
 # Switch building type
-python scripts/train_multizones.py multizones.building_type=OfficeMedium
+python scripts/train_multizones.py bldg.building_type=OfficeMedium
 
 # Train on a specific building instance
 python scripts/train_multizones.py \
-    multizones.building_type=OfficeMedium \
-    multizones.split=train \
-    multizones.index=2
+    bldg.building_type=OfficeMedium \
+    bldg.split=train \
+    bldg.index=2
 
 # Use SAC instead of PPO
 python scripts/train_multizones.py policy=sac
 
 # Short run for debugging
 python scripts/train_multizones.py \
-    training.total_timesteps=10000 env.max_steps=960
+    training.total_timesteps=10000 env.max_steps=2880
 
 # Winter-only training
 python scripts/train_multizones.py task.run_period=winter

@@ -1,8 +1,0 @@
-type: zone_temp_21
-
-target_temp_c: 21.0
-deadband_c: 0.5
-heating_setpoint_c: 20.5
-cooling_setpoint_c: 21.5
-vav_max_flow_fraction: 1.0
-vav_default_mass_flow_kg_s: 1.0

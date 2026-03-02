@@ -59,6 +59,7 @@ def prepare_building(
     input_file: Derivation,
     energyplus_path: Realizable,
     src_version: str,
+    timesteps_per_hour: int = 12,
 ) -> Derivation:
     """
     Convert IDF to epJSON and prepare for controllability.
@@ -68,7 +69,7 @@ def prepare_building(
     2. Convert IDF → epJSON
     3. Add HVAC meters (electricity, gas) - needed for RL reward calculation
     4. Add outdoor air meters - needed for RL observations
-    5. Modify timestep to 4 steps/hour
+    5. Modify timestep to *timesteps_per_hour* steps/hour
 
     Does NOT add discovery outputs (EDD, tabular, SQLite) or modify HVAC control.
     Use make_controllable() and extract_discovery_metadata() for those.
@@ -80,7 +81,7 @@ def prepare_building(
     current = convert_idf(current, energyplus_path)
     current = add_hvac_meters(current)
     current = add_outdoor_air_meters(current)
-    current = modify_timestep(current, timesteps_per_hour=4)
+    current = modify_timestep(current, timesteps_per_hour=timesteps_per_hour)
     current = modify_run_period(current, begin_day_of_month=1, begin_month=1, end_day_of_month=31, end_month=12)
     current = Rename("building.epjson", current)
     return current
@@ -90,6 +91,7 @@ def create_complete_pipeline(
     input_file: Derivation,
     energyplus_path: Realizable,
     src_version: str,
+    timesteps_per_hour: int = 12,
 ) -> Expression[tuple[Path, list[ActuatorDescription]]]:
     """
     Complete pipeline: IDF → controllable epJSON with actuators.
@@ -106,7 +108,10 @@ def create_complete_pipeline(
     Returns:
         Expression resolving to (epjson_path, actuator_descriptions)
     """
-    epjson = prepare_building(input_file, energyplus_path, src_version)
+    epjson = prepare_building(
+        input_file, energyplus_path, src_version,
+        timesteps_per_hour=timesteps_per_hour,
+    )
     return make_controllable(epjson)
 
 

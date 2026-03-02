@@ -198,10 +198,9 @@ def search_config(
         raise TypeError("config['bldg'] must be a mapping")
 
     if dataset == "single_zone_houses":
-        cfg_bldg.setdefault("bldg", {})
-        q = cfg_bldg["bldg"]
+        q = cfg_bldg.setdefault("query", {})
         if not isinstance(q, dict):
-            raise TypeError("config['bldg']['bldg'] must be a mapping")
+            raise TypeError("config['bldg']['query'] must be a mapping")
         q.update(query)
         if split is not None and split_index is not None:
             building_id = single_zone_building_id_from_split_index(split, split_index)
@@ -219,18 +218,14 @@ def search_config(
         )[0]
 
     if dataset == "multizones_reference_buildings":
-        q = cfg_bldg.setdefault("bldg", {})
-        if not isinstance(q, dict):
-            raise TypeError("config['bldg']['bldg'] must be a mapping")
-        q.update(query)
         if building_type is not None:
-            q["building_type"] = building_type
+            cfg_bldg["building_type"] = building_type
         if split is not None and split_index is not None:
             if building_type is None:
                 raise ValueError(
                     "building_type is required when using split/split_index for multizones"
                 )
-            q["building_id"] = multizones_reference_buildings.building_id_from_split_index(
+            cfg_bldg["building_id"] = multizones_reference_buildings.building_id_from_split_index(
                 building_type=building_type,
                 split=split,
                 split_index=split_index,

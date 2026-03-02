@@ -184,6 +184,12 @@ class DynamicTargetTemperature:
         return self.zone_target.occupied_c
 
 
+_PEAK_HVAC_POWER_W_M2 = 200.0
+"""Assumed peak HVAC power density (W/m²).  The per-timestep energy bound
+is derived as ``_PEAK_HVAC_POWER_W_M2 / timesteps_per_hour`` so that it
+scales automatically with the simulation timestep."""
+
+
 def flat_observation_info(
     ont: Ontology,
     *,
@@ -201,12 +207,13 @@ def flat_observation_info(
     -    - Current Time of Day [0, 24]
     -    - Day of Week [1, 7]  (1=Sunday, ..., 7=Saturday)
     -    - Day of Year [1, 366]
-    -    - HVAC Electricity Consumption [0, 50]  Wh/m² per timestep
-    -    - HVAC Natural Gas Consumption [0, 50]  Wh/m² per timestep
+    -    - HVAC Electricity Consumption [0, energy_bound]  Wh/m² per timestep
+    -    - HVAC Natural Gas Consumption [0, energy_bound]  Wh/m² per timestep
 
     """
 
     joules_to_watthours = 3600.0
+    energy_bound = _PEAK_HVAC_POWER_W_M2 / task_config.timesteps_per_hour
 
     occupancy_template: dict[str, Any] = {}
     target_template: dict[str, Any] = {}
@@ -282,14 +289,14 @@ def flat_observation_info(
                 FunctionHole(
                     DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area * joules_to_watthours)
                 ),
-                (0.0, 50.0),
+                (0.0, energy_bound),
             ),
             "electricity": (
                 "energy_electricity",
                 FunctionHole(
                     DivideBy(DynamicMeter(["Electricity:HVAC"]), area * joules_to_watthours)
                 ),
-                (0.0, 50.0),
+                (0.0, energy_bound),
             ),
         },
     }

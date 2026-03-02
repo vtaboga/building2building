@@ -113,7 +113,7 @@ def run_multizones_rollout(
     max_steps = (
         int(max_steps_raw)
         if max_steps_raw is not None
-        else task_cfg.run_period.expected_steps()
+        else task_cfg.expected_steps()
     )
 
     results_path = output_dir / "rollout_results.jsonl"

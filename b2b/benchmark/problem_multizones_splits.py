@@ -19,7 +19,7 @@ from b2b.sources.multizones_reference_buildings import BuildingType
 from b2b.types import ActuatorDescription, BuildingConfig, Equipment
 
 SelectionMode = Literal["random", "indices", "search_config"]
-SplitName = Literal["train", "test"]
+SplitName = Literal["train", "test", "test_small"]
 
 
 @dataclass(frozen=True)

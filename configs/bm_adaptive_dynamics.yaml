@@ -1,7 +1,7 @@
 defaults:
   - base
   - _self_
-  - override /policy: unitary_sat
+  - override /policy: unitary_g36
 
 # The adaptive-dynamics benchmark evaluates a controller policy on a fixed dataset
 # of Hydro-Québec buildings. It requires the actuator-based control mode.

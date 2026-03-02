@@ -58,6 +58,7 @@ Controls the simulation period and target temperatures.
 # configs/task/default.yaml
 run_period: full_year        # full_year | winter | summer
 target_temperature_mode: constant  # constant | occupancy
+timesteps_per_hour: 12       # 5-min steps (valid: 1,2,3,4,5,6,10,12,15,20,30,60)
 
 default_zone_target_temperature:
   occupied_c: 21.0
@@ -68,11 +69,23 @@ zone_target_temperatures: {}
 
 ### Run Periods
 
-| Period | Start | End | Steps (15 min) |
+| Period | Start | End | Steps (5 min) |
 |---|---|---|---|
-| `full_year` | Jan 1 | Dec 31 | 35,040 |
-| `winter` | Jan 1 | Mar 31 | 8,640 |
-| `summer` | Jun 1 | Aug 31 | 8,832 |
+| `full_year` | Jan 1 | Dec 31 | 105,120 |
+| `winter` | Jan 1 | Mar 31 | 25,920 |
+| `summer` | Jun 1 | Aug 31 | 26,496 |
+
+### Simulation Timestep
+
+The `timesteps_per_hour` parameter controls the EnergyPlus simulation resolution.
+Higher values give finer control but produce longer episodes. The value must be a
+divisor of 60 accepted by EnergyPlus.
+
+| `timesteps_per_hour` | Step duration | Full-year steps |
+|---|---|---|
+| 4 | 15 min | 35,040 |
+| **12** (default) | **5 min** | **105,120** |
+| 60 | 1 min | 525,600 |
 
 ### Target Temperature Modes
 
@@ -84,6 +97,9 @@ zone_target_temperatures: {}
 ```bash
 # Run for winter only
 python -m b2b.train task.run_period=winter
+
+# Use 15-minute timestep (legacy default)
+python -m b2b.train task.timesteps_per_hour=4
 
 # Occupancy-based targets with setback
 python -m b2b.train \
@@ -186,10 +202,9 @@ kwargs: {}                  # Constructor keyword arguments
 ### Baseline Controllers
 
 ```yaml
-# configs/policy/fan_coil_constant.yaml
-# configs/policy/unitary_pi.yaml
-# configs/policy/unitary_sat.yaml
 # configs/policy/unitary_g36.yaml
+# configs/policy/ashrae_air_loop.yaml
+# configs/policy/air_loop_sat.yaml
 ```
 
 ### CLI Override Examples

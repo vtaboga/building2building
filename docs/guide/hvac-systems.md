@@ -10,7 +10,7 @@ B2B supports three distinct HVAC system types, each with a different control int
 |---|---|---|---|
 | **VAV** (Variable Air Volume) | OfficeMedium | Supply temp setpoint + per-zone flow fraction, heating/cooling setpoints | Central AHU with zone-level terminal units |
 | **Unitary** | OfficeSmall, HotelSmall, RetailStandalone, RestaurantFastFood, single-zone houses | Fan mass flow rate + supply air temperature setpoint | Dedicated unit per zone |
-| **Baseboard** | Warehouse (supplemental) | On/off availability schedule | Simple convective heating |
+| **Heating-Only Zone** | Warehouse (Bulk Storage) | Zone thermostat heating setpoint | Unit heaters, baseboards, radiant heaters |
 
 ---
 
@@ -131,37 +131,53 @@ For each discovered system, the pipeline:
 
 ---
 
-## Baseboard
+## Heating-Only Zones
 
-Baseboard systems provide simple zone-level heating through electric resistance or hot water convectors.
+Heating-only zones are thermal zones whose sole HVAC equipment provides heating (no cooling). This covers unit heaters, baseboards, and high-temperature radiant heaters. Instead of exposing equipment-level on/off control, B2B instruments these zones via their **thermostat heating setpoint** — a single continuous actuator that tells EnergyPlus what temperature to maintain.
+
+Equipment availability is pinned always-on; EnergyPlus modulates heat output to meet the setpoint. Zones with multiple heating-only devices (e.g. a unit heater plus a radiant heater) receive a single setpoint actuator, deduplicated by zone.
 
 ### Architecture
 
 ```mermaid
 flowchart LR
-    B[Baseboard<br/>Electric or Water] --> Z[Zone]
+    H[Heating Equipment<br/>Unit Heater / Baseboard / Radiant] --> Z[Zone]
     subgraph Agent Controls
-        A[Availability: On/Off]
+        SP[Heating Setpoint °C]
     end
-    A --> B
+    SP --> T[Zone Thermostat] --> H
 ```
 
 ### Equipment Class
 
-**`Baseboard`** — Represents one baseboard heater:
+**`HeatingOnlyZone`** — Represents one heating-only zone:
 
-- `actuator`: A single `ActuatorDescription` for on/off availability
+- `zone`: The thermal zone name
+- `heating_setpoint`: An `ActuatorDescription` for the zone thermostat heating setpoint
 
 ### Actuator Bounds
 
 | Actuator | Units | Lower | Upper |
 |---|---|---|---|
-| Availability schedule | discrete | 0 (off) | 1 (on) |
+| Zone heating setpoint | °C | 10.0 | 35.0 |
 
 ### Supported EnergyPlus Types
 
 - `ZoneHVAC:Baseboard:Convective:Electric`
 - `ZoneHVAC:Baseboard:Convective:Water`
+- `ZoneHVAC:Baseboard:RadiantConvective:Electric`
+- `ZoneHVAC:Baseboard:RadiantConvective:Water`
+- `ZoneHVAC:UnitHeater`
+- `ZoneHVAC:HighTemperatureRadiant`
+
+### Expose / Hide Toggle
+
+The `expose_heating_only_zones` flag in `EnvBuildConfig` (default `True`) controls whether heating-only zone actuators appear in the agent's action space:
+
+- **`True`**: The heating setpoint actuator is part of the agent action space; the zone contributes to the reward.
+- **`False`**: The actuator is pinned at 18 °C and removed from the agent action space; the zone is excluded from the reward.
+
+This is useful for experiments that focus on the primary HVAC systems while keeping storage zones at a safe temperature.
 
 ---
 
@@ -204,14 +220,14 @@ flowchart TD
     A[Raw epJSON] --> B[Convert HeatPumps<br/>→ UnitarySystem]
     B --> C[Discover & instrument<br/>Unitary Systems]
     C --> D[Discover & instrument<br/>VAV Systems]
-    D --> E[Discover & instrument<br/>Baseboards]
+    D --> E[Discover & instrument<br/>Heating-Only Zones]
     E --> F[Modified epJSON +<br/>Equipment list]
 ```
 
 1. **Convert heat pumps**: `AirLoopHVAC:UnitaryHeatPump:AirToAir` → `AirLoopHVAC:UnitarySystem`
 2. **Instrument unitary**: Discover and install fan + SAT actuators
 3. **Instrument VAV**: Discover AHU loops and install supply temp + terminal actuators
-4. **Instrument baseboard**: Discover baseboards and install availability schedule actuators
+4. **Instrument heating-only zones**: Discover unit heaters, baseboards, and radiant heaters; install thermostat heating setpoint actuators
 
 The result is a modified epJSON file ready for simulation and a list of `Equipment` objects describing all controllable actuators.
 

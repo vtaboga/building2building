@@ -38,7 +38,7 @@ def select_hydroquebec_buildings_by_row_id_split(
     Select buildings from the HydroQuebec (big) dataset based on stored dataset row indices.
 
     The row ids are loaded from:
-    - `b2b/sources/data/action_space_2_zone_1_train_data`
-    - `b2b/sources/data/action_space_2_zone_1_test_data`
+    - `b2b/sources/data/action_space_2_zone_1_train_data.json`
+    - `b2b/sources/data/action_space_2_zone_1_test_data.json`
     """
     return select_buildings_by_split(split, row_id_splits=row_id_splits)

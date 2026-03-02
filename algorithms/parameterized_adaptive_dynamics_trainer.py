@@ -23,7 +23,7 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 
 from algorithms.callbacks import make_adaptive_dynamics_callbacks
-from algorithms.sb3_utils import build_sb3_model, load_best_model
+from b2b.training.sb3_utils import build_sb3_model, load_best_model
 from b2b.baselines.wandb_utils import init_wandb_from_config
 from b2b.benchmark.experiments.bm_adaptive_dynamics import log_returns_to_wandb
 from b2b.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
@@ -65,7 +65,7 @@ def _create_env_for_split_index(
 
     logger.info("Creating environment for %s split: split_index=%d", split, split_index)
 
-    # Create config with selection enabled
+    # Set building selection in config
     cfg_dict = OmegaConf.to_container(config, resolve=True)
     if not isinstance(cfg_dict, dict):
         cfg_dict = {}
@@ -79,11 +79,8 @@ def _create_env_for_split_index(
         bldg_section = {}
         cfg_dict["bldg"] = bldg_section
 
-    bldg_section["selection"] = {
-        "enabled": True,
-        "split": split,
-        "index": split_index,
-    }
+    bldg_section["split"] = split
+    bldg_section["index"] = split_index
 
     # Create environment
     env = make_env(config=OmegaConf.create(cfg_dict), eplus_output_dir=str(output_path))

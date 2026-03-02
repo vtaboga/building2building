@@ -216,7 +216,7 @@ The `energy_weight` parameter controls the comfort-vs-energy trade-off:
 
 !!! tip "Scaling matters"
 
-    Energy values are in Wh/m² per 15-minute timestep, typically 0–50. Temperature MSE for a 2°C error is 4.0. An `energy_weight` of 0.1 means a 10 Wh/m² energy consumption contributes 1.0 to the penalty — comparable to a 1°C temperature error.
+    Energy values are in Wh/m² per timestep (typically 0–17 at the default 5-min step, 0–50 at 15-min). Temperature MSE for a 2°C error is 4.0. An `energy_weight` of 0.1 means a 10 Wh/m² energy consumption contributes 1.0 to the penalty — comparable to a 1°C temperature error.
 
 ---
 

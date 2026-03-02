@@ -23,7 +23,7 @@ The B2B environment pipeline:
 3. **EnergyPlus**: Launch the EnergyPlus simulator with the modified building model and weather file
 4. **Gymnasium Env**: Wrap the simulation in a standard `gym.Env` with `Box` observation and action spaces
 5. **Wrappers**: Optionally normalize observations, pad to fixed size, augment with building parameters
-6. **Agent**: The RL policy receives observations and returns actions at each 15-minute timestep
+6. **Agent**: The RL policy receives observations and returns actions at each simulation timestep (default: 5 minutes)
 
 ---
 
@@ -132,7 +132,7 @@ Controls which building is selected from the dataset:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `dataset` | `"single_zone_houses"` \| `"multizones_reference_buildings"` | — | Dataset to query |
-| `split` | `"train"` \| `"test"` \| `None` | `"train"` | Dataset split |
+| `split` | `"train"` \| `"test"` \| `"test_small"` \| `None` | `"train"` | Dataset split (`test_small`: one per climate zone, multizones only) |
 | `mode` | `SelectionMode` | `"split_index"` | How to select buildings |
 | `split_index` | `int` | `0` | Index when mode is `split_index` |
 | `split_indices` | `list[int]` | `[]` | Indices when mode is `split_indices` |
@@ -149,16 +149,17 @@ Controls the simulation task:
 |---|---|---|---|
 | `run_period` | `RunPeriodConfig` | `full_year` | Simulation period |
 | `target_temperature_mode` | `"constant"` \| `"occupancy"` | `"constant"` | How target temps are determined |
+| `timesteps_per_hour` | `int` | `12` | Simulation steps per hour (5-min default) |
 | `default_zone_target_temperature` | `ZoneTargetTemperatureConfig` | `21.0°C / 21.0°C` | Default occupied/unoccupied targets |
 | `zone_target_temperatures` | `dict[str, ZoneTargetTemperatureConfig]` | `{}` | Per-zone overrides |
 
 ### Run Periods
 
-| Name | Period | Days | Steps (at 15 min) |
+| Name | Period | Days | Steps (at 5 min) |
 |---|---|---|---|
-| `full_year` | Jan 1 – Dec 31 | 365 | 35,040 |
-| `winter` | Jan 1 – Mar 31 | 90 | 8,640 |
-| `summer` | Jun 1 – Aug 31 | 92 | 8,832 |
+| `full_year` | Jan 1 – Dec 31 | 365 | 105,120 |
+| `winter` | Jan 1 – Mar 31 | 90 | 25,920 |
+| `summer` | Jun 1 – Aug 31 | 92 | 26,496 |
 
 ---
 
@@ -178,7 +179,7 @@ Calling `reset()` initializes (or re-initializes) the EnergyPlus simulation. The
 obs, reward, terminated, truncated, info = env.step(action)
 ```
 
-Each `step()` advances the EnergyPlus simulation by one timestep (default: 15 minutes). The action is applied to the HVAC actuators, and the resulting observation, reward, and termination signals are returned.
+Each `step()` advances the EnergyPlus simulation by one timestep (default: 5 minutes, configurable via `task.timesteps_per_hour`). The action is applied to the HVAC actuators, and the resulting observation, reward, and termination signals are returned.
 
 - **`terminated`**: Always `False` (the simulation does not terminate early)
 - **`truncated`**: `True` when `max_episode_steps` is reached (via `TimeLimit` wrapper)

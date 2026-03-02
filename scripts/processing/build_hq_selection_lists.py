@@ -6,7 +6,7 @@ We filter processed buildings to those with exactly two actuators:
 - exactly one temperature node setpoint actuator
 
 Then we sample non-overlapping train/test lists (default 900/100) and save them
-as pickled int lists under `b2b/sources/data/`.
+as JSON int lists under `b2b/sources/data/`.
 
 IMPORTANT:
 The saved lists are *dataset row indices* (0-based), not building ids.
@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import pickle
 import random
 from dataclasses import dataclass
 from pathlib import Path
@@ -71,13 +70,13 @@ def _parse_args() -> argparse.Namespace:
         "--out-dir",
         type=str,
         default="b2b/sources/data",
-        help="Where to write the pickled lists (relative to repo root).",
+        help="Where to write the JSON lists (relative to repo root).",
     )
     p.add_argument(
         "--out-prefix",
         type=str,
         default="action_space_2_zone_1",
-        help="Output prefix, writes <prefix>_train_data and <prefix>_test_data.",
+        help="Output prefix, writes <prefix>_train_data.json and <prefix>_test_data.json.",
     )
     p.add_argument(
         "--report-json",
@@ -204,10 +203,10 @@ def main() -> None:
         out_dir = (repo_root / out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    train_path = out_dir / f"{args.out_prefix}_train_data"
-    test_path = out_dir / f"{args.out_prefix}_test_data"
-    train_path.write_bytes(pickle.dumps(train_ids))
-    test_path.write_bytes(pickle.dumps(test_ids))
+    train_path = out_dir / f"{args.out_prefix}_train_data.json"
+    test_path = out_dir / f"{args.out_prefix}_test_data.json"
+    train_path.write_text(json.dumps(train_ids, indent=2) + "\n", encoding="utf-8")
+    test_path.write_text(json.dumps(test_ids, indent=2) + "\n", encoding="utf-8")
 
     report_path = Path(args.report_json)
     if not report_path.is_absolute():

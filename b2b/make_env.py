@@ -32,45 +32,29 @@ def _infer_dataset_selection(cfg: dict[str, Any]) -> DatasetSelectionConfig:
     bldg = cfg.get("bldg", {})
     if not isinstance(bldg, dict):
         bldg = {}
-    raw_query = bldg.get("bldg", {})
-    if not isinstance(raw_query, dict):
-        raw_query = {}
-    selection = bldg.get("selection", {})
-    if not isinstance(selection, dict):
-        selection = {}
+    dataset = str(bldg.get("dataset", "single_zone_houses"))
+    building_type = bldg.get("building_type")
+    split = str(bldg.get("split", "train"))
+    index = int(bldg.get("index", 0))
+    query = bldg.get("query", {})
+    if not isinstance(query, dict):
+        query = {}
 
-    if "building_type" in raw_query:
-        if selection.get("enabled"):
-            return DatasetSelectionConfig(
-                dataset="multizones_reference_buildings",
-                building_type=str(raw_query["building_type"]),  # type: ignore[arg-type]
-                split=str(selection.get("split", "train")),  # type: ignore[arg-type]
-                mode="split_index",
-                split_index=int(selection.get("index", 0)),
-            )
+    if query:
         return DatasetSelectionConfig(
-            dataset="multizones_reference_buildings",
-            building_type=str(raw_query["building_type"]),  # type: ignore[arg-type]
-            split="train",
+            dataset=dataset,
+            building_type=str(building_type) if building_type else None,
+            split=split,  # type: ignore[arg-type]
             mode="metadata_query",
-            metadata_query=dict(raw_query),
+            metadata_query=dict(query),
             sample_size=1,
         )
-
-    if selection.get("enabled"):
-        return DatasetSelectionConfig(
-            dataset="single_zone_houses",
-            split=str(selection.get("split", "train")),  # type: ignore[arg-type]
-            mode="split_index",
-            split_index=int(selection.get("index", 0)),
-        )
-
     return DatasetSelectionConfig(
-        dataset="single_zone_houses",
-        split="train",
-        mode="metadata_query",
-        metadata_query=dict(raw_query),
-        sample_size=1,
+        dataset=dataset,
+        building_type=str(building_type) if building_type else None,
+        split=split,  # type: ignore[arg-type]
+        mode="split_index",
+        split_index=index,
     )
 
 
@@ -94,6 +78,9 @@ def make_env(config: object, eplus_output_dir: str | Path):
                 int(env_section["max_steps"])
                 if env_section.get("max_steps") is not None
                 else None
+            ),
+            expose_heating_only_zones=bool(
+                env_section.get("expose_heating_only_zones", True)
             ),
         )
         return make_env_typed(build, eplus_output_dir=out_dir)

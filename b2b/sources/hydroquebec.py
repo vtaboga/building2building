@@ -165,6 +165,7 @@ def _build_control_derivation(
     ep: Realizable,
     controls: list[str],
     run_period_name: str,
+    timesteps_per_hour: int = 12,
 ):
     """
     Build control-ready epJSON from IDF (hydroquebec-specific).
@@ -175,7 +176,10 @@ def _build_control_derivation(
     idf_derivation = ExtractFromZip(root_zip, idf_filename)
 
     # Step 1: Prepare epJSON (upgrade, convert, add meters, set timestep)
-    epjson = prepare_building(idf_derivation, ep, src_version="24.2.0")
+    epjson = prepare_building(
+        idf_derivation, ep, src_version="24.2.0",
+        timesteps_per_hour=timesteps_per_hour,
+    )
     run_period = TaskConfig.from_dict({"run_period": run_period_name}).run_period
     epjson = modify_run_period(
         epjson,
@@ -193,7 +197,11 @@ def _build_control_derivation(
     return make_controllable(epjson, controls=controls)
 
 
-def search_buildings(run_period: str = "full_year", **query) -> DataFrame:
+def search_buildings(
+    run_period: str = "full_year",
+    timesteps_per_hour: int = 12,
+    **query,
+) -> DataFrame:
     root_zip = dataset_zip()
     index = realize(STORE_PATH.get(), table_index(root_zip))
     ep = energyplus_path()
@@ -207,6 +215,7 @@ def search_buildings(run_period: str = "full_year", **query) -> DataFrame:
             ep,
             controls,
             run_period_name=run_period,
+            timesteps_per_hour=timesteps_per_hour,
         )
 
     db = duckdb.from_parquet(str(index))
@@ -253,38 +262,23 @@ def search_configs(
     else:
         cfg = cfg_any
 
-    config_nn = cfg.get("bldg", {})
+    bldg_section = cfg.get("bldg", {})
+    if not isinstance(bldg_section, dict):
+        bldg_section = {}
+    config_nn = bldg_section.get("query", {})
+    if not isinstance(config_nn, dict):
+        config_nn = {}
+
     task_section = cfg.get("task", {}) if isinstance(cfg, dict) else {}
     if not isinstance(task_section, dict):
         task_section = {}
     task_config = TaskConfig.from_dict(task_section)
 
-    # Our bldg group configs are nested like: bldg: { bldg: {...} }
-    if (
-        isinstance(config_nn, dict)
-        and "bldg" in config_nn
-        and isinstance(config_nn["bldg"], dict)
-    ):
-        config_nn = config_nn["bldg"]
-
-    # Propagate controls from `bldg.selection.controls` into the pipeline.
-    #
-    # Important: `make_env()` overwrites `bldg.bldg` to pick a specific
-    # (idf_filename, schedule_filename) pair, so controls must be read from the
-    # sibling `selection` section.
-    if isinstance(cfg.get("bldg"), dict) and isinstance(config_nn, dict):
-        sel = cfg["bldg"].get("selection")
-        if isinstance(sel, dict) and "controls" in sel:
-            controls = sel.get("controls")
-            if not isinstance(controls, list) or not all(
-                isinstance(x, str) for x in controls
-            ):
-                raise TypeError("bldg.selection.controls must be a list[str]")
-            # `search_buildings()` already looks for a `controls` entry in the
-            # query dict and forwards it to `_build_control_derivation()`.
-            config_nn["controls"] = controls
-
-    rows = search_buildings(run_period=task_config.run_period.name, **config_nn)
+    rows = search_buildings(
+        run_period=task_config.run_period.name,
+        timesteps_per_hour=task_config.timesteps_per_hour,
+        **config_nn,
+    )
     # Heuristic: when no explicit filters are provided, prioritize simpler
     # buildings first to avoid long sequences of E+ fatals during discovery.
     try:

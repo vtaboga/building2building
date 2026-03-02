@@ -11,15 +11,15 @@ from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
 from b2b.baselines.common import RolloutPaths, make_rollout_paths
-from b2b.baselines.controllers.fan_coil_constant import FanCoilConstantPolicy
-from b2b.baselines.controllers.unitary_pi import UnitaryPIPolicy
-from b2b.baselines.controllers.unitary_sat import UnitaryAirflowFirstSatPolicy
-from b2b.baselines.controllers.zone_temp_21 import ZoneTemp21Policy
+from b2b.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
+from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
 from b2b.baselines.wandb_utils import (
+    derive_wandb_run_name,
     finish_wandb_if_started,
     init_wandb_from_config,
     wandb_log_df_line_series,
 )
+from b2b.benchmark.plot_rollout import plot_rollout_df
 from b2b.benchmark.runner import run_rollout
 
 logger = logging.getLogger(__name__)
@@ -33,15 +33,11 @@ def _require_list_str(meta: dict[str, Any], key: str) -> list[str]:
 
 
 def _build_controller_policy(cfg: DictConfig) -> Any:
-    policy_type = str(getattr(cfg.policy, "type", "fan_coil_constant")).strip()
-    if policy_type == "fan_coil_constant":
-        return FanCoilConstantPolicy(cfg.policy)
-    if policy_type == "unitary_pi":
-        return UnitaryPIPolicy(cfg.policy)
-    if policy_type in ("unitary_airflow_first_sat", "unitary_sat"):
-        return UnitaryAirflowFirstSatPolicy(cfg.policy)
-    if policy_type == "zone_temp_21":
-        return ZoneTemp21Policy(cfg.policy)
+    policy_type = str(getattr(cfg.policy, "type", "unitary_g36")).strip()
+    if policy_type == "unitary_g36":
+        return UnitaryG36Policy(cfg.policy)
+    if policy_type == "ashrae_air_loop":
+        return AshraeAirLoopPolicy(cfg.policy)
     raise NotImplementedError(f"Unsupported baseline policy.type={policy_type!r}")
 
 
@@ -80,7 +76,21 @@ def run_baseline_rollout(
         max_steps = int(getattr(cfg.env, "max_steps"))
         n_episodes = int(getattr(cfg, "n_episodes", 1))
 
+        source_meta = meta.get("building_source_metadata", {})
+        building_label = source_meta.get("building_type", "unknown")
+        building_id = source_meta.get("building_id")
+        if building_id is not None:
+            building_label = f"{building_label} (id={building_id})"
+
         wandb_run, started_here = init_wandb_from_config(cfg, run_dir=Path(run_dir))
+        if wandb_run is not None:
+            run_name = derive_wandb_run_name(cfg, meta)
+            if run_name:
+                wandb_run.name = run_name  # type: ignore[attr-defined]
+            wandb_run.config.update(  # type: ignore[attr-defined]
+                {"building_source_metadata": dict(source_meta)}, allow_val_change=True
+            )
+
         try:
             results, data = run_rollout(
                 env=env,
@@ -114,6 +124,11 @@ def run_baseline_rollout(
             df_plot = pd.DataFrame(df_dict)
             df_plot.to_csv(paths.csv_path, index=False)
 
+            try:
+                plot_rollout_df(df_plot, paths.out_dir)
+            except Exception as exc:
+                logger.warning("Failed to generate rollout plots: %s", exc)
+
             # Log a few lightweight timeseries plots to W&B (downsampled).
             if wandb_run is not None:
                 try:
@@ -144,10 +159,9 @@ def run_baseline_rollout(
                             x="global_step",
                             y_cols=temp_cols,
                             key_prefix="rollout/temperature",
-                            title="Temperatures",
+                            title=f"Temperatures — {building_label}",
                         )
 
-                    # Actions: log a small subset (fan + any schedule setpoints)
                     act_cols = [c for c in df_plot.columns if c.lower().startswith("act::")]
                     preferred = [
                         c
@@ -163,10 +177,9 @@ def run_baseline_rollout(
                             x="global_step",
                             y_cols=action_cols,
                             key_prefix="rollout/actions",
-                            title="Actions",
+                            title=f"Actions — {building_label}",
                         )
 
-                    # Energy + reward
                     energy_cols = [
                         c
                         for c in ("obs::energy_electricity", "obs::energy_gas")
@@ -178,7 +191,7 @@ def run_baseline_rollout(
                             x="global_step",
                             y_cols=energy_cols,
                             key_prefix="rollout/energy",
-                            title="Energy",
+                            title=f"Energy (Wh/m²) — {building_label}",
                         )
                     if "reward" in df_plot.columns:
                         wandb_log_df_line_series(
@@ -186,7 +199,7 @@ def run_baseline_rollout(
                             x="global_step",
                             y_cols=["reward"],
                             key_prefix="rollout/reward",
-                            title="Reward",
+                            title=f"Reward — {building_label}",
                         )
                 except Exception as e:
                     logger.warning("Failed to log rollout plots to wandb: %s", e)
@@ -208,7 +221,6 @@ def run_baseline_rollout(
                 else np.zeros((len(df_plot), 0)),
             )
 
-            # Summary scalars.
             if wandb_run is not None:
                 try:
                     import wandb  # type: ignore
@@ -218,6 +230,13 @@ def run_baseline_rollout(
                         wandb.summary["rollout/episode_return_mean"] = float(
                             np.mean([r.total_reward for r in results])
                         )
+                    wandb.summary["building/type"] = source_meta.get("building_type", "unknown")
+                    if building_id is not None:
+                        wandb.summary["building/id"] = building_id
+                    area = meta.get("area")
+                    if area is not None:
+                        wandb.summary["building/area_m2"] = float(area)
+                    wandb.summary["building/controlled_zones"] = meta.get("controlled_zones", [])
                 except Exception as e:
                     logger.warning("Failed to log rollout summary to wandb: %s", e)
 

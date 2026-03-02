@@ -199,45 +199,25 @@ The custom class must be importable from the Python path. B2B will:
 
 ## Built-In Baseline Controllers
 
-B2B includes several hand-crafted controllers for benchmarking:
-
-### FanCoilConstantPolicy
-
-A constant-output baseline that sets fixed values for all actuators:
-
-```bash
-python -m b2b.benchmark.baseline_rollout policy=fan_coil_constant
-```
-
-| Parameter | Default | Description |
-|---|---|---|
-| `target_temp_c` | 21.0 | Target zone temperature |
-| `availability_on` | 2.0 | Availability schedule value |
-| `fan_mass_flow_kg_s` | 1.0 | Fixed fan mass flow rate |
-| `outlet_node_setpoint_c` | 21.0 | Supply air temperature |
-
-### UnitaryPIPolicy
-
-A proportional-integral controller for unitary systems:
-
-```bash
-python -m b2b.benchmark.baseline_rollout policy=unitary_pi
-```
-
-### UnitaryAirflowFirstSatPolicy
-
-An airflow-first supply air temperature controller:
-
-```bash
-python -m b2b.benchmark.baseline_rollout policy=unitary_sat
-```
+B2B includes rule-based controllers for benchmarking:
 
 ### UnitaryG36Policy
 
-A controller based on ASHRAE Guideline 36 control sequences:
+G36-inspired PI airflow + Trim-and-Respond SAT controller for PSZ systems:
 
 ```bash
-python -m b2b.benchmark.baseline_rollout policy=unitary_g36
+python scripts/baselines.py policy=unitary_g36
+```
+
+See [G36 Controller docs](../baselines/unitary-g36.md) for full parameter reference.
+
+### AshraeAirLoopPolicy / AirLoopSatPolicy
+
+ASHRAE-based controllers for VAV air-loop systems:
+
+```bash
+python scripts/baselines.py policy=ashrae_air_loop
+python scripts/baselines.py policy=air_loop_sat
 ```
 
 ---
@@ -247,11 +227,9 @@ python -m b2b.benchmark.baseline_rollout policy=unitary_g36
 The baseline rollout infrastructure runs any policy through a full episode and records observations, actions, rewards, and metrics:
 
 ```bash
-python -m b2b.benchmark.baseline_rollout \
-    policy=fan_coil_constant \
+python scripts/baselines.py \
+    policy=unitary_g36 \
     bldg=single_family \
-    task.run_period=winter \
-    reward=barrier \
     n_episodes=1 \
     wandb.enabled=true
 ```
@@ -280,13 +258,13 @@ A common workflow for comparing policies:
 
 ```bash
 # 1. Run baseline
-python -m b2b.benchmark.baseline_rollout \
-    policy=fan_coil_constant \
+python scripts/baselines.py \
+    policy=unitary_g36 \
     bldg=single_family \
     wandb.tags="[baseline]"
 
 # 2. Run trained PPO
-python -m b2b.benchmark.baseline_rollout \
+python scripts/baselines.py \
     policy=sb3 \
     policy.algorithm=ppo \
     policy.checkpoint_path=checkpoints/ppo.zip \
@@ -294,7 +272,7 @@ python -m b2b.benchmark.baseline_rollout \
     wandb.tags="[ppo,trained]"
 
 # 3. Run custom controller
-python -m b2b.benchmark.baseline_rollout \
+python scripts/baselines.py \
     policy=custom \
     policy.module=my_controllers \
     policy.class_name=MySmartController \

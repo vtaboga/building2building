@@ -24,7 +24,6 @@ import io
 import logging
 import traceback
 import json
-import pickle
 import random
 import zipfile
 from pathlib import Path
@@ -71,21 +70,21 @@ SPLIT_DATA_DIR = Path(__file__).resolve().parent / "data"
 
 def load_split_ids(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     *,
     split_data_dir: Path | None = None,
 ) -> list[int]:
     base_dir = split_data_dir if split_data_dir is not None else SPLIT_DATA_DIR
-    path = base_dir / f"{building_type}_{split}_data"
+    path = base_dir / f"{building_type}_{split}_data.json"
     if not path.exists():
         raise FileNotFoundError(f"Split file not found: {path}")
-    ids: list[int] = pickle.loads(path.read_bytes())
+    ids: list[int] = json.loads(path.read_text(encoding="utf-8"))
     return ids
 
 
 def building_id_from_split_index(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     split_index: int,
 ) -> int:
     ids = load_split_ids(building_type, split)
@@ -99,7 +98,7 @@ def building_id_from_split_index(
 
 def building_ids_from_split_indices(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     split_indices: Sequence[int],
 ) -> list[int]:
     return [
@@ -110,7 +109,7 @@ def building_ids_from_split_indices(
 
 def sample_building_ids(
     building_type: BuildingType,
-    split: Literal["train", "test"],
+    split: Literal["train", "test", "test_small"],
     n: int,
     *,
     seed: int | None = None,
@@ -136,7 +135,7 @@ def dataset_zip() -> Derivation:
         "multizones_reference_buildings.zip",
         "https://huggingface.co/datasets/vtaboga/multizones_reference_buildings/resolve/main/multizones_reference_buildings.zip",
         bytes.fromhex(
-            "85e437d1fbbd095edd5ba3d4206fa8036e5043ba937318b9f3725d97e9d1eb4e"
+            "66b94393c129d78a8271e70da805ca48a8af9fdecb1204d2d9fb95398d3786de"
         ),
     )
 
@@ -148,13 +147,14 @@ def table_index(root_zip: Path) -> None:
     all_rows: list[dict[str, Any]] = []
     with zipfile.ZipFile(root_zip) as zf:
         for name in sorted(zf.namelist()):
-            if not name.startswith("dataset/metadata_") or not name.endswith(".csv"):
+            basename = name.rsplit("/", 1)[-1]
+            if not basename.startswith("metadata") or not basename.endswith(".csv"):
                 continue
             with zf.open(name) as f:
                 reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8"))
                 for row in reader:
                     row["building_id"] = int(row["building_id"])
-                    row["epjson_filename"] = f"dataset/{row['building_id']}.epJSON"
+                    row["epjson_filename"] = f"{row['building_id']}.epJSON"
                     all_rows.append(row)
 
     df = DataFrame(all_rows)
@@ -165,6 +165,7 @@ def _build_control_derivation(
     root_zip: Realizable,
     epjson_filename: str,
     run_period_name: str,
+    timesteps_per_hour: int = 12,
 ) -> Any:
     """Build a control-ready epJSON from a raw dataset epJSON.
 
@@ -174,7 +175,7 @@ def _build_control_derivation(
     current: Derivation = ExtractFromZip(root_zip, epjson_filename)
     current = add_hvac_meters(current)
     current = add_outdoor_air_meters(current)
-    current = modify_timestep(current, timesteps_per_hour=4)
+    current = modify_timestep(current, timesteps_per_hour=timesteps_per_hour)
     run_period = TaskConfig.from_dict({"run_period": run_period_name}).run_period
     current = modify_run_period(
         current,
@@ -192,6 +193,7 @@ def search_buildings(
     place: str | None = None,
     building_id: int | None = None,
     run_period: str = "full_year",
+    timesteps_per_hour: int = 12,
     **query: Any,
 ) -> DataFrame:
     root_zip = dataset_zip()
@@ -230,6 +232,7 @@ def search_buildings(
             root_zip,
             epjson_filename,
             run_period_name=run_period,
+            timesteps_per_hour=timesteps_per_hour,
         )
 
     return df.assign(derivation_thunk=df["epjson_filename"].apply(trans))
@@ -254,17 +257,24 @@ def search_configs(
             except Exception:
                 cfg = {}
 
-    bldg_query = cfg.get("bldg", {})
-    if isinstance(bldg_query, dict) and "bldg" in bldg_query and isinstance(bldg_query["bldg"], dict):
-        bldg_query = bldg_query["bldg"]
+    bldg_section = cfg.get("bldg", {})
+    if not isinstance(bldg_section, dict):
+        bldg_section = {}
+    bldg_query: dict[str, Any] = {}
+    for k in ("building_type", "place", "building_id"):
+        if k in bldg_section:
+            bldg_query[k] = bldg_section[k]
 
     task_section = cfg.get("task", {}) if isinstance(cfg, dict) else {}
     if not isinstance(task_section, dict):
         task_section = {}
     task_config = TaskConfig.from_dict(task_section)
 
+    expose_heating_only_zones = bool(cfg.get("expose_heating_only_zones", True))
+
     rows = search_buildings(
         run_period=task_config.run_period.name,
+        timesteps_per_hour=task_config.timesteps_per_hour,
         **bldg_query,
     )
     root_zip = dataset_zip()
@@ -282,7 +292,7 @@ def search_configs(
         }
 
         try:
-            epw_derivation = ExtractFromZip(root_zip, f"dataset/{row.weather_file}")
+            epw_derivation = ExtractFromZip(root_zip, row.weather_file)
 
             control_derivation = row.derivation_thunk()
             epjson, hvac_equipment = realize(STORE_PATH.get(), control_derivation)
@@ -310,6 +320,7 @@ def search_configs(
                     area=metadata.net_conditioned_area,
                     source_metadata=source_meta,
                     task_config=task_config,
+                    expose_heating_only_zones=expose_heating_only_zones,
                 )
             )
         except Exception as e:

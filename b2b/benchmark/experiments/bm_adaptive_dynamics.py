@@ -15,24 +15,18 @@ logger = logging.getLogger(__name__)
 
 def make_policy_from_cfg(cfg: DictConfig) -> Any:
     policy_type = str(getattr(cfg.policy, "type", "")).strip()
-    if policy_type in ("unitary_airflow_first_sat", "unitary_sat"):
-        from b2b.baselines.controllers.unitary_sat import (  # noqa: WPS433
-            UnitaryAirflowFirstSatPolicy,
+    if policy_type == "unitary_g36":
+        from b2b.baselines.controllers.unitary_g36 import (  # noqa: WPS433
+            UnitaryG36Policy,
         )
 
-        return UnitaryAirflowFirstSatPolicy(cfg.policy)
-    if policy_type == "unitary_pi":
-        from b2b.baselines.controllers.unitary_pi import (  # noqa: WPS433
-            UnitaryPIPolicy,
+        return UnitaryG36Policy(cfg.policy)
+    if policy_type == "ashrae_air_loop":
+        from b2b.baselines.controllers.ashrae_air_loop import (  # noqa: WPS433
+            AshraeAirLoopPolicy,
         )
 
-        return UnitaryPIPolicy(cfg.policy)
-    if policy_type == "fan_coil_constant":
-        from b2b.baselines.controllers.fan_coil_constant import (  # noqa: WPS433
-            FanCoilConstantPolicy,
-        )
-
-        return FanCoilConstantPolicy(cfg.policy)
+        return AshraeAirLoopPolicy(cfg.policy)
 
     raise NotImplementedError(
         f"Unsupported policy.type={policy_type!r} for adaptive dynamics benchmark."
