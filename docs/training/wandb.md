@@ -41,7 +41,7 @@ from the run configuration for easier filtering:
 | `algo:<algorithm>` | `policy.algorithm` (e.g. `algo:ppo`) |
 | `policy:<type>` | `policy.type` (e.g. `policy:unitary_g36`) |
 | `split:<split>` | `benchmark.split` (e.g. `split:train`) |
-| `building:<type>` | `bldg.bldg.building_type` (e.g. `building:OfficeSmall`) |
+| `building:<type>` | `bldg.building_type` (e.g. `building:OfficeSmall`) |
 
 These are merged with any user-defined tags from the config.
 

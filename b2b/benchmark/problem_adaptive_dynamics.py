@@ -18,8 +18,8 @@ def _default_base_config() -> dict[str, Any]:
     """
     Minimal config that works with `b2b.make_env.make_env()`.
 
-    The adaptive dynamics benchmark overrides `bldg.selection` internally to select
-    specific Hydro-Québec buildings.
+    The adaptive dynamics benchmark overrides `bldg.split` and `bldg.index`
+    internally to select specific Hydro-Québec buildings.
     """
     return {
         "env": {
@@ -31,7 +31,7 @@ def _default_base_config() -> dict[str, Any]:
             "normalize_obs": False,
         },
         "reward": {"reward_type": None},
-        "bldg": {"bldg": {}},
+        "bldg": {"dataset": "single_zone_houses"},
     }
 
 

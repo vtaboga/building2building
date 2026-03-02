@@ -27,16 +27,12 @@ def _derived_wandb_tags(cfg: Any) -> list[str]:
 
     bldg = getattr(cfg, "bldg", None)
     if bldg is not None:
-        bldg_inner = getattr(bldg, "bldg", None)
-        if bldg_inner is not None:
-            bt = getattr(bldg_inner, "building_type", None)
-            if isinstance(bt, str) and bt.strip():
-                tags.append(f"building:{bt.strip()}")
-        sel = getattr(bldg, "selection", None)
-        if sel is not None:
-            sel_split = getattr(sel, "split", None)
-            if isinstance(sel_split, str) and sel_split.strip():
-                tags.append(f"split:{sel_split.strip().lower()}")
+        bt = getattr(bldg, "building_type", None)
+        if isinstance(bt, str) and bt.strip():
+            tags.append(f"building:{bt.strip()}")
+        bldg_split = getattr(bldg, "split", None)
+        if isinstance(bldg_split, str) and bldg_split.strip():
+            tags.append(f"split:{bldg_split.strip().lower()}")
 
     seen: set[str] = set()
     out: list[str] = []
@@ -105,14 +101,11 @@ def _extract_wandb_config(cfg: Any) -> dict[str, Any]:
 
     bldg = full.get("bldg", {})
     if isinstance(bldg, dict):
-        inner = bldg.get("bldg", {})
-        if isinstance(inner, dict) and "building_type" in inner:
-            out["building_type"] = inner["building_type"]
-        sel = bldg.get("selection", {})
-        if isinstance(sel, dict):
-            for k in ("split", "index"):
-                if k in sel:
-                    out[f"selection/{k}"] = sel[k]
+        if "building_type" in bldg:
+            out["building_type"] = bldg["building_type"]
+        for k in ("split", "index"):
+            if k in bldg:
+                out[f"bldg/{k}"] = bldg[k]
 
     env = full.get("env", {})
     if isinstance(env, dict):

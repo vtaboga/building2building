@@ -250,8 +250,8 @@ def multizones_trainer(config: OmegaConf, output_dir: Path) -> None:
     """Train an SB3 agent on a single multizones_reference_buildings building."""
     repo_root = Path(__file__).resolve().parents[2]
 
-    # ---- read multizones selection from config ----
-    mz = config.multizones
+    # ---- read building selection from config ----
+    mz = config.bldg
     building_type: BuildingType = str(mz.building_type)  # type: ignore[assignment]
     split: Literal["train", "test", "test_small"] = str(mz.split)  # type: ignore[assignment]
     index = int(mz.index)

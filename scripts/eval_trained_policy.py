@@ -86,9 +86,9 @@ def evaluate_run(
         raise FileNotFoundError(f"No config at {cfg_path}")
     cfg = OmegaConf.load(cfg_path)
 
-    building_type = str(cfg.multizones.building_type)
-    split = str(cfg.multizones.split)
-    index = int(cfg.multizones.index)
+    building_type = str(cfg.bldg.building_type)
+    split = str(cfg.bldg.split)
+    index = int(cfg.bldg.index)
     algo = str(cfg.policy.algorithm)
 
     rp = run_period or str(getattr(cfg.task, "run_period", "full_year"))
@@ -258,8 +258,8 @@ def main() -> None:
             continue
 
         cfg = OmegaConf.load(run_dir / ".hydra" / "config.yaml")
-        bt = str(cfg.multizones.building_type)
-        idx = int(cfg.multizones.index)
+        bt = str(cfg.bldg.building_type)
+        idx = int(cfg.bldg.index)
         algo = str(cfg.policy.algorithm)
         sub = f"{bt}_test_{idx}_{algo}"
 

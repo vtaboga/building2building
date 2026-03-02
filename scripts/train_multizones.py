@@ -10,7 +10,7 @@ Usage::
 
     # Train PPO on the 3rd building of the OfficeMedium train split
     python scripts/train_multizones.py \\
-        multizones.building_type=OfficeMedium multizones.split=train multizones.index=2
+        bldg.building_type=OfficeMedium bldg.split=train bldg.index=2
 
     # Use SAC instead of PPO
     python scripts/train_multizones.py policy=sac

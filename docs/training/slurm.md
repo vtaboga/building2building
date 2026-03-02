@@ -102,8 +102,8 @@ To train across multiple building instances in parallel:
 #SBATCH --job-name=multizones_%a
 
 python scripts/train_multizones.py \
-    multizones.building_type=OfficeSmall \
-    multizones.index=$SLURM_ARRAY_TASK_ID
+    bldg.building_type=OfficeSmall \
+    bldg.index=$SLURM_ARRAY_TASK_ID
 ```
 
 ## Monitoring Jobs

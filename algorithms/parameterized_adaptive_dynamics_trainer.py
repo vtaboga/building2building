@@ -65,7 +65,7 @@ def _create_env_for_split_index(
 
     logger.info("Creating environment for %s split: split_index=%d", split, split_index)
 
-    # Create config with selection enabled
+    # Set building selection in config
     cfg_dict = OmegaConf.to_container(config, resolve=True)
     if not isinstance(cfg_dict, dict):
         cfg_dict = {}
@@ -79,11 +79,8 @@ def _create_env_for_split_index(
         bldg_section = {}
         cfg_dict["bldg"] = bldg_section
 
-    bldg_section["selection"] = {
-        "enabled": True,
-        "split": split,
-        "index": split_index,
-    }
+    bldg_section["split"] = split
+    bldg_section["index"] = split_index
 
     # Create environment
     env = make_env(config=OmegaConf.create(cfg_dict), eplus_output_dir=str(output_path))

@@ -147,13 +147,14 @@ def table_index(root_zip: Path) -> None:
     all_rows: list[dict[str, Any]] = []
     with zipfile.ZipFile(root_zip) as zf:
         for name in sorted(zf.namelist()):
-            if not name.startswith("dataset/metadata_") or not name.endswith(".csv"):
+            basename = name.rsplit("/", 1)[-1]
+            if not basename.startswith("metadata") or not basename.endswith(".csv"):
                 continue
             with zf.open(name) as f:
                 reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8"))
                 for row in reader:
                     row["building_id"] = int(row["building_id"])
-                    row["epjson_filename"] = f"dataset/{row['building_id']}.epJSON"
+                    row["epjson_filename"] = f"{row['building_id']}.epJSON"
                     all_rows.append(row)
 
     df = DataFrame(all_rows)
@@ -256,9 +257,13 @@ def search_configs(
             except Exception:
                 cfg = {}
 
-    bldg_query = cfg.get("bldg", {})
-    if isinstance(bldg_query, dict) and "bldg" in bldg_query and isinstance(bldg_query["bldg"], dict):
-        bldg_query = bldg_query["bldg"]
+    bldg_section = cfg.get("bldg", {})
+    if not isinstance(bldg_section, dict):
+        bldg_section = {}
+    bldg_query: dict[str, Any] = {}
+    for k in ("building_type", "place", "building_id"):
+        if k in bldg_section:
+            bldg_query[k] = bldg_section[k]
 
     task_section = cfg.get("task", {}) if isinstance(cfg, dict) else {}
     if not isinstance(task_section, dict):
@@ -287,7 +292,7 @@ def search_configs(
         }
 
         try:
-            epw_derivation = ExtractFromZip(root_zip, f"dataset/{row.weather_file}")
+            epw_derivation = ExtractFromZip(root_zip, row.weather_file)
 
             control_derivation = row.derivation_thunk()
             epjson, hvac_equipment = realize(STORE_PATH.get(), control_derivation)

@@ -1,15 +1,11 @@
 defaults:
   - _self_
+  - bldg: multi_zone
   - wandb: default
   - training: default
   - policy: ppo
   - reward: deadband
   - task: default
-
-multizones:
-  building_type: OfficeSmall   # Warehouse, HotelSmall, RetailStandalone, RestaurantFastFood, OfficeMedium, OfficeSmall
-  split: train                 # train, test, or test_small
-  index: 0                     # 0-based position in the split's ID list
 
 env:
   normalize_obs: true
@@ -20,6 +16,6 @@ seed: 42
 
 hydra:
   run:
-    dir: outputs/train_multizones/${multizones.building_type}/${multizones.split}_${multizones.index}/${policy.algorithm}/${now:%Y%m%d_%H%M%S}
+    dir: outputs/train_multizones/${bldg.building_type}/${bldg.split}_${bldg.index}/${policy.algorithm}/${now:%Y%m%d_%H%M%S}
   job:
     chdir: true

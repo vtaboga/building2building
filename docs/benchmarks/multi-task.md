@@ -52,17 +52,24 @@ The multi-task training script is `scripts/train_multizones.py`, driven by
 `configs/train_multizones.yaml`.
 
 ```yaml title="configs/train_multizones.yaml (excerpt)"
-multizones:
-  building_type: OfficeSmall   # Warehouse, HotelSmall, RetailStandalone, ...
-  split: train                 # train or test
-  index: 0                     # 0-based position in the split's ID list
+defaults:
+  - _self_
+  - bldg: multi_zone           # building_type, split, index live here
+  - ...
 
 env:
   normalize_obs: true
-  normalize_action: false
-  max_steps: null              # defaults to task.run_period horizon
+  normalize_action: true
+  max_steps: 35040              # full year at 15-min timesteps
 
 seed: 42
+```
+
+```yaml title="configs/bldg/multi_zone.yaml"
+dataset: multizones_reference_buildings
+building_type: OfficeSmall   # Warehouse, HotelSmall, RetailStandalone, ...
+split: train                 # train or test
+index: 0                     # 0-based position in the split's ID list
 ```
 
 ### Running
@@ -72,14 +79,14 @@ seed: 42
 python scripts/train_multizones.py
 
 # Switch building type
-python scripts/train_multizones.py multizones.building_type=OfficeMedium
+python scripts/train_multizones.py bldg.building_type=OfficeMedium
 
 # Use SAC instead of PPO
 python scripts/train_multizones.py policy=sac
 
 # Train on the 3rd building of the OfficeMedium train split
 python scripts/train_multizones.py \
-    multizones.building_type=OfficeMedium multizones.split=train multizones.index=2
+    bldg.building_type=OfficeMedium bldg.split=train bldg.index=2
 
 # Short run for debugging
 python scripts/train_multizones.py \

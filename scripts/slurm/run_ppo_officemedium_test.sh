@@ -15,8 +15,8 @@ mkdir -p logs
 SCRATCH=/network/scratch/v/vincent.taboga/Building2Building/ppo_officemedium_test
 
 python scripts/train_multizones.py \
-    multizones.building_type=OfficeMedium \
-    multizones.split=test \
-    multizones.index=${SLURM_ARRAY_TASK_ID} \
+    bldg.building_type=OfficeMedium \
+    bldg.split=test \
+    bldg.index=${SLURM_ARRAY_TASK_ID} \
     reward.energy_weight=0.01 \
     hydra.run.dir=${SCRATCH}/building_${SLURM_ARRAY_TASK_ID}

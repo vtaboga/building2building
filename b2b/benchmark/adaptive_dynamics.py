@@ -74,11 +74,8 @@ def _with_selection(
     if not isinstance(bldg, dict):
         bldg = {}
         out["bldg"] = bldg
-    # Preserve existing nested bldg query keys if present.
-    bldg.setdefault("bldg", {})
-    if not isinstance(bldg.get("bldg"), dict):
-        bldg["bldg"] = {}
-    bldg["selection"] = {"enabled": True, "split": split_s, "index": int(split_index)}
+    bldg["split"] = split_s
+    bldg["index"] = int(split_index)
     out["bldg"] = bldg
     return out
 
@@ -142,7 +139,7 @@ def benchmark_adaptive_dynamics(
     records: list[AdaptiveDynamicsRecord] = []
 
     # Each element of train_row_ids is a dataset row index (0-based). The split index
-    # is what `make_env` expects when selection.enabled is true.
+    # is what `make_env` expects via bldg.split / bldg.index.
     for split_index in range(start, end):
         dataset_row_index = int(row_indices[int(split_index)])
         building_id = int(dataset_row_index) + 1

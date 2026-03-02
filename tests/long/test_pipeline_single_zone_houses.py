@@ -25,8 +25,9 @@ def test_single_zone_pipeline_selection_and_env_creation(tmp_path: Path) -> None
             "reward": {"reward_type": "BaseRewardConfig"},
             "task": {"run_period": "winter"},
             "bldg": {
-                "selection": {"enabled": True, "split": "train", "index": 0},
-                "bldg": {},
+                "dataset": "single_zone_houses",
+                "split": "train",
+                "index": 0,
             },
         }
     )

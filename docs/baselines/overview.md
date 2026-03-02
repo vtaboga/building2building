@@ -58,7 +58,7 @@ python scripts/baselines.py
 
 # G36 controller on OfficeSmall
 python scripts/baselines.py policy=unitary_g36 \
-    bldg.bldg.building_type=OfficeSmall
+    bldg.building_type=OfficeSmall
 
 # ASHRAE air-loop controller
 python scripts/baselines.py policy=ashrae_air_loop
