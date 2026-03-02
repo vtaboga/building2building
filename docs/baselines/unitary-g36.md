@@ -2,10 +2,10 @@
 
 ## Overview
 
-`UnitaryG36Policy` implements ASHRAE Guideline 36, Section 5.18 for
-single-zone VAV unitary systems.  Two normalised PI demand signals (heating
-and cooling) are mapped through **piecewise-linear functions** to determine fan
-speed and supply air temperature — with no trim-and-respond delay.
+`UnitaryG36Policy` implements a G36-inspired supervisory controller for
+single-zone PSZ (Packaged Single Zone) unitary systems.  A PI loop drives fan
+airflow based on zone temperature error, while a **Trim-and-Respond** (T&R)
+algorithm adjusts the supply air temperature setpoint each timestep.
 
 ```python
 from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
@@ -13,70 +13,58 @@ from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
 
 ## Control Strategy
 
-### Demand Signals
+### Airflow PI Loop
 
-Two independent PI controllers produce normalised demand signals in \([0, 1]\):
+A single PI controller converts zone temperature error into a fan mass flow
+rate command.  Error is the distance from the nearest deadband edge:
 
-- **Heating demand** \(u_{\text{heat}}\): error = `heating_setpoint_c` - \(T_z\)
-- **Cooling demand** \(u_{\text{cool}}\): error = \(T_z\) - `cooling_setpoint_c`
+- Zone above cooling setpoint: error = \(T_z\) - `cooling_setpoint_c`
+- Zone below heating setpoint: error = `heating_setpoint_c` - \(T_z\)
+- In deadband: integrator decays toward zero, fan holds minimum flow.
 
-Both use back-calculation anti-windup with a non-negative integral floor.
+The PI output scales linearly from `min_fan_fraction * fan_max` to `fan_max`.
 
-### Fan Speed Mapping (G36 Table 5.18.4)
+### SAT Trim-and-Respond
 
-Fan speed is expressed as a fraction of design-maximum airflow:
+Each timestep the supply air temperature setpoint is adjusted:
 
-| Condition | Fan fraction |
-|---|---|
-| Heating 0–50 % | `min_fan_fraction` |
-| Heating 50–100 % | `min_fan_fraction` ... 1.0 |
-| Cooling 0–25 % | `min_fan_fraction` |
-| Cooling 25–50 % | `min_fan_fraction` ... `med_fan_fraction` |
-| Cooling 50–75 % | `med_fan_fraction` |
-| Cooling 75–100 % | `med_fan_fraction` ... 1.0 |
-| Deadband | `min_fan_fraction` |
+- **Respond down** (zone too warm): if \(T_z\) exceeds the cooling setpoint
+  by more than `demand_deadband`, SAT is lowered by `sat_respond`.
+- **Respond up** (zone too cold): if \(T_z\) falls below the heating setpoint
+  by more than `demand_deadband`, SAT is raised by `sat_respond`.
+- **Trim** (zone satisfied): SAT drifts toward `sat_initial_c` at rate
+  `sat_trim`, returning to a neutral operating point.
 
-### Supply Air Temperature Mapping (G36 Table 5.18.4)
-
-| Condition | SAT setpoint |
-|---|---|
-| Heating 0–50 % | `sat_dead` ... `sat_max_c` |
-| Heating 50–100 % | `sat_max_c` |
-| Cooling 0–25 % | `sat_dead` |
-| Cooling 25–75 % | `sat_dead` ... `sat_min_c` |
-| Cooling 75–100 % | `sat_min_c` |
-| Deadband | `sat_dead` |
-
-Where `sat_dead` is the midpoint of the heating and cooling setpoints
-(clamped to 21–24 °C).
+SAT is clamped to [`sat_min_c`, `sat_max_c`] and initialised to
+`sat_initial_c` on reset.
 
 ### Multi-Zone Support
 
 The controller auto-discovers per-zone unitary systems from the environment
-metadata and maintains independent PI states for each zone.  A warmup-reset
-detector resets PI state when zone temperature jumps by more than 3 °C
-between timesteps (indicating an EnergyPlus warmup phase boundary).
+metadata and maintains independent PI and T&R states for each zone.  A
+warmup-reset detector resets PI state when zone temperature jumps by more
+than 3 C between timesteps (indicating an EnergyPlus warmup phase boundary).
 
 ## Parameters
 
 ```yaml title="configs/policy/unitary_g36.yaml"
 type: unitary_g36
 
-# Zone setpoints [°C]
-heating_setpoint_c: 21.0
-cooling_setpoint_c: 24.0
+heating_setpoint_c: 20.0
+cooling_setpoint_c: 22.0
 
-# PI gains (tuned for 15-min timesteps)
-kp: 2.0
-ki: 0.1
+kp: 0.25
+ki: 0.02
+integral_max: 200.0
 
-# Fan speed fractions (of design-max)
-min_fan_fraction: 0.70
-med_fan_fraction: 0.85
+min_fan_fraction: 0.15
 
-# SAT bounds [°C]
-sat_min_c: 13.0
-sat_max_c: null          # null = read from action space
+sat_min_c: 12.0
+sat_max_c: 35.0
+sat_initial_c: 21.0
+sat_trim: 0.5
+sat_respond: 1.0
+demand_deadband: 0.3
 
 availability_on: 2.0
 
@@ -86,21 +74,19 @@ target_schedule:
 
 | Parameter | Default | Description |
 |---|---|---|
-| `heating_setpoint_c` | 21.0 | Heating zone setpoint (°C) |
-| `cooling_setpoint_c` | 24.0 | Cooling zone setpoint (°C) |
-| `kp` | 2.0 | Proportional gain |
-| `ki` | 0.1 | Integral gain |
-| `min_fan_fraction` | 0.70 | Minimum fan speed fraction |
-| `med_fan_fraction` | 0.85 | Medium fan speed fraction |
-| `sat_min_c` | 13.0 | Minimum cooling SAT (°C) |
-| `sat_max_c` | `null` | Maximum SAT; `null` reads from action space |
+| `heating_setpoint_c` | 20.0 | Heating zone setpoint (C) |
+| `cooling_setpoint_c` | 22.0 | Cooling zone setpoint (C) |
+| `kp` | 0.25 | Proportional gain for airflow PI |
+| `ki` | 0.02 | Integral gain for airflow PI |
+| `integral_max` | 200.0 | Anti-windup integrator clamp |
+| `min_fan_fraction` | 0.15 | Minimum fan speed (fraction of design max) |
+| `sat_min_c` | 12.0 | Lower SAT limit for T&R (C) |
+| `sat_max_c` | 35.0 | Upper SAT limit for T&R (C) |
+| `sat_initial_c` | 21.0 | Neutral SAT setpoint at reset (C) |
+| `sat_trim` | 0.5 | SAT drift rate toward neutral (C/step) |
+| `sat_respond` | 1.0 | SAT step on heating/cooling demand (C/step) |
+| `demand_deadband` | 0.3 | Zone overshoot threshold for T&R respond (C) |
 | `availability_on` | 2.0 | HVAC availability schedule value |
-
-!!! note "Minimum fan fraction"
-    `min_fan_fraction` must stay above ~58 % to ensure the heating coil can
-    overcome outdoor-air dilution at design heating conditions.  At lower fan
-    speeds the fixed minimum ventilation volume becomes a larger fraction of
-    total airflow, chilling the mixed air and starving heat delivery.
 
 ## Usage
 

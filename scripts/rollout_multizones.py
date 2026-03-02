@@ -13,7 +13,7 @@ Usage::
         'multizones.types=[OfficeSmall,Warehouse]' multizones.n_per_type=3
 
     # Different policy
-    python scripts/rollout_multizones.py policy=fan_coil_constant
+    python scripts/rollout_multizones.py policy=unitary_g36
 
     # Shorter episodes
     python scripts/rollout_multizones.py env.max_steps=672

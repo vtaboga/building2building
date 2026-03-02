@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import pickle
 import random
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,11 +21,11 @@ class SingleZoneHouseRowIdSplits:
     @classmethod
     def load_default(cls) -> "SingleZoneHouseRowIdSplits":
         data_dir = Path(__file__).resolve().parent / "data"
-        train_path = data_dir / "action_space_2_zone_1_train_data"
-        test_path = data_dir / "action_space_2_zone_1_test_data"
+        train_path = data_dir / "action_space_2_zone_1_train_data.json"
+        test_path = data_dir / "action_space_2_zone_1_test_data.json"
         return cls(
-            train_row_ids=_load_pickled_int_list(train_path),
-            test_row_ids=_load_pickled_int_list(test_path),
+            train_row_ids=_load_json_int_list(train_path),
+            test_row_ids=_load_json_int_list(test_path),
         )
 
     # Backward-compatible name used in several modules/tests.
@@ -44,8 +43,8 @@ class SingleZoneHouseRowIdSplits:
         )
 
 
-def _load_pickled_int_list(path: Path) -> list[int]:
-    obj = pickle.loads(path.read_bytes())
+def _load_json_int_list(path: Path) -> list[int]:
+    obj = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(obj, list):
         raise TypeError(f"Expected a list in {path}, got {type(obj).__name__}")
     if not all(isinstance(x, int) for x in obj):

@@ -23,7 +23,7 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 
 from algorithms.callbacks import make_adaptive_dynamics_callbacks
-from algorithms.sb3_utils import build_sb3_model, load_best_model
+from b2b.training.sb3_utils import build_sb3_model, load_best_model
 from b2b.baselines.wandb_utils import init_wandb_from_config
 from b2b.benchmark.experiments.bm_adaptive_dynamics import log_returns_to_wandb
 from b2b.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem

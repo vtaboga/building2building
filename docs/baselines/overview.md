@@ -13,10 +13,9 @@ field in the Hydra config.  The dispatch lives in
 
 | `policy.type` | Controller class | Description |
 |---|---|---|
-| `fan_coil_constant` | `FanCoilConstantPolicy` | Constant fan coil output |
-| `unitary_pi` | `UnitaryPIPolicy` | PI controller on fan airflow + fixed outlet temperature |
-| `unitary_sat` / `unitary_airflow_first_sat` | `UnitaryAirflowFirstSatPolicy` | Airflow-first with SAT trim/reset |
-| `unitary_g36` | `UnitaryG36Policy` | ASHRAE Guideline 36 piecewise-linear controller |
+| `unitary_g36` | `UnitaryG36Policy` | G36-inspired PI airflow + Trim-and-Respond SAT for PSZ |
+| `ashrae_air_loop` | `AshraeAirLoopPolicy` | ASHRAE air-loop controller for VAV systems |
+| `air_loop_sat` | `AirLoopSatPolicy` | SAT-based air-loop controller for VAV systems |
 
 Additional policy types used through SB3 training scripts:
 
@@ -36,7 +35,7 @@ The entry point is `scripts/baselines.py`, which uses the Hydra config
 defaults:
   - _self_
   - bldg: single_family
-  - policy: unitary_sat
+  - policy: unitary_g36
   - reward: deadband
   - wandb: default
 
@@ -54,17 +53,15 @@ n_episodes: 1
 ### Examples
 
 ```bash
-# Default: unitary_sat on a single-family house
+# Default: unitary_g36 on a single-family house
 python scripts/baselines.py
 
-# PI controller
-python scripts/baselines.py policy=unitary_pi
+# G36 controller on OfficeSmall
+python scripts/baselines.py policy=unitary_g36 \
+    bldg.bldg.building_type=OfficeSmall
 
-# G36 controller
-python scripts/baselines.py policy=unitary_g36
-
-# Fan coil constant
-python scripts/baselines.py policy=fan_coil_constant
+# ASHRAE air-loop controller
+python scripts/baselines.py policy=ashrae_air_loop
 
 # Override episode length
 python scripts/baselines.py env.max_steps=8760
@@ -102,7 +99,4 @@ outputs/<policy_type>/<date>/<time>/
 
 ## Controller Details
 
-- [PI Controller (unitary_pi)](unitary-pi.md)
-- [SAT Controller (unitary_sat)](unitary-sat.md)
 - [G36 Controller (unitary_g36)](unitary-g36.md)
-- [Fan Coil Constant (fan_coil_constant)](fan-coil-constant.md)

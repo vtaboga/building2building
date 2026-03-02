@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - policy: zone_temp_21
+  - policy: unitary_g36
   - reward: deadband
   - task: default
 

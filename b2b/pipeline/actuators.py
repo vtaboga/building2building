@@ -52,7 +52,146 @@ def create_onoff_availability_stl(obj: dict[str, Any], *, name: str = "OnOff") -
 
 
 temp_stl_lower_bound = 5.0
-temp_stl_upper_bound = 50.0
+temp_stl_upper_bound = 50.0  # fallback; overridden per-system when possible
+
+STD_AIR_DENSITY = 1.2  # kg/m³ at ~20 °C, 101.325 kPa
+DEFAULT_FAN_MAX_KGS = 1.0  # fallback when design data is unavailable (covers typical small-to-medium zones)
+DEFAULT_SAT_MAX_C = 40.0  # design-max for DX heat pump + supplemental heater
+
+DX_COOLING_COMPRESSOR_MIN_OAT_C = 10.0
+
+
+def _set_dx_cooling_compressor_lockout(
+    obj: dict[str, Any],
+    cooling_coil_type: str,
+    cooling_coil_name: str,
+    min_oat_c: float = DX_COOLING_COMPRESSOR_MIN_OAT_C,
+) -> None:
+    """Prevent DX cooling compressor operation below *min_oat_c* outdoor air.
+
+    Without this, SetPoint-controlled UnitarySystem will activate the DX
+    cooling coil whenever the SAT setpoint is below return air temperature
+    — even in winter.  Running a DX cooling compressor at sub-zero outdoor
+    temperatures causes frost/freeze and wastes energy.
+    """
+    dx_types = (
+        "Coil:Cooling:DX:SingleSpeed",
+        "Coil:Cooling:DX:TwoSpeed",
+        "Coil:Cooling:DX:MultiSpeed",
+        "Coil:Cooling:DX:TwoStageWithHumidityControlMode",
+    )
+    if cooling_coil_type not in dx_types:
+        return
+    coils = obj.get(cooling_coil_type, {})
+    target = cooling_coil_name.upper()
+    for name, coil in coils.items():
+        if name == cooling_coil_name or name.upper() == target:
+            coil["minimum_outdoor_dry_bulb_temperature_for_compressor_operation"] = (
+                min_oat_c
+            )
+            return
+
+
+def _read_fan_design_flow_kgs(
+    obj: dict[str, Any], fan_name: str
+) -> float | None:
+    """Read the fan's design max air flow [m³/s] from the epJSON and convert to kg/s.
+
+    EnergyPlus object names are case-insensitive, so we fall back to a
+    case-insensitive lookup when the exact key isn't found.
+    """
+    target = fan_name.upper()
+    for fan_type in ("Fan:SystemModel", "Fan:OnOff", "Fan:ConstantVolume"):
+        fans = obj.get(fan_type, {})
+        fan = fans.get(fan_name)
+        if fan is None:
+            for k, v in fans.items():
+                if k.upper() == target:
+                    fan = v
+                    break
+        if fan is None:
+            continue
+        for key in ("design_maximum_air_flow_rate", "maximum_flow_rate"):
+            val = fan.get(key)
+            if isinstance(val, (int, float)) and val > 0:
+                return float(val) * STD_AIR_DENSITY
+    return None
+
+
+def _read_max_supply_air_temp_c(
+    obj: dict[str, Any], system_name: str, epjson_type: str
+) -> float | None:
+    """Try to read the maximum supply air temperature [°C] from the epJSON."""
+    systems = obj.get(epjson_type, {})
+    system = systems.get(system_name, {})
+    val = system.get("maximum_supply_air_temperature")
+    if isinstance(val, (int, float)) and val > 0:
+        return float(val)
+    return None
+
+
+def _set_fan_always_on(
+    obj: dict[str, Any], fan_name: str, always_on_sched: str
+) -> None:
+    """Override a fan's availability schedule to *always_on_sched*.
+
+    OfficeSmall (and similar) buildings use ``HVACOperationSchd`` which turns
+    the fan off nights/weekends.  For RL control the fan must be always
+    available so the agent can modulate mass flow at any time.
+    """
+    target = fan_name.upper()
+    for fan_type in ("Fan:SystemModel", "Fan:OnOff", "Fan:ConstantVolume"):
+        fans = obj.get(fan_type, {})
+        fan = fans.get(fan_name)
+        if fan is None:
+            for k, v in fans.items():
+                if k.upper() == target:
+                    fan = v
+                    break
+        if fan is not None:
+            fan["availability_schedule_name"] = always_on_sched
+            return
+
+
+def _ensure_always_on_availability(
+    obj: dict[str, Any], loop_name: str, always_on_sched: str
+) -> None:
+    """Replace NightCycle availability managers on *loop_name* with always-on.
+
+    ``AvailabilityManager:NightCycle`` cycles the fan based on thermostat
+    tolerance when the HVAC schedule says OFF.  Under RL control, equipment
+    must be unconditionally available; replace with
+    ``AvailabilityManager:Scheduled`` pointing at an always-on schedule.
+    """
+    loop_obj = obj.get("AirLoopHVAC", {}).get(loop_name)
+    if loop_obj is None:
+        return
+    avail_list_name = loop_obj.get("availability_manager_list_name")
+    if not avail_list_name:
+        return
+    avail_list = obj.get("AvailabilityManagerAssignmentList", {}).get(
+        avail_list_name
+    )
+    if avail_list is None:
+        return
+
+    night_cycle_mgrs = obj.get("AvailabilityManager:NightCycle", {})
+    scheduled_mgrs = obj.setdefault("AvailabilityManager:Scheduled", {})
+
+    for mgr in avail_list.get("managers", []):
+        if mgr.get("availability_manager_object_type") != "AvailabilityManager:NightCycle":
+            continue
+        old_name = mgr.get("availability_manager_name", "")
+        night_cycle_mgrs.pop(old_name, None)
+
+        new_name = f"B2B Always On Avail for {loop_name} ({gensym()})"
+        scheduled_mgrs[new_name] = {"schedule_name": always_on_sched}
+
+        mgr["availability_manager_name"] = new_name
+        mgr["availability_manager_object_type"] = "AvailabilityManager:Scheduled"
+
+    if "AvailabilityManager:NightCycle" in obj and not obj["AvailabilityManager:NightCycle"]:
+        del obj["AvailabilityManager:NightCycle"]
 
 
 def create_temp_stl(
@@ -105,6 +244,26 @@ class UnitarySystem:
         return [self.zone]
 
 
+@dataclass
+class HeatPump:
+    """Equipment descriptor for an AirLoopHVAC:UnitaryHeatPump:AirToAir zone.
+
+    Load-based heat pumps are controlled via thermostat setpoint schedules
+    rather than supply air temperature setpoints.
+    """
+
+    zone: str
+    heating_setpoint: ActuatorDescription
+    cooling_setpoint: ActuatorDescription
+    equipment_type: Literal["heatpump"] = "heatpump"
+
+    def actuator_descriptions(self) -> list[ActuatorDescription]:
+        return [self.heating_setpoint, self.cooling_setpoint]
+
+    def zones(self) -> list[str]:
+        return [self.zone]
+
+
 def make_unitary_controllable(
     obj: dict[str, Any],
     *,
@@ -112,8 +271,8 @@ def make_unitary_controllable(
     fan_field: str,
     set_control_type: bool,
 ) -> tuple[dict[str, Any], list[UnitarySystem]]:
-    """Generic discovery and mutation for any AirLoopHVAC unitary type that
-    follows the one-zone-per-loop / ConstantVolume:NoReheat pattern.
+    """Generic discovery and mutation for AirLoopHVAC:UnitarySystem objects
+    following the one-zone-per-loop / ConstantVolume:NoReheat pattern.
 
     Parameters
     ----------
@@ -125,8 +284,6 @@ def make_unitary_controllable(
         UnitaryHeatPump:AirToAir.
     set_control_type:
         Whether to write control_type = "SetPoint" onto the object.
-        UnitarySystem requires it; UnitaryHeatPump:AirToAir does not have
-        that field.
     """
     epjson_type_literal = rdflib.Literal(epjson_type)
 
@@ -140,9 +297,6 @@ def make_unitary_controllable(
 
     onoff_stl_name = create_onoff_availability_stl(
         obj, name="unitaryhvac fan availibiliby stl"
-    )
-    temp_stl_name = create_temp_stl(
-        obj, 5.0, 50.0, name="unitaryhvac temperature setpoints stl"
     )
 
     # Step 1: zone -> terminal_inlet_node
@@ -236,6 +390,35 @@ def make_unitary_controllable(
         )
     }
 
+    # Step 5: loop_name -> demand_side_inlet_node
+    # Needed to clean up SingleZone SPMs that target the demand inlet.
+    loop_to_demand_inlet: dict[str, str] = {
+        str(row.loop): str(row.demandInletNode)
+        for row in g.query("""
+            SELECT ?loop ?demandInletNode
+            WHERE {
+                ?loop a "AirLoopHVAC" .
+                ?loop idf:demand_side_inlet_node_names ?demandInletNode .
+            }
+        """)
+    }
+    for row in g.query("""
+        SELECT ?loop ?nodeValue
+        WHERE {
+            ?loop a "AirLoopHVAC" .
+            ?loop idf:demand_side_inlet_node_names ?nodeListName .
+            ?nodeListName a "NodeList" .
+            ?nodeListName idf:nodes ?head .
+            ?head rdf:rest*/rdf:first ?item .
+            ?item idf:node_name ?nodeValue .
+        }
+    """):
+        loop_to_demand_inlet[str(row.loop)] = str(row.nodeValue)
+
+    always_on_sched_name = create_schedule_constant(
+        obj, onoff_stl_name, 1, name="unitaryhvac always on availability"
+    )
+
     # Assemble and mutate
     for zone, terminal_inlet in zone_to_terminal_inlet.items():
         splitter_inlet = terminal_to_splitter_inlet.get(terminal_inlet)
@@ -254,6 +437,13 @@ def make_unitary_controllable(
         if set_control_type:
             system["control_type"] = "SetPoint"
 
+        cooling_coil_type = system.get("cooling_coil_object_type", "")
+        cooling_coil_name = system.get("cooling_coil_name", "")
+        if cooling_coil_type and cooling_coil_name:
+            _set_dx_cooling_compressor_lockout(
+                obj, cooling_coil_type, cooling_coil_name
+            )
+
         new_actuators = []
 
         fan_mode_schedule_name = create_schedule_constant(
@@ -262,65 +452,164 @@ def make_unitary_controllable(
         system["supply_air_fan_operating_mode_schedule_name"] = fan_mode_schedule_name
 
         supply_fan_name = system[fan_field]
+
+        _set_fan_always_on(obj, supply_fan_name, always_on_sched_name)
+        _ensure_always_on_availability(obj, loop_name, always_on_sched_name)
+
+        design_kgs = _read_fan_design_flow_kgs(obj, supply_fan_name)
+        fan_upper_kgs = design_kgs if design_kgs is not None else DEFAULT_FAN_MAX_KGS
+
         new_actuators.append(
             ActuatorDescription(
-                "Fan", "Fan Air Mass Flow Rate", supply_fan_name, "[kg/s]", 0, 100
+                "Fan",
+                "Fan Air Mass Flow Rate",
+                supply_fan_name,
+                "[kg/s]",
+                0,
+                fan_upper_kgs,
             )
         )
 
-        node_to_roles = {outlet_node: ["outlet"]}
-        for node_name in sorted(node_to_roles):
-            roles_str = "+".join(sorted(node_to_roles[node_name]))
+        sat_max = (
+            _read_max_supply_air_temp_c(obj, unitary_name, epjson_type)
+            or DEFAULT_SAT_MAX_C
+        )
+        temp_stl_name = create_temp_stl(
+            obj, temp_stl_lower_bound, sat_max,
+            name="unitaryhvac temperature setpoints stl",
+        )
 
-            sched_constant_name = create_schedule_constant(
-                obj,
-                temp_stl_name,
-                22,
-                name=f"unitaryhvac {roles_str} temp setpoint schedule",
+        # Remove pre-existing setpoint managers on the supply outlet node
+        # so they don't conflict with our scheduled manager.  Demand-side
+        # SingleZone SPMs are left in place: with control_type="SetPoint"
+        # the UnitarySystem reads only the outlet node setpoint, and the
+        # existing zone thermostat SPMs satisfy EnergyPlus's
+        # checkSetpointNodesAtEnd validation on the demand inlet.
+        outlet_upper = outlet_node.upper()
+        for spm_type in list(obj.keys()):
+            if not spm_type.startswith("SetpointManager:"):
+                continue
+            to_delete = [
+                name
+                for name, spm in obj[spm_type].items()
+                if spm.get("setpoint_node_or_nodelist_name", "").upper()
+                == outlet_upper
+            ]
+            for name in to_delete:
+                del obj[spm_type][name]
+
+        sched_constant_name = create_schedule_constant(
+            obj,
+            temp_stl_name,
+            22,
+            name="unitaryhvac temp setpoint schedule",
+        )
+        spm_label = (
+            f"B2B Unitary TEMP SPM for {outlet_node} ({gensym()})"
+        )
+        setpoint_managers[spm_label] = {
+            "control_variable": "Temperature",
+            "schedule_name": sched_constant_name,
+            "setpoint_node_or_nodelist_name": outlet_node,
+        }
+
+        new_actuators.append(
+            ActuatorDescription(
+                component_type="Schedule:Constant",
+                control_type="Schedule Value",
+                component_name=sched_constant_name,
+                units="Temperature",
+                lower_bound=temp_stl_lower_bound,
+                upper_bound=sat_max,
             )
-            setpoint_manager_name = (
-                f"B2B {roles_str} Node TEMP SPM for {node_name} ({gensym()})"
-            )
-            setpoint_managers[setpoint_manager_name] = {
-                "control_variable": "Temperature",
-                "schedule_name": sched_constant_name,
-                "setpoint_node_or_nodelist_name": node_name,
-            }
-            new_actuators.append(
-                ActuatorDescription(
-                    component_type="Schedule:Constant",
-                    control_type="Schedule Value",
-                    component_name=sched_constant_name,
-                    units="Temperature",
-                    lower_bound=temp_stl_lower_bound,
-                    upper_bound=temp_stl_upper_bound,
-                )
-            )
+        )
 
         devices.append(UnitarySystem(zone, new_actuators))
 
     return obj, devices
 
 
+def convert_heat_pumps_to_unitary_systems(obj: dict[str, Any]) -> dict[str, Any]:
+    """Convert AirLoopHVAC:UnitaryHeatPump:AirToAir objects to
+    AirLoopHVAC:UnitarySystem with control_type="SetPoint".
+
+    UnitaryHeatPump is load-based and ignores outlet node SAT setpoints.
+    UnitarySystem with SetPoint control actively modulates coils to meet them,
+    which is required for the two-actuator (fan flow + SAT) RL strategy.
+
+    Must be called before make_unitary_system_controllable so that the
+    converted systems are discovered by the SPARQL queries.
+    """
+    HP_TYPE = "AirLoopHVAC:UnitaryHeatPump:AirToAir"
+    US_TYPE = "AirLoopHVAC:UnitarySystem"
+
+    heat_pumps = obj.get(HP_TYPE, {})
+    if not heat_pumps:
+        return obj
+
+    unitary_systems = obj.setdefault(US_TYPE, {})
+
+    FIELD_RENAME: dict[str, str] = {
+        "supply_air_fan_name": "supply_fan_name",
+        "supply_air_fan_object_type": "supply_fan_object_type",
+        "maximum_supply_air_temperature_from_supplemental_heater": (
+            "maximum_supply_air_temperature"
+        ),
+    }
+
+    FLOW_RATE_METHOD_FIELDS: dict[str, str] = {
+        "cooling_supply_air_flow_rate": "cooling_supply_air_flow_rate_method",
+        "heating_supply_air_flow_rate": "heating_supply_air_flow_rate_method",
+        "no_load_supply_air_flow_rate": "no_load_supply_air_flow_rate_method",
+    }
+
+    for hp_name, hp_fields in heat_pumps.items():
+        us_fields: dict[str, Any] = {}
+
+        for field_name, value in hp_fields.items():
+            new_name = FIELD_RENAME.get(field_name, field_name)
+            us_fields[new_name] = value
+
+        for flow_field, method_field in FLOW_RATE_METHOD_FIELDS.items():
+            if flow_field in us_fields:
+                us_fields[method_field] = "SupplyAirFlowRate"
+
+        us_fields["control_type"] = "SetPoint"
+        us_fields["dehumidification_control_type"] = "None"
+
+        HP_ONLY_FIELDS = {
+            "maximum_outdoor_dry_bulb_temperature_for_supplemental_heater_operation",
+        }
+        for hp_field in HP_ONLY_FIELDS:
+            us_fields.pop(hp_field, None)
+
+        unitary_systems[hp_name] = us_fields
+
+    del obj[HP_TYPE]
+
+    for _branch_name, branch in obj.get("Branch", {}).items():
+        for component in branch.get("components", []):
+            if component.get("component_object_type") == HP_TYPE:
+                component["component_object_type"] = US_TYPE
+
+    return obj
+
+
 def make_unitary_system_controllable(
     obj: dict[str, Any],
 ) -> tuple[dict[str, Any], list[UnitarySystem]]:
+    """Discover AirLoopHVAC:UnitarySystem objects and instrument them with
+    fan mass flow rate + SAT setpoint actuators.
+
+    The control_type is set to "SetPoint" so that the system actively modulates
+    coils to meet the outlet node setpoint. Systems converted from
+    UnitaryHeatPump already have this field, but setting it again is harmless.
+    """
     return make_unitary_controllable(
         obj,
         epjson_type="AirLoopHVAC:UnitarySystem",
         fan_field="supply_fan_name",
         set_control_type=True,
-    )
-
-
-def make_heat_pump_controllable(
-    obj: dict[str, Any],
-) -> tuple[dict[str, Any], list[UnitarySystem]]:
-    return make_unitary_controllable(
-        obj,
-        epjson_type="AirLoopHVAC:UnitaryHeatPump:AirToAir",
-        fan_field="supply_air_fan_name",
-        set_control_type=False,
     )
 
 
@@ -743,9 +1032,10 @@ AnyEquipment = VAVSystem | UnitarySystem | Baseboard
 def make_all_equipment(
     json_obj: dict[str, Any],
 ) -> tuple[dict[str, Any], Sequence[AnyEquipment]]:
+    json_obj = convert_heat_pumps_to_unitary_systems(json_obj)
+
     all_functions = [
         make_unitary_system_controllable,
-        make_heat_pump_controllable,
         make_vav_system_controllable,
         make_baseboard_controllable,
     ]

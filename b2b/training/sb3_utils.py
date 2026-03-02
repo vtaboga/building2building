@@ -10,6 +10,7 @@ import inspect
 import logging
 from pathlib import Path
 
+import torch.nn as nn
 from omegaconf import OmegaConf
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,11 @@ def build_sb3_model(config: OmegaConf, train_env, tb_dir: Path):
         k for k in sig.parameters.keys() if k not in ["self", "env", "policy"]
     }
     kwargs = {k: v for k, v in params.items() if k in valid_params}
+
+    # Resolve activation_fn string to torch.nn class if needed.
+    pk = kwargs.get("policy_kwargs")
+    if isinstance(pk, dict) and isinstance(pk.get("activation_fn"), str):
+        pk["activation_fn"] = getattr(nn, pk["activation_fn"])
 
     kwargs["tensorboard_log"] = str(tb_dir)
     policy = config.policy.policy_type

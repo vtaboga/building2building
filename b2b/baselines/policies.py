@@ -1,3 +1,10 @@
+"""Policy factory for baseline and user-defined controllers.
+
+Dispatches on a ``"policy.type"`` key in the configuration to load
+built-in rule-based controllers, Stable-Baselines3 checkpoints, or
+arbitrary custom classes.
+"""
+
 from __future__ import annotations
 
 import importlib
@@ -49,6 +56,30 @@ def _load_custom_policy(policy_cfg: dict[str, Any]) -> PolicyLike:
 
 
 def make_policy_from_config(cfg: dict[str, Any]) -> PolicyLike:
+    """Instantiate a policy from a Hydra / OmegaConf configuration.
+
+    Supported ``policy.type`` values:
+
+    * ``"unitary_g36"`` / ``"air_loop_sat"`` / ``"ashrae_air_loop"``
+      – built-in controllers.
+    * ``"sb3"`` – loads a Stable-Baselines3 checkpoint (requires
+      ``policy.algorithm`` and ``policy.checkpoint_path``).
+    * ``"custom"`` – dynamically imports a user class (requires
+      ``policy.module`` and ``policy.class_name``).
+
+    Args:
+        cfg: Configuration dict (or OmegaConf) with a ``"policy"``
+            sub-section.
+
+    Returns:
+        An object satisfying the ``PolicyLike`` protocol (i.e. exposing
+        a ``predict`` method).
+
+    Raises:
+        NotImplementedError: If the policy type is not supported.
+        ValueError: If required keys are missing for the chosen type.
+        ImportError: If an SB3 algorithm cannot be found.
+    """
     if not isinstance(cfg, dict):
         cfg_any = OmegaConf.to_container(cfg, resolve=True)
         cfg = cfg_any if isinstance(cfg_any, dict) else {}
@@ -56,26 +87,18 @@ def make_policy_from_config(cfg: dict[str, Any]) -> PolicyLike:
     if not isinstance(policy_cfg, dict):
         policy_cfg = {}
     policy_type = str(policy_cfg.get("type", "")).strip()
-    if policy_type == "zone_temp_21":
-        from b2b.baselines.controllers.zone_temp_21 import ZoneTemp21Policy
+    if policy_type == "unitary_g36":
+        from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
 
-        return ZoneTemp21Policy(OmegaConf.create(policy_cfg))
-    if policy_type == "fan_coil_constant":
-        from b2b.baselines.controllers.fan_coil_constant import FanCoilConstantPolicy
-
-        return FanCoilConstantPolicy(OmegaConf.create(policy_cfg))
-    if policy_type == "unitary_pi":
-        from b2b.baselines.controllers.unitary_pi import UnitaryPIPolicy
-
-        return UnitaryPIPolicy(OmegaConf.create(policy_cfg))
-    if policy_type in ("unitary_sat", "unitary_airflow_first_sat"):
-        from b2b.baselines.controllers.unitary_sat import UnitaryAirflowFirstSatPolicy
-
-        return UnitaryAirflowFirstSatPolicy(OmegaConf.create(policy_cfg))
+        return UnitaryG36Policy(OmegaConf.create(policy_cfg))
     if policy_type == "air_loop_sat":
         from b2b.baselines.controllers.air_loop_sat import AirLoopSatPolicy
 
         return AirLoopSatPolicy(OmegaConf.create(policy_cfg))
+    if policy_type == "ashrae_air_loop":
+        from b2b.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
+
+        return AshraeAirLoopPolicy(OmegaConf.create(policy_cfg))
     if policy_type == "sb3":
         return _load_sb3_policy(policy_cfg)
     if policy_type == "custom":

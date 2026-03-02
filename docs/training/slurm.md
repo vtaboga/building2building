@@ -12,7 +12,6 @@ running training and evaluation on HPC clusters.
 | `run_ppo.sh` | PPO training (single-zone) | 48 h | 8 | 32 GB |
 | `run_sac.sh` | SAC training (single-zone) | 12 h | 8 | 32 GB |
 | `run_baselines.sh` | Rule-based baseline rollouts | varies | varies | varies |
-| `run_baseline_unitary_pi.sh` | PI controller rollout | varies | varies | varies |
 | `run_rulebased_adaptive_dynamics.sh` | Rule-based adaptive dynamics benchmark | varies | varies | varies |
 | `run_ppo_baseline_adaptive_dynamics.sh` | PPO adaptive dynamics evaluation | varies | varies | varies |
 | `run_ppo_per_building_adaptive_dynamics.sh` | Per-building PPO training for adaptive dynamics | varies | varies | varies |

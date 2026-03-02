@@ -19,7 +19,7 @@ experiment:
   continue_on_error: true
 
   # Which baseline policy config to run for each building.
-  policy: unitary_airflow_first_sat
+  policy: unitary_g36
 
   # Extra Hydra overrides forwarded to `python -m scripts.baselines`.
   # Example:

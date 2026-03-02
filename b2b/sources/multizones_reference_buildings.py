@@ -24,7 +24,6 @@ import io
 import logging
 import traceback
 import json
-import pickle
 import random
 import zipfile
 from pathlib import Path
@@ -76,10 +75,10 @@ def load_split_ids(
     split_data_dir: Path | None = None,
 ) -> list[int]:
     base_dir = split_data_dir if split_data_dir is not None else SPLIT_DATA_DIR
-    path = base_dir / f"{building_type}_{split}_data"
+    path = base_dir / f"{building_type}_{split}_data.json"
     if not path.exists():
         raise FileNotFoundError(f"Split file not found: {path}")
-    ids: list[int] = pickle.loads(path.read_bytes())
+    ids: list[int] = json.loads(path.read_text(encoding="utf-8"))
     return ids
 
 
