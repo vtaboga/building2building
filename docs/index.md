@@ -15,7 +15,7 @@ B2B is designed to accelerate research in **transfer learning**, **multi-task RL
 - **7,000+ parametrically generated buildings** across commercial and residential archetypes
 - **7 building types**: Warehouse, HotelSmall, RetailStandalone, RestaurantFastFood, OfficeMedium, OfficeSmall, and single-zone houses
 - **16 ASHRAE climate zones** with real TMY3 weather files
-- **3 HVAC system types**: VAV (Variable Air Volume), Unitary, and Baseboard
+- **3 HVAC system types**: VAV (Variable Air Volume), Unitary, and Heating-Only (unit heaters, baseboards, radiant)
 - **Gymnasium-compatible** environments registered as `EnergyPlus-v0`
 - **Flexible reward functions**: BaseReward (MSE + energy), BarrierReward (deadband + violation), DeadbandReward (quadratic/linear)
 - **Observation & action wrappers** for normalization, padding, and building-parameter augmentation
@@ -84,7 +84,7 @@ env.close()
 | [Installation](guide/installation.md) | System requirements, installation, and verification |
 | [Environments](guide/environments.md) | Architecture, factory functions, and lifecycle |
 | [Building Types & Climate Zones](guide/buildings.md) | The 7,000+ building dataset |
-| [HVAC Systems](guide/hvac-systems.md) | VAV, Unitary, and Baseboard control interfaces |
+| [HVAC Systems](guide/hvac-systems.md) | VAV, Unitary, and Heating-Only zone control interfaces |
 | [Observations](guide/observations.md) | Observation space structure and bounds |
 | [Actions](guide/actions.md) | Action space per HVAC type |
 | [Rewards](guide/rewards.md) | Reward function definitions and math |

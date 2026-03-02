@@ -74,6 +74,7 @@ def make_env_from_config(config: EnvBuildConfig, eplus_output_dir: str | Path) -
                 for zone, tgt in config.task.zone_target_temperatures.items()
             },
         },
+        "expose_heating_only_zones": config.expose_heating_only_zones,
     }
 
     if config.dataset_selection.dataset == "single_zone_houses":

@@ -372,3 +372,4 @@ class BuildingConfig:
     task_config: TaskConfig = field(
         default_factory=lambda: TaskConfig.from_dict({})
     )
+    expose_heating_only_zones: bool = True

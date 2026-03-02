@@ -1,0 +1,7 @@
+selection:
+  enabled: true
+  split: test
+  index: 0
+
+bldg:
+  building_type: Warehouse

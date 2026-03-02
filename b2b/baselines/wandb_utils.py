@@ -150,6 +150,10 @@ def init_wandb_from_config(
     if wandb_cfg is None:
         return None, False
 
+    enabled = getattr(wandb_cfg, "enabled", True)
+    if not enabled:
+        return None, False
+
     project = getattr(wandb_cfg, "project", None)
     if project is None:
         return None, False

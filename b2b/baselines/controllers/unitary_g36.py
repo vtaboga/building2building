@@ -67,6 +67,12 @@ class _ZoneState:
     prev_temp: float | None = None
 
 
+@dataclass
+class _BaseboardState:
+    htg_sp_idx: int
+    temp_obs_idx: int
+
+
 # -- policy ----------------------------------------------------------------
 
 
@@ -147,6 +153,7 @@ class UnitaryG36Policy:
             self._setback_end = 16.0
 
         self._zones: list[_ZoneState] = []
+        self._baseboards: list[_BaseboardState] = []
         self._avail_idxs: list[int] = []
         self._n_act: int = 0
         self._tod_idx: int | None = None
@@ -215,10 +222,34 @@ class UnitaryG36Policy:
                 )
             )
 
-        if not self._zones:
+        heating_only_systems = [
+            e for e in equipment
+            if hasattr(e, "equipment_type") and e.equipment_type == "heating_only"
+        ]
+
+        self._baseboards = []
+        for bb in heating_only_systems:
+            for act in bb.actuator_descriptions():
+                target = (
+                    f"{act.component_type}::{act.control_type}"
+                    f"::{act.component_name}"
+                )
+                if target not in act_names:
+                    continue
+                idx = _match_actuator_index(
+                    act_names, act.component_type, act.control_type, act.component_name,
+                )
+                temp_idx = find_zone_air_temp_index_for_zone(
+                    obs_names, zone_name=bb.zone
+                )
+                self._baseboards.append(
+                    _BaseboardState(htg_sp_idx=idx, temp_obs_idx=temp_idx)
+                )
+
+        if not self._zones and not self._baseboards:
             logger.warning(
-                "UnitaryG36Policy: no unitary systems discovered"
-                " -- policy is a no-op"
+                "UnitaryG36Policy: no unitary systems or heating-only zones"
+                " discovered -- policy is a no-op"
             )
 
         if self._sched_enabled:
@@ -307,7 +338,7 @@ class UnitaryG36Policy:
     def predict(
         self, obs: Any, deterministic: bool = True
     ) -> tuple[np.ndarray, None]:
-        if not self._zones:
+        if not self._zones and not self._baseboards:
             raise RuntimeError(
                 "Policy not bound to an env; call bind_env() first."
             )
@@ -330,6 +361,9 @@ class UnitaryG36Policy:
             action[z.fan_idx] = self._airflow_command(z, tz, heat_sp, cool_sp)
             action[z.sat_idx] = self._sat_trim_and_respond(z, tz, heat_sp, cool_sp)
 
+        for bb in self._baseboards:
+            action[bb.htg_sp_idx] = heat_sp
+
         return action, None
 
     # -- metrics -----------------------------------------------------------
@@ -341,6 +375,9 @@ class UnitaryG36Policy:
         for z in self._zones:
             if z.temp_obs_idx < len(obs_arr):
                 temps.append(float(obs_arr[z.temp_obs_idx]))
+        for bb in self._baseboards:
+            if bb.temp_obs_idx < len(obs_arr):
+                temps.append(float(obs_arr[bb.temp_obs_idx]))
         metrics: dict[str, float] = {
             "heating_setpoint_c": heat_sp,
             "cooling_setpoint_c": cool_sp,

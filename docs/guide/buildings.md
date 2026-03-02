@@ -12,7 +12,7 @@ B2B includes 6 ASHRAE 90.1-2022 commercial reference building prototypes plus si
 |---|---|---|---|
 | **OfficeSmall** | 5 | Unitary | Small office building with perimeter and core zones |
 | **OfficeMedium** | 15+ | VAV | Medium office with multiple floors, VAV with reheat |
-| **Warehouse** | 3 | Unitary + Baseboard | Large open warehouse with office and fine-storage zones |
+| **Warehouse** | 3 | Unitary + Heating-Only | Large open warehouse with office, fine-storage, and bulk-storage zones |
 | **HotelSmall** | 10+ | Unitary | Small hotel with guest rooms, lobby, and mechanical rooms |
 | **RetailStandalone** | 4 | Unitary | Standalone retail store with back/core/entry zones |
 | **RestaurantFastFood** | 2 | Unitary | Fast-food restaurant with kitchen and dining zones |
@@ -110,7 +110,7 @@ Single-family detached residential houses with one thermal zone each.
 Multi-zone ASHRAE 90.1 commercial reference buildings with varying zone counts.
 
 - **6 building types** × ~1,000 buildings each ≈ 6,000 buildings
-- **HVAC**: VAV (OfficeMedium), Unitary (most types), Baseboard (Warehouse supplemental)
+- **HVAC**: VAV (OfficeMedium), Unitary (most types), Heating-Only (Warehouse bulk storage)
 - **Zone count**: 2–15+ zones depending on building type
 - **Use cases**: Multi-task learning, cross-environment transfer, action-space shift
 

@@ -614,31 +614,57 @@ def make_unitary_system_controllable(
 
 
 @dataclass
-class Baseboard:
-    actuator: ActuatorDescription
-    equipment_type: Literal["baseboard"] = "baseboard"
+class HeatingOnlyZone:
+    zone: str
+    heating_setpoint: ActuatorDescription
+    equipment_type: Literal["heating_only"] = "heating_only"
 
     def actuator_descriptions(self) -> list[ActuatorDescription]:
-        return [self.actuator]
+        return [self.heating_setpoint]
 
     def zones(self) -> list[str]:
-        return []
+        return [self.zone]
 
 
-def make_baseboard_controllable(
+Baseboard = HeatingOnlyZone
+
+HEATING_ONLY_EQUIPMENT_TYPES: list[str] = [
+    "ZoneHVAC:Baseboard:Convective:Electric",
+    "ZoneHVAC:Baseboard:Convective:Water",
+    "ZoneHVAC:Baseboard:RadiantConvective:Electric",
+    "ZoneHVAC:Baseboard:RadiantConvective:Water",
+    "ZoneHVAC:UnitHeater",
+    "ZoneHVAC:HighTemperatureRadiant",
+]
+
+
+def make_heating_only_controllable(
     obj: dict[str, Any],
-) -> tuple[dict[str, Any], Sequence[Baseboard]]:
-    """Find all baseboards (electric or water) via EquipmentConnections and
-    expose their availability schedule as a controllable schedule."""
+) -> tuple[dict[str, Any], Sequence[HeatingOnlyZone]]:
+    """Find all heating-only zone equipment via EquipmentConnections and
+    control them via thermostat heating setpoint schedules.
+
+    Covers baseboards, unit heaters, and high-temperature radiant heaters.
+    Equipment availability is pinned always-on; the only actuator exposed
+    is the zone thermostat heating setpoint.  Zones with multiple
+    heating-only devices get a single actuator (deduplicated by zone).
+    """
 
     obj = deepcopy(obj)
     ont = Ontology.from_object(obj)
     g = ont.rdf
 
-    binary_stl = create_onoff_availability_stl(obj, name="baseboard availibility")
+    htg_stl_name = create_temp_stl(
+        obj, 10.0, 35.0, name="heating only setpoint stl"
+    )
 
-    baseboard_query = """
-        SELECT ?zone ?baseboardName
+    onoff_stl = create_onoff_availability_stl(obj, name="heating only availability")
+    always_on_sched = create_schedule_constant(
+        obj, onoff_stl, 1, name="heating only always on"
+    )
+
+    equip_query = """
+        SELECT ?zone ?equipName ?equipType
         WHERE {
             ?equipConn a "ZoneHVAC:EquipmentConnections" .
             ?equipConn idf:zone_name ?zone .
@@ -647,41 +673,74 @@ def make_baseboard_controllable(
             ?equipList a "ZoneHVAC:EquipmentList" .
             ?equipList idf:equipment ?equipHead .
             ?equipHead rdf:rest*/rdf:first ?equipItem .
-            ?equipItem idf:zone_equipment_object_type ?baseboardType .
-            ?equipItem idf:zone_equipment_name ?baseboardName .
+            ?equipItem idf:zone_equipment_object_type ?equipType .
+            ?equipItem idf:zone_equipment_name ?equipName .
         }
     """
 
-    new_devices = []
-    for baseboard_type in [
-        "ZoneHVAC:Baseboard:Convective:Electric",
-        "ZoneHVAC:Baseboard:Convective:Water",
-    ]:
-        type_literal = rdflib.Literal(baseboard_type)
+    zones_seen: set[str] = set()
+    new_devices: list[HeatingOnlyZone] = []
+
+    for heating_type in HEATING_ONLY_EQUIPMENT_TYPES:
+        type_literal = rdflib.Literal(heating_type)
         for row in g.query(
-            baseboard_query, initBindings={"baseboardType": type_literal}
+            equip_query, initBindings={"equipType": type_literal}
         ):
-            baseboard_name = str(row.baseboardName)
-            new_schedule_name = create_schedule_constant(
-                obj,
-                binary_stl,
-                1,
-                name="controllable schedule for baseboard",
-            )
-            obj[baseboard_type][baseboard_name]["availability_schedule_name"] = (
-                new_schedule_name
-            )
-            new_devices.append(
-                Baseboard(
-                    ActuatorDescription(
-                        component_type="Schedule:Constant",
-                        control_type="Schedule Value",
-                        component_name=new_schedule_name,
-                        units="Availability",
-                        lower_bound=0.0,
-                        upper_bound=1.0,
-                    )
+            zone = str(row.zone)
+            equip_name = str(row.equipName)
+
+            type_section = obj.get(heating_type, {})
+            if equip_name in type_section:
+                type_section[equip_name]["availability_schedule_name"] = (
+                    always_on_sched
                 )
+
+            if zone in zones_seen:
+                continue
+            zones_seen.add(zone)
+
+            thermostat_controls = obj.get("ZoneControl:Thermostat", {})
+            tc = None
+            for _name, candidate in thermostat_controls.items():
+                if candidate.get("zone_or_zonelist_name") == zone:
+                    tc = candidate
+                    break
+
+            if tc is None:
+                raise ValueError(
+                    f"No ZoneControl:Thermostat found for heating-only zone {zone}"
+                )
+
+            control_type = tc.get("control_1_object_type", "")
+            control_name = tc["control_1_name"]
+
+            htg_sched = create_schedule_constant(
+                obj, htg_stl_name, 18, name=f"heating only htg setpoint {zone}"
+            )
+
+            if control_type == "ThermostatSetpoint:DualSetpoint":
+                dsp = obj["ThermostatSetpoint:DualSetpoint"][control_name]
+                dsp["heating_setpoint_temperature_schedule_name"] = htg_sched
+            elif control_type == "ThermostatSetpoint:SingleHeating":
+                sp = obj["ThermostatSetpoint:SingleHeating"][control_name]
+                sp["setpoint_temperature_schedule_name"] = htg_sched
+            else:
+                raise ValueError(
+                    f"Unsupported thermostat type {control_type!r} "
+                    f"for heating-only zone {zone}"
+                )
+
+            htg_actuator = ActuatorDescription(
+                component_type="Schedule:Constant",
+                control_type="Schedule Value",
+                component_name=htg_sched,
+                units="[C]",
+                lower_bound=10.0,
+                upper_bound=35.0,
+            )
+
+            new_devices.append(
+                HeatingOnlyZone(zone=zone, heating_setpoint=htg_actuator)
             )
 
     return obj, new_devices
@@ -1026,7 +1085,7 @@ def make_vav_system_controllable(
 # The purpose of this type (compared to types.Equipment) is to actually list all
 # the different types of things an `Equipment` can be. If we don't do that, the
 # cattrs library cant rehydrate the dataclasses correctly.
-AnyEquipment = VAVSystem | UnitarySystem | Baseboard
+AnyEquipment = VAVSystem | UnitarySystem | HeatingOnlyZone
 
 
 def make_all_equipment(
@@ -1037,7 +1096,7 @@ def make_all_equipment(
     all_functions = [
         make_unitary_system_controllable,
         make_vav_system_controllable,
-        make_baseboard_controllable,
+        make_heating_only_controllable,
     ]
     all_equipment: list[AnyEquipment] = []
     for func in all_functions:

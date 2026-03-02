@@ -262,6 +262,8 @@ def search_configs(
         task_section = {}
     task_config = TaskConfig.from_dict(task_section)
 
+    expose_heating_only_zones = bool(cfg.get("expose_heating_only_zones", True))
+
     rows = search_buildings(
         run_period=task_config.run_period.name,
         **bldg_query,
@@ -309,6 +311,7 @@ def search_configs(
                     area=metadata.net_conditioned_area,
                     source_metadata=source_meta,
                     task_config=task_config,
+                    expose_heating_only_zones=expose_heating_only_zones,
                 )
             )
         except Exception as e:

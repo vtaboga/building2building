@@ -44,17 +44,21 @@ For an OfficeMedium with 15 zones and 1 AHU, the full action space has:
 
     VAV **cooling setpoints are removed from the agent-facing action space** and pinned at 40°C for simulation stability. The agent action space is therefore 1 + 15 + 15 = **31 dimensions** for this example.
 
-### Baseboard Systems
+### Heating-Only Zones
 
-Each baseboard exposes **1 binary actuator**:
+Each heating-only zone exposes **1 continuous actuator** — the zone thermostat heating setpoint:
 
 | Index | Actuator | Units | Lower | Upper |
 |---|---|---|---|---|
-| 0 | Availability Schedule | discrete | 0 (off) | 1 (on) |
+| 0 | Zone Heating Setpoint | °C | 10.0 | 35.0 |
 
 !!! note "Mixed systems"
 
-    Buildings like `Warehouse` may have both unitary and baseboard equipment. In that case, the action space concatenates all actuators from all equipment in discovery order.
+    Buildings like `Warehouse` may have both unitary and heating-only equipment. In that case, the action space concatenates all actuators from all equipment in discovery order.
+
+!!! info "Expose / hide toggle"
+
+    When `expose_heating_only_zones=False`, heating-only actuators are **removed** from the agent action space and pinned at 18 °C. This is analogous to how VAV cooling setpoints are fixed.
 
 ---
 
@@ -68,14 +72,14 @@ The complete set of actuators needed by EnergyPlus, including fixed actuators. U
 
 ### Agent Action Space
 
-The reduced set of actuators exposed to the RL agent. Fixed actuators (currently VAV cooling setpoints) are removed and their values are pinned automatically.
+The reduced set of actuators exposed to the RL agent. Fixed actuators (VAV cooling setpoints and, optionally, heating-only zone setpoints) are removed and their values are pinned automatically.
 
 ```mermaid
 flowchart LR
     A[Agent Action<br/>reduced dim] --> H[HvacActionSpace<br/>assemble_full_action]
     H --> F[Full Action<br/>all actuators]
     F --> E[EnergyPlus]
-    P[Fixed Values<br/>cooling SP = 40°C] --> H
+    P[Fixed Values<br/>cooling SP = 40°C<br/>heating-only SP = 18°C] --> H
 ```
 
 The `assemble_full_action` method on `HvacActionSpace` takes the agent's action vector and inserts fixed values at the appropriate indices:
@@ -123,11 +127,11 @@ class ActuatorDescription:
     | `Schedule:Constant` | `Schedule Value` | `[C]` (heating SP) |
     | `Schedule:Constant` | `Schedule Value` | `[C]` (cooling SP, fixed) |
 
-=== "Baseboard"
+=== "Heating-Only Zone"
 
     | component_type | control_type | units |
     |---|---|---|
-    | `Schedule:Constant` | `Schedule Value` | `Availability` |
+    | `Schedule:Constant` | `Schedule Value` | `[C]` (heating SP) |
 
 ---
 
@@ -156,7 +160,7 @@ Example output for a single-zone house:
 |---|---|---|---|
 | Single-Zone Houses | Unitary | 2 | Fan + SAT |
 | RestaurantFastFood | Unitary | 4 | 2 zones × 2 actuators |
-| Warehouse | Unitary + Baseboard | 4–8 | Varies by zone/equipment count |
+| Warehouse | Unitary + Heating-Only | 5–6 | 2 unitary zones × 2 + 1 heating-only setpoint |
 | RetailStandalone | Unitary | 8 | 4 zones × 2 actuators |
 | OfficeSmall | Unitary | 10 | 5 zones × 2 actuators |
 | HotelSmall | Unitary | 20+ | 10+ zones × 2 actuators |

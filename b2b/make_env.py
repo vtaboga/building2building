@@ -95,6 +95,9 @@ def make_env(config: object, eplus_output_dir: str | Path):
                 if env_section.get("max_steps") is not None
                 else None
             ),
+            expose_heating_only_zones=bool(
+                env_section.get("expose_heating_only_zones", True)
+            ),
         )
         return make_env_typed(build, eplus_output_dir=out_dir)
     except Exception as e:

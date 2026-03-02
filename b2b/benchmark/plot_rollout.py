@@ -65,7 +65,7 @@ def _act_cols_by_type(df: pd.DataFrame) -> dict[str, list[str]]:
         "vav_flow_frac": [],
         "thermostat_htg": [],
         "thermostat_clg": [],
-        "baseboard_avail": [],
+        "heating_only_sp": [],
         "other": [],
     }
     for c in df.columns:
@@ -74,6 +74,8 @@ def _act_cols_by_type(df: pd.DataFrame) -> dict[str, list[str]]:
         cl = c.lower()
         if "fan air mass flow rate" in cl:
             groups["fan_flow"].append(c)
+        elif "heating only" in cl:
+            groups["heating_only_sp"].append(c)
         elif "temp" in cl or "setpoint" in cl:
             if "htg" in cl or "heating" in cl:
                 groups["thermostat_htg"].append(c)
@@ -85,8 +87,6 @@ def _act_cols_by_type(df: pd.DataFrame) -> dict[str, list[str]]:
                 groups["sat_setpoint"].append(c)
         elif "flow fraction" in cl or ("vav" in cl and "frac" in cl):
             groups["vav_flow_frac"].append(c)
-        elif "availability" in cl or "baseboard" in cl:
-            groups["baseboard_avail"].append(c)
         else:
             groups["other"].append(c)
     return {k: v for k, v in groups.items() if v}
@@ -170,7 +170,7 @@ def _plot_actuators(
         ("vav_flow_frac", "VAV Flow Fraction (Damper Position)", "Fraction (0–1)", None),
         ("thermostat_htg", "Heating Setpoints", "Temperature (°C)", None),
         ("thermostat_clg", "Cooling Setpoints", "Temperature (°C)", None),
-        ("baseboard_avail", "Baseboard Availability", "On/Off", None),
+        ("heating_only_sp", "Heating-Only Zone Setpoints", "Temperature (°C)", None),
         ("other", "Other Actuators", "", None),
     ]
 

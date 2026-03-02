@@ -145,20 +145,33 @@ class HvacActionSpace:
         return full
 
 
+FIXED_HEATING_ONLY_VALUE = 18.0
+
+
 def hvac_action_space(
     hvac_actuators: Sequence[ActuatorDescription],
+    *,
+    fixed_heating_only_names: frozenset[str] = frozenset(),
+    fixed_heating_only_value: float = FIXED_HEATING_ONLY_VALUE,
 ) -> HvacActionSpace:
-    """Build a split action space where cooling setpoints are fixed at 40 °C.
+    """Build a split action space where some actuators are fixed.
 
     Returns an ``HvacActionSpace`` whose ``agent_transform`` exposes only
     non-fixed actuators to the agent, while ``full_transform`` covers all
     actuators for EnergyPlus.
 
+    VAV cooling-setpoint actuators (identified by ``"b2b vav clg setpoint"``
+    in the component name) are always fixed at 40 °C.  Heating-only zone
+    actuators whose ``component_name`` is in *fixed_heating_only_names* are
+    pinned at *fixed_heating_only_value*.
+
     Args:
         hvac_actuators: Complete ordered sequence of HVAC actuator
-            descriptions. Cooling-setpoint actuators (identified by
-            ``"b2b vav clg setpoint"`` in the component name) are
-            removed from the agent-facing space.
+            descriptions.
+        fixed_heating_only_names: Component names of heating-only
+            actuators to pin (empty set means none are pinned).
+        fixed_heating_only_value: Constant value for pinned
+            heating-only actuators (default 18 °C).
 
     Returns:
         An ``HvacActionSpace`` with both full and agent transforms.
@@ -173,6 +186,9 @@ def hvac_action_space(
         if _is_fixed_actuator(a):
             fixed_indices.append(i)
             fixed_values.append(FIXED_CLG_SP_VALUE)
+        elif a.component_name in fixed_heating_only_names:
+            fixed_indices.append(i)
+            fixed_values.append(fixed_heating_only_value)
         else:
             agent_actuators.append(a)
 

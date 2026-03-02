@@ -93,6 +93,13 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         set(itertools.chain(*(item.zones() for item in building_config.hvac_equipment)))
     )
 
+    heating_only_zones = sorted(set(
+        z
+        for eq in building_config.hvac_equipment
+        if hasattr(eq, "equipment_type") and eq.equipment_type == "heating_only"
+        for z in eq.zones()
+    ))
+
     task_config = building_config.task_config
 
     # We compute the observation side stuff
@@ -109,7 +116,19 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         )
     )
 
-    action_space_info = hvac_action_space(actuators)
+    if not building_config.expose_heating_only_zones:
+        fixed_heating_only_names = frozenset(
+            a.component_name
+            for eq in building_config.hvac_equipment
+            if hasattr(eq, "equipment_type") and eq.equipment_type == "heating_only"
+            for a in eq.actuator_descriptions()
+        )
+    else:
+        fixed_heating_only_names = frozenset()
+
+    action_space_info = hvac_action_space(
+        actuators, fixed_heating_only_names=fixed_heating_only_names
+    )
     action_names = [
         f"{a.component_type}::{a.control_type}::{a.component_name}"
         for a in action_space_info.agent_actuators
@@ -125,9 +144,15 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         warmup_phases=building_config.warmup_phases,
     )
 
+    reward_zones = (
+        [z for z in controlled_zones if z not in set(heating_only_zones)]
+        if not building_config.expose_heating_only_zones
+        else controlled_zones
+    )
+
     if isinstance(building_config.reward_config, BarrierRewardConfig):
         reward_function = BarrierReward(
-            controlled_zones=controlled_zones,
+            controlled_zones=reward_zones,
             energy_weight=building_config.reward_config.energy_weight,
             deadband_c=building_config.reward_config.deadband_c,
             violation_penalty=building_config.reward_config.violation_penalty,
@@ -135,13 +160,13 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         )
     elif isinstance(building_config.reward_config, BaseRewardConfig):
         reward_function = BaseReward(
-            controlled_zones=controlled_zones,
+            controlled_zones=reward_zones,
             energy_weight=building_config.reward_config.energy_weight,
             task_config=task_config,
         )
     elif isinstance(building_config.reward_config, DeadbandRewardConfig):
         reward_function = DeadbandReward(
-            controlled_zones=controlled_zones,
+            controlled_zones=reward_zones,
             energy_weight=building_config.reward_config.energy_weight,
             dT=building_config.reward_config.dT,
             task_config=task_config,
@@ -164,6 +189,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     gymenv.metadata = {
         "controlled_zones": controlled_zones,
+        "heating_only_zones": heating_only_zones,
         "uncontrolled_zones": uncontrolled_zones,
         "observation_names": obs_info.slot_names,
         "action_names": action_names,
