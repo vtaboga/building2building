@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""Optuna-based per-building-type parameter tuning for the ASHRAE G36 controller.
+"""Optuna-based parameter tuning for the ASHRAE G36 controller.
 
-For each trial, instantiates a UnitaryG36Policy with suggested parameters,
-evaluates on N test-split buildings, and maximises the mean % of timesteps
-where zone temperatures fall within [20, 22]°C.
+Tunes one set of parameters per (building_type, climate_zone) pair.
+Each climate zone has exactly one building in the ``test_small`` split;
+that single building is used for evaluation during optimisation.
 
 Usage:
-    python scripts/tune_g36.py --building-type Warehouse --n-trials 50
-    python scripts/tune_g36.py --building-type RetailStandalone --n-trials 50
-    python scripts/tune_g36.py --building-type RestaurantFastFood --n-trials 50
+    python scripts/tune_g36.py --building-type Warehouse --climate-zone 3 --n-trials 200
 """
 
 from __future__ import annotations
@@ -17,7 +15,6 @@ import argparse
 import logging
 import tempfile
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 import optuna
@@ -27,6 +24,11 @@ from omegaconf import OmegaConf
 from b2b.api import make_multizones_env
 from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
 from b2b.benchmark.runner import run_rollout
+from b2b.sources.multizones_reference_buildings import (
+    BuildingType,
+    load_split_ids,
+    search_buildings,
+)
 from b2b.types import RunPeriodConfig
 
 logging.basicConfig(
@@ -39,28 +41,79 @@ log = logging.getLogger(__name__)
 HEATING_SP = 20.0
 COOLING_SP = 22.0
 
-BuildingType = Literal["OfficeSmall"]
+BUILDING_TYPES: list[BuildingType] = [
+    "OfficeSmall",
+    "RetailStandalone",
+    "RestaurantFastFood",
+    "Warehouse",
+]
 
+PLACE_TO_CLIMATE_ZONE: dict[str, int] = {
+    "Miami": 1,
+    "Houston": 2,
+    "Tampa": 2,
+    "Tucson": 2,
+    "Atlanta": 3,
+    "ElPaso": 3,
+    "SanDiego": 3,
+    "SanFrancisco": 3,
+    "Albuquerque": 4,
+    "Baltimore": 4,
+    "NewYork": 4,
+    "PortAngeles": 4,
+    "Seattle": 4,
+    "Buffalo": 5,
+    "Chicago": 5,
+    "Denver": 5,
+    "Vancouver": 5,
+    "GreatFalls": 6,
+    "Rochester": 6,
+    "Duluth": 7,
+    "InternationalFalls": 7,
+    "Fairbanks": 8,
+}
+
+CLIMATE_ZONES = sorted(set(PLACE_TO_CLIMATE_ZONE.values()))
+
+
+def climate_zone_for_building(building_type: BuildingType, building_id: int) -> int:
+    """Look up the climate zone of a building via the metadata index."""
+    rows = search_buildings(building_type=building_type, building_id=building_id)
+    if rows.empty:
+        raise ValueError(f"No metadata for {building_type} id={building_id}")
+    place = str(rows.iloc[0]["place"])
+    return PLACE_TO_CLIMATE_ZONE[place]
+
+
+def test_small_index_for_climate_zone(
+    building_type: BuildingType, climate_zone: int
+) -> int:
+    """Return the test_small split index whose building belongs to *climate_zone*."""
+    ids = load_split_ids(building_type, "test_small")
+    for idx, bid in enumerate(ids):
+        if climate_zone_for_building(building_type, bid) == climate_zone:
+            return idx
+    raise ValueError(
+        f"No test_small building for {building_type} in CZ {climate_zone}"
+    )
+
+
+# ── Temperature metric ───────────────────────────────────────────────────────
 
 def _zone_temp_indices(
     obs_names: list[str], controlled_zones: list[str]
 ) -> list[int]:
-    """Return obs column indices for each controlled zone's air temperature."""
     prefix = "zone air temperature"
     indices: list[int] = []
     for zone in controlled_zones:
         zn = zone.strip().lower()
-        found = False
         for i, name in enumerate(obs_names):
             nl = name.strip().lower()
             if nl.startswith(prefix):
                 zone_part = nl[len(prefix) :].strip()
                 if zone_part == zn or zn in zone_part or zone_part in zn:
                     indices.append(i)
-                    found = True
                     break
-        if not found:
-            log.warning("Could not find temperature obs for zone %r", zone)
     return indices
 
 
@@ -70,7 +123,7 @@ def compute_pct_in_band(
     low: float = HEATING_SP,
     high: float = COOLING_SP,
 ) -> tuple[float, float]:
-    """Return (mean_pct_in_band, worst_zone_pct_in_band) across zones."""
+    """Return (mean_pct_in_band, worst_zone_pct_in_band)."""
     if not temp_indices:
         return 0.0, 0.0
     pcts: list[float] = []
@@ -79,120 +132,91 @@ def compute_pct_in_band(
         n = len(temps)
         if n == 0:
             continue
-        in_band = float(np.sum((temps >= low) & (temps <= high)) / n * 100)
-        pcts.append(in_band)
+        pcts.append(float(np.sum((temps >= low) & (temps <= high)) / n * 100))
     if not pcts:
         return 0.0, 0.0
     return float(np.mean(pcts)), float(np.min(pcts))
 
 
+# ── Evaluation ────────────────────────────────────────────────────────────────
+
 def evaluate_params(
-    building_type: str,
+    building_type: BuildingType,
+    split: str,
+    split_index: int,
     params: dict[str, float],
-    n_buildings: int,
     run_period: str,
-    eplus_base_dir: Path,
+    eplus_dir: Path,
 ) -> tuple[float, float]:
-    """Run rollouts on N buildings and return (mean_pct, worst_zone_pct)."""
-    all_zone_pcts: list[float] = []
-    worst_zones: list[float] = []
+    """Rollout one building and return (mean_pct, worst_zone_pct)."""
+    eplus_dir.mkdir(parents=True, exist_ok=True)
 
     policy_cfg = OmegaConf.create(
         {
             "heating_setpoint_c": HEATING_SP,
             "cooling_setpoint_c": COOLING_SP,
-            "kp": params["kp"],
-            "ki": params["ki"],
-            "integral_max": params["integral_max"],
-            "min_fan_fraction": params["min_fan_fraction"],
-            "sat_min_c": params["sat_min_c"],
-            "sat_max_c": params["sat_max_c"],
-            "sat_initial_c": params["sat_initial_c"],
-            "sat_trim": params["sat_trim"],
-            "sat_respond": params["sat_respond"],
-            "demand_deadband": params["demand_deadband"],
+            **params,
             "availability_on": 2.0,
         }
     )
 
-    for idx in range(n_buildings):
-        eplus_dir = eplus_base_dir / f"{building_type}_idx{idx}"
-        eplus_dir.mkdir(parents=True, exist_ok=True)
+    env = make_multizones_env(
+        building_type=building_type,
+        split=split,
+        split_index=split_index,
+        eplus_output_dir=str(eplus_dir),
+        task={"run_period": run_period},
+    )
+    try:
+        meta = env.metadata
+        obs_names: list[str] = meta["observation_names"]
+        controlled_zones: list[str] = meta.get("controlled_zones", [])
+        temp_indices = _zone_temp_indices(obs_names, controlled_zones)
 
-        env = make_multizones_env(
-            building_type=building_type,
-            split="test",
-            split_index=idx,
-            eplus_output_dir=str(eplus_dir),
-            task={"run_period": run_period},
+        policy = UnitaryG36Policy(policy_cfg)
+        max_steps = (
+            env.spec.max_episode_steps
+            if env.spec and env.spec.max_episode_steps
+            else RunPeriodConfig.from_name("full_year").expected_steps()
         )
+
+        results, data = run_rollout(
+            env=env,
+            policy=policy,
+            n_episodes=1,
+            deterministic=True,
+            max_steps=max_steps,
+            record=True,
+        )
+        assert data is not None
+        return compute_pct_in_band(data.obs, temp_indices)
+    finally:
         try:
-            meta = env.metadata
-            obs_names: list[str] = meta["observation_names"]
-            controlled_zones: list[str] = meta.get("controlled_zones", [])
-            temp_indices = _zone_temp_indices(obs_names, controlled_zones)
+            env.close()
+        except Exception:
+            pass
 
-            policy = UnitaryG36Policy(policy_cfg)
-            max_steps = (
-                env.spec.max_episode_steps
-                if env.spec and env.spec.max_episode_steps
-                else RunPeriodConfig.from_name("full_year").expected_steps()
-            )
 
-            results, data = run_rollout(
-                env=env,
-                policy=policy,
-                n_episodes=1,
-                deterministic=True,
-                max_steps=max_steps,
-                record=True,
-            )
-            assert data is not None
-
-            mean_pct, worst_pct = compute_pct_in_band(data.obs, temp_indices)
-            all_zone_pcts.append(mean_pct)
-            worst_zones.append(worst_pct)
-
-            source = meta.get("building_source_metadata", {})
-            log.info(
-                "  [%s idx=%d id=%s] mean_in_band=%.1f%%  worst_zone=%.1f%%  return=%.1f",
-                building_type,
-                idx,
-                source.get("building_id", "?"),
-                mean_pct,
-                worst_pct,
-                results[0].total_reward,
-            )
-        finally:
-            try:
-                env.close()
-            except Exception:
-                pass
-
-    if not all_zone_pcts:
-        return 0.0, 0.0
-    return float(np.mean(all_zone_pcts)), float(np.min(worst_zones))
-
+# ── Optuna objective ──────────────────────────────────────────────────────────
 
 def make_objective(
-    building_type: str,
-    n_buildings: int,
+    building_type: BuildingType,
+    split: str,
+    split_index: int,
     run_period: str,
     eplus_base_dir: Path,
-) -> optuna.Study:
-    """Create an Optuna objective closure."""
-
+):
     def objective(trial: optuna.Trial) -> float:
-        kp = trial.suggest_float("kp", 0.05, 1.0)
-        ki = trial.suggest_float("ki", 0.005, 0.1, log=True)
-        integral_max = trial.suggest_float("integral_max", 50.0, 500.0)
-        min_fan_fraction = trial.suggest_float("min_fan_fraction", 0.10, 0.50)
-        sat_min_c = trial.suggest_float("sat_min_c", 10.0, 16.0)
-        sat_max_c = trial.suggest_float("sat_max_c", 25.0, 45.0)
+        kp = trial.suggest_float("kp", 0.001, 0.1)
+        ki = trial.suggest_float("ki", 0.0001, 0.02, log=True)
+        integral_max = trial.suggest_float("integral_max", 5.0, 100.0)
+        min_fan_fraction = trial.suggest_float("min_fan_fraction", 0.005, 0.10)
+        sat_min_c = trial.suggest_float("sat_min_c", 6.0, 16.0)
+        sat_max_c = trial.suggest_float("sat_max_c", 25.0, 60.0)
         sat_initial_c = trial.suggest_float("sat_initial_c", sat_min_c, sat_max_c)
-        sat_trim = trial.suggest_float("sat_trim", 0.1, 1.5)
-        sat_respond = trial.suggest_float("sat_respond", 0.5, 3.0)
-        demand_deadband = trial.suggest_float("demand_deadband", 0.1, 1.0)
+        sat_trim = trial.suggest_float("sat_trim", 0.01, 1.5)
+        sat_respond = trial.suggest_float("sat_respond", 0.5, 6.0)
+        demand_deadband = trial.suggest_float("demand_deadband", 0.01, 1.0)
 
         params = {
             "kp": kp,
@@ -208,34 +232,35 @@ def make_objective(
         }
 
         trial_dir = eplus_base_dir / f"trial_{trial.number}"
-        trial_dir.mkdir(parents=True, exist_ok=True)
-
         mean_pct, worst_pct = evaluate_params(
             building_type=building_type,
+            split=split,
+            split_index=split_index,
             params=params,
-            n_buildings=n_buildings,
             run_period=run_period,
-            eplus_base_dir=trial_dir,
+            eplus_dir=trial_dir,
         )
 
         trial.set_user_attr("worst_zone_pct", worst_pct)
         log.info(
-            "Trial %d: mean_in_band=%.1f%%  worst_zone=%.1f%%  params=%s",
+            "Trial %d: mean_in_band=%.1f%%  worst_zone=%.1f%%",
             trial.number,
             mean_pct,
             worst_pct,
-            {k: (f"{v:.4f}" if isinstance(v, float) else v) for k, v in params.items()},
         )
         return mean_pct
 
     return objective
 
 
-def write_best_config(
-    best_params: dict[str, float],
-    output_path: Path,
-) -> None:
-    """Write the best trial parameters to a YAML config file."""
+# ── Config I/O ────────────────────────────────────────────────────────────────
+
+def config_path_for(building_type: BuildingType, climate_zone: int) -> Path:
+    bt = building_type.lower()
+    return Path(f"configs/policy/unitary_g36_{bt}_cz{climate_zone}.yaml")
+
+
+def write_best_config(best_params: dict[str, float], output_path: Path) -> None:
     config = {
         "type": "unitary_g36",
         "heating_setpoint_c": HEATING_SP,
@@ -253,49 +278,43 @@ def write_best_config(
         "availability_on": 2.0,
         "target_schedule": {"enabled": False},
     }
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
     log.info("Wrote best config to %s", output_path)
 
 
-_TYPE_TO_CONFIG_SUFFIX: dict[str, str] = {
-    "Warehouse": "warehouse",
-    "RetailStandalone": "retail",
-    "RestaurantFastFood": "restaurant",
-}
-
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--building-type",
         required=True,
-        choices=["Warehouse", "RetailStandalone", "RestaurantFastFood", "OfficeSmall"],
+        choices=list(BUILDING_TYPES),
     )
-    parser.add_argument("--n-trials", type=int, default=50)
+    parser.add_argument("--climate-zone", type=int, required=True, choices=CLIMATE_ZONES)
+    parser.add_argument("--n-trials", type=int, default=200)
     parser.add_argument(
-        "--run-period",
-        default="full_year",
-        choices=["winter", "summer", "full_year"],
+        "--run-period", default="full_year", choices=["winter", "summer", "full_year"]
     )
-    parser.add_argument("--n-buildings", type=int, default=5)
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("outputs/tune_g36"),
-    )
+    parser.add_argument("--output-dir", type=Path, default=Path("outputs/tune_g36"))
     args = parser.parse_args()
 
-    study_dir = args.output_dir / args.building_type
+    building_type: BuildingType = args.building_type  # type: ignore[assignment]
+    cz: int = args.climate_zone
+
+    split_index = test_small_index_for_climate_zone(building_type, cz)
+    log.info(
+        "Tuning %s CZ%d  (test_small split_index=%d)", building_type, cz, split_index
+    )
+
+    study_dir = args.output_dir / building_type / f"cz{cz}"
     study_dir.mkdir(parents=True, exist_ok=True)
     db_path = study_dir / "study.db"
-    study_name = f"tune_g36_{args.building_type}"
+    study_name = f"tune_g36_{building_type}_cz{cz}"
 
-    eplus_base_dir = Path(
-        tempfile.mkdtemp(prefix=f"tune_g36_{args.building_type}_")
-    )
+    eplus_base_dir = Path(tempfile.mkdtemp(prefix=f"tune_g36_{building_type}_cz{cz}_"))
     log.info("EnergyPlus scratch dir: %s", eplus_base_dir)
 
     storage = f"sqlite:///{db_path}"
@@ -307,17 +326,17 @@ def main() -> None:
     )
 
     objective = make_objective(
-        building_type=args.building_type,
-        n_buildings=args.n_buildings,
+        building_type=building_type,
+        split="test_small",
+        split_index=split_index,
         run_period=args.run_period,
         eplus_base_dir=eplus_base_dir,
     )
 
     log.info(
-        "Starting Optuna study %r (%d trials, %d buildings, period=%s)",
+        "Starting Optuna study %r (%d trials, period=%s)",
         study_name,
         args.n_trials,
-        args.n_buildings,
         args.run_period,
     )
     study.optimize(objective, n_trials=args.n_trials)
@@ -331,9 +350,8 @@ def main() -> None:
     )
     log.info("  params: %s", study.best_params)
 
-    suffix = _TYPE_TO_CONFIG_SUFFIX.get(args.building_type, args.building_type.lower())
-    config_path = Path(f"configs/policy/unitary_g36_{suffix}.yaml")
-    write_best_config(dict(study.best_params), config_path)
+    out_path = config_path_for(building_type, cz)
+    write_best_config(dict(study.best_params), out_path)
 
 
 if __name__ == "__main__":

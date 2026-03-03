@@ -11,7 +11,7 @@ hydra:
 
 env:
   normalize_obs: false
-  max_steps: 35040
+  max_steps: 105120
   expose_heating_only_zones: true
 
 n_episodes: 1

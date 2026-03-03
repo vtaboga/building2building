@@ -1,4 +1,5 @@
 import json
+import logging
 import shutil
 import tempfile
 from copy import deepcopy
@@ -55,8 +56,10 @@ temp_stl_lower_bound = 5.0
 temp_stl_upper_bound = 50.0  # fallback; overridden per-system when possible
 
 STD_AIR_DENSITY = 1.2  # kg/m³ at ~20 °C, 101.325 kPa
-DEFAULT_FAN_MAX_KGS = 1.0  # fallback when design data is unavailable (covers typical small-to-medium zones)
-DEFAULT_SAT_MAX_C = 40.0  # design-max for DX heat pump + supplemental heater
+DEFAULT_FAN_MAX_KGS = 15.0  # fallback when design data is unavailable
+DEFAULT_SAT_MAX_C = 60.0  # fallback when maximum_supply_air_temperature is Autosize or missing
+
+logger = logging.getLogger(__name__)
 
 DX_COOLING_COMPRESSOR_MIN_OAT_C = 10.0
 
@@ -457,6 +460,13 @@ def make_unitary_controllable(
         _ensure_always_on_availability(obj, loop_name, always_on_sched_name)
 
         design_kgs = _read_fan_design_flow_kgs(obj, supply_fan_name)
+        if design_kgs is None:
+            logger.warning(
+                "Could not read design fan flow rate for fan %r; "
+                "falling back to DEFAULT_FAN_MAX_KGS=%.1f kg/s",
+                supply_fan_name,
+                DEFAULT_FAN_MAX_KGS,
+            )
         fan_upper_kgs = design_kgs if design_kgs is not None else DEFAULT_FAN_MAX_KGS
 
         new_actuators.append(
@@ -470,10 +480,16 @@ def make_unitary_controllable(
             )
         )
 
-        sat_max = (
-            _read_max_supply_air_temp_c(obj, unitary_name, epjson_type)
-            or DEFAULT_SAT_MAX_C
-        )
+        sat_max = _read_max_supply_air_temp_c(obj, unitary_name, epjson_type)
+        if sat_max is None:
+            logger.warning(
+                "Could not read maximum_supply_air_temperature for %s %r; "
+                "falling back to DEFAULT_SAT_MAX_C=%.1f °C",
+                epjson_type,
+                unitary_name,
+                DEFAULT_SAT_MAX_C,
+            )
+            sat_max = DEFAULT_SAT_MAX_C
         temp_stl_name = create_temp_stl(
             obj, temp_stl_lower_bound, sat_max,
             name="unitaryhvac temperature setpoints stl",
