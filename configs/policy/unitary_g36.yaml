@@ -3,9 +3,10 @@ type: unitary_g36
 # G36-inspired PI airflow + Trim-and-Respond SAT controller for PSZ.
 # Zone temperature PI loop modulates fan airflow; T&R adjusts SAT.
 
-# Zone setpoints [C] -- aligned with reward deadband [20, 22] C.
-heating_setpoint_c: 20.0
-cooling_setpoint_c: 22.0
+# Zone setpoints [C] -- inset 0.25 C from reward deadband [20, 22] C
+# to give the controller margin before hitting the penalty boundary.
+heating_setpoint_c: 20.25
+cooling_setpoint_c: 21.75
 
 # PI gains for zone-temp -> airflow loop.
 kp: 0.25

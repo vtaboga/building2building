@@ -469,7 +469,7 @@ def reward_to_dict(reward: RewardConfig) -> dict[str, Any]:
         return {
             "reward_type": "BarrierRewardConfig",
             "energy_weight": reward.energy_weight,
-            "deadband_c": reward.deadband_c,
+            "dT": reward.dT,
             "violation_penalty": reward.violation_penalty,
         }
     if isinstance(reward, BaseRewardConfig):

@@ -1,16 +1,16 @@
 type: unitary_g36
 heating_setpoint_c: 20.0
 cooling_setpoint_c: 22.0
-kp: 0.25
-ki: 0.02
-integral_max: 200.0
-min_fan_fraction: 0.15
-sat_min_c: 12.0
-sat_max_c: 35.0
-sat_initial_c: 21.0
-sat_trim: 0.5
-sat_respond: 1.0
-demand_deadband: 0.3
+kp: 0.6664
+ki: 0.006335
+integral_max: 395.0
+min_fan_fraction: 0.3866
+sat_min_c: 10.87
+sat_max_c: 40.36
+sat_initial_c: 26.85
+sat_trim: 0.186
+sat_respond: 2.929
+demand_deadband: 0.101
 availability_on: 2.0
 target_schedule:
   enabled: false

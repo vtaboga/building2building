@@ -99,6 +99,11 @@ class UnitaryG36Policy:
         self.cooling_sp_c: float = float(
             getattr(policy_cfg, "cooling_setpoint_c")
         )
+        if self.cooling_sp_c <= self.heating_sp_c:
+            raise ValueError(
+                f"cooling_setpoint_c ({self.cooling_sp_c}) must be greater "
+                f"than heating_setpoint_c ({self.heating_sp_c})"
+            )
 
         # PI gains for zone-temp -> airflow loop
         self.kp: float = float(getattr(policy_cfg, "kp"))

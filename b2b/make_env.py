@@ -39,6 +39,30 @@ def _infer_dataset_selection(cfg: dict[str, Any]) -> DatasetSelectionConfig:
     query = bldg.get("query", {})
     if not isinstance(query, dict):
         query = {}
+    climate_zone = bldg.get("climate_zone")
+
+    if (
+        climate_zone is not None
+        and dataset == "multizones_reference_buildings"
+        and building_type is not None
+    ):
+        from b2b.sources.multizones_reference_buildings import (
+            find_building_id_for_climate_zone,
+        )
+
+        bid = find_building_id_for_climate_zone(
+            building_type=building_type,
+            split=split,  # type: ignore[arg-type]
+            climate_zone=int(climate_zone),
+            index=index,
+        )
+        return DatasetSelectionConfig(
+            dataset=dataset,
+            building_type=str(building_type),
+            split=split,  # type: ignore[arg-type]
+            mode="building_id",
+            building_id=bid,
+        )
 
     if query:
         return DatasetSelectionConfig(

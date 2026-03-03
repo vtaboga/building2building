@@ -10,7 +10,7 @@ defaults:
 env:
   normalize_obs: true
   normalize_action: true
-  max_steps: 35040             # full year at 15-min timesteps
+  max_steps: 105120             # full year at 5-min timesteps (365 * 24 * 12)
 
 seed: 42
 

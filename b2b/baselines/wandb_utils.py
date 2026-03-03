@@ -88,7 +88,7 @@ def _extract_wandb_config(cfg: Any) -> dict[str, Any]:
 
     reward = full.get("reward", {})
     if isinstance(reward, dict):
-        for k in ("reward_type", "energy_weight", "dT", "deadband_c"):
+        for k in ("reward_type", "energy_weight", "dT"):
             if k in reward:
                 out[f"reward/{k}"] = reward[k]
 
@@ -103,7 +103,7 @@ def _extract_wandb_config(cfg: Any) -> dict[str, Any]:
     if isinstance(bldg, dict):
         if "building_type" in bldg:
             out["building_type"] = bldg["building_type"]
-        for k in ("split", "index"):
+        for k in ("split", "index", "climate_zone"):
             if k in bldg:
                 out[f"bldg/{k}"] = bldg[k]
 

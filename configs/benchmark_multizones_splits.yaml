@@ -17,7 +17,7 @@ benchmark_interface:
       reward:
         reward_type: BarrierRewardConfig
         energy_weight: 0.1
-        deadband_c: 0.5
+        dT: 0.5
         violation_penalty: 100.0
       task:
         run_period: winter

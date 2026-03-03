@@ -276,13 +276,13 @@ class BarrierRewardConfig:
 
     Attributes:
         energy_weight: Multiplicative weight applied to energy cost.
-        deadband_c: Half-width of the acceptable temperature band (°C).
+        dT: Half-width of the acceptable temperature band (°C).
         violation_penalty: Penalty magnitude when temperature exits the
             deadband.
     """
 
     energy_weight: float
-    deadband_c: float = 0.5
+    dT: float = 0.5
     violation_penalty: float = 100.0
 
 
@@ -326,14 +326,14 @@ def reward_config_from_dict(
     reward_type = reward_section.get("reward_type")
     if reward_type == "DeadbandRewardConfig":
         return DeadbandRewardConfig(
-            energy_weight=float(reward_section.get("energy_weight", 0.0)),
-            dT=float(reward_section.get("dT", 0.5)),
+            energy_weight=float(reward_section.get("energy_weight", 0.01)),
+            dT=float(reward_section.get("dT", 1.0)),
         )
     if reward_type == "BarrierRewardConfig":
         return BarrierRewardConfig(
-            energy_weight=float(reward_section.get("energy_weight", 0.0)),
-            deadband_c=float(reward_section.get("deadband_c", 0.5)),
-            violation_penalty=float(reward_section.get("violation_penalty", 100.0)),
+            energy_weight=float(reward_section.get("energy_weight", 1.0)),
+            dT=float(reward_section.get("dT", 100)),
+            violation_penalty=float(reward_section.get("violation_penalty", 10.0)),
         )
     if reward_type in (None, "BaseRewardConfig"):
         return BaseRewardConfig(energy_weight=float(reward_section.get("energy_weight", 0.0)))
