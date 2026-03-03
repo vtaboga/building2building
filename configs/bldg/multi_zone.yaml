@@ -2,3 +2,4 @@ dataset: multizones_reference_buildings
 building_type: OfficeSmall
 split: train
 index: 0
+# climate_zone: null  # set to 1-8 to select a building from a specific ASHRAE climate zone

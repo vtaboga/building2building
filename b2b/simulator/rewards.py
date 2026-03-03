@@ -78,8 +78,8 @@ def barrier_reward_function(
     controlled_zones: list[str],
     task_config: TaskConfig,
     energy_weight: float = 1.0,
-    deadband_c: float = 0.5,
-    violation_penalty: float = 100.0,
+    dT: float = 1.0,
+    violation_penalty: float = 10.0,
 ) -> float:
     """Calculate a reward combining temperature tracking and energy consumption.
 
@@ -88,7 +88,7 @@ def barrier_reward_function(
         controlled_zones: List of controlled zone names
         task_config: Task configuration with target temperature info
         energy_weight: Weight for the energy consumption penalty
-        deadband_c: Comfort deadband in °C
+        dT: Comfort deadband in °C
         violation_penalty: Penalty for comfort violations
 
     Returns:
@@ -97,18 +97,16 @@ def barrier_reward_function(
 
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
 
-    comfort_penalty = 0.0
+    temp_error = 0.0
     for zone in controlled_zones:
         current_temp = float(obs["temperature"][zone])
         target_temp = _zone_target(obs, zone, task_config)
-        deviation = abs(current_temp - target_temp)
-        if deviation > deadband_c:
-            comfort_penalty += violation_penalty * (deviation - deadband_c)
-        else:
-            comfort_penalty += (current_temp - target_temp) ** 2
+        dev = abs(current_temp - target_temp)
+        if dev >= dT:
+            temp_error += violation_penalty * (dev + 1)
 
-    comfort_penalty = comfort_penalty / len(controlled_zones)
-    total_reward = -(comfort_penalty + energy_weight * energy_penalty)
+    temp_error = temp_error / len(controlled_zones)
+    total_reward = -(temp_error + energy_weight * energy_penalty)
 
     return total_reward
 
@@ -117,7 +115,7 @@ def barrier_reward_function(
 class BarrierReward:
     controlled_zones: list[str]
     energy_weight: float
-    deadband_c: float
+    dT: float
     violation_penalty: float
     task_config: TaskConfig
 
@@ -127,7 +125,7 @@ class BarrierReward:
             self.controlled_zones,
             self.task_config,
             self.energy_weight,
-            self.deadband_c,
+            self.dT,
             self.violation_penalty,
         )
 

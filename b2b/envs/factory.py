@@ -14,11 +14,18 @@ from b2b.datasets import access as dataset_access
 from b2b.simulator import create_simulator
 
 
-def _build_query_for_selection(selection: DatasetSelectionConfig, building_id: int) -> dict[str, object]:
+def _build_bldg_section(selection: DatasetSelectionConfig, building_id: int) -> dict[str, object]:
+    """Build the ``"bldg"`` section of the search config dict.
+
+    For single_zone_houses the query filters go under a ``"query"`` sub-key.
+    For multizones_reference_buildings the filters are top-level keys.
+    """
     if selection.dataset == "single_zone_houses":
         return {
-            "idf_filename": f"IDFsAndSchedules/{building_id}/in.idf",
-            "schedule_filename": f"IDFsAndSchedules/{building_id}/in.schedules.csv",
+            "query": {
+                "idf_filename": f"IDFsAndSchedules/{building_id}/in.idf",
+                "schedule_filename": f"IDFsAndSchedules/{building_id}/in.schedules.csv",
+            },
         }
     if selection.dataset == "multizones_reference_buildings":
         out: dict[str, object] = {"building_id": int(building_id)}
@@ -55,9 +62,9 @@ def make_env_from_config(config: EnvBuildConfig, eplus_output_dir: str | Path) -
     if len(selected_ids) < 1:
         raise RuntimeError("dataset selection produced zero buildings")
     selected_building_id = int(selected_ids[0])
-    bldg_query = _build_query_for_selection(config.dataset_selection, selected_building_id)
+    bldg_section = _build_bldg_section(config.dataset_selection, selected_building_id)
     search_cfg = {
-        "bldg": {"bldg": bldg_query},
+        "bldg": bldg_section,
         "reward": reward_to_dict(config.reward),
         "task": {
             "run_period": config.task.run_period.name,

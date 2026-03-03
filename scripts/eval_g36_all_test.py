@@ -28,8 +28,9 @@ from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
 from b2b.benchmark.runner import run_rollout
 from b2b.sources.multizones_reference_buildings import (
     BuildingType,
+    PLACE_TO_CLIMATE_ZONE,
+    climate_zone_for_building,
     load_split_ids,
-    search_buildings,
 )
 from b2b.types import RunPeriodConfig
 
@@ -50,31 +51,6 @@ BUILDING_TYPES: list[BuildingType] = [
     "Warehouse",
 ]
 
-PLACE_TO_CLIMATE_ZONE: dict[str, int] = {
-    "Miami": 1,
-    "Houston": 2,
-    "Tampa": 2,
-    "Tucson": 2,
-    "Atlanta": 3,
-    "ElPaso": 3,
-    "SanDiego": 3,
-    "SanFrancisco": 3,
-    "Albuquerque": 4,
-    "Baltimore": 4,
-    "NewYork": 4,
-    "PortAngeles": 4,
-    "Seattle": 4,
-    "Buffalo": 5,
-    "Chicago": 5,
-    "Denver": 5,
-    "Vancouver": 5,
-    "GreatFalls": 6,
-    "Rochester": 6,
-    "Duluth": 7,
-    "InternationalFalls": 7,
-    "Fairbanks": 8,
-}
-
 
 def config_path_for(building_type: BuildingType, climate_zone: int) -> Path:
     bt = building_type.lower()
@@ -85,14 +61,6 @@ def load_policy_config(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
     return OmegaConf.create(raw)
-
-
-def climate_zone_for_building(building_type: BuildingType, building_id: int) -> int:
-    rows = search_buildings(building_type=building_type, building_id=building_id)
-    if rows.empty:
-        raise ValueError(f"No metadata for {building_type} id={building_id}")
-    place = str(rows.iloc[0]["place"])
-    return PLACE_TO_CLIMATE_ZONE[place]
 
 
 def _zone_temp_indices(

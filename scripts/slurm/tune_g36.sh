@@ -19,6 +19,6 @@ echo "=== Tuning ${BUILDING_TYPE} CZ${CZ} ==="
 python scripts/tune_g36.py \
     --building-type ${BUILDING_TYPE} \
     --climate-zone ${CZ} \
-    --n-trials 200 \
+    --n-trials 300 \
     --run-period full_year \
     --output-dir outputs/tune_g36

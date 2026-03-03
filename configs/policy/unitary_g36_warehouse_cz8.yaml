@@ -1,0 +1,16 @@
+type: unitary_g36
+heating_setpoint_c: 20.25
+cooling_setpoint_c: 21.75
+kp: 0.0999
+ki: 0.003915
+integral_max: 21.2
+min_fan_fraction: 0.0128
+sat_min_c: 15.13
+sat_max_c: 40.67
+sat_initial_c: 40.14
+sat_trim: 0.331
+sat_respond: 3.911
+demand_deadband: 0.472
+availability_on: 2.0
+target_schedule:
+  enabled: false

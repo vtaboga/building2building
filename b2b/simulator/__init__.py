@@ -154,7 +154,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         reward_function = BarrierReward(
             controlled_zones=reward_zones,
             energy_weight=building_config.reward_config.energy_weight,
-            deadband_c=building_config.reward_config.deadband_c,
+            dT=building_config.reward_config.dT,
             violation_penalty=building_config.reward_config.violation_penalty,
             task_config=task_config,
         )

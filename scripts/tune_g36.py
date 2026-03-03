@@ -26,8 +26,9 @@ from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
 from b2b.benchmark.runner import run_rollout
 from b2b.sources.multizones_reference_buildings import (
     BuildingType,
+    CLIMATE_ZONES,
+    climate_zone_for_building,
     load_split_ids,
-    search_buildings,
 )
 from b2b.types import RunPeriodConfig
 
@@ -38,8 +39,11 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-HEATING_SP = 20.0
-COOLING_SP = 22.0
+HEATING_SP = 20.25
+COOLING_SP = 21.75
+
+REWARD_BAND_LOW = 20.0
+REWARD_BAND_HIGH = 22.0
 
 BUILDING_TYPES: list[BuildingType] = [
     "OfficeSmall",
@@ -47,42 +51,6 @@ BUILDING_TYPES: list[BuildingType] = [
     "RestaurantFastFood",
     "Warehouse",
 ]
-
-PLACE_TO_CLIMATE_ZONE: dict[str, int] = {
-    "Miami": 1,
-    "Houston": 2,
-    "Tampa": 2,
-    "Tucson": 2,
-    "Atlanta": 3,
-    "ElPaso": 3,
-    "SanDiego": 3,
-    "SanFrancisco": 3,
-    "Albuquerque": 4,
-    "Baltimore": 4,
-    "NewYork": 4,
-    "PortAngeles": 4,
-    "Seattle": 4,
-    "Buffalo": 5,
-    "Chicago": 5,
-    "Denver": 5,
-    "Vancouver": 5,
-    "GreatFalls": 6,
-    "Rochester": 6,
-    "Duluth": 7,
-    "InternationalFalls": 7,
-    "Fairbanks": 8,
-}
-
-CLIMATE_ZONES = sorted(set(PLACE_TO_CLIMATE_ZONE.values()))
-
-
-def climate_zone_for_building(building_type: BuildingType, building_id: int) -> int:
-    """Look up the climate zone of a building via the metadata index."""
-    rows = search_buildings(building_type=building_type, building_id=building_id)
-    if rows.empty:
-        raise ValueError(f"No metadata for {building_type} id={building_id}")
-    place = str(rows.iloc[0]["place"])
-    return PLACE_TO_CLIMATE_ZONE[place]
 
 
 def test_small_index_for_climate_zone(
@@ -120,8 +88,8 @@ def _zone_temp_indices(
 def compute_pct_in_band(
     obs: np.ndarray,
     temp_indices: list[int],
-    low: float = HEATING_SP,
-    high: float = COOLING_SP,
+    low: float = REWARD_BAND_LOW,
+    high: float = REWARD_BAND_HIGH,
 ) -> tuple[float, float]:
     """Return (mean_pct_in_band, worst_zone_pct_in_band)."""
     if not temp_indices:
