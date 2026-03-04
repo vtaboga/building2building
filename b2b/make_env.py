@@ -88,9 +88,13 @@ def make_env(config: object, eplus_output_dir: str | Path):
     try:
         cfg = _to_plain_dict(config)
         task_section = cfg.get("task", {}) if isinstance(cfg.get("task"), dict) else {}
-        reward_section = (
-            cfg.get("reward", {}) if isinstance(cfg.get("reward"), dict) else {}
-        )
+        reward_raw = cfg.get("reward")
+        if not isinstance(reward_raw, dict) or not reward_raw:
+            raise ValueError(
+                "The 'reward' section is required in the environment config.  "
+                "Pass a dict with at least a 'reward_type' key."
+            )
+        reward_section: dict[str, Any] = reward_raw
         env_section = cfg.get("env", {}) if isinstance(cfg.get("env"), dict) else {}
         task = TaskConfig.from_dict(task_section)
         reward = reward_config_from_dict(reward_section)

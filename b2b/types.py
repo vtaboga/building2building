@@ -302,6 +302,11 @@ class DeadbandRewardConfig:
 RewardConfig = Union[DeadbandRewardConfig, BaseRewardConfig, BarrierRewardConfig]
 
 
+VALID_REWARD_TYPES = frozenset(
+    {"DeadbandRewardConfig", "BarrierRewardConfig", "BaseRewardConfig"}
+)
+
+
 def reward_config_from_dict(
     reward_section: dict[str, Any],
 ) -> RewardConfig:
@@ -311,19 +316,25 @@ def reward_config_from_dict(
 
     * ``"DeadbandRewardConfig"`` -> :class:`DeadbandRewardConfig`
     * ``"BarrierRewardConfig"``  -> :class:`BarrierRewardConfig`
-    * ``None`` / ``"BaseRewardConfig"`` -> :class:`BaseRewardConfig`
+    * ``"BaseRewardConfig"``     -> :class:`BaseRewardConfig`
 
     Args:
-        reward_section: Dictionary with a ``"reward_type"`` key and
-            type-specific parameters.
+        reward_section: Dictionary with a mandatory ``"reward_type"`` key
+            and type-specific parameters.
 
     Returns:
         The appropriate ``RewardConfig`` variant.
 
     Raises:
-        ValueError: If ``"reward_type"`` is not recognised.
+        ValueError: If ``"reward_type"`` is missing or not recognised.
     """
     reward_type = reward_section.get("reward_type")
+    if reward_type is None:
+        raise ValueError(
+            "reward.reward_type is required — specify one of "
+            f"{sorted(VALID_REWARD_TYPES)}.  "
+            "Pass an explicit reward config to avoid silent defaults."
+        )
     if reward_type == "DeadbandRewardConfig":
         return DeadbandRewardConfig(
             energy_weight=float(reward_section.get("energy_weight", 0.01)),
@@ -335,10 +346,15 @@ def reward_config_from_dict(
             dT=float(reward_section.get("dT", 100)),
             violation_penalty=float(reward_section.get("violation_penalty", 10.0)),
         )
-    if reward_type in (None, "BaseRewardConfig"):
-        return BaseRewardConfig(energy_weight=float(reward_section.get("energy_weight", 0.0)))
+    if reward_type == "BaseRewardConfig":
+        return BaseRewardConfig(
+            energy_weight=float(reward_section.get("energy_weight", 0.0))
+        )
 
-    raise ValueError(f"Unknown reward type: {reward_type}")
+    raise ValueError(
+        f"Unknown reward_type: {reward_type!r} — "
+        f"must be one of {sorted(VALID_REWARD_TYPES)}"
+    )
 
 
 @dataclass(frozen=True)

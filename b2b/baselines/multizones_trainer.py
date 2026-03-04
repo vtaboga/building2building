@@ -66,7 +66,7 @@ def make_multizones_env(
     split: Literal["train", "test", "test_small"],
     index: int,
     eplus_output_dir: str | Path,
-    reward_section: dict[str, Any] | None = None,
+    reward_section: dict[str, Any],
     task_section: dict[str, Any] | None = None,
     max_steps: int | None = None,
 ) -> gym.Env:
@@ -82,8 +82,10 @@ def make_multizones_env(
         0-based position in the split's ID list.
     eplus_output_dir:
         Root directory for EnergyPlus output files.
-    energy_weight:
-        Weight for the energy term in the reward.
+    reward_section:
+        Reward configuration dict with a ``"reward_type"`` key.
+    task_section:
+        Optional task configuration dict.
     max_steps:
         If given, wrap the env with ``TimeLimit``.
     """

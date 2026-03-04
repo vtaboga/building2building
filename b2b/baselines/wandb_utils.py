@@ -176,6 +176,13 @@ def init_wandb_from_config(
         logger.warning("wandb.init failed; skipping logging: %s", e)
         return None, False
 
+    if run is not None:
+        try:
+            wandb.define_metric("time/total_timesteps")
+            wandb.define_metric("*", step_metric="time/total_timesteps")
+        except Exception as e:
+            logger.warning("wandb.define_metric failed: %s", e)
+
     if run is not None and log_code_root is not None:
         try:
             run.log_code(root=str(log_code_root))

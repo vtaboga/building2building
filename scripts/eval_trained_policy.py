@@ -121,6 +121,7 @@ def evaluate_run(
         split_index=index,
         eplus_output_dir=str(eplus_dir),
         task={"run_period": rp},
+        reward={"reward_type": "DeadbandRewardConfig", "energy_weight": 0.01, "dT": 1.0},
         max_steps=max_steps,
     )
 

@@ -57,4 +57,11 @@ if [ "${REWARD}" = "barrier" ]; then
     )
 fi
 
+if [ "${TARGET}" = "occupancy" ]; then
+    COMMON_ARGS+=(
+        task.default_zone_target_temperature.occupied_c=21.0
+        task.default_zone_target_temperature.unoccupied_c=18.0
+    )
+fi
+
 python scripts/train_multizones.py "${COMMON_ARGS[@]}"

@@ -326,8 +326,11 @@ def search_configs(
             warmup_phases = metadata.warmup_phases
 
             reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
-            if not isinstance(reward_section, dict):
-                reward_section = {}
+            if not isinstance(reward_section, dict) or "reward_type" not in reward_section:
+                raise ValueError(
+                    "The 'reward' section with a 'reward_type' key is required "
+                    "in the building config."
+                )
             reward_config = reward_config_from_dict(reward_section)
 
             configs.append(

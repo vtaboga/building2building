@@ -3,7 +3,8 @@
 
 For each building in the full test split, looks up its climate zone from the
 metadata, loads the matching per-(building_type, climate_zone) YAML config,
-and runs a full-year rollout.  Results are written to a CSV file.
+and runs a full-year rollout under several reward / task setups.  Results are
+written to per-setup CSV files.
 
 Usage:
     python scripts/eval_g36_all_test.py --building-type Warehouse
@@ -16,6 +17,7 @@ import argparse
 import csv
 import logging
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -52,15 +54,62 @@ BUILDING_TYPES: list[BuildingType] = [
 ]
 
 
+@dataclass(frozen=True)
+class EvalSetup:
+    """A named evaluation configuration pairing a reward YAML with task overrides."""
+
+    name: str
+    reward_config_path: Path
+    task_overrides: dict[str, Any]
+
+
+EVAL_SETUPS: list[EvalSetup] = [
+    EvalSetup(
+        name="deadband_ew001_const",
+        reward_config_path=Path("configs/reward/deadband_ew001.yaml"),
+        task_overrides={
+            "target_temperature_mode": "constant",
+        },
+    ),
+    EvalSetup(
+        name="deadband_ew01_const",
+        reward_config_path=Path("configs/reward/deadband_ew01.yaml"),
+        task_overrides={
+            "target_temperature_mode": "constant",
+        },
+    ),
+    EvalSetup(
+        name="deadband_ew001_occ",
+        reward_config_path=Path("configs/reward/deadband_ew001_occ.yaml"),
+        task_overrides={
+            "target_temperature_mode": "occupancy",
+            "default_zone_target_temperature": {
+                "occupied_c": 21.0,
+                "unoccupied_c": 18.0,
+            },
+        },
+    ),
+    EvalSetup(
+        name="barrier_ew1",
+        reward_config_path=Path("configs/reward/barrier_ew1.yaml"),
+        task_overrides={},
+    ),
+]
+
+
 def config_path_for(building_type: BuildingType, climate_zone: int) -> Path:
     bt = building_type.lower()
     return Path(f"configs/policy/unitary_g36_{bt}_cz{climate_zone}.yaml")
 
 
-def load_policy_config(path: Path) -> Any:
+def load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
-    return OmegaConf.create(raw)
+    return raw if isinstance(raw, dict) else {}
+
+
+def load_policy_config(path: Path) -> Any:
+    return OmegaConf.create(load_yaml(path))
 
 
 def _zone_temp_indices(
@@ -101,6 +150,7 @@ def compute_pct_in_band(
 
 
 CSV_FIELDS = [
+    "setup",
     "building_type",
     "building_id",
     "split_index",
@@ -121,14 +171,18 @@ def eval_one_building(
     policy_cfg: Any,
     run_period: str,
     eplus_dir: Path,
+    reward: dict[str, Any],
+    task_overrides: dict[str, Any],
 ) -> dict[str, Any]:
     eplus_dir.mkdir(parents=True, exist_ok=True)
+    task_dict: dict[str, Any] = {"run_period": run_period, **task_overrides}
     env = make_multizones_env(
         building_type=building_type,
         split="test",
         split_index=split_index,
         eplus_output_dir=str(eplus_dir),
-        task={"run_period": run_period},
+        task=task_dict,
+        reward=reward,
     )
     try:
         meta = env.metadata
@@ -173,52 +227,46 @@ def eval_one_building(
             pass
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--building-type",
-        required=True,
-        choices=list(BUILDING_TYPES),
+def run_setup(
+    setup: EvalSetup,
+    building_type: BuildingType,
+    run_period: str,
+    output_dir: Path,
+    eplus_base_dir: Path,
+    cz_configs: dict[int, Any],
+    test_ids: list[int],
+) -> None:
+    """Run a single evaluation setup across all test buildings."""
+    reward_dict = load_yaml(setup.reward_config_path)
+    setup_dir = output_dir / setup.name
+    setup_dir.mkdir(parents=True, exist_ok=True)
+
+    log.info(
+        "--- Setup: %s  reward=%s ---", setup.name, setup.reward_config_path
     )
-    parser.add_argument(
-        "--run-period", default="full_year", choices=["winter", "summer", "full_year"]
-    )
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs/eval_g36"))
-    args = parser.parse_args()
 
-    building_type: BuildingType = args.building_type  # type: ignore[assignment]
-    output_dir: Path = args.output_dir / building_type
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    eplus_base_dir = Path(tempfile.mkdtemp(prefix=f"eval_g36_{building_type}_"))
-    log.info("EnergyPlus scratch dir: %s", eplus_base_dir)
-
-    # Pre-load all CZ configs
-    cz_configs: dict[int, Any] = {}
-    for cz in sorted(set(PLACE_TO_CLIMATE_ZONE.values())):
-        cfg_path = config_path_for(building_type, cz)
-        if cfg_path.exists():
-            cz_configs[cz] = load_policy_config(cfg_path)
-            log.info("Loaded config for CZ%d: %s", cz, cfg_path)
-        else:
-            log.warning("Missing config for CZ%d: %s — buildings in this CZ will be skipped", cz, cfg_path)
-
-    test_ids = load_split_ids(building_type, "test")
-    log.info("Evaluating %d test buildings for %s", len(test_ids), building_type)
-
-    csv_path = output_dir / "results.csv"
+    csv_path = setup_dir / "results.csv"
     rows: list[dict[str, Any]] = []
 
     for idx, bid in enumerate(test_ids):
         cz = climate_zone_for_building(building_type, bid)
         if cz not in cz_configs:
             log.warning(
-                "Skipping %s id=%d (CZ%d): no tuned config", building_type, bid, cz
+                "Skipping %s id=%d (CZ%d): no tuned config",
+                building_type,
+                bid,
+                cz,
             )
             continue
 
         log.info(
-            "  [%d/%d] %s id=%d CZ%d", idx + 1, len(test_ids), building_type, bid, cz
+            "  [%d/%d] %s id=%d CZ%d  setup=%s",
+            idx + 1,
+            len(test_ids),
+            building_type,
+            bid,
+            cz,
+            setup.name,
         )
         try:
             row = eval_one_building(
@@ -227,9 +275,12 @@ def main() -> None:
                 building_id=bid,
                 climate_zone=cz,
                 policy_cfg=cz_configs[cz],
-                run_period=args.run_period,
-                eplus_dir=eplus_base_dir / f"idx{idx}",
+                run_period=run_period,
+                eplus_dir=eplus_base_dir / setup.name / f"idx{idx}",
+                reward=reward_dict,
+                task_overrides=setup.task_overrides,
             )
+            row["setup"] = setup.name
             rows.append(row)
             log.info(
                 "    mean_in_band=%.1f%%  worst_zone=%.1f%%  return=%.1f",
@@ -238,36 +289,100 @@ def main() -> None:
                 row["episode_return"],
             )
         except Exception:
-            log.exception("FAILED for %s id=%d idx=%d", building_type, bid, idx)
+            log.exception(
+                "FAILED for %s id=%d idx=%d setup=%s",
+                building_type,
+                bid,
+                idx,
+                setup.name,
+            )
 
-    # Write CSV
     with csv_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
         writer.writeheader()
         writer.writerows(rows)
     log.info("Wrote %d results to %s", len(rows), csv_path)
 
-    # Summary
     if rows:
         means = [r["mean_pct_in_band"] for r in rows]
         worsts = [r["worst_zone_pct_in_band"] for r in rows]
-        log.info("=" * 70)
         log.info(
-            "SUMMARY %s: %d buildings, mean_in_band=%.1f%%, worst_zone=%.1f%%",
+            "SUMMARY %s / %s: %d buildings, mean_in_band=%.1f%%, worst_zone=%.1f%%",
             building_type,
+            setup.name,
             len(rows),
             float(np.mean(means)),
             float(np.min(worsts)),
         )
-        for cz in sorted(set(r["climate_zone"] for r in rows)):
-            cz_rows = [r for r in rows if r["climate_zone"] == cz]
-            cz_means = [r["mean_pct_in_band"] for r in cz_rows]
-            log.info(
-                "  CZ%d: %d buildings, mean_in_band=%.1f%%",
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--building-type",
+        required=True,
+        choices=list(BUILDING_TYPES),
+    )
+    parser.add_argument(
+        "--run-period",
+        default="full_year",
+        choices=["winter", "summer", "full_year"],
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, default=Path("outputs/eval_g36")
+    )
+    parser.add_argument(
+        "--setup",
+        choices=[s.name for s in EVAL_SETUPS],
+        default=None,
+        help="Run a single setup instead of all four.",
+    )
+    args = parser.parse_args()
+
+    building_type: BuildingType = args.building_type  # type: ignore[assignment]
+    output_dir: Path = args.output_dir / building_type
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    eplus_base_dir = Path(
+        tempfile.mkdtemp(prefix=f"eval_g36_{building_type}_")
+    )
+    log.info("EnergyPlus scratch dir: %s", eplus_base_dir)
+
+    cz_configs: dict[int, Any] = {}
+    for cz in sorted(set(PLACE_TO_CLIMATE_ZONE.values())):
+        cfg_path = config_path_for(building_type, cz)
+        if cfg_path.exists():
+            cz_configs[cz] = load_policy_config(cfg_path)
+            log.info("Loaded config for CZ%d: %s", cz, cfg_path)
+        else:
+            log.warning(
+                "Missing config for CZ%d: %s — buildings in this CZ will be skipped",
                 cz,
-                len(cz_rows),
-                float(np.mean(cz_means)),
+                cfg_path,
             )
+
+    test_ids = load_split_ids(building_type, "test")
+    log.info(
+        "Evaluating %d test buildings for %s", len(test_ids), building_type
+    )
+
+    setups = EVAL_SETUPS
+    if args.setup is not None:
+        setups = [s for s in EVAL_SETUPS if s.name == args.setup]
+
+    for setup in setups:
+        run_setup(
+            setup=setup,
+            building_type=building_type,
+            run_period=args.run_period,
+            output_dir=output_dir,
+            eplus_base_dir=eplus_base_dir,
+            cz_configs=cz_configs,
+            test_ids=test_ids,
+        )
+
+    log.info("=" * 70)
+    log.info("All setups complete for %s.", building_type)
 
 
 if __name__ == "__main__":

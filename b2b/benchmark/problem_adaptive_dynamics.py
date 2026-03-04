@@ -30,7 +30,7 @@ def _default_base_config() -> dict[str, Any]:
             "max_steps": 0,
             "normalize_obs": False,
         },
-        "reward": {"reward_type": None},
+        "reward": {"reward_type": "BaseRewardConfig", "energy_weight": 0.0},
         "bldg": {"dataset": "single_zone_houses"},
     }
 

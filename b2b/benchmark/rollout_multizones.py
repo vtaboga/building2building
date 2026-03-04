@@ -104,8 +104,13 @@ def run_multizones_rollout(
         max_steps_raw = max_steps_raw.get("max_steps", None)
     else:
         max_steps_raw = None
-    reward_sect = cfg.get("reward", {})
-    reward_section = reward_sect if isinstance(reward_sect, dict) else {}
+    reward_sect = cfg.get("reward")
+    if not isinstance(reward_sect, dict) or "reward_type" not in reward_sect:
+        raise ValueError(
+            "The 'reward' section with a 'reward_type' key is required in "
+            "the rollout config."
+        )
+    reward_section: dict[str, Any] = reward_sect
 
     task_sect = cfg.get("task", {})
     task_section = task_sect if isinstance(task_sect, dict) else {}
