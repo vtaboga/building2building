@@ -62,6 +62,7 @@ class _ZoneState:
     sat_idx: int
     temp_obs_idx: int
     fan_max: float  # design-max kg/s (from action space upper bound)
+    target_obs_idx: int | None = None  # obs index for dynamic target temperature
     air_pi: _PIState = field(default_factory=_PIState)
     sat_sp: float = 14.0  # current SAT setpoint [C], evolved by T&R
     prev_temp: float | None = None
@@ -87,6 +88,19 @@ def _match_actuator_index(
         if name == target:
             return i
     raise RuntimeError(f"Could not find action for actuator: {target!r}")
+
+
+def _find_target_temp_index(obs_names: list[str], zone_name: str) -> int | None:
+    """Find the obs index for ``target_temperature <zone>``, or None."""
+    prefix = "target_temperature"
+    zn = zone_name.strip().lower()
+    for i, name in enumerate(obs_names):
+        nl = name.strip().lower()
+        if nl.startswith(prefix):
+            zone_part = nl[len(prefix) :].strip()
+            if zone_part == zn or zn in zone_part or zone_part in zn:
+                return i
+    return None
 
 
 class UnitaryG36Policy:
@@ -223,6 +237,7 @@ class UnitaryG36Policy:
                     sat_idx=sat_idx,
                     temp_obs_idx=temp_idx,
                     fan_max=fan_max,
+                    target_obs_idx=_find_target_temp_index(obs_names, sys.zone),
                     sat_sp=self.sat_initial_c,
                 )
             )
@@ -276,8 +291,22 @@ class UnitaryG36Policy:
             z.sat_sp = self.sat_initial_c
             z.prev_temp = None
 
-    def _current_setpoints(self, obs_arr: np.ndarray) -> tuple[float, float]:
-        """Return (heating_sp, cooling_sp) for the current timestep."""
+    def _current_setpoints(
+        self, obs_arr: np.ndarray, zone: _ZoneState | None = None
+    ) -> tuple[float, float]:
+        """Return (heating_sp, cooling_sp) for the current timestep.
+
+        When *zone* has a dynamic ``target_obs_idx`` (occupancy mode), the
+        setpoints are centred on the per-timestep target read from the
+        observation vector, preserving the configured deadband width.
+        """
+        gap = self.cooling_sp_c - self.heating_sp_c
+
+        if zone is not None and zone.target_obs_idx is not None:
+            target = float(obs_arr[zone.target_obs_idx])
+            half = gap / 2.0
+            return target - half, target + half
+
         if not self._sched_enabled or self._tod_idx is None or self._dow_idx is None:
             return self.heating_sp_c, self.cooling_sp_c
 
@@ -291,7 +320,6 @@ class UnitaryG36Policy:
         else:
             sp = self._weekday_c
 
-        gap = self.cooling_sp_c - self.heating_sp_c
         return sp, sp + gap
 
     # -- control logic -----------------------------------------------------
@@ -349,7 +377,6 @@ class UnitaryG36Policy:
             )
 
         obs_arr = np.asarray(obs, dtype=float).reshape(-1)
-        heat_sp, cool_sp = self._current_setpoints(obs_arr)
 
         action = np.zeros(self._n_act, dtype=float)
 
@@ -357,6 +384,7 @@ class UnitaryG36Policy:
             action[idx] = self.availability_on
 
         for z in self._zones:
+            heat_sp, cool_sp = self._current_setpoints(obs_arr, zone=z)
             tz = float(obs_arr[z.temp_obs_idx])
 
             if z.prev_temp is not None and abs(tz - z.prev_temp) > _WARMUP_JUMP_C:
@@ -367,6 +395,7 @@ class UnitaryG36Policy:
             action[z.sat_idx] = self._sat_trim_and_respond(z, tz, heat_sp, cool_sp)
 
         for bb in self._baseboards:
+            heat_sp, _ = self._current_setpoints(obs_arr)
             action[bb.htg_sp_idx] = heat_sp
 
         return action, None
@@ -375,18 +404,28 @@ class UnitaryG36Policy:
 
     def step_metrics(self, obs: Any, *, action: np.ndarray) -> dict[str, float]:
         obs_arr = np.asarray(obs, dtype=float).reshape(-1)
-        heat_sp, cool_sp = self._current_setpoints(obs_arr)
         temps: list[float] = []
+        heat_sps: list[float] = []
+        cool_sps: list[float] = []
         for z in self._zones:
+            h, c = self._current_setpoints(obs_arr, zone=z)
+            heat_sps.append(h)
+            cool_sps.append(c)
             if z.temp_obs_idx < len(obs_arr):
                 temps.append(float(obs_arr[z.temp_obs_idx]))
         for bb in self._baseboards:
+            h, c = self._current_setpoints(obs_arr)
+            heat_sps.append(h)
+            cool_sps.append(c)
             if bb.temp_obs_idx < len(obs_arr):
                 temps.append(float(obs_arr[bb.temp_obs_idx]))
         metrics: dict[str, float] = {
-            "heating_setpoint_c": heat_sp,
-            "cooling_setpoint_c": cool_sp,
+            "heating_setpoint_c": float(np.max(heat_sps)) if heat_sps else self.heating_sp_c,
+            "cooling_setpoint_c": float(np.max(cool_sps)) if cool_sps else self.cooling_sp_c,
         }
+        if heat_sps and min(heat_sps) != max(heat_sps):
+            metrics["heating_setpoint_min_c"] = float(np.min(heat_sps))
+            metrics["cooling_setpoint_min_c"] = float(np.min(cool_sps))
         if temps:
             metrics["mean_zone_temp_c"] = float(np.mean(temps))
             metrics["min_zone_temp_c"] = float(np.min(temps))

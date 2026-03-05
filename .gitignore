@@ -35,6 +35,7 @@ b2b_outputs/
 !b2b/sources/data/
 ./cursor/
 dataset_v2/
+analysis/
 
 dataset/
 *.zip

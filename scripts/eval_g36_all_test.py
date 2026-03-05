@@ -129,21 +129,57 @@ def _zone_temp_indices(
     return indices
 
 
+def _zone_target_temp_indices(
+    obs_names: list[str], controlled_zones: list[str]
+) -> list[int]:
+    """Find indices of ``target_temperature <zone>`` in the flat obs vector.
+
+    Returns an empty list when the observation space does not contain
+    per-zone target temperatures (i.e. constant-setpoint mode).
+    """
+    prefix = "target_temperature"
+    indices: list[int] = []
+    for zone in controlled_zones:
+        zn = zone.strip().lower()
+        for i, name in enumerate(obs_names):
+            nl = name.strip().lower()
+            if nl.startswith(prefix):
+                zone_part = nl[len(prefix) :].strip()
+                if zone_part == zn or zn in zone_part or zone_part in zn:
+                    indices.append(i)
+                    break
+    return indices
+
+
 def compute_pct_in_band(
     obs: np.ndarray,
     temp_indices: list[int],
     low: float = HEATING_SP,
     high: float = COOLING_SP,
+    target_indices: list[int] | None = None,
+    dT: float = 1.0,
 ) -> tuple[float, float]:
+    """Compute per-zone % of timesteps inside the comfort band.
+
+    When *target_indices* is provided (occupancy-aware mode), the band
+    at each timestep is ``[target - dT, target + dT]`` using the
+    per-timestep target temperature from the observation vector.
+    Otherwise the fixed ``[low, high]`` band is used.
+    """
     if not temp_indices:
         return 0.0, 0.0
     pcts: list[float] = []
-    for idx in temp_indices:
+    for zi, idx in enumerate(temp_indices):
         temps = obs[:, idx]
         n = len(temps)
         if n == 0:
             continue
-        pcts.append(float(np.sum((temps >= low) & (temps <= high)) / n * 100))
+        if target_indices and zi < len(target_indices):
+            targets = obs[:, target_indices[zi]]
+            in_band = (temps >= targets - dT) & (temps <= targets + dT)
+        else:
+            in_band = (temps >= low) & (temps <= high)
+        pcts.append(float(np.sum(in_band) / n * 100))
     if not pcts:
         return 0.0, 0.0
     return float(np.mean(pcts)), float(np.min(pcts))
@@ -190,6 +226,7 @@ def eval_one_building(
         controlled_zones: list[str] = meta.get("controlled_zones", [])
         source = meta.get("building_source_metadata", {})
         temp_indices = _zone_temp_indices(obs_names, controlled_zones)
+        target_indices = _zone_target_temp_indices(obs_names, controlled_zones)
 
         policy = UnitaryG36Policy(policy_cfg)
         max_steps = (
@@ -208,7 +245,11 @@ def eval_one_building(
         )
         assert data is not None
 
-        mean_pct, worst_pct = compute_pct_in_band(data.obs, temp_indices)
+        mean_pct, worst_pct = compute_pct_in_band(
+            data.obs,
+            temp_indices,
+            target_indices=target_indices or None,
+        )
         return {
             "building_type": building_type,
             "building_id": building_id,
