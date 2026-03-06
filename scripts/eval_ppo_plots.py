@@ -276,6 +276,11 @@ def main() -> None:
         default=DEFAULT_MAX_STEPS,
         help="Number of rollout steps per model (default: 2016 ≈ 3 weeks).",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-evaluate all models, ignoring existing plots.",
+    )
     args = parser.parse_args()
 
     setup_energyplus_path()
@@ -287,16 +292,40 @@ def main() -> None:
         log.warning("No models found in %s — exiting.", args.models_dir)
         return
 
+    if args.force:
+        pending = models
+    else:
+        pending = []
+        for md in models:
+            case_dir = (
+                args.output_dir
+                / md.building_type
+                / md.task
+                / f"building_{md.building_index}"
+            )
+            if (case_dir / "rollout.csv").exists():
+                continue
+            pending.append(md)
+        log.info(
+            "%d models already have plots, %d remaining",
+            len(models) - len(pending),
+            len(pending),
+        )
+
+    if not pending:
+        log.info("Nothing new to evaluate.")
+        return
+
     eplus_base_dir = Path(tempfile.mkdtemp(prefix="eval_ppo_plots_"))
     log.info("EnergyPlus scratch dir: %s", eplus_base_dir)
 
     succeeded = 0
     failed = 0
-    for i, md in enumerate(models):
+    for i, md in enumerate(pending):
         log.info(
             "[%d/%d] %s / %s / building_%d",
             i + 1,
-            len(models),
+            len(pending),
             md.building_type,
             md.task,
             md.building_index,
@@ -314,11 +343,12 @@ def main() -> None:
             failed += 1
 
     log.info(
-        "\n%s\nDone: %d succeeded, %d failed out of %d total\n%s",
+        "\n%s\nDone: %d succeeded, %d failed out of %d pending (%d already done)\n%s",
         "=" * 70,
         succeeded,
         failed,
-        len(models),
+        len(pending),
+        len(models) - len(pending),
         "=" * 70,
     )
 

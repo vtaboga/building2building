@@ -3,7 +3,7 @@
 #SBATCH --output=logs/ppo_house_%A_%a.out
 #SBATCH --error=logs/ppo_house_%A_%a.err
 #SBATCH --array=0-31
-#SBATCH --time=14:00:00
+#SBATCH --time=4:00:00
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 

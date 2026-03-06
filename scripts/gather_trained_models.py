@@ -36,6 +36,14 @@ TAG_TO_TASK: dict[str, str] = {
     "rf_db001_occ": "deadband_ew001_occ",
     "rf_db01_const": "deadband_ew01_const",
     "rf_bar": "barrier_ew1",
+    "om_db001_const": "deadband_ew001_const",
+    "om_db001_occ": "deadband_ew001_occ",
+    "om_db01_const": "deadband_ew01_const",
+    "om_bar": "barrier_ew1",
+    "so_db001_const": "deadband_ew001_const",
+    "so_db001_occ": "deadband_ew001_occ",
+    "so_db01_const": "deadband_ew01_const",
+    "so_bar": "barrier_ew1",
 }
 
 TAG_TO_BUILDING_TYPE: dict[str, str] = {
@@ -51,6 +59,14 @@ TAG_TO_BUILDING_TYPE: dict[str, str] = {
     "rf_db001_occ": "RestaurantFastFood",
     "rf_db01_const": "RestaurantFastFood",
     "rf_bar": "RestaurantFastFood",
+    "om_db001_const": "OfficeMedium",
+    "om_db001_occ": "OfficeMedium",
+    "om_db01_const": "OfficeMedium",
+    "om_bar": "OfficeMedium",
+    "so_db001_const": "OfficeSmall",
+    "so_db001_occ": "OfficeSmall",
+    "so_db01_const": "OfficeSmall",
+    "so_bar": "OfficeSmall",
 }
 
 NUM_BUILDINGS = 8

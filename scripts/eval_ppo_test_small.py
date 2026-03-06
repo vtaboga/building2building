@@ -52,6 +52,8 @@ BUILDING_TYPES: list[BuildingType] = [
     "Warehouse",
     "RetailStandalone",
     "RestaurantFastFood",
+    "OfficeMedium",
+    "OfficeSmall",
 ]
 
 TASKS = [
@@ -350,6 +352,20 @@ def eval_one_model(
             pass
 
 
+def _load_existing_results(
+    csv_path: Path,
+) -> tuple[list[dict[str, Any]], set[tuple[str, str, int]]]:
+    """Load previously computed rows and return them with a set of done keys."""
+    if not csv_path.exists():
+        return [], set()
+    df = pd.read_csv(csv_path)
+    rows = df.to_dict(orient="records")
+    done: set[tuple[str, str, int]] = set()
+    for row in rows:
+        done.add((str(row["building_type"]), str(row["task"]), int(row["building_index"])))
+    return rows, done
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -370,6 +386,11 @@ def main() -> None:
         default=DEFAULT_G36_DIR,
         help="Root of G36 baseline eval results.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-evaluate all models, ignoring existing results.",
+    )
     args = parser.parse_args()
 
     setup_energyplus_path()
@@ -381,22 +402,47 @@ def main() -> None:
         log.warning("No models found in %s — exiting.", args.models_dir)
         return
 
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = args.output_dir / "results.csv"
+
+    if args.force:
+        existing_rows: list[dict[str, Any]] = []
+        done: set[tuple[str, str, int]] = set()
+    else:
+        existing_rows, done = _load_existing_results(csv_path)
+        if done:
+            log.info("Loaded %d existing results — will skip those.", len(done))
+
+    pending = [
+        md for md in models
+        if (md.building_type, md.task, md.building_index) not in done
+    ]
+    log.info(
+        "%d models already evaluated, %d remaining",
+        len(models) - len(pending),
+        len(pending),
+    )
+
+    if not pending:
+        log.info("Nothing new to evaluate.")
+        return
+
     eplus_base_dir = Path(tempfile.mkdtemp(prefix="eval_ppo_"))
     log.info("EnergyPlus scratch dir: %s", eplus_base_dir)
 
-    rows: list[dict[str, Any]] = []
-    for i, md in enumerate(models):
+    new_rows: list[dict[str, Any]] = []
+    for i, md in enumerate(pending):
         log.info(
             "[%d/%d] %s / %s / building_%d",
             i + 1,
-            len(models),
+            len(pending),
             md.building_type,
             md.task,
             md.building_index,
         )
         try:
             row = eval_one_model(md, eplus_base_dir)
-            rows.append(row)
+            new_rows.append(row)
             log.info(
                 "  return=%.1f  mean_in_band=%.1f%%  worst_zone=%.1f%%",
                 row["episode_return"],
@@ -410,6 +456,8 @@ def main() -> None:
                 md.task,
                 md.building_index,
             )
+
+    rows = existing_rows + new_rows
 
     # --- Post-processing: normalise against G36 baselines ---
     baselines = load_g36_baselines(args.g36_dir)
@@ -425,13 +473,11 @@ def main() -> None:
             row["g36_return"] = ""
             row["normalized_return"] = ""
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = args.output_dir / "results.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
         writer.writeheader()
         writer.writerows(rows)
-    log.info("Wrote %d results to %s", len(rows), csv_path)
+    log.info("Wrote %d results (%d new) to %s", len(rows), len(new_rows), csv_path)
 
     # --- Summary ---
     expected = len(BUILDING_TYPES) * len(TASKS) * 8
