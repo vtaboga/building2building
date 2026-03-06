@@ -26,6 +26,7 @@ from b2b.baselines.wandb_utils import (
     init_wandb_from_config,
 )
 from b2b.api import make_multizones_env as make_multizones_env_api
+from b2b.benchmark.runner import run_episode
 from b2b.simulator.wrappers import NormalizeObservation
 from b2b.sources import multizones_reference_buildings as mz_source
 from b2b.sources.multizones_reference_buildings import (
@@ -248,6 +249,79 @@ def _make_callbacks(
     return CallbackList(callbacks)
 
 
+def _post_training_eval(
+    model: Any,
+    *,
+    building_type: BuildingType,
+    split: Literal["train", "test", "test_small"],
+    index: int,
+    reward_section: dict[str, Any],
+    task_section: dict[str, Any],
+    max_steps: int | None,
+    norm_obs: bool,
+    norm_action: bool,
+    output_dir: Path,
+    building_id: int,
+) -> float:
+    """Run a single deterministic rollout after training and log the return."""
+    import json as _json
+
+    eval_eplus_dir = output_dir / "post_train_eval_eplus"
+    eval_eplus_dir.mkdir(parents=True, exist_ok=True)
+
+    env: gym.Env = make_multizones_env(
+        building_type=building_type,
+        split=split,
+        index=index,
+        eplus_output_dir=str(eval_eplus_dir),
+        reward_section=reward_section,
+        task_section=task_section,
+        max_steps=max_steps,
+    )
+    if norm_action:
+        env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
+    if norm_obs:
+        env = NormalizeObservation(env)
+
+    result = run_episode(env=env, policy=model, deterministic=True, max_steps=max_steps)
+    try:
+        env.close()
+    except Exception:
+        pass
+
+    logger.info(
+        "Post-training eval: %s id=%d  return=%.2f  steps=%d",
+        building_type, building_id, result.total_reward, result.n_steps,
+    )
+
+    eval_meta = {
+        "building_type": building_type,
+        "building_id": building_id,
+        "split": split,
+        "index": index,
+        "total_reward": result.total_reward,
+        "n_steps": result.n_steps,
+    }
+    meta_path = output_dir / "post_train_eval.json"
+    with meta_path.open("w") as f:
+        _json.dump(eval_meta, f, indent=2)
+    logger.info("Saved post-training eval metadata to %s", meta_path)
+
+    try:
+        import wandb
+        if wandb.run is not None:
+            wandb.run.summary["eval/post_train_return"] = result.total_reward
+            wandb.run.summary["eval/post_train_steps"] = result.n_steps
+            wandb.log({
+                "eval/post_train_return": result.total_reward,
+                "eval/post_train_steps": result.n_steps,
+            })
+    except Exception:
+        pass
+
+    return result.total_reward
+
+
 def multizones_trainer(config: OmegaConf, output_dir: Path) -> None:
     """Train an SB3 agent on a single multizones_reference_buildings building."""
     repo_root = Path(__file__).resolve().parents[2]
@@ -334,6 +408,22 @@ def multizones_trainer(config: OmegaConf, output_dir: Path) -> None:
     best_model = load_best_model(config, model_dir)
     if best_model is not None:
         logger.info("Best model (by eval callback) available at %s/best_model.zip", model_dir)
+
+    # ---- post-training evaluation rollout ----
+    eval_model = best_model if best_model is not None else model
+    eval_return = _post_training_eval(
+        eval_model,
+        building_type=building_type,
+        split=split,
+        index=index,
+        reward_section=reward_section,
+        task_section=task_section,
+        max_steps=max_steps,
+        norm_obs=config.env.normalize_obs,
+        norm_action=getattr(config.env, "normalize_action", False),
+        output_dir=output_dir,
+        building_id=building_id,
+    )
 
     finish_wandb_if_started(wandb_run, started_here=started_here)
 
