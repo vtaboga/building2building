@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Optuna-based parameter tuning for the ASHRAE G36 controller.
+"""Optuna-based parameter tuning for the ASHRAE air-loop controller.
 
-Tunes one set of parameters per (building_type, climate_zone) pair.
+Tunes one set of parameters per climate zone for the OfficeMedium building type.
 Each climate zone has exactly one building in the ``test_small`` split;
 that single building is used for evaluation during optimisation.
 
 Usage:
-    python scripts/tune_g36.py --building-type Warehouse --climate-zone 3 --n-trials 200
+    python scripts/tune_ashrae_air_loop.py --climate-zone 3 --n-trials 200
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import yaml
 from omegaconf import OmegaConf
 
 from b2b.api import make_multizones_env
-from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
+from b2b.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
 from b2b.benchmark.runner import run_rollout
 from b2b.sources.multizones_reference_buildings import (
     BuildingType,
@@ -39,34 +39,25 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-HEATING_SP = 20.25
-COOLING_SP = 21.75
+BUILDING_TYPE: BuildingType = "OfficeMedium"
 
 REWARD_BAND_LOW = 20.0
 REWARD_BAND_HIGH = 22.0
 
-BUILDING_TYPES: list[BuildingType] = [
-    "OfficeSmall",
-    "RetailStandalone",
-    "RestaurantFastFood",
-    "Warehouse",
-]
 
-
-def test_small_index_for_climate_zone(
-    building_type: BuildingType, climate_zone: int
-) -> int:
+def test_small_index_for_climate_zone(climate_zone: int) -> int:
     """Return the test_small split index whose building belongs to *climate_zone*."""
-    ids = load_split_ids(building_type, "test_small")
+    ids = load_split_ids(BUILDING_TYPE, "test_small")
     for idx, bid in enumerate(ids):
-        if climate_zone_for_building(building_type, bid) == climate_zone:
+        if climate_zone_for_building(BUILDING_TYPE, bid) == climate_zone:
             return idx
     raise ValueError(
-        f"No test_small building for {building_type} in CZ {climate_zone}"
+        f"No test_small building for {BUILDING_TYPE} in CZ {climate_zone}"
     )
 
 
 # ── Temperature metric ───────────────────────────────────────────────────────
+
 
 def _zone_temp_indices(
     obs_names: list[str], controlled_zones: list[str]
@@ -108,8 +99,8 @@ def compute_pct_in_band(
 
 # ── Evaluation ────────────────────────────────────────────────────────────────
 
+
 def evaluate_params(
-    building_type: BuildingType,
     split: str,
     split_index: int,
     params: dict[str, float],
@@ -119,22 +110,15 @@ def evaluate_params(
     """Rollout one building and return (mean_pct, worst_zone_pct)."""
     eplus_dir.mkdir(parents=True, exist_ok=True)
 
-    policy_cfg = OmegaConf.create(
-        {
-            "heating_setpoint_c": HEATING_SP,
-            "cooling_setpoint_c": COOLING_SP,
-            **params,
-            "availability_on": 2.0,
-        }
-    )
+    policy_cfg = OmegaConf.create(params)
 
     env = make_multizones_env(
-        building_type=building_type,
+        building_type=BUILDING_TYPE,
         split=split,
         split_index=split_index,
         eplus_output_dir=str(eplus_dir),
         task={"run_period": run_period},
-        reward={"reward_type": "BaseRewardDeadbandConfig", "energy_weight": 0.01, "dT": 1.0},
+        reward={"reward_type": "DeadbandRewardConfig", "energy_weight": 0.01, "dT": 1.0},
     )
     try:
         meta = env.metadata
@@ -142,7 +126,7 @@ def evaluate_params(
         controlled_zones: list[str] = meta.get("controlled_zones", [])
         temp_indices = _zone_temp_indices(obs_names, controlled_zones)
 
-        policy = UnitaryG36Policy(policy_cfg)
+        policy = AshraeAirLoopPolicy(policy_cfg)
         max_steps = (
             env.spec.max_episode_steps
             if env.spec and env.spec.max_episode_steps
@@ -168,41 +152,74 @@ def evaluate_params(
 
 # ── Optuna objective ──────────────────────────────────────────────────────────
 
+
 def make_objective(
-    building_type: BuildingType,
     split: str,
     split_index: int,
     run_period: str,
     eplus_base_dir: Path,
 ):
     def objective(trial: optuna.Trial) -> float:
-        kp = trial.suggest_float("kp", 0.001, 0.1)
-        ki = trial.suggest_float("ki", 0.0001, 0.02, log=True)
-        integral_max = trial.suggest_float("integral_max", 5.0, 100.0)
-        min_fan_fraction = trial.suggest_float("min_fan_fraction", 0.005, 0.10)
-        sat_min_c = trial.suggest_float("sat_min_c", 6.0, 16.0)
-        sat_max_c = trial.suggest_float("sat_max_c", 25.0, 60.0)
-        sat_initial_c = trial.suggest_float("sat_initial_c", sat_min_c, sat_max_c)
-        sat_trim = trial.suggest_float("sat_trim", 0.01, 1.5)
-        sat_respond = trial.suggest_float("sat_respond", 0.5, 6.0)
-        demand_deadband = trial.suggest_float("demand_deadband", 0.01, 1.0)
+        target_temp = trial.suggest_float("target_temp", 20.0, 22.0)
+        deadband = trial.suggest_float("deadband", 0.3, 2.0)
+
+        sat_neutral = trial.suggest_float("sat_neutral", 16.0, 25.0)
+        sat_kp = trial.suggest_float("sat_kp", 0.1, 3.0)
+        sat_min = trial.suggest_float("sat_min", 6.0, 16.0)
+        sat_max = trial.suggest_float("sat_max", 30.0, 60.0)
+        sat_rate_limit = trial.suggest_float("sat_rate_limit", 0.05, 1.0)
+        outdoor_sat_gain = trial.suggest_float("outdoor_sat_gain", 0.0, 0.3)
+        sat_cold_bias = trial.suggest_float("sat_cold_bias", 0.0, 0.5)
+        sat_warm_bias = trial.suggest_float("sat_warm_bias", 0.0, 1.0)
+
+        flow_base = trial.suggest_float("flow_base", 0.2, 0.7)
+        flow_kp = trial.suggest_float("flow_kp", 0.05, 0.6)
+        flow_ki = trial.suggest_float("flow_ki", 0.005, 0.1, log=True)
+        flow_min = trial.suggest_float("flow_min", 0.05, 0.3)
+        flow_max = trial.suggest_float("flow_max", 0.7, 1.0)
+        flow_rate_limit = trial.suggest_float("flow_rate_limit", 0.01, 0.15)
+        integral_max = trial.suggest_float("integral_max", 5.0, 50.0)
+        integral_decay = trial.suggest_float("integral_decay", 0.9, 1.0)
+
+        reheat_sp_min = trial.suggest_float("reheat_sp_min", 8.0, 15.0)
+        reheat_sp_max = trial.suggest_float("reheat_sp_max", 20.0, 30.0)
+        reheat_sp_deadband = trial.suggest_float("reheat_sp_deadband", 0.1, 1.0)
+        reheat_sp_kp = trial.suggest_float("reheat_sp_kp", 1.0, 6.0)
+        reheat_sp_rate_limit = trial.suggest_float("reheat_sp_rate_limit", 0.05, 0.5)
+
+        clg_sp_default = trial.suggest_float("clg_sp_default", 21.0, 26.0)
+        error_ema_alpha = trial.suggest_float("error_ema_alpha", 0.1, 0.6)
 
         params = {
-            "kp": kp,
-            "ki": ki,
+            "target_temp": target_temp,
+            "deadband": deadband,
+            "sat_neutral": sat_neutral,
+            "sat_kp": sat_kp,
+            "sat_min": sat_min,
+            "sat_max": sat_max,
+            "sat_rate_limit": sat_rate_limit,
+            "outdoor_sat_gain": outdoor_sat_gain,
+            "sat_cold_bias": sat_cold_bias,
+            "sat_warm_bias": sat_warm_bias,
+            "flow_base": flow_base,
+            "flow_kp": flow_kp,
+            "flow_ki": flow_ki,
+            "flow_min": flow_min,
+            "flow_max": flow_max,
+            "flow_rate_limit": flow_rate_limit,
             "integral_max": integral_max,
-            "min_fan_fraction": min_fan_fraction,
-            "sat_min_c": sat_min_c,
-            "sat_max_c": sat_max_c,
-            "sat_initial_c": sat_initial_c,
-            "sat_trim": sat_trim,
-            "sat_respond": sat_respond,
-            "demand_deadband": demand_deadband,
+            "integral_decay": integral_decay,
+            "reheat_sp_min": reheat_sp_min,
+            "reheat_sp_max": reheat_sp_max,
+            "reheat_sp_deadband": reheat_sp_deadband,
+            "reheat_sp_kp": reheat_sp_kp,
+            "reheat_sp_rate_limit": reheat_sp_rate_limit,
+            "clg_sp_default": clg_sp_default,
+            "error_ema_alpha": error_ema_alpha,
         }
 
         trial_dir = eplus_base_dir / f"trial_{trial.number}"
         mean_pct, worst_pct = evaluate_params(
-            building_type=building_type,
             split=split,
             split_index=split_index,
             params=params,
@@ -224,29 +241,17 @@ def make_objective(
 
 # ── Config I/O ────────────────────────────────────────────────────────────────
 
-def config_path_for(building_type: BuildingType, climate_zone: int) -> Path:
-    bt = building_type.lower()
-    return Path(f"configs/policy/unitary_g36_{bt}_cz{climate_zone}.yaml")
+
+def config_path_for(climate_zone: int) -> Path:
+    return Path(f"configs/policy/ashrae_air_loop_officemedium_cz{climate_zone}.yaml")
 
 
 def write_best_config(best_params: dict[str, float], output_path: Path) -> None:
-    config = {
-        "type": "unitary_g36",
-        "heating_setpoint_c": HEATING_SP,
-        "cooling_setpoint_c": COOLING_SP,
-        "kp": round(float(best_params["kp"]), 4),
-        "ki": round(float(best_params["ki"]), 6),
-        "integral_max": round(float(best_params["integral_max"]), 1),
-        "min_fan_fraction": round(float(best_params["min_fan_fraction"]), 4),
-        "sat_min_c": round(float(best_params["sat_min_c"]), 2),
-        "sat_max_c": round(float(best_params["sat_max_c"]), 2),
-        "sat_initial_c": round(float(best_params["sat_initial_c"]), 2),
-        "sat_trim": round(float(best_params["sat_trim"]), 3),
-        "sat_respond": round(float(best_params["sat_respond"]), 3),
-        "demand_deadband": round(float(best_params["demand_deadband"]), 3),
-        "availability_on": 2.0,
-        "target_schedule": {"enabled": False},
-    }
+    config: dict[str, object] = {"type": "ashrae_air_loop"}
+    for key, value in best_params.items():
+        config[key] = round(float(value), 4)
+    config["sat_aware_flow"] = True
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
@@ -255,35 +260,32 @@ def write_best_config(best_params: dict[str, float], output_path: Path) -> None:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--building-type",
-        required=True,
-        choices=list(BUILDING_TYPES),
-    )
     parser.add_argument("--climate-zone", type=int, required=True, choices=CLIMATE_ZONES)
     parser.add_argument("--n-trials", type=int, default=200)
     parser.add_argument(
         "--run-period", default="full_year", choices=["winter", "summer", "full_year"]
     )
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs/tune_g36"))
+    parser.add_argument("--output-dir", type=Path, default=Path("outputs/tune_ashrae_air_loop"))
     args = parser.parse_args()
 
-    building_type: BuildingType = args.building_type  # type: ignore[assignment]
     cz: int = args.climate_zone
 
-    split_index = test_small_index_for_climate_zone(building_type, cz)
+    split_index = test_small_index_for_climate_zone(cz)
     log.info(
-        "Tuning %s CZ%d  (test_small split_index=%d)", building_type, cz, split_index
+        "Tuning %s CZ%d  (test_small split_index=%d)", BUILDING_TYPE, cz, split_index
     )
 
-    study_dir = args.output_dir / building_type / f"cz{cz}"
+    study_dir = args.output_dir / f"cz{cz}"
     study_dir.mkdir(parents=True, exist_ok=True)
     db_path = study_dir / "study.db"
-    study_name = f"tune_g36_{building_type}_cz{cz}"
+    study_name = f"tune_ashrae_air_loop_officemedium_cz{cz}"
 
-    eplus_base_dir = Path(tempfile.mkdtemp(prefix=f"tune_g36_{building_type}_cz{cz}_"))
+    eplus_base_dir = Path(
+        tempfile.mkdtemp(prefix=f"tune_ashrae_air_loop_cz{cz}_")
+    )
     log.info("EnergyPlus scratch dir: %s", eplus_base_dir)
 
     storage = f"sqlite:///{db_path}"
@@ -295,7 +297,6 @@ def main() -> None:
     )
 
     objective = make_objective(
-        building_type=building_type,
         split="test_small",
         split_index=split_index,
         run_period=args.run_period,
@@ -319,7 +320,7 @@ def main() -> None:
     )
     log.info("  params: %s", study.best_params)
 
-    out_path = config_path_for(building_type, cz)
+    out_path = config_path_for(cz)
     write_best_config(dict(study.best_params), out_path)
 
 

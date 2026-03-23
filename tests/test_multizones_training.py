@@ -265,6 +265,7 @@ class TestMakeMultizonesEnv:
             split="train",
             index=0,
             eplus_output_dir=tmp_path,
+            reward_section={"reward_type": "BaseRewardConfig", "energy_weight": 0.0},
         )
 
         mock_make_env_api.assert_called_once()
@@ -279,6 +280,7 @@ class TestMakeMultizonesEnv:
                 split="train",
                 index=99999,
                 eplus_output_dir=tmp_path,
+                reward_section={"reward_type": "BaseRewardConfig", "energy_weight": 0.0},
             )
 
 

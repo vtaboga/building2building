@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=ppo_offmed
-#SBATCH --output=logs/ppo_offmed_%A_%a.out
-#SBATCH --error=logs/ppo_offmed_%A_%a.err
-#SBATCH --array=0-7
+#SBATCH --job-name=ppo_offsmall
+#SBATCH --output=logs/ppo_offsmall_%A_%a.out
+#SBATCH --error=logs/ppo_offsmall_%A_%a.err
+#SBATCH --array=0-31
 #SBATCH --time=10:00:00
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
@@ -18,15 +18,18 @@ EXP_IDX=$((SLURM_ARRAY_TASK_ID / NUM_BUILDINGS))
 BLDG_IDX=$((SLURM_ARRAY_TASK_ID % NUM_BUILDINGS))
 
 declare -a REWARD_TYPES=(
+    "deadband"  # 0: deadband ew=0.01 constant
     "deadband"  # 1: deadband ew=0.01 occupancy
+    "deadband"  # 2: deadband ew=0.1  constant
+    "barrier"   # 3: barrier  dT=1 penalty=10
 )
 
-declare -a ENERGY_WEIGHTS=("0.01")
+declare -a ENERGY_WEIGHTS=("0.01" "0.01" "0.1" "1.0")
 
-declare -a TARGET_MODES=("occupancy")
+declare -a TARGET_MODES=("constant" "occupancy" "constant" "constant")
 
 declare -a TAG_LABELS=(
-    "om_db001_occ"
+    "so_db001_const"  "so_db001_occ"  "so_db01_const"  "so_bar"
 )
 
 REWARD=${REWARD_TYPES[$EXP_IDX]}
@@ -34,10 +37,10 @@ EW=${ENERGY_WEIGHTS[$EXP_IDX]}
 TARGET=${TARGET_MODES[$EXP_IDX]}
 TAG=${TAG_LABELS[$EXP_IDX]}
 
-echo "Experiment ${EXP_IDX} | Building ${BLDG_IDX} | OfficeMedium | ${REWARD} ew=${EW} target=${TARGET}"
+echo "Experiment ${EXP_IDX} | Building ${BLDG_IDX} | OfficeSmall | ${REWARD} ew=${EW} target=${TARGET}"
 
 COMMON_ARGS=(
-    bldg.building_type=OfficeMedium
+    bldg.building_type=OfficeSmall
     bldg.split=test_small
     bldg.index=${BLDG_IDX}
     reward=${REWARD}
@@ -46,6 +49,13 @@ COMMON_ARGS=(
     "wandb.tags=[test_small, ${TAG}]"
     hydra.run.dir=${SCRATCH}/${TAG}/building_${BLDG_IDX}
 )
+
+if [ "${REWARD}" = "barrier" ]; then
+    COMMON_ARGS+=(
+        reward.dT=1.0
+        reward.violation_penalty=10.0
+    )
+fi
 
 if [ "${TARGET}" = "occupancy" ]; then
     COMMON_ARGS+=(

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Optuna-based parameter tuning for the ASHRAE G36 controller.
+"""Optuna-based parameter tuning for the ASHRAE G36 controller on single-zone test buildings.
 
-Tunes one set of parameters per (building_type, climate_zone) pair.
-Each climate zone has exactly one building in the ``test_small`` split;
-that single building is used for evaluation during optimisation.
+Tunes a single set of G36 parameters by rolling out trajectories on the first
+N buildings of the ``action_space_2_zone_1`` test split and averaging the
+in-band percentage across all of them.
 
 Usage:
-    python scripts/tune_g36.py --building-type Warehouse --climate-zone 3 --n-trials 200
+    python scripts/tune_g36_test.py --n-buildings 8 --n-trials 200
 """
 
 from __future__ import annotations
@@ -21,15 +21,9 @@ import optuna
 import yaml
 from omegaconf import OmegaConf
 
-from b2b.api import make_multizones_env
+from b2b.api import make_single_zone_env
 from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
 from b2b.benchmark.runner import run_rollout
-from b2b.sources.multizones_reference_buildings import (
-    BuildingType,
-    CLIMATE_ZONES,
-    climate_zone_for_building,
-    load_split_ids,
-)
 from b2b.types import RunPeriodConfig
 
 logging.basicConfig(
@@ -45,28 +39,9 @@ COOLING_SP = 21.75
 REWARD_BAND_LOW = 20.0
 REWARD_BAND_HIGH = 22.0
 
-BUILDING_TYPES: list[BuildingType] = [
-    "OfficeSmall",
-    "RetailStandalone",
-    "RestaurantFastFood",
-    "Warehouse",
-]
-
-
-def test_small_index_for_climate_zone(
-    building_type: BuildingType, climate_zone: int
-) -> int:
-    """Return the test_small split index whose building belongs to *climate_zone*."""
-    ids = load_split_ids(building_type, "test_small")
-    for idx, bid in enumerate(ids):
-        if climate_zone_for_building(building_type, bid) == climate_zone:
-            return idx
-    raise ValueError(
-        f"No test_small building for {building_type} in CZ {climate_zone}"
-    )
-
 
 # ── Temperature metric ───────────────────────────────────────────────────────
+
 
 def _zone_temp_indices(
     obs_names: list[str], controlled_zones: list[str]
@@ -108,9 +83,8 @@ def compute_pct_in_band(
 
 # ── Evaluation ────────────────────────────────────────────────────────────────
 
-def evaluate_params(
-    building_type: BuildingType,
-    split: str,
+
+def evaluate_params_single(
     split_index: int,
     params: dict[str, float],
     run_period: str,
@@ -128,13 +102,12 @@ def evaluate_params(
         }
     )
 
-    env = make_multizones_env(
-        building_type=building_type,
-        split=split,
+    env = make_single_zone_env(
+        split="test",
         split_index=split_index,
         eplus_output_dir=str(eplus_dir),
         task={"run_period": run_period},
-        reward={"reward_type": "BaseRewardDeadbandConfig", "energy_weight": 0.01, "dT": 1.0},
+        reward={"reward_type": "DeadbandRewardConfig", "energy_weight": 0.01, "dT": 1.0},
     )
     try:
         meta = env.metadata
@@ -166,12 +139,34 @@ def evaluate_params(
             pass
 
 
+def evaluate_params_multi(
+    split_indices: list[int],
+    params: dict[str, float],
+    run_period: str,
+    eplus_base_dir: Path,
+) -> tuple[float, float]:
+    """Rollout on multiple buildings, return (avg_mean_pct, avg_worst_pct)."""
+    mean_pcts: list[float] = []
+    worst_pcts: list[float] = []
+    for idx in split_indices:
+        eplus_dir = eplus_base_dir / f"bldg_{idx}"
+        m, w = evaluate_params_single(
+            split_index=idx,
+            params=params,
+            run_period=run_period,
+            eplus_dir=eplus_dir,
+        )
+        mean_pcts.append(m)
+        worst_pcts.append(w)
+        log.info("  building idx=%d: mean=%.1f%%  worst=%.1f%%", idx, m, w)
+    return float(np.mean(mean_pcts)), float(np.mean(worst_pcts))
+
+
 # ── Optuna objective ──────────────────────────────────────────────────────────
 
+
 def make_objective(
-    building_type: BuildingType,
-    split: str,
-    split_index: int,
+    split_indices: list[int],
     run_period: str,
     eplus_base_dir: Path,
 ):
@@ -201,32 +196,29 @@ def make_objective(
         }
 
         trial_dir = eplus_base_dir / f"trial_{trial.number}"
-        mean_pct, worst_pct = evaluate_params(
-            building_type=building_type,
-            split=split,
-            split_index=split_index,
+        avg_mean_pct, avg_worst_pct = evaluate_params_multi(
+            split_indices=split_indices,
             params=params,
             run_period=run_period,
-            eplus_dir=trial_dir,
+            eplus_base_dir=trial_dir,
         )
 
-        trial.set_user_attr("worst_zone_pct", worst_pct)
+        trial.set_user_attr("avg_worst_zone_pct", avg_worst_pct)
         log.info(
-            "Trial %d: mean_in_band=%.1f%%  worst_zone=%.1f%%",
+            "Trial %d: avg_mean_in_band=%.1f%%  avg_worst_zone=%.1f%%",
             trial.number,
-            mean_pct,
-            worst_pct,
+            avg_mean_pct,
+            avg_worst_pct,
         )
-        return mean_pct
+        return avg_mean_pct
 
     return objective
 
 
 # ── Config I/O ────────────────────────────────────────────────────────────────
 
-def config_path_for(building_type: BuildingType, climate_zone: int) -> Path:
-    bt = building_type.lower()
-    return Path(f"configs/policy/unitary_g36_{bt}_cz{climate_zone}.yaml")
+
+CONFIG_OUTPUT_PATH = Path("configs/policy/unitary_g36_singlezone_test.yaml")
 
 
 def write_best_config(best_params: dict[str, float], output_path: Path) -> None:
@@ -255,35 +247,35 @@ def write_best_config(best_params: dict[str, float], output_path: Path) -> None:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--building-type",
-        required=True,
-        choices=list(BUILDING_TYPES),
+        "--n-buildings", type=int, default=8,
+        help="Number of buildings from the start of the test split to evaluate on.",
     )
-    parser.add_argument("--climate-zone", type=int, required=True, choices=CLIMATE_ZONES)
     parser.add_argument("--n-trials", type=int, default=200)
     parser.add_argument(
         "--run-period", default="full_year", choices=["winter", "summer", "full_year"]
     )
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs/tune_g36"))
+    parser.add_argument("--output-dir", type=Path, default=Path("outputs/tune_g36_test"))
     args = parser.parse_args()
 
-    building_type: BuildingType = args.building_type  # type: ignore[assignment]
-    cz: int = args.climate_zone
-
-    split_index = test_small_index_for_climate_zone(building_type, cz)
+    split_indices = list(range(args.n_buildings))
     log.info(
-        "Tuning %s CZ%d  (test_small split_index=%d)", building_type, cz, split_index
+        "Tuning G36 on %d single-zone test buildings (indices %s)",
+        len(split_indices),
+        split_indices,
     )
 
-    study_dir = args.output_dir / building_type / f"cz{cz}"
+    study_dir = args.output_dir
     study_dir.mkdir(parents=True, exist_ok=True)
     db_path = study_dir / "study.db"
-    study_name = f"tune_g36_{building_type}_cz{cz}"
+    study_name = f"tune_g36_test_{args.n_buildings}bldg"
 
-    eplus_base_dir = Path(tempfile.mkdtemp(prefix=f"tune_g36_{building_type}_cz{cz}_"))
+    eplus_base_dir = Path(
+        tempfile.mkdtemp(prefix=f"tune_g36_test_{args.n_buildings}bldg_")
+    )
     log.info("EnergyPlus scratch dir: %s", eplus_base_dir)
 
     storage = f"sqlite:///{db_path}"
@@ -295,9 +287,7 @@ def main() -> None:
     )
 
     objective = make_objective(
-        building_type=building_type,
-        split="test_small",
-        split_index=split_index,
+        split_indices=split_indices,
         run_period=args.run_period,
         eplus_base_dir=eplus_base_dir,
     )
@@ -312,15 +302,14 @@ def main() -> None:
 
     log.info("=" * 70)
     log.info("Best trial: #%d", study.best_trial.number)
-    log.info("  mean_in_band = %.2f%%", study.best_value)
+    log.info("  avg_mean_in_band = %.2f%%", study.best_value)
     log.info(
-        "  worst_zone   = %.2f%%",
-        study.best_trial.user_attrs.get("worst_zone_pct", float("nan")),
+        "  avg_worst_zone   = %.2f%%",
+        study.best_trial.user_attrs.get("avg_worst_zone_pct", float("nan")),
     )
     log.info("  params: %s", study.best_params)
 
-    out_path = config_path_for(building_type, cz)
-    write_best_config(dict(study.best_params), out_path)
+    write_best_config(dict(study.best_params), CONFIG_OUTPUT_PATH)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 #SBATCH --output=logs/ppo_house_%A_%a.out
 #SBATCH --error=logs/ppo_house_%A_%a.err
 #SBATCH --array=0-31
-#SBATCH --time=14:00:00
+#SBATCH --time=4:00:00
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 
@@ -53,6 +53,13 @@ if [ "${REWARD}" = "barrier" ]; then
     COMMON_ARGS+=(
         reward.dT=1.0
         reward.violation_penalty=10.0
+    )
+fi
+
+if [ "${TARGET}" = "occupancy" ]; then
+    COMMON_ARGS+=(
+        task.default_zone_target_temperature.occupied_c=21.0
+        task.default_zone_target_temperature.unoccupied_c=18.0
     )
 fi
 

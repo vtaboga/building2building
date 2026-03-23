@@ -140,6 +140,7 @@ def run_one_building(
         split_index=split_index,
         eplus_output_dir=str(eplus_dir),
         task={"run_period": run_period},
+        reward={"reward_type": "DeadbandRewardConfig", "energy_weight": 0.01, "dT": 1.0},
     )
     try:
         meta = env.metadata
