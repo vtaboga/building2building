@@ -37,7 +37,7 @@ Train on one set of building types (e.g. `OfficeSmall`, `Warehouse`) and
 evaluate zero-shot on a disjoint set (e.g. `OfficeMedium`,
 `RetailStandalone`).  The `MultiTypeTrainTestBenchmark` and
 `SingleTypeTrainTestBenchmark` classes — defined in
-`b2b.benchmark.problem_multizones_splits` — manage train/test building
+`building2building.benchmark.problem_multizones_splits` — manage train/test building
 selection and configuration.
 
 See [Cross-Environment Generalisation](cross-env.md) for details.
@@ -45,7 +45,7 @@ See [Cross-Environment Generalisation](cross-env.md) for details.
 ### Action-Space Shift
 
 Train with one actuator configuration and test with a different one.
-`ActuatorAccessConfig` (from `b2b.config.models`) controls which actuators are
+`ActuatorAccessConfig` (from `building2building.config.models`) controls which actuators are
 exposed.  For example, zone heating setpoints can be withheld during training
 and restored at test time.
 
@@ -56,7 +56,7 @@ See [Action-Space Shift](action-shift.md) for details.
 Evaluate a controller across parametrically varied buildings of the **same
 archetype** (e.g. Hydro-Québec single-family houses with different insulation,
 orientation, or HVAC sizing).  `AdaptiveDynamicsProblem` from
-`b2b.benchmark.problem_adaptive_dynamics` orchestrates building iteration and
+`building2building.benchmark.problem_adaptive_dynamics` orchestrates building iteration and
 rollout.
 
 See [Adaptive Dynamics](adaptive-dynamics.md) for details.
@@ -64,13 +64,13 @@ See [Adaptive Dynamics](adaptive-dynamics.md) for details.
 ## Key Classes
 
 ```python
-from b2b.benchmark.problem_multizones_splits import (
+from building2building.benchmark.problem_multizones_splits import (
     SingleTypeTrainTestBenchmark,
     MultiTypeTrainTestBenchmark,
 )
-from b2b.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
-from b2b.config.models import ActuatorAccessConfig
-from b2b.simulator.wrappers import (
+from building2building.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
+from building2building.config.models import ActuatorAccessConfig
+from building2building.simulator.wrappers import (
     ResampleBuildingOnResetWrapper,
     PadObservation,
     AugmentObservationWithBuildingParams,

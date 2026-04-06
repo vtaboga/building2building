@@ -10,7 +10,7 @@ building with different HVAC commissioning or access rights.
 ## Mechanism: `ActuatorAccessConfig`
 
 ```python
-from b2b.config.models import ActuatorAccessConfig
+from building2building.config.models import ActuatorAccessConfig
 ```
 
 `ActuatorAccessConfig` is a frozen dataclass that controls which actuators are
@@ -27,7 +27,7 @@ heating setpoint actuators are filtered out of the `BuildingConfig` before the
 environment is created.  This is applied per-side (train or test) through the
 benchmark configuration.
 
-The filtering logic lives in `b2b.benchmark.problem_multizones_splits` and
+The filtering logic lives in `building2building.benchmark.problem_multizones_splits` and
 removes actuators whose component/control types match zone temperature heating
 setpoints, VAV thermostat schedule actuators, or any actuator with "heating
 setpoint" in its name.
@@ -105,7 +105,7 @@ python scripts/benchmark_multizones_splits.py \
 ## How Actuator Filtering Works
 
 Under the hood, `_apply_actuator_access()` in
-`b2b.benchmark.problem_multizones_splits` iterates over each equipment
+`building2building.benchmark.problem_multizones_splits` iterates over each equipment
 object's actuator descriptions and removes those identified as zone heating
 setpoints.  The check covers:
 

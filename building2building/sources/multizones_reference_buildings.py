@@ -5,7 +5,7 @@ This dataset contains 6000 parametrically varied EnergyPlus epJSON files
 Latin Hypercube Sampling over envelope, fenestration, infiltration, and
 geometry parameters.
 
-Building types: Warehouse, HotelSmall, RetailStandalone, RestaurantFastFood,
+Building types: Warehouse, RetailStandalone, RestaurantFastFood,
 OfficeMedium, OfficeSmall.
 
 Layout inside the zip::
@@ -32,8 +32,8 @@ from typing import Any, Literal, Sequence
 import duckdb
 from pandas import DataFrame
 
-from b2b.env import STORE_PATH
-from b2b.pipeline import (
+from building2building.env import STORE_PATH
+from building2building.pipeline import (
     add_hvac_meters,
     add_outdoor_air_meters,
     extract_discovery_metadata,
@@ -41,7 +41,7 @@ from b2b.pipeline import (
     modify_run_period,
     modify_timestep,
 )
-from b2b.store import (
+from building2building.store import (
     OUTPUT,
     Constant,
     Derivation,
@@ -52,13 +52,12 @@ from b2b.store import (
     derivation,
     realize,
 )
-from b2b.types import BuildingConfig, TaskConfig, reward_config_from_dict
+from building2building.types import BuildingConfig, TaskConfig, reward_config_from_dict
 
 logger = logging.getLogger(__name__)
 
 BuildingType = Literal[
     "Warehouse",
-    "HotelSmall",
     "RetailStandalone",
     "RestaurantFastFood",
     "OfficeMedium",

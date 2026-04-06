@@ -2,7 +2,7 @@
 
 B2B provides Gymnasium wrappers for observation normalization, padding, building-parameter augmentation, and multi-building training. These wrappers are essential for training RL agents that generalize across buildings.
 
-All wrappers are located in `b2b.simulator.wrappers`.
+All wrappers are located in `building2building.simulator.wrappers`.
 
 ---
 
@@ -13,7 +13,7 @@ Normalizes observations to the [0, 1] range using the observation space bounds.
 ### Usage
 
 ```python
-from b2b.simulator.wrappers import NormalizeObservation
+from building2building.simulator.wrappers import NormalizeObservation
 
 env = NormalizeObservation(env)
 ```
@@ -60,7 +60,7 @@ Pads observations to a fixed target size with **zone-aware padding**. This is cr
 ### Usage
 
 ```python
-from b2b.simulator.wrappers import PadObservation
+from building2building.simulator.wrappers import PadObservation
 
 env = PadObservation(env, target_size=25)
 ```
@@ -116,7 +116,7 @@ Appends normalized building metadata to the observation vector, enabling a polic
 ### Usage
 
 ```python
-from b2b.simulator.wrappers import AugmentObservationWithBuildingParams
+from building2building.simulator.wrappers import AugmentObservationWithBuildingParams
 
 env = AugmentObservationWithBuildingParams(env)
 ```
@@ -165,7 +165,7 @@ Resamples a new building environment on each episode reset, enabling **multi-tas
 ### Usage
 
 ```python
-from b2b.simulator.wrappers import ResampleBuildingOnResetWrapper
+from building2building.simulator.wrappers import ResampleBuildingOnResetWrapper
 
 def env_factory(index: int) -> gym.Env:
     return make_single_zone_env(
@@ -221,8 +221,8 @@ The wrapper logs the following to W&B (best-effort, never raises):
 A typical multi-building training setup:
 
 ```python
-from b2b.api import make_single_zone_env
-from b2b.simulator.wrappers import (
+from building2building.api import make_single_zone_env
+from building2building.simulator.wrappers import (
     AugmentObservationWithBuildingParams,
     NormalizeObservation,
     PadObservation,

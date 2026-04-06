@@ -29,7 +29,7 @@ The B2B environment pipeline:
 
 ## Environment Registration
 
-B2B environments are registered with Gymnasium as `EnergyPlus-v0`. However, the recommended way to create environments is through the factory functions in `b2b.api`, which handle all configuration and pipeline setup.
+B2B environments are registered with Gymnasium as `EnergyPlus-v0`. However, the recommended way to create environments is through the factory functions in `building2building.api`, which handle all configuration and pipeline setup.
 
 ---
 
@@ -42,7 +42,7 @@ B2B provides four levels of environment creation, from high-level convenience to
 Create a single-zone house environment from scalar arguments:
 
 ```python
-from b2b.api import make_single_zone_env
+from building2building.api import make_single_zone_env
 
 env = make_single_zone_env(
     split="train",
@@ -68,7 +68,7 @@ env = make_single_zone_env(
 Create a multi-zone reference building environment:
 
 ```python
-from b2b.api import make_multizones_env
+from building2building.api import make_multizones_env
 
 env = make_multizones_env(
     building_type="OfficeSmall",
@@ -87,9 +87,9 @@ Takes the same parameters as `make_single_zone_env` plus `building_type`.
 Create an environment from a fully-specified `EnvBuildConfig`:
 
 ```python
-from b2b.api import make_env
-from b2b.config.models import DatasetSelectionConfig, EnvBuildConfig
-from b2b.types import TaskConfig, reward_config_from_dict
+from building2building.api import make_env
+from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
+from building2building.types import TaskConfig, reward_config_from_dict
 
 cfg = EnvBuildConfig(
     dataset_selection=DatasetSelectionConfig(

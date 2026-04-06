@@ -1,10 +1,10 @@
 """Typed configuration models for Building2Building.
 
-Re-exports all dataclass configs from :mod:`b2b.config.models` for
-convenient top-level imports such as ``from b2b.config import EnvBuildConfig``.
+Re-exports all dataclass configs from :mod:`building2building.config.models` for
+convenient top-level imports such as ``from building2building.config import EnvBuildConfig``.
 """
 
-from b2b.config.models import (
+from building2building.config.models import (
     ActuatorAccessConfig,
     BenchmarkConfig,
     BenchmarkSelectionConfig,

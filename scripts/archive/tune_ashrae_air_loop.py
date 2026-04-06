@@ -21,16 +21,16 @@ import optuna
 import yaml
 from omegaconf import OmegaConf
 
-from b2b.api import make_multizones_env
-from b2b.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
-from b2b.benchmark.runner import run_rollout
-from b2b.sources.multizones_reference_buildings import (
+from building2building.api import make_multizones_env
+from building2building.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
+from building2building.benchmark.runner import run_rollout
+from building2building.sources.multizones_reference_buildings import (
     BuildingType,
     CLIMATE_ZONES,
     climate_zone_for_building,
     load_split_ids,
 )
-from b2b.types import RunPeriodConfig
+from building2building.types import RunPeriodConfig
 
 logging.basicConfig(
     level=logging.INFO,

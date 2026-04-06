@@ -6,9 +6,9 @@ import tempfile
 from pathlib import Path
 from typing import Literal, TypeAlias
 
-from b2b.env import STORE_PATH
-from b2b.pipeline.common import chdir
-from b2b.store import (
+from building2building.env import STORE_PATH
+from building2building.pipeline.common import chdir
+from building2building.store import (
     OUTPUT,
     ChildFile,
     Derivation,

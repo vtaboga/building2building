@@ -12,7 +12,7 @@ from typing import Any
 
 from omegaconf import OmegaConf
 
-from b2b.benchmark.runner import PolicyLike
+from building2building.benchmark.runner import PolicyLike
 
 
 def _load_sb3_policy(policy_cfg: dict[str, Any]) -> PolicyLike:
@@ -88,15 +88,15 @@ def make_policy_from_config(cfg: dict[str, Any]) -> PolicyLike:
         policy_cfg = {}
     policy_type = str(policy_cfg.get("type", "")).strip()
     if policy_type == "unitary_g36":
-        from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
+        from building2building.baselines.controllers.unitary_g36 import UnitaryG36Policy
 
         return UnitaryG36Policy(OmegaConf.create(policy_cfg))
     if policy_type == "air_loop_sat":
-        from b2b.baselines.controllers.air_loop_sat import AirLoopSatPolicy
+        from building2building.baselines.controllers.air_loop_sat import AirLoopSatPolicy
 
         return AirLoopSatPolicy(OmegaConf.create(policy_cfg))
     if policy_type == "ashrae_air_loop":
-        from b2b.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
+        from building2building.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
 
         return AshraeAirLoopPolicy(OmegaConf.create(policy_cfg))
     if policy_type == "sb3":

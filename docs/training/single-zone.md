@@ -13,7 +13,7 @@ scaling to multi-zone or multi-building settings.
 scripts/train_single_zone_houses.py
 ```
 
-The script uses `b2b.baselines.online_trainer.online_trainer()` as the
+The script uses `building2building.baselines.online_trainer.online_trainer()` as the
 training backend and is configured via `configs/base.yaml`.
 
 ## Configuration

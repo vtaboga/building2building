@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from omegaconf import OmegaConf
 
-from b2b.make_env import make_env
+from building2building.api import make_env_from_hydra_config as make_env
 
 
 pytestmark = pytest.mark.long

@@ -16,7 +16,7 @@ from gymnasium.spaces import Box, Dict
 from minergym.simulation import ActuatorHole
 from rdflib.term import Node
 
-from b2b.types import ActuatorDescription
+from building2building.types import ActuatorDescription
 
 from .transform_utils import (
     Transform,

@@ -23,10 +23,10 @@ import numpy as np
 import yaml
 from omegaconf import OmegaConf
 
-from b2b.api import make_multizones_env
-from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
-from b2b.benchmark.runner import run_rollout
-from b2b.types import RunPeriodConfig
+from building2building.api import make_multizones_env
+from building2building.baselines.controllers.unitary_g36 import UnitaryG36Policy
+from building2building.benchmark.runner import run_rollout
+from building2building.types import RunPeriodConfig
 
 logging.basicConfig(
     level=logging.INFO,

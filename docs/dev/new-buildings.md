@@ -28,7 +28,7 @@ Each building type requires:
 | Metadata JSON  | Zone names, floor areas, schedules  |
 
 Place these files according to the existing dataset directory layout so the
-selection helpers in `b2b.datasets` can discover them.
+selection helpers in `building2building.datasets` can discover them.
 
 ## 3. Run the Pipeline
 
@@ -41,22 +41,22 @@ IDF → version upgrade → format conversion → meter injection → make contr
 Use the pipeline entry point:
 
 ```python
-from b2b.pipeline import prepare_building
+from building2building.pipeline import prepare_building
 
 prepare_building(building_type="your_new_type", ...)
 ```
 
 The pipeline calls `make_controllable`, which discovers HVAC equipment via
-`b2b.pipeline.actuators` and injects the required EnergyPlus actuators.
+`building2building.pipeline.actuators` and injects the required EnergyPlus actuators.
 
 ## 4. Integration with the Selection System
 
 Once the dataset files are in place and the pipeline has run, the new building
 type will be available through:
 
-- `b2b.datasets` listing and filtering functions
-- `b2b.config.models.EnvConfig` with `building_type="your_new_type"`
-- Benchmark split definitions in `b2b.benchmark.problem_multizones_splits`
+- `building2building.datasets` listing and filtering functions
+- `building2building.config.models.EnvConfig` with `building_type="your_new_type"`
+- Benchmark split definitions in `building2building.benchmark.problem_multizones_splits`
 
 ## Checklist
 

@@ -96,13 +96,13 @@ divisor of 60 accepted by EnergyPlus.
 
 ```bash
 # Run for winter only
-python -m b2b.train task.run_period=winter
+python -m building2building.train task.run_period=winter
 
 # Use 15-minute timestep (legacy default)
-python -m b2b.train task.timesteps_per_hour=4
+python -m building2building.train task.timesteps_per_hour=4
 
 # Occupancy-based targets with setback
-python -m b2b.train \
+python -m building2building.train \
     task.target_temperature_mode=occupancy \
     task.default_zone_target_temperature.occupied_c=22.0 \
     task.default_zone_target_temperature.unoccupied_c=16.0
@@ -135,10 +135,10 @@ energy_weight: 0.001
 
 ```bash
 # Switch reward function
-python -m b2b.train reward=barrier
+python -m building2building.train reward=barrier
 
 # Override reward parameters
-python -m b2b.train reward=barrier reward.energy_weight=0.5 reward.violation_penalty=200.0
+python -m building2building.train reward=barrier reward.energy_weight=0.5 reward.violation_penalty=200.0
 ```
 
 ---
@@ -211,13 +211,13 @@ kwargs: {}                  # Constructor keyword arguments
 
 ```bash
 # Switch algorithm
-python -m b2b.train policy=sac
+python -m building2building.train policy=sac
 
 # Override hyperparameters
-python -m b2b.train policy=ppo policy.learning_rate=0.001 policy.n_steps=4096
+python -m building2building.train policy=ppo policy.learning_rate=0.001 policy.n_steps=4096
 
 # Load a trained checkpoint
-python -m b2b.benchmark.baseline_rollout policy=sb3 policy.checkpoint_path=checkpoints/ppo.zip
+python -m building2building.benchmark.baseline_rollout policy=sb3 policy.checkpoint_path=checkpoints/ppo.zip
 ```
 
 ---
@@ -244,7 +244,7 @@ cb_gradient_save_freq: 500
 ### CLI Override Examples
 
 ```bash
-python -m b2b.train training.total_timesteps=2000000 training.num_train_envs=8
+python -m building2building.train training.total_timesteps=2000000 training.num_train_envs=8
 ```
 
 ---
@@ -270,10 +270,10 @@ tags: []
 
 ```bash
 # Disable wandb
-python -m b2b.train wandb.enabled=false
+python -m building2building.train wandb.enabled=false
 
 # Custom project
-python -m b2b.train wandb.project=my-experiment wandb.tags="[transfer,vav]"
+python -m building2building.train wandb.project=my-experiment wandb.tags="[transfer,vav]"
 ```
 
 ---
@@ -344,7 +344,7 @@ train:
     task:
       run_period: winter
 test:
-  types: [HotelSmall, OfficeMedium]
+  types: [OfficeMedium]
   selection:
     mode: random
     n: 10
@@ -360,19 +360,19 @@ test:
 ### Overriding Nested Values
 
 ```bash
-python -m b2b.train task.default_zone_target_temperature.occupied_c=23.0
+python -m building2building.train task.default_zone_target_temperature.occupied_c=23.0
 ```
 
 ### Switching Config Groups
 
 ```bash
-python -m b2b.train policy=sac reward=barrier bldg=multi_zone
+python -m building2building.train policy=sac reward=barrier bldg=multi_zone
 ```
 
 ### Multi-Run Sweeps
 
 ```bash
-python -m b2b.train --multirun \
+python -m building2building.train --multirun \
     policy=ppo,sac \
     reward=barrier,deadband \
     seed=1,2,3
@@ -398,10 +398,10 @@ outputs/
 
 ## Typed Configuration with Dataclasses
 
-All configuration is backed by frozen dataclasses in `b2b.config.models` and `b2b.types`, ensuring type safety:
+All configuration is backed by frozen dataclasses in `building2building.config.models` and `building2building.types`, ensuring type safety:
 
 ```python
-from b2b.config.models import EnvBuildConfig
+from building2building.config.models import EnvBuildConfig
 
 # From YAML/dict — validates all fields
 cfg = EnvBuildConfig.from_dict({

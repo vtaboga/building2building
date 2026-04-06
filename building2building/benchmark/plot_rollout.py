@@ -1,12 +1,12 @@
 """Generic rollout plotting for any building type.
 
-Reads the flat CSV produced by :func:`~b2b.benchmark.baseline_rollout.run_baseline_rollout`
+Reads the flat CSV produced by :func:`~building2building.benchmark.baseline_rollout.run_baseline_rollout`
 and generates diagnostic PNG plots.  HVAC system type (VAV, Unitary, Baseboard)
 is auto-detected from the ``act::`` column names.
 
 Typical usage::
 
-    from b2b.benchmark.plot_rollout import plot_rollout_csv
+    from building2building.benchmark.plot_rollout import plot_rollout_csv
     plot_rollout_csv(Path("rollout.csv"), out_dir=Path("outputs/plots"))
 """
 

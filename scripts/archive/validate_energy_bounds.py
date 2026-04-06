@@ -98,7 +98,7 @@ def main() -> None:
 
     results_by_type: dict[str, list[dict]] = {}
     btypes = [
-        "Warehouse", "HotelSmall", "RetailStandalone",
+        "Warehouse", "RetailStandalone",
         "RestaurantFastFood", "OfficeMedium", "OfficeSmall",
     ]
 

@@ -5,7 +5,7 @@ from typing import Any
 
 from omegaconf import OmegaConf
 
-from b2b.baselines.multizones_trainer import multizones_trainer
+from building2building.baselines.multizones_trainer import multizones_trainer
 
 
 def run_multizones_training(config: dict[str, Any], output_dir: Path) -> None:

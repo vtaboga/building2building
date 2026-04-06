@@ -55,7 +55,7 @@ from unittest.mock import patch
 
 @pytest.mark.quick
 def test_reward_without_simulation(mock_obs):
-    with patch("b2b.simulator.energyplus.run") as mock_run:
+    with patch("building2building.simulator.energyplus.run") as mock_run:
         mock_run.return_value = mock_obs
         result = compute_reward(mock_obs)
         assert result < 0

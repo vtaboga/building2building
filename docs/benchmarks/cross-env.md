@@ -14,7 +14,7 @@ topologies, and thermal dynamics.
 Use when train and test sets span **different building types**.
 
 ```python
-from b2b.benchmark.problem_multizones_splits import MultiTypeTrainTestBenchmark
+from building2building.benchmark.problem_multizones_splits import MultiTypeTrainTestBenchmark
 ```
 
 `MultiTypeTrainTestBenchmark` accepts separate lists of building types for the
@@ -28,7 +28,7 @@ Use when train and test sets come from the **same building type** but different
 building instances (within-type generalisation).
 
 ```python
-from b2b.benchmark.problem_multizones_splits import SingleTypeTrainTestBenchmark
+from building2building.benchmark.problem_multizones_splits import SingleTypeTrainTestBenchmark
 ```
 
 Both classes expose the same interface:
@@ -126,6 +126,5 @@ Each side (train and test) can independently specify:
 | `OfficeSmall` | Small commercial office |
 | `OfficeMedium` | Medium commercial office |
 | `Warehouse` | Commercial warehouse |
-| `HotelSmall` | Small hotel |
 | `RetailStandalone` | Standalone retail building |
 | `RestaurantFastFood` | Fast-food restaurant |

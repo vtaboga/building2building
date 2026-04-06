@@ -6,10 +6,10 @@ Building2Building.
 ## 1. Implement the Equipment Protocol
 
 All HVAC equipment classes must satisfy the `Equipment` protocol defined in
-`b2b.types`:
+`building2building.types`:
 
 ```python
-from b2b.types import Equipment, ActuatorDescription
+from building2building.types import Equipment, ActuatorDescription
 
 class MyNewEquipment:
     """Equipment implementation for <describe system>."""

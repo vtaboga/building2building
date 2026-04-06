@@ -1,6 +1,6 @@
 """Factory for creating Gymnasium environments from build configs.
 
-Bridges the configuration layer (:mod:`b2b.config.models`) with the
+Bridges the configuration layer (:mod:`building2building.config.models`) with the
 dataset access and EnergyPlus simulator layers.
 """
 
@@ -9,9 +9,9 @@ from __future__ import annotations
 import gymnasium as gym
 from pathlib import Path
 
-from b2b.config.models import DatasetSelectionConfig, EnvBuildConfig, reward_to_dict
-from b2b.datasets import access as dataset_access
-from b2b.simulator import create_simulator
+from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig, reward_to_dict
+from building2building.datasets import access as dataset_access
+from building2building.simulator import create_simulator
 
 
 def _build_bldg_section(selection: DatasetSelectionConfig, building_id: int) -> dict[str, object]:

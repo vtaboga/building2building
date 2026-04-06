@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from b2b.baselines.common import find_action_indices
+from building2building.baselines.common import find_action_indices
 
 
 @dataclass(frozen=True, slots=True)

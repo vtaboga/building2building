@@ -39,7 +39,7 @@ pytest -m quick
 The simplest way to get started is with a single-zone house:
 
 ```python
-from b2b.api import make_single_zone_env
+from building2building.api import make_single_zone_env
 
 env = make_single_zone_env(
     split="train",
@@ -59,7 +59,7 @@ print(f"Action space: {env.action_space}")
 For multi-zone buildings from the ASHRAE 90.1 prototypes:
 
 ```python
-from b2b.api import make_multizones_env
+from building2building.api import make_multizones_env
 
 env = make_multizones_env(
     building_type="OfficeSmall",
@@ -77,16 +77,16 @@ print(f"Action space: {env.action_space}")
 
 !!! note "Building types"
 
-    Available building types for `make_multizones_env`: `Warehouse`, `HotelSmall`, `RetailStandalone`, `RestaurantFastFood`, `OfficeMedium`, `OfficeSmall`.
+    Available building types for `make_multizones_env`: `Warehouse`, `RetailStandalone`, `RestaurantFastFood`, `OfficeMedium`, `OfficeSmall`.
 
 ### Full Config API
 
 For maximum control, use `EnvBuildConfig` directly:
 
 ```python
-from b2b.api import make_env
-from b2b.config.models import DatasetSelectionConfig, EnvBuildConfig
-from b2b.types import TaskConfig, reward_config_from_dict
+from building2building.api import make_env
+from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
+from building2building.types import TaskConfig, reward_config_from_dict
 
 cfg = EnvBuildConfig(
     dataset_selection=DatasetSelectionConfig(
@@ -120,7 +120,7 @@ env = make_env(cfg, eplus_output_dir="outputs/eplus")
 ## 3. Running a Random Agent
 
 ```python
-from b2b.api import make_single_zone_env
+from building2building.api import make_single_zone_env
 
 env = make_single_zone_env(
     split="train",
@@ -164,7 +164,7 @@ Baseline controllers follow the same `predict(obs, deterministic) -> (action, st
 === "Hydra CLI"
 
     ```bash
-    python -m b2b.train \
+    python -m building2building.train \
         policy=ppo \
         bldg=single_family \
         task.run_period=winter \
@@ -177,8 +177,8 @@ Baseline controllers follow the same `predict(obs, deterministic) -> (action, st
 
     ```python
     from stable_baselines3 import PPO
-    from b2b.api import make_single_zone_env
-    from b2b.simulator.wrappers import NormalizeObservation
+    from building2building.api import make_single_zone_env
+    from building2building.simulator.wrappers import NormalizeObservation
 
     env = make_single_zone_env(
         split="train",
@@ -202,7 +202,7 @@ Baseline controllers follow the same `predict(obs, deterministic) -> (action, st
 === "Hydra CLI"
 
     ```bash
-    python -m b2b.train \
+    python -m building2building.train \
         policy=sac \
         bldg=single_family \
         task.run_period=winter \
@@ -214,8 +214,8 @@ Baseline controllers follow the same `predict(obs, deterministic) -> (action, st
 
     ```python
     from stable_baselines3 import SAC
-    from b2b.api import make_single_zone_env
-    from b2b.simulator.wrappers import NormalizeObservation
+    from building2building.api import make_single_zone_env
+    from building2building.simulator.wrappers import NormalizeObservation
 
     env = make_single_zone_env(
         split="train",
@@ -240,8 +240,8 @@ After training, evaluate your policy on the held-out test split:
 
 ```python
 from stable_baselines3 import PPO
-from b2b.api import make_single_zone_env
-from b2b.simulator.wrappers import NormalizeObservation
+from building2building.api import make_single_zone_env
+from building2building.simulator.wrappers import NormalizeObservation
 import numpy as np
 
 model = PPO.load("ppo_single_zone")

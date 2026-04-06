@@ -50,19 +50,19 @@ from typing import Any
 import numpy as np
 from scipy.stats.qmc import LatinHypercube
 
-from b2b.env import STORE_PATH, energyplus_path
-from b2b.simulator.generator import (
+from building2building.env import STORE_PATH, energyplus_path
+from building2building.simulator.generator import (
     BuildingModification,
     apply_modifications,
     convert_to_epjson,
 )
-from b2b.sources.energycodes import (
+from building2building.sources.energycodes import (
     ASHRAE901_all_zip,
     BuildingType,
     search_buildings,
     search_weathers,
 )
-from b2b.store import ExtractFromZip, realize
+from building2building.store import ExtractFromZip, realize
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,7 +74,6 @@ log = logging.getLogger(__name__)
 
 BUILDING_TYPES: list[BuildingType] = [
     "Warehouse",
-    "HotelSmall",
     "RetailStandalone",
     "RestaurantFastFood",
     "OfficeMedium",

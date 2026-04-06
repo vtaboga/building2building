@@ -3,9 +3,9 @@ from pathlib import Path
 import tempfile
 import shutil
 
-from b2b.pipeline import get_hvac_actuators
-from b2b.env import STORE_PATH, energyplus_path
-from b2b.store import realize
+from building2building.pipeline import get_hvac_actuators
+from building2building.env import STORE_PATH, energyplus_path
+from building2building.store import realize
 
 import pytest
 

@@ -97,15 +97,15 @@ nav:
       - SLURM Cluster Execution: training/slurm.md
       - W&B Integration: training/wandb.md
   - API Reference:
-      - b2b.api: api/api.md
-      - b2b.config: api/config.md
-      - b2b.types: api/types.md
-      - b2b.simulator: api/simulator.md
-      - b2b.pipeline: api/pipeline.md
-      - b2b.benchmark: api/benchmark.md
-      - b2b.baselines: api/baselines.md
-      - b2b.envs: api/envs.md
-      - b2b.datasets: api/datasets.md
+      - building2building.api: api/api.md
+      - building2building.config: api/config.md
+      - building2building.types: api/types.md
+      - building2building.simulator: api/simulator.md
+      - building2building.pipeline: api/pipeline.md
+      - building2building.benchmark: api/benchmark.md
+      - building2building.baselines: api/baselines.md
+      - building2building.envs: api/envs.md
+      - building2building.datasets: api/datasets.md
   - Developer Guide:
       - Contributing: dev/contributing.md
       - Code Style: dev/code-style.md

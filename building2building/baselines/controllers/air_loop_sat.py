@@ -25,7 +25,7 @@ from typing import Any
 
 import numpy as np
 
-from b2b.baselines.common import (
+from building2building.baselines.common import (
     find_obs_index_by_exact_name,
     find_zone_air_temp_index_for_zone,
     require_env_metadata_list_str,

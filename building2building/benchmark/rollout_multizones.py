@@ -18,21 +18,20 @@ from typing import Any
 import numpy as np
 from omegaconf import OmegaConf
 
-from b2b.api import make_env
-from b2b.baselines import make_policy_from_config
-from b2b.benchmark.runner import EpisodeResult, PolicyLike, run_rollout
-from b2b.config import DatasetSelectionConfig, EnvBuildConfig
-from b2b.sources.multizones_reference_buildings import (
+from building2building.api import make_env
+from building2building.baselines import make_policy_from_config
+from building2building.benchmark.runner import EpisodeResult, PolicyLike, run_rollout
+from building2building.config import DatasetSelectionConfig, EnvBuildConfig
+from building2building.sources.multizones_reference_buildings import (
     BuildingType,
     search_buildings,
 )
-from b2b.types import TaskConfig, reward_config_from_dict
+from building2building.types import TaskConfig, reward_config_from_dict
 
 logger = logging.getLogger(__name__)
 
 ALL_BUILDING_TYPES: list[BuildingType] = [
     "Warehouse",
-    "HotelSmall",
     "RetailStandalone",
     "RestaurantFastFood",
     "OfficeMedium",

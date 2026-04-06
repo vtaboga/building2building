@@ -203,11 +203,11 @@ def main() -> None:
     store_path = _require_scratch_store()
 
     # Import after forcing STORE_PATH.
-    from b2b.env import STORE_PATH  # noqa: WPS433
-    from b2b.env import energyplus_path  # noqa: WPS433
-    from b2b.sources import hydroquebec  # noqa: WPS433
-    from b2b.store import realize  # noqa: WPS433
-    from b2b.sources.single_zone_houses import (  # noqa: WPS433
+    from building2building.env import STORE_PATH  # noqa: WPS433
+    from building2building.env import energyplus_path  # noqa: WPS433
+    from building2building.sources import residential  # noqa: WPS433
+    from building2building.store import realize  # noqa: WPS433
+    from building2building.sources.single_zone_houses import (  # noqa: WPS433
         SingleZoneHouseRowIdSplits,
     )
 
@@ -235,7 +235,7 @@ def main() -> None:
     split_idx_sliced = split_indices[args.start : args.stop]
 
     ep = energyplus_path()
-    root_zip = hydroquebec.dataset_zip()
+    root_zip = residential.dataset_zip()
 
     records: list[BuildingProcessingRecord] = []
     processed = 0
@@ -247,7 +247,7 @@ def main() -> None:
         try:
             idf_filename = f"IDFsAndSchedules/{building_id}/in.idf"
             schedule_filename = f"IDFsAndSchedules/{building_id}/in.schedules.csv"
-            deriv = hydroquebec._build_control_derivation(  # noqa: SLF001
+            deriv = residential._build_control_derivation(  # noqa: SLF001
                 root_zip, idf_filename, schedule_filename, ep
             )
             epjson_path, actuator_descs = realize(STORE_PATH.get(), deriv)

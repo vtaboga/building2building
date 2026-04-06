@@ -6,10 +6,10 @@ Baselines package.
 Implements baseline RL policies and classic rule-based controllers.
 """
 
-from b2b.make_env import make_env
-from b2b.baselines.policies import make_policy_from_config
-from b2b.baselines.utils import plot_timeseries
-from b2b.baselines.runner import run_baseline_rollout
+from building2building.api import make_env_from_hydra_config as make_env
+from building2building.baselines.policies import make_policy_from_config
+from building2building.baselines.utils import plot_timeseries
+from building2building.baselines.runner import run_baseline_rollout
 
 # Package exports.
 __all__ = [

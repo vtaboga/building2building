@@ -158,7 +158,7 @@ checkpoint_path: ???        # Path to the saved .zip model file
 ```
 
 ```bash
-python -m b2b.benchmark.baseline_rollout \
+python -m building2building.benchmark.baseline_rollout \
     policy=sb3 \
     policy.algorithm=ppo \
     policy.checkpoint_path=checkpoints/ppo_office_small.zip
@@ -179,7 +179,7 @@ kwargs: {}                  # Keyword arguments passed to __init__
 ```
 
 ```bash
-python -m b2b.benchmark.baseline_rollout \
+python -m building2building.benchmark.baseline_rollout \
     policy=custom \
     policy.module=my_package.controllers \
     policy.class_name=ProportionalController \

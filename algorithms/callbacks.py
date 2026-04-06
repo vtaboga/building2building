@@ -14,7 +14,7 @@ from omegaconf import OmegaConf
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, EvalCallback
 from wandb.integration.sb3 import WandbCallback
 
-from b2b.baselines.callbacks import TrainingEpisodeRewardCallback
+from building2building.baselines.callbacks import TrainingEpisodeRewardCallback
 
 logger = logging.getLogger(__name__)
 

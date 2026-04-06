@@ -1,19 +1,18 @@
 # Building Types & Climate Zones
 
-B2B contains over 7,000 parametrically generated buildings spanning 7 building types, 16 climate zones, and 3 HVAC system types. This page describes the building types, climate zones, parametric generation process, and dataset structure.
+B2B contains over 7,000 parametrically generated buildings spanning 6 building types, 16 climate zones, and 3 HVAC system types. This page describes the building types, climate zones, parametric generation process, and dataset structure.
 
 ---
 
 ## Building Types
 
-B2B includes 6 ASHRAE 90.1-2022 commercial reference building prototypes plus single-zone residential houses:
+B2B includes 5 ASHRAE 90.1-2022 commercial reference building prototypes plus single-zone residential houses:
 
 | Building Type | Zones | HVAC System | Description |
 |---|---|---|---|
 | **OfficeSmall** | 5 | Unitary | Small office building with perimeter and core zones |
 | **OfficeMedium** | 15+ | VAV | Medium office with multiple floors, VAV with reheat |
 | **Warehouse** | 3 | Unitary + Heating-Only | Large open warehouse with office, fine-storage, and bulk-storage zones |
-| **HotelSmall** | 10+ | Unitary | Small hotel with guest rooms, lobby, and mechanical rooms |
 | **RetailStandalone** | 4 | Unitary | Standalone retail store with back/core/entry zones |
 | **RestaurantFastFood** | 2 | Unitary | Fast-food restaurant with kitchen and dining zones |
 | **Single-Zone Houses** | 1 | Unitary | Residential single-family detached houses |

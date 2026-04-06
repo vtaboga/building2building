@@ -6,8 +6,8 @@ import numpy as np
 from gymnasium.spaces import Box, Dict
 from omegaconf import OmegaConf
 
-from b2b.make_env import make_env
-from b2b.simulator.wrappers import (
+from building2building.api import make_env_from_hydra_config as make_env
+from building2building.simulator.wrappers import (
     NormalizeObservation,
     AugmentObservationWithBuildingParams,
 )

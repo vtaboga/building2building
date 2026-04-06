@@ -4,9 +4,9 @@ Pipeline package.
 
 from pathlib import Path
 
-from b2b.pipeline.actuators import ActuatorDescription, make_controllable
-from b2b.pipeline.discovery import Metadata, extract_discovery_metadata
-from b2b.pipeline.parse_edd import (
+from building2building.pipeline.actuators import ActuatorDescription, make_controllable
+from building2building.pipeline.discovery import Metadata, extract_discovery_metadata
+from building2building.pipeline.parse_edd import (
     EddActuatorDescriptor,
     get_airflow_and_coil_node_setpoint_actuators,
     get_b2b_scheduled_node_setpoint_actuators,
@@ -15,18 +15,18 @@ from b2b.pipeline.parse_edd import (
     get_zone_temperature_control_actuators,
     iter_edd_actuators,
 )
-from b2b.pipeline.parse_reports import (
+from building2building.pipeline.parse_reports import (
     get_net_conditioned_area,
     get_warmup_days,
 )
-from b2b.pipeline.simulation import (
+from building2building.pipeline.simulation import (
     detect_warmup_phases,
     eddfile,
     eiofile,
     eplustbl,
     run_simulation,
 )
-from b2b.pipeline.steps.conversion import (
+from building2building.pipeline.steps.conversion import (
     ConvertIDF,
     Transition,
     all_transitions,
@@ -35,7 +35,7 @@ from b2b.pipeline.steps.conversion import (
     upgrade,
     upgrade_idf,
 )
-from b2b.pipeline.steps.outputs import (
+from building2building.pipeline.steps.outputs import (
     add_all_outputs,
     add_edd_output,
     add_hvac_meters,
@@ -45,14 +45,14 @@ from b2b.pipeline.steps.outputs import (
     modify_timestep,
     modify_run_period,
 )
-from b2b.pipeline.steps.schedule_files import link_in_schedule
-from b2b.pipeline.steps.surfaces import GlueSurfaces, glue_surfaces
-from b2b.pipeline.steps.thermostat_setpoints import (
+from building2building.pipeline.steps.schedule_files import link_in_schedule
+from building2building.pipeline.steps.surfaces import GlueSurfaces, glue_surfaces
+from building2building.pipeline.steps.thermostat_setpoints import (
     AddSetpointControl,
     add_setpoint_control,
     get_temperature_setpoints,
 )
-from b2b.store import Derivation, Expression, Realizable, Rename
+from building2building.store import Derivation, Expression, Realizable, Rename
 
 
 def prepare_building(

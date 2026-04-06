@@ -16,7 +16,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from b2b.env import store_path
+from building2building.env import store_path
 
 
 def _parse_args() -> argparse.Namespace:

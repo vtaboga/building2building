@@ -31,8 +31,9 @@ jobs_logs/
 site/
 analyze_metadata.ipynb
 data/
+!building2building/data/
 b2b_outputs/
-!b2b/sources/data/
+!building2building/sources/data/
 ./cursor/
 dataset_v2/
 analysis/
@@ -40,6 +41,7 @@ analysis/
 dataset/
 *.zip
 scrap/
+refactoring/
 
 # temporary
 simulator/patched_minergym_simulation.py

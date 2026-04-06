@@ -11,19 +11,19 @@ from minergym.environment import EnergyPlusEnvironment
 from minergym.ontology import Ontology
 from minergym.simulation import EnergyPlusSimulation
 
-from b2b.simulator.action_spaces import (
+from building2building.simulator.action_spaces import (
     hvac_action_space,
 )
-from b2b.simulator.observation_spaces import (
+from building2building.simulator.observation_spaces import (
     dict_observation_info,
     flat_observation_info,
 )
-from b2b.simulator.rewards import (
+from building2building.simulator.rewards import (
     BarrierReward,
     BaseReward,
     DeadbandReward,
 )
-from b2b.types import (
+from building2building.types import (
     BarrierRewardConfig,
     BaseRewardConfig,
     BuildingConfig,

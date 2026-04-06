@@ -9,7 +9,7 @@ that performs well across all buildings without per-building fine-tuning.
 ## Core Mechanism: `ResampleBuildingOnResetWrapper`
 
 ```python
-from b2b.simulator.wrappers import ResampleBuildingOnResetWrapper
+from building2building.simulator.wrappers import ResampleBuildingOnResetWrapper
 ```
 
 `ResampleBuildingOnResetWrapper` wraps a Gymnasium environment and, on every
@@ -33,7 +33,7 @@ temperatures are padded to a configurable maximum while shared features
 (outdoor temperature, time-of-day, energy) are kept in consistent positions.
 
 ```python
-from b2b.simulator.wrappers import PadObservation
+from building2building.simulator.wrappers import PadObservation
 ```
 
 ### `AugmentObservationWithBuildingParams`
@@ -43,7 +43,7 @@ the observation vector so the policy can condition its behaviour on building
 characteristics.
 
 ```python
-from b2b.simulator.wrappers import AugmentObservationWithBuildingParams
+from building2building.simulator.wrappers import AugmentObservationWithBuildingParams
 ```
 
 ## Configuration
@@ -67,7 +67,7 @@ seed: 42
 
 ```yaml title="configs/bldg/multi_zone.yaml"
 dataset: multizones_reference_buildings
-building_type: OfficeSmall   # Warehouse, HotelSmall, RetailStandalone, ...
+building_type: OfficeSmall   # Warehouse, RetailStandalone, ...
 split: train                 # train or test
 index: 0                     # 0-based position in the split's ID list
 ```

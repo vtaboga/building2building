@@ -5,7 +5,7 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig
 
-from b2b.benchmark.experiments.bm_adaptive_dynamics import run_bm_adaptive_dynamics
+from building2building.benchmark.experiments.bm_adaptive_dynamics import run_bm_adaptive_dynamics
 
 
 @hydra.main(version_base=None, config_path="../../configs", config_name="base")

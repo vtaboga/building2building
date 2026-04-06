@@ -7,12 +7,12 @@ from pathlib import Path
 
 from cattrs import structure, unstructure
 
-from b2b.pipeline.parse_reports import (
+from building2building.pipeline.parse_reports import (
     get_net_conditioned_area,
     get_warmup_days,
 )
-from b2b.pipeline.steps.outputs import add_all_outputs, modify_run_period
-from b2b.store import (
+from building2building.pipeline.steps.outputs import add_all_outputs, modify_run_period
+from building2building.store import (
     OUTPUT,
     Expression,
     Realizable,

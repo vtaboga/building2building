@@ -13,9 +13,9 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from b2b.simulator import create_simulator
-from b2b.simulator.observation_spaces import flat_observation_info
-from b2b.sources import hydroquebec
+from building2building.simulator import create_simulator
+from building2building.simulator.observation_spaces import flat_observation_info
+from building2building.sources import residential
 from minergym.ontology import Ontology
 
 logger = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ def fetch_diverse_building_pool(config, n_buildings: int = 10) -> list[Any]:
 
     # Fetch more buildings than needed to ensure diversity and filtering
     # Use 2x instead of 3x to reduce memory usage during filtering
-    configs = hydroquebec.search_configs(
+    configs = residential.search_configs(
         config=config,
         n=n_buildings * 2,  # Fetch 2x to account for failures and filtering
         eplus_output_dir=Path("/tmp/building_pool_discovery"),

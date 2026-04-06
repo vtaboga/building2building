@@ -14,7 +14,7 @@ arise from construction variations in otherwise similar buildings.
 ## Key Class: `AdaptiveDynamicsProblem`
 
 ```python
-from b2b.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
+from building2building.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
 ```
 
 `AdaptiveDynamicsProblem` is a frozen dataclass that encapsulates the benchmark
@@ -33,7 +33,7 @@ class AdaptiveDynamicsProblem:
 ### Usage
 
 ```python
-from b2b.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
+from building2building.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
 
 problem = AdaptiveDynamicsProblem(split="train", start=0, limit=0)
 records = problem.run(policy, output_dir="./results")
@@ -45,7 +45,7 @@ results.
 A convenience function is also available:
 
 ```python
-from b2b.benchmark.problem_adaptive_dynamics import run
+from building2building.benchmark.problem_adaptive_dynamics import run
 
 records = run(policy, split="train", output_dir="./results")
 ```

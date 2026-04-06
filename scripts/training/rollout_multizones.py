@@ -31,7 +31,7 @@ from omegaconf import DictConfig, OmegaConf
     version_base=None, config_path="../configs", config_name="rollout_multizones"
 )
 def main(cfg: DictConfig) -> int:
-    from b2b.benchmark.rollout_multizones import run_multizones_rollout
+    from building2building.benchmark.rollout_multizones import run_multizones_rollout
 
     cfg_dict_any = OmegaConf.to_container(cfg, resolve=True)
     cfg_dict = cfg_dict_any if isinstance(cfg_dict_any, dict) else {}

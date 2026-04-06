@@ -164,8 +164,8 @@ def run_benchmark_for_type(
     """Run a live benchmark for a building type to measure step time."""
     import time
 
-    from b2b.api import make_multizones_env, make_single_zone_env
-    from b2b.types import RunPeriodConfig
+    from building2building.api import make_multizones_env, make_single_zone_env
+    from building2building.types import RunPeriodConfig
 
     log.info(
         "Running benchmark for %s (%d buildings)...",

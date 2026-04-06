@@ -8,7 +8,7 @@ airflow based on zone temperature error, while a **Trim-and-Respond** (T&R)
 algorithm adjusts the supply air temperature setpoint each timestep.
 
 ```python
-from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
+from building2building.baselines.controllers.unitary_g36 import UnitaryG36Policy
 ```
 
 ## Control Strategy

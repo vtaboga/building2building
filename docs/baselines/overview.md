@@ -9,7 +9,7 @@ Weights & Biases logging.
 
 The baseline rollout system selects a controller based on the `policy.type`
 field in the Hydra config.  The dispatch lives in
-`b2b.benchmark.baseline_rollout._build_controller_policy()`:
+`building2building.benchmark.baseline_rollout._build_controller_policy()`:
 
 | `policy.type` | Controller class | Description |
 |---|---|---|
@@ -72,7 +72,7 @@ python scripts/baselines.py wandb.enabled=false
 
 ## Rollout Pipeline
 
-`run_baseline_rollout()` in `b2b.benchmark.baseline_rollout` orchestrates:
+`run_baseline_rollout()` in `building2building.benchmark.baseline_rollout` orchestrates:
 
 1. **Environment creation** — builds the EnergyPlus Gymnasium environment from
    the Hydra config.

@@ -3,7 +3,7 @@
 Defines :class:`SingleTypeTrainTestBenchmark` and
 :class:`MultiTypeTrainTestBenchmark` which select buildings from the
 ``multizones_reference_buildings`` dataset and produce
-:class:`~b2b.types.BuildingConfig` lists for train and test sides.
+:class:`~building2building.types.BuildingConfig` lists for train and test sides.
 """
 
 from __future__ import annotations
@@ -12,11 +12,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from b2b.config import parse_benchmark_config
-from b2b.config.models import MultiTypeBenchmarkConfig, SingleTypeBenchmarkConfig
-from b2b.sources import building_access, multizones_reference_buildings as mz
-from b2b.sources.multizones_reference_buildings import BuildingType
-from b2b.types import ActuatorDescription, BuildingConfig, Equipment
+from building2building.config import parse_benchmark_config
+from building2building.config.models import MultiTypeBenchmarkConfig, SingleTypeBenchmarkConfig
+from building2building.sources import building_access, multizones_reference_buildings as mz
+from building2building.sources.multizones_reference_buildings import BuildingType
+from building2building.types import ActuatorDescription, BuildingConfig, Equipment
 
 SelectionMode = Literal["random", "indices", "search_config"]
 SplitName = Literal["train", "test", "test_small"]

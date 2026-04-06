@@ -4,41 +4,41 @@ from typing import Literal, Sequence
 
 from pandas import DataFrame
 
-from b2b.sources.single_zone_houses import (
-    SingleZoneHouseRowIdSplits as HydroQuebecRowIdSplits,
+from building2building.sources.single_zone_houses import (
+    SingleZoneHouseRowIdSplits as ResidentialRowIdSplits,
 )
-from b2b.sources.single_zone_houses import (
+from building2building.sources.single_zone_houses import (
     building_id_from_split_index,
     filenames_for_building_id,
     select_buildings_by_split,
 )
 
 
-def hydroquebec_building_id_from_split_index(
+def residential_building_id_from_split_index(
     split: Literal["train", "test"],
     split_index: int,
     *,
-    row_id_splits: HydroQuebecRowIdSplits | None = None,
+    row_id_splits: ResidentialRowIdSplits | None = None,
 ) -> int:
     return building_id_from_split_index(
         split, split_index, row_id_splits=row_id_splits
     )
 
 
-def hydroquebec_filenames_for_building_id(building_id: int) -> tuple[str, str]:
+def residential_filenames_for_building_id(building_id: int) -> tuple[str, str]:
     return filenames_for_building_id(building_id)
 
 
-def select_hydroquebec_buildings_by_row_id_split(
+def select_residential_buildings_by_row_id_split(
     split: Literal["train", "test"],
     *,
-    row_id_splits: HydroQuebecRowIdSplits | None = None,
+    row_id_splits: ResidentialRowIdSplits | None = None,
 ) -> DataFrame:
     """
-    Select buildings from the HydroQuebec (big) dataset based on stored dataset row indices.
+    Select buildings from the residential (big) dataset based on stored dataset row indices.
 
     The row ids are loaded from:
-    - `b2b/sources/data/action_space_2_zone_1_train_data.json`
-    - `b2b/sources/data/action_space_2_zone_1_test_data.json`
+    - `building2building/sources/data/action_space_2_zone_1_train_data.json`
+    - `building2building/sources/data/action_space_2_zone_1_test_data.json`
     """
     return select_buildings_by_split(split, row_id_splits=row_id_splits)

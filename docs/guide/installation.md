@@ -170,7 +170,7 @@ pytest
 Verify that B2B can import and create an environment:
 
 ```python
-from b2b.api import make_single_zone_env
+from building2building.api import make_single_zone_env
 
 env = make_single_zone_env(
     split="train",

@@ -1,0 +1,5 @@
+building_type,building_id,reward_run1,reward_run2,reward_run3,reward_mean
+OfficeSmall,1,-30000.0,-30000.0,-30000.0,-30000.0
+OfficeSmall,2,-25000.0,-25000.0,-25000.0,-25000.0
+Warehouse,1,-40000.0,-40000.0,-40000.0,-40000.0
+SingleFamilyHouse,1,-10000.0,-10000.0,-10000.0,-10000.0

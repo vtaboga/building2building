@@ -163,7 +163,6 @@ Example output for a single-zone house:
 | Warehouse | Unitary + Heating-Only | 5–6 | 2 unitary zones × 2 + 1 heating-only setpoint |
 | RetailStandalone | Unitary | 8 | 4 zones × 2 actuators |
 | OfficeSmall | Unitary | 10 | 5 zones × 2 actuators |
-| HotelSmall | Unitary | 20+ | 10+ zones × 2 actuators |
 | OfficeMedium | VAV | 31+ | 1 SAT + N×(flow + htg SP) |
 
 !!! tip "Handling variable action spaces"

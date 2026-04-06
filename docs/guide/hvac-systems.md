@@ -9,7 +9,7 @@ B2B supports three distinct HVAC system types, each with a different control int
 | System | Buildings | Actuators per Zone | Control Strategy |
 |---|---|---|---|
 | **VAV** (Variable Air Volume) | OfficeMedium | Supply temp setpoint + per-zone flow fraction, heating/cooling setpoints | Central AHU with zone-level terminal units |
-| **Unitary** | OfficeSmall, HotelSmall, RetailStandalone, RestaurantFastFood, single-zone houses | Fan mass flow rate + supply air temperature setpoint | Dedicated unit per zone |
+| **Unitary** | OfficeSmall, RetailStandalone, RestaurantFastFood, single-zone houses | Fan mass flow rate + supply air temperature setpoint | Dedicated unit per zone |
 | **Heating-Only Zone** | Warehouse (Bulk Storage) | Zone thermostat heating setpoint | Unit heaters, baseboards, radiant heaters |
 
 ---
@@ -183,7 +183,7 @@ This is useful for experiments that focus on the primary HVAC systems while keep
 
 ## The `Equipment` Protocol
 
-All HVAC equipment types implement the `Equipment` protocol defined in `b2b.types`:
+All HVAC equipment types implement the `Equipment` protocol defined in `building2building.types`:
 
 ```python
 class Equipment(Protocol):
@@ -213,7 +213,7 @@ class ActuatorDescription:
 
 ## Equipment Discovery Pipeline
 
-The `make_all_equipment` function in `b2b.pipeline.actuators` orchestrates the full discovery process:
+The `make_all_equipment` function in `building2building.pipeline.actuators` orchestrates the full discovery process:
 
 ```mermaid
 flowchart TD

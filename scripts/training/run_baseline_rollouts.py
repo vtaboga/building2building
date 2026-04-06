@@ -24,12 +24,12 @@ from typing import Any
 
 import numpy as np
 
-from b2b.api import make_env
-from b2b.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
-from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
-from b2b.benchmark.runner import run_rollout
-from b2b.config.models import DatasetSelectionConfig, EnvBuildConfig
-from b2b.types import DeadbandRewardConfig, TaskConfig
+from building2building.api import make_env
+from building2building.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
+from building2building.baselines.controllers.unitary_g36 import UnitaryG36Policy
+from building2building.benchmark.runner import run_rollout
+from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
+from building2building.types import DeadbandRewardConfig, TaskConfig
 
 logging.basicConfig(
     level=logging.INFO,

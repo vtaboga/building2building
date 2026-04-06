@@ -11,7 +11,7 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig
 
-from b2b.baselines.online_trainer import online_trainer
+from building2building.baselines.online_trainer import online_trainer
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="base")

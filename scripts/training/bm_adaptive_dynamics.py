@@ -7,7 +7,7 @@ from omegaconf import DictConfig
 
 @hydra.main(version_base=None, config_path="../configs", config_name="bm_adaptive_dynamics")
 def main(cfg: DictConfig) -> int:
-    from b2b.benchmark.experiments.bm_adaptive_dynamics import (  # noqa: WPS433
+    from building2building.benchmark.experiments.bm_adaptive_dynamics import (  # noqa: WPS433
         run_bm_adaptive_dynamics,
     )
 

@@ -8,7 +8,7 @@ from typing import Literal, Sequence
 
 from pandas import DataFrame
 
-from b2b.sources import hydroquebec
+from building2building.sources import residential
 
 SplitName = Literal["train", "test"]
 
@@ -80,7 +80,7 @@ def building_id_from_split_index(
     dataset_row_index = ids[split_index]
     if dataset_row_index < 0:
         raise ValueError(
-            f"Expected HydroQuebec dataset row index >= 0, got {dataset_row_index}"
+            f"Expected residential dataset row index >= 0, got {dataset_row_index}"
         )
     # Hydro-Quebec dataset row indices are 0-based, filenames are 1-based.
     return int(dataset_row_index) + 1
@@ -143,7 +143,7 @@ def select_buildings_by_split(
     row_id_splits: SingleZoneHouseRowIdSplits | None = None,
 ) -> DataFrame:
     row_ids = split_row_ids(split, row_id_splits=row_id_splits)
-    df = hydroquebec.search_buildings()
+    df = residential.search_buildings()
     if not row_ids:
         return df.iloc[0:0]
     ilocs: list[int] = []

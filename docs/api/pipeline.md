@@ -1,10 +1,10 @@
-# b2b.pipeline
+# building2building.pipeline
 
 The building preparation pipeline. This module transforms raw IDF building
 files into fully controllable EnergyPlus models by upgrading versions,
 converting formats, injecting meters, and discovering HVAC equipment.
 
-::: b2b.pipeline
+::: building2building.pipeline
     options:
       members:
         - prepare_building

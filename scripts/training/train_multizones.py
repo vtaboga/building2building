@@ -27,7 +27,7 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from b2b.training import run_multizones_training
+from building2building.training import run_multizones_training
 
 
 @hydra.main(

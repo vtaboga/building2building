@@ -3,18 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Sequence
 
-from b2b.config.models import DatasetName, DatasetSelectionConfig, SplitName
-from b2b.sources import hydroquebec, multizones_reference_buildings
-from b2b.sources.multizones_reference_buildings import BuildingType as MultiZonesType
-from b2b.sources.single_zone_houses import (
+from building2building.config.models import DatasetName, DatasetSelectionConfig, SplitName
+from building2building.sources import residential, multizones_reference_buildings
+from building2building.sources.multizones_reference_buildings import BuildingType as MultiZonesType
+from building2building.sources.single_zone_houses import (
     building_id_from_split_index as single_zone_building_id_from_split_index,
 )
-from b2b.sources.single_zone_houses import (
+from building2building.sources.single_zone_houses import (
     building_ids_from_split_indices as single_zone_building_ids_from_split_indices,
 )
-from b2b.sources.single_zone_houses import sample_building_ids as sample_single_zone_building_ids
-from b2b.sources.single_zone_houses import split_row_ids as single_zone_split_row_ids
-from b2b.types import BuildingConfig
+from building2building.sources.single_zone_houses import sample_building_ids as sample_single_zone_building_ids
+from building2building.sources.single_zone_houses import split_row_ids as single_zone_split_row_ids
+from building2building.types import BuildingConfig
 
 
 def sample_building_ids(
@@ -92,7 +92,7 @@ def query_building_ids(
     if selection.mode != "metadata_query":
         raise ValueError("query_building_ids expects metadata_query mode")
     if selection.dataset == "single_zone_houses":
-        rows = hydroquebec.search_buildings(**selection.metadata_query)
+        rows = residential.search_buildings(**selection.metadata_query)
         split_rows = (
             set(single_zone_split_row_ids(selection.split))
             if selection.split is not None
@@ -211,7 +211,7 @@ def search_config(
                     "schedule_filename": f"IDFsAndSchedules/{building_id}/in.schedules.csv",
                 }
             )
-        return hydroquebec.search_configs(
+        return residential.search_configs(
             config=cfg,
             n=1,
             eplus_output_dir=eplus_output_dir,

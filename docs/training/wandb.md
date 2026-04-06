@@ -33,7 +33,7 @@ python scripts/train_single_zone_houses.py wandb.enabled=false
 
 ## Automatic Tags
 
-The logging system (`b2b.baselines.wandb_utils`) automatically derives tags
+The logging system (`building2building.baselines.wandb_utils`) automatically derives tags
 from the run configuration for easier filtering:
 
 | Tag format | Source |

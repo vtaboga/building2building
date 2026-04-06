@@ -8,8 +8,8 @@ import pandas as pd
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from b2b.make_env import make_env
-from b2b.baselines.wandb_utils import wandb_log_xy_series
+from building2building.api import make_env_from_hydra_config as make_env
+from building2building.baselines.wandb_utils import wandb_log_xy_series
 
 logger = logging.getLogger(__name__)
 

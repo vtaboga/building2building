@@ -309,28 +309,28 @@ def main() -> None:
     store_path = _require_scratch_store()
 
     # Import after STORE_PATH is set to avoid ever defaulting to $HOME.
-    from b2b.env import STORE_PATH  # noqa: WPS433
-    from b2b.env import energyplus_path  # noqa: WPS433
-    from b2b.sources import hydroquebec  # noqa: WPS433
-    from b2b.store import realize  # noqa: WPS433
+    from building2building.env import STORE_PATH  # noqa: WPS433
+    from building2building.env import energyplus_path  # noqa: WPS433
+    from building2building.sources import residential  # noqa: WPS433
+    from building2building.store import realize  # noqa: WPS433
 
     STORE_PATH.set(store_path)
 
     # Enumerate all buildings (duckdb->pandas). Each row has a callable that yields
     # the derivation graph for the building.
     root_zip = (
-        hydroquebec.dataset_zip_small()
+        residential.dataset_zip_small()
         if args.dataset_zip == "small"
-        else hydroquebec.dataset_zip()
+        else residential.dataset_zip()
     )
     zip_path = Path(realize(STORE_PATH.get(), root_zip))
     df = _load_hq_dataframe_from_zip(zip_path)
 
-    # Add derivation thunk, mirroring hydroquebec.search_buildings().
+    # Add derivation thunk, mirroring residential.search_buildings().
     ep = energyplus_path()
 
     def trans(idf_filename: str, schedule_filename: str):
-        return lambda: hydroquebec._build_control_derivation(  # noqa: SLF001
+        return lambda: residential._build_control_derivation(  # noqa: SLF001
             root_zip, idf_filename, schedule_filename, ep
         )
 

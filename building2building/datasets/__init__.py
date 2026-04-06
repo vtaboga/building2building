@@ -6,7 +6,7 @@ both the ``single_zone_houses`` and ``multizones_reference_buildings``
 datasets.
 """
 
-from b2b.datasets.access import (
+from building2building.datasets.access import (
     building_id_from_split_index,
     building_ids_from_split_indices,
     query_building_ids,

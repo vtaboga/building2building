@@ -28,8 +28,8 @@ from typing import Any
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from b2b.benchmarks import build_multizones_split_benchmark
-from b2b.benchmark.problem_multizones_splits import (
+from building2building.benchmarks import build_multizones_split_benchmark
+from building2building.benchmark.problem_multizones_splits import (
     MultiTypeTrainTestBenchmark,
     SingleTypeTrainTestBenchmark,
 )

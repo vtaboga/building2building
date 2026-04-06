@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from b2b.store import Derivation, OUTPUT, derivation
+from building2building.store import Derivation, OUTPUT, derivation
 
 
 @derivation("setpoint-control")

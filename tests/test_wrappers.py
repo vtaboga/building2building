@@ -6,7 +6,7 @@ import gymnasium as gym
 import numpy as np
 import pytest
 
-from b2b.simulator.wrappers import (
+from building2building.simulator.wrappers import (
     AugmentObservationWithBuildingParams,
     NormalizeObservation,
     PadObservation,

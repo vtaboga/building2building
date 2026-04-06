@@ -7,16 +7,16 @@ from typing import Any, Literal
 
 import gymnasium as gym
 
-from b2b.benchmark.adaptive_dynamics import (
+from building2building.benchmark.adaptive_dynamics import (
     AdaptiveDynamicsRecord,
     benchmark_adaptive_dynamics,
 )
-from b2b.benchmark.runner import PolicyLike
+from building2building.benchmark.runner import PolicyLike
 
 
 def _default_base_config() -> dict[str, Any]:
     """
-    Minimal config that works with `b2b.make_env.make_env()`.
+    Minimal config that works with `building2building.api.make_env_from_hydra_config()`.
 
     The adaptive dynamics benchmark overrides `bldg.split` and `bldg.index`
     internally to select specific Hydro-Québec buildings.
@@ -43,7 +43,7 @@ class AdaptiveDynamicsProblem:
     Intended usage from external repos:
 
     ```python
-    from b2b.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
+    from building2building.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
 
     problem = AdaptiveDynamicsProblem()
     records = problem.run(policy)

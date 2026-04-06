@@ -7,10 +7,10 @@ import gymnasium as gym
 import numpy as np
 import pytest
 
-from b2b.config import DatasetSelectionConfig, EnvBuildConfig, parse_benchmark_config
-from b2b.datasets.access import select_building_ids
-from b2b.make_env import make_env
-from b2b.types import BaseRewardConfig, BuildingConfig
+from building2building.config import DatasetSelectionConfig, EnvBuildConfig, parse_benchmark_config
+from building2building.datasets.access import select_building_ids
+from building2building.api import make_env_from_hydra_config as make_env
+from building2building.types import BaseRewardConfig, BuildingConfig
 
 
 pytestmark = pytest.mark.quick
@@ -29,7 +29,7 @@ class _DummyEnv(gym.Env):
 
 
 def test_dataset_selection_random_mode() -> None:
-    with patch("b2b.datasets.access.sample_building_ids") as mock_sample:
+    with patch("building2building.datasets.access.sample_building_ids") as mock_sample:
         mock_sample.return_value = [11, 22]
         out = select_building_ids(
             DatasetSelectionConfig(
@@ -44,7 +44,7 @@ def test_dataset_selection_random_mode() -> None:
 
 
 def test_dataset_selection_indices_mode() -> None:
-    with patch("b2b.datasets.access.building_ids_from_split_indices") as mock_indices:
+    with patch("building2building.datasets.access.building_ids_from_split_indices") as mock_indices:
         mock_indices.return_value = [101, 103]
         out = select_building_ids(
             DatasetSelectionConfig(
@@ -63,15 +63,24 @@ def test_parse_benchmark_config_single_type() -> None:
         {
             "mode": "single_type",
             "building_type": "OfficeSmall",
-            "train": {"selection": {"mode": "indices", "indices": [1, 2]}},
-            "test": {"selection": {"mode": "random", "n": 2}},
+            "train": {
+                "selection": {"mode": "indices", "indices": [1, 2]},
+                "config": {"reward": {"reward_type": "DeadbandRewardConfig"}},
+            },
+            "test": {
+                "selection": {"mode": "random", "n": 2},
+                "config": {"reward": {"reward_type": "DeadbandRewardConfig"}},
+            },
         }
     )
     assert parsed.mode == "single_type"
 
 
-@patch("b2b.datasets.access.hydroquebec.search_configs")
-def test_make_env_uses_typed_canonical_path(mock_search_configs: MagicMock, tmp_path: Path) -> None:
+@patch("building2building.datasets.access.residential.search_configs")
+@patch("building2building.datasets.access.select_building_ids", return_value=[42])
+def test_make_env_uses_typed_canonical_path(
+    mock_select: MagicMock, mock_search_configs: MagicMock, tmp_path: Path
+) -> None:
     fake_config = BuildingConfig(
         path_to_building=Path("a"),
         path_to_weather=Path("b"),
@@ -82,7 +91,7 @@ def test_make_env_uses_typed_canonical_path(mock_search_configs: MagicMock, tmp_
         hvac_equipment=[],
     )
     mock_search_configs.return_value = [fake_config]
-    with patch("b2b.envs.factory.create_simulator") as mock_create:
+    with patch("building2building.envs.factory.create_simulator") as mock_create:
         mock_env = _DummyEnv()
         mock_create.return_value = mock_env
         env = make_env(

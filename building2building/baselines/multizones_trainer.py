@@ -18,22 +18,22 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnv
 
-from b2b.baselines.recycling_vec_env import RecyclingSubprocVecEnv
-from b2b.training.sb3_utils import build_sb3_model, load_best_model
-from b2b.baselines.callbacks import TrainingEpisodeRewardCallback
-from b2b.baselines.wandb_utils import (
+from building2building.baselines.recycling_vec_env import RecyclingSubprocVecEnv
+from building2building.training.sb3_utils import build_sb3_model, load_best_model
+from building2building.baselines.callbacks import TrainingEpisodeRewardCallback
+from building2building.baselines.wandb_utils import (
     finish_wandb_if_started,
     init_wandb_from_config,
 )
-from b2b.api import make_multizones_env as make_multizones_env_api
-from b2b.benchmark.runner import run_episode
-from b2b.simulator.wrappers import NormalizeObservation
-from b2b.sources import multizones_reference_buildings as mz_source
-from b2b.sources.multizones_reference_buildings import (
+from building2building.api import make_multizones_env as make_multizones_env_api
+from building2building.benchmark.runner import run_episode
+from building2building.simulator.wrappers import NormalizeObservation
+from building2building.sources import multizones_reference_buildings as mz_source
+from building2building.sources.multizones_reference_buildings import (
     BuildingType,
     SPLIT_DATA_DIR,
 )
-from b2b.types import TaskConfig
+from building2building.types import TaskConfig
 
 logger = logging.getLogger(__name__)
 

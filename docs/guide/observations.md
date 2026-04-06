@@ -50,7 +50,6 @@ The number of zone air temperature features varies by building:
 | Warehouse | 3 | 10 |
 | RetailStandalone | 4 | 11 |
 | OfficeSmall | 5 | 12 |
-| HotelSmall | 10+ | 17+ |
 | OfficeMedium | 15+ | 22+ |
 
 ---
@@ -83,7 +82,7 @@ task=TaskConfig.from_dict({
 
 ## Observation Construction
 
-Observations are assembled by the `flat_observation_info` function in `b2b.simulator.observation_spaces`. The process:
+Observations are assembled by the `flat_observation_info` function in `building2building.simulator.observation_spaces`. The process:
 
 1. **Zone temperatures**: One `VariableHole("ZONE AIR TEMPERATURE", zone_name)` per controlled zone
 2. **Occupancy** (optional): `DynamicZoneVariable("Zone People Occupant Count", zone_name)` per zone
@@ -137,7 +136,7 @@ The key challenge for multi-building generalization is that **observation dimens
 Pads zone temperatures to a fixed maximum size while keeping non-zone features at consistent indices:
 
 ```python
-from b2b.simulator.wrappers import PadObservation
+from building2building.simulator.wrappers import PadObservation
 
 env = PadObservation(env, target_size=25)
 # All buildings now produce 25-dimensional observations
@@ -150,7 +149,7 @@ Padded dimensions have bounds `[0, 0]`, so normalization layers treat them as co
 Appends building metadata (area, warmup phases, number of actuators) to help the policy identify which building it is controlling:
 
 ```python
-from b2b.simulator.wrappers import AugmentObservationWithBuildingParams
+from building2building.simulator.wrappers import AugmentObservationWithBuildingParams
 
 env = AugmentObservationWithBuildingParams(env)
 ```

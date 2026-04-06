@@ -47,7 +47,7 @@ where:
 ### Configuration
 
 ```python
-from b2b.types import BaseRewardConfig
+from building2building.types import BaseRewardConfig
 
 reward = BaseRewardConfig(energy_weight=1.0)
 ```
@@ -93,7 +93,7 @@ where:
 ### Configuration
 
 ```python
-from b2b.types import BarrierRewardConfig
+from building2building.types import BarrierRewardConfig
 
 reward = BarrierRewardConfig(
     energy_weight=0.1,
@@ -153,7 +153,7 @@ where:
 ### Configuration
 
 ```python
-from b2b.types import DeadbandRewardConfig
+from building2building.types import DeadbandRewardConfig
 
 reward = DeadbandRewardConfig(
     energy_weight=0.001,
@@ -225,7 +225,7 @@ The `energy_weight` parameter controls the comfort-vs-energy trade-off:
 Create reward configs programmatically using `reward_config_from_dict`:
 
 ```python
-from b2b.types import reward_config_from_dict
+from building2building.types import reward_config_from_dict
 
 # BaseReward
 reward = reward_config_from_dict({"reward_type": "BaseRewardConfig", "energy_weight": 1.0})

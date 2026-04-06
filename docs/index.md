@@ -4,7 +4,7 @@
 
 ---
 
-Reinforcement learning (RL) has achieved strong results in control, yet learned policies remain brittle to changes in dynamics, action spaces, observation spaces, or reward changes. **Building2Building** (B2B) is a large-scale suite of realistic HVAC control environments built on EnergyPlus. Starting from ASHRAE 90.1-2022 building prototypes, B2B parametrically generates over **7,000 buildings** spanning **7 commercial and residential building types**, **16 climate zones**, and **3 distinct HVAC system types**.
+Reinforcement learning (RL) has achieved strong results in control, yet learned policies remain brittle to changes in dynamics, action spaces, observation spaces, or reward changes. **Building2Building** (B2B) is a large-scale suite of realistic HVAC control environments built on EnergyPlus. Starting from ASHRAE 90.1-2022 building prototypes, B2B parametrically generates over **7,000 buildings** spanning **6 commercial and residential building types**, **16 climate zones**, and **3 distinct HVAC system types**.
 
 B2B is designed to accelerate research in **transfer learning**, **multi-task RL**, and **meta-learning** for building energy management.
 
@@ -13,7 +13,7 @@ B2B is designed to accelerate research in **transfer learning**, **multi-task RL
 ## Feature Highlights
 
 - **7,000+ parametrically generated buildings** across commercial and residential archetypes
-- **7 building types**: Warehouse, HotelSmall, RetailStandalone, RestaurantFastFood, OfficeMedium, OfficeSmall, and single-zone houses
+- **6 building types**: Warehouse, RetailStandalone, RestaurantFastFood, OfficeMedium, OfficeSmall, and single-zone houses
 - **16 ASHRAE climate zones** with real TMY3 weather files
 - **3 HVAC system types**: VAV (Variable Air Volume), Unitary, and Heating-Only (unit heaters, baseboards, radiant)
 - **Gymnasium-compatible** environments registered as `EnergyPlus-v0`
@@ -30,9 +30,9 @@ B2B is designed to accelerate research in **transfer learning**, **multi-task RL
 ## Quick Start
 
 ```python
-from b2b.api import make_env
-from b2b.config.models import DatasetSelectionConfig, EnvBuildConfig
-from b2b.types import TaskConfig, reward_config_from_dict
+from building2building.api import make_env
+from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
+from building2building.types import TaskConfig, reward_config_from_dict
 
 cfg = EnvBuildConfig(
     dataset_selection=DatasetSelectionConfig(
@@ -60,7 +60,7 @@ env.close()
     For common use cases, B2B provides shorthand factory functions:
 
     ```python
-    from b2b.api import make_single_zone_env, make_multizones_env
+    from building2building.api import make_single_zone_env, make_multizones_env
 
     # Single-zone house
     env = make_single_zone_env(split="train", split_index=0, eplus_output_dir="outputs/eplus")

@@ -19,9 +19,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, get_args
 
-from b2b.env import STORE_PATH
-from b2b.sources.energycodes import BuildingType, search_buildings
-from b2b.store import realize
+from building2building.env import STORE_PATH
+from building2building.sources.energycodes import BuildingType, search_buildings
+from building2building.store import realize
 
 ACTIVE_BUILDING_TYPES: list[str] = list(get_args(BuildingType))
 

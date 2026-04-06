@@ -11,14 +11,14 @@ import rdflib
 from cattrs import structure, unstructure
 from minergym.ontology import Ontology
 
-from b2b.store import (
+from building2building.store import (
     OUTPUT,
     Expression,
     Realizable,
     derivation,
     expression,
 )
-from b2b.types import ActuatorDescription, Equipment
+from building2building.types import ActuatorDescription, Equipment
 
 
 @dataclass

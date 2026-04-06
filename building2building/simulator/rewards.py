@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from b2b.types import TaskConfig
+from building2building.types import TaskConfig
 
 
 def _zone_target(obs: dict[str, Any], zone: str, task_config: TaskConfig) -> float:

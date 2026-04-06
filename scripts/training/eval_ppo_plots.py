@@ -35,16 +35,16 @@ import numpy as np
 import pandas as pd
 from omegaconf import OmegaConf
 
-from b2b.api import make_multizones_env
-from b2b.benchmark.plot_rollout import plot_rollout_df
-from b2b.benchmark.runner import run_rollout
-from b2b.env import setup_energyplus_path
-from b2b.simulator.wrappers import NormalizeObservation
-from b2b.sources.multizones_reference_buildings import (
+from building2building.api import make_multizones_env
+from building2building.benchmark.plot_rollout import plot_rollout_df
+from building2building.benchmark.runner import run_rollout
+from building2building.env import setup_energyplus_path
+from building2building.simulator.wrappers import NormalizeObservation
+from building2building.sources.multizones_reference_buildings import (
     building_id_from_split_index,
     climate_zone_for_building,
 )
-from b2b.types import RunPeriodConfig
+from building2building.types import RunPeriodConfig
 
 logging.basicConfig(
     level=logging.INFO,

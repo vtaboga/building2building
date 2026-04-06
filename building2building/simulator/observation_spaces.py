@@ -20,13 +20,13 @@ from minergym.simulation import (
     api,
 )
 
-from b2b.simulator.transform_utils import (
+from building2building.simulator.transform_utils import (
     Transform,
     TransformDictSpace,
     TransformScalarToArray,
     transform_flatten,
 )
-from b2b.types import TaskConfig, ZoneTargetTemperatureConfig
+from building2building.types import TaskConfig, ZoneTargetTemperatureConfig
 
 
 # We redefine those methods as toplevel functions so that pickle is able to

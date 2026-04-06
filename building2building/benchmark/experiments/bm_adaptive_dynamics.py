@@ -7,8 +7,8 @@ from typing import Any
 import numpy as np
 from omegaconf import DictConfig, OmegaConf
 
-from b2b.baselines.wandb_utils import finish_wandb_if_started, init_wandb_from_config
-from b2b.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
+from building2building.baselines.wandb_utils import finish_wandb_if_started, init_wandb_from_config
+from building2building.benchmark.problem_adaptive_dynamics import AdaptiveDynamicsProblem
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +16,13 @@ logger = logging.getLogger(__name__)
 def make_policy_from_cfg(cfg: DictConfig) -> Any:
     policy_type = str(getattr(cfg.policy, "type", "")).strip()
     if policy_type == "unitary_g36":
-        from b2b.baselines.controllers.unitary_g36 import (  # noqa: WPS433
+        from building2building.baselines.controllers.unitary_g36 import (  # noqa: WPS433
             UnitaryG36Policy,
         )
 
         return UnitaryG36Policy(cfg.policy)
     if policy_type == "ashrae_air_loop":
-        from b2b.baselines.controllers.ashrae_air_loop import (  # noqa: WPS433
+        from building2building.baselines.controllers.ashrae_air_loop import (  # noqa: WPS433
             AshraeAirLoopPolicy,
         )
 
@@ -99,7 +99,7 @@ def run_bm_adaptive_dynamics(cfg: DictConfig, *, output_dir: Path) -> int:
     """
     Hydra/W&B wrapper around the adaptive dynamics control problem.
 
-    The core, reusable API is `b2b.benchmark.problem_adaptive_dynamics.AdaptiveDynamicsProblem`.
+    The core, reusable API is `building2building.benchmark.problem_adaptive_dynamics.AdaptiveDynamicsProblem`.
     """
     output_dir = Path(output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)

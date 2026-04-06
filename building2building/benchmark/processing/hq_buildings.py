@@ -8,7 +8,7 @@ This module provides a stable processing pipeline that:
 
 The key backward-compatibility guarantee is that the default controls list is
 explicit and intentionally conservative, so newly-added actuators in
-`b2b.pipeline.actuators` do not change results unless explicitly enabled.
+`building2building.pipeline.actuators` do not change results unless explicitly enabled.
 """
 
 from __future__ import annotations
@@ -148,10 +148,10 @@ def run_hq_buildings_processing(cfg: object, *, output_dir: Path) -> Path:
     store_path = _require_scratch_store(config.store_path)
 
     # Import after STORE_PATH is set to avoid any defaulting to $HOME.
-    from b2b.env import STORE_PATH, energyplus_path  # noqa: WPS433
-    from b2b.pipeline import link_in_schedule, make_controllable, prepare_building  # noqa: WPS433
-    from b2b.sources import hydroquebec  # noqa: WPS433
-    from b2b.store import ExtractFromZip, Realizable, realize  # noqa: WPS433
+    from building2building.env import STORE_PATH, energyplus_path  # noqa: WPS433
+    from building2building.pipeline import link_in_schedule, make_controllable, prepare_building  # noqa: WPS433
+    from building2building.sources import residential  # noqa: WPS433
+    from building2building.store import ExtractFromZip, Realizable, realize  # noqa: WPS433
 
     STORE_PATH.set(store_path)
 
@@ -160,7 +160,7 @@ def run_hq_buildings_processing(cfg: object, *, output_dir: Path) -> Path:
         _atomic_write_json(out_path, [])
         return out_path
 
-    root_zip = hydroquebec.dataset_zip()
+    root_zip = residential.dataset_zip()
     zip_path = Path(realize(STORE_PATH.get(), root_zip))
     df = _load_hq_dataframe_from_zip(zip_path)
 

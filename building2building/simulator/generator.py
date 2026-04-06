@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from b2b.pipeline.steps.conversion import convert_idf, upgrade
-from b2b.store import OUTPUT, Derivation, Realizable, derivation
+from building2building.pipeline.steps.conversion import convert_idf, upgrade
+from building2building.store import OUTPUT, Derivation, Realizable, derivation
 
 
 @dataclass(frozen=True)

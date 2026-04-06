@@ -11,11 +11,11 @@ from pathlib import Path
 from typing import List
 
 import duckdb
-from b2b import pipeline
-from b2b.env import STORE_PATH, energyplus_path
+from building2building import pipeline
+from building2building.env import STORE_PATH, energyplus_path
 
 # Extract metadata from control epJSON
-from b2b.pipeline import (
+from building2building.pipeline import (
     create_complete_pipeline,
     extract_discovery_metadata,
     link_in_schedule,
@@ -23,7 +23,7 @@ from b2b.pipeline import (
     modify_run_period,
     prepare_building,
 )
-from b2b.store import (
+from building2building.store import (
     OUTPUT,
     Constant,
     Derivation,
@@ -35,7 +35,7 @@ from b2b.store import (
     derivation,
     realize,
 )
-from b2b.types import (
+from building2building.types import (
     BuildingConfig,
     TaskConfig,
     reward_config_from_dict,
@@ -49,7 +49,7 @@ def _row_source_metadata(row) -> dict[str, object]:
     Extract a compact, JSON-friendly subset of identifying info from the selected row.
     Use for logging to identify the chosen building.
     """
-    meta: dict[str, object] = {"source": "hydroquebec"}
+    meta: dict[str, object] = {"source": "residential"}
     # DataFrame index from duckdb/parquet (helps uniquely identify the chosen row)
     try:
         meta["dataset_row_index"] = int(row.name)  # type: ignore[attr-defined]
@@ -81,7 +81,7 @@ def _row_source_metadata(row) -> dict[str, object]:
 # requires reading the file in its entirety, which is bad. Perhaps this should
 # use LocalSymlink?
 def dataset_zip_small() -> Derivation:
-    place = files("b2b.sources.data") / "hydroquebec.zip"
+    place = files("building2building.sources.data") / "hydroquebec.zip"
     if not isinstance(place, Path):
         raise Exception("error")
 
@@ -168,7 +168,7 @@ def _build_control_derivation(
     timesteps_per_hour: int = 12,
 ):
     """
-    Build control-ready epJSON from IDF (hydroquebec-specific).
+    Build control-ready epJSON from IDF (residential-specific).
 
     Pipeline: IDF → prepare → link schedule → make controllable
     """
@@ -190,7 +190,7 @@ def _build_control_derivation(
     )
 
     schedule_derivation = ExtractFromZip(root_zip, schedule_filename)
-    # Step 2: Link schedule data (hydroquebec-specific)
+    # Step 2: Link schedule data (residential-specific)
     epjson = link_in_schedule(epjson, schedule_derivation)
 
     # Step 3: Make controllable
@@ -379,5 +379,5 @@ def search_config(
 ) -> BuildingConfig:
     configs = search_configs(config=config, n=1, eplus_output_dir=eplus_output_dir)
     if not configs:
-        raise RuntimeError("No Hydro-Quebec building configuration found")
+        raise RuntimeError("No residential building configuration found")
     return configs[0]

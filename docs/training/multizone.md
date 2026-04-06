@@ -13,7 +13,7 @@ a specific building instance (selected by type, split, and index).
 scripts/train_multizones.py
 ```
 
-The script calls `b2b.training.run_multizones_training()` and is configured
+The script calls `building2building.training.run_multizones_training()` and is configured
 via `configs/train_multizones.yaml`.
 
 ## Configuration
@@ -40,7 +40,7 @@ Building selection is configured via `configs/bldg/multi_zone.yaml`:
 
 ```yaml title="configs/bldg/multi_zone.yaml"
 dataset: multizones_reference_buildings
-building_type: OfficeSmall   # Warehouse, HotelSmall, RetailStandalone,
+building_type: OfficeSmall   # Warehouse, RetailStandalone,
                              # RestaurantFastFood, OfficeMedium, OfficeSmall
 split: train                 # train, test, or test_small
 index: 0                     # 0-based position in the split's ID list
@@ -53,7 +53,6 @@ index: 0                     # 0-based position in the split's ID list
 | `OfficeSmall` | Small commercial office |
 | `OfficeMedium` | Medium commercial office |
 | `Warehouse` | Commercial warehouse |
-| `HotelSmall` | Small hotel |
 | `RetailStandalone` | Standalone retail building |
 | `RestaurantFastFood` | Fast-food restaurant |
 

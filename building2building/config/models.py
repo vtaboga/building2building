@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from b2b.types import (
+from building2building.types import (
     BarrierRewardConfig,
     BaseRewardConfig,
     DeadbandRewardConfig,
@@ -22,7 +22,6 @@ DatasetName = Literal["single_zone_houses", "multizones_reference_buildings"]
 SplitName = Literal["train", "test", "test_small"]
 BuildingType = Literal[
     "Warehouse",
-    "HotelSmall",
     "RetailStandalone",
     "RestaurantFastFood",
     "OfficeMedium",

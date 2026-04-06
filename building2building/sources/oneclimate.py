@@ -11,8 +11,8 @@ from urllib.parse import urljoin, urlparse
 
 import duckdb
 import requests
-from b2b.env import STORE_PATH
-from b2b.store import (
+from building2building.env import STORE_PATH
+from building2building.store import (
     OUTPUT,
     ChildFile,
     Derivation,

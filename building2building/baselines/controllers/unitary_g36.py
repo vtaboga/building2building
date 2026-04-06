@@ -21,7 +21,7 @@ from typing import Any
 
 import numpy as np
 
-from b2b.baselines.common import (
+from building2building.baselines.common import (
     find_day_of_week_index,
     find_time_of_day_index,
     find_zone_air_temp_index_for_zone,

@@ -10,17 +10,17 @@ import pandas as pd
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
-from b2b.baselines.common import RolloutPaths, make_rollout_paths
-from b2b.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
-from b2b.baselines.controllers.unitary_g36 import UnitaryG36Policy
-from b2b.baselines.wandb_utils import (
+from building2building.baselines.common import RolloutPaths, make_rollout_paths
+from building2building.baselines.controllers.ashrae_air_loop import AshraeAirLoopPolicy
+from building2building.baselines.controllers.unitary_g36 import UnitaryG36Policy
+from building2building.baselines.wandb_utils import (
     derive_wandb_run_name,
     finish_wandb_if_started,
     init_wandb_from_config,
     wandb_log_df_line_series,
 )
-from b2b.benchmark.plot_rollout import plot_rollout_df
-from b2b.benchmark.runner import run_rollout
+from building2building.benchmark.plot_rollout import plot_rollout_df
+from building2building.benchmark.runner import run_rollout
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +50,8 @@ def run_baseline_rollout(
     """
     Rollout a simulation with a baseline controller policy.
 
-    This lives under `b2b.benchmark` so all simulation execution code stays
-    centralized outside of `b2b.baselines` (controllers + SB3 interaction only).
+    This lives under `building2building.benchmark` so all simulation execution code stays
+    centralized outside of `building2building.baselines` (controllers + SB3 interaction only).
     """
     if run_dir is None:
         if HydraConfig.initialized():

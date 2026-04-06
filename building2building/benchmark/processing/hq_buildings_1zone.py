@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from b2b.benchmark.processing.hq_buildings import (  # noqa: WPS433
+from building2building.benchmark.processing.hq_buildings import (  # noqa: WPS433
     BuildingProcessingRecord,
     HQBuildingsProcessingConfig,
     run_hq_buildings_processing,

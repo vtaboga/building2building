@@ -14,10 +14,10 @@ from collections.abc import Callable
 
 import gymnasium as gym
 
-from b2b.benchmark.runner import EpisodeResult, PolicyLike, run_rollout
-from b2b.make_env import make_env
-from b2b.sources.single_zone_houses import SingleZoneHouseRowIdSplits
-from b2b.types import RunPeriodConfig
+from building2building.benchmark.runner import EpisodeResult, PolicyLike, run_rollout
+from building2building.api import make_env_from_hydra_config as make_env
+from building2building.sources.single_zone_houses import SingleZoneHouseRowIdSplits
+from building2building.types import RunPeriodConfig
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +57,8 @@ def _short_error(e: BaseException) -> str:
 
 def _with_train_selection(cfg: dict[str, Any], *, split_index: int) -> dict[str, Any]:
     """
-    Return a copy of cfg with `bldg.selection` set so `b2b.make_env.make_env()`
-    picks a deterministic HydroQuebec building from stored split lists.
+    Return a copy of cfg with `bldg.selection` set so `building2building.api.make_env_from_hydra_config()`
+    picks a deterministic residential building from stored split lists.
     """
     return _with_selection(cfg, split="train", split_index=split_index)
 
@@ -90,7 +90,7 @@ def benchmark_adaptive_dynamics(
     Sequentially evaluate a policy on the Hydro-Québec train selection list.
 
     For each dataset row index stored in:
-      `b2b/sources/data/action_space_2_zone_1_train_data.json`
+      `building2building/sources/data/action_space_2_zone_1_train_data.json`
     we build the corresponding EnergyPlus environment, run a full episode
     (intended to be one year), and collect the resulting EpisodeResult.
 
@@ -147,7 +147,7 @@ def benchmark_adaptive_dynamics(
 
         episode_result: EpisodeResult | None = None
         building_source_metadata: dict[str, Any] = {
-            "source": "hydroquebec",
+            "source": "residential",
             "dataset_row_index": int(dataset_row_index),
             "building_id": int(building_id),
             "split": str(split),
