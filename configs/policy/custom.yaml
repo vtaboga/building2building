@@ -1,4 +1,0 @@
-type: custom
-module: ???              # fully-qualified Python module (e.g. my_package.policies)
-class_name: ???          # class name that exposes predict(obs, deterministic) -> (action, state)
-kwargs: {}               # optional keyword arguments passed to the constructor

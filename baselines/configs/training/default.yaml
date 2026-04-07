@@ -1,0 +1,6 @@
+# Default training parameters
+total_timesteps: 5_000_000
+n_envs: 14
+eval_freq: 262144
+eval_episodes: 1
+recycle_every: null

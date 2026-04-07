@@ -1,0 +1,8 @@
+# Task 2: Deadband reward, high energy weight, constant target
+task_name: task2
+reward_type: deadband
+energy_weight: 0.10
+dT: 1.0
+target_temperature_mode: constant
+target_temperature_occupied: 21.0
+target_temperature_unoccupied: 21.0

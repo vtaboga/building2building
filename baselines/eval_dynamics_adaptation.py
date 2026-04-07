@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+"""Evaluate dynamics adaptation models on held-out test buildings.
+
+Loads a trained PPO model (specialist, baseline, or parameterized) and
+evaluates on the test split of the dynamics adaptation benchmark.
+
+Usage::
+
+    python -m baselines.eval_dynamics_adaptation \
+        --model-path outputs/dynamics_specialist/models/specialist_42.zip \
+        --difficulty easy --approach specialist
+
+    python -m baselines.eval_dynamics_adaptation \
+        --model-path outputs/dynamics_parameterized/models/multi_parameterized.zip \
+        --difficulty easy --approach parameterized
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+from stable_baselines3 import PPO
+from stable_baselines3.common.monitor import Monitor
+
+import building2building as b2b
+from baselines.utils.evaluation import EpisodeResult, run_episode
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TestResult:
+    building_id: str
+    reward: float
+    episode_length: int
+    normalized_score: float | None
+
+
+def evaluate_specialist(
+    model_dir: Path,
+    bench: b2b.benchmarks.DynamicsAdaptation,
+    n_episodes: int = 1,
+) -> list[TestResult]:
+    """Evaluate per-building specialist models on test buildings."""
+    test_ids = bench.test_building_ids()
+    results: list[TestResult] = []
+
+    for bid in test_ids:
+        model_path = model_dir / f"specialist_{bid}.zip"
+        if not model_path.exists():
+            logger.warning("No specialist model for %s, skipping", bid)
+            continue
+
+        model = PPO.load(str(model_path))
+        for _ in range(n_episodes):
+            env = b2b.new_make_env(
+                bench.building_type, building_id=bid, task=bench.task
+            )
+            try:
+                ep: EpisodeResult = run_episode(env, model)
+                try:
+                    ns = b2b.compute_normalized_score(
+                        bench.building_type, ep.total_reward, task=bench.task
+                    )
+                except Exception:
+                    ns = None
+                results.append(
+                    TestResult(
+                        building_id=bid,
+                        reward=ep.total_reward,
+                        episode_length=ep.episode_length,
+                        normalized_score=ns,
+                    )
+                )
+                logger.info(
+                    "  %s: reward=%.1f ns=%s",
+                    bid,
+                    ep.total_reward,
+                    f"{ns:.4f}" if ns is not None else "N/A",
+                )
+            finally:
+                env.close()
+
+    return results
+
+
+def evaluate_multi_building(
+    model_path: Path,
+    bench: b2b.benchmarks.DynamicsAdaptation,
+    *,
+    augment_params: bool = False,
+    n_episodes: int = 1,
+) -> list[TestResult]:
+    """Evaluate a single multi-building model on all test buildings."""
+    model = PPO.load(str(model_path))
+    test_ids = bench.test_building_ids()
+    results: list[TestResult] = []
+
+    for bid in test_ids:
+        for _ in range(n_episodes):
+            env: Any = b2b.new_make_env(
+                bench.building_type, building_id=bid, task=bench.task
+            )
+            env = b2b.PadObservation(env, target_size=20)
+            env = b2b.NormalizeObservation(env)
+            if augment_params:
+                env = b2b.AugmentObservationWithBuildingParams(env)
+            env = Monitor(env)
+            try:
+                ep: EpisodeResult = run_episode(env, model)
+                try:
+                    ns = b2b.compute_normalized_score(
+                        bench.building_type, ep.total_reward, task=bench.task
+                    )
+                except Exception:
+                    ns = None
+                results.append(
+                    TestResult(
+                        building_id=bid,
+                        reward=ep.total_reward,
+                        episode_length=ep.episode_length,
+                        normalized_score=ns,
+                    )
+                )
+                logger.info(
+                    "  %s: reward=%.1f ns=%s",
+                    bid,
+                    ep.total_reward,
+                    f"{ns:.4f}" if ns is not None else "N/A",
+                )
+            finally:
+                env.close()
+
+    return results
+
+
+def write_csv(results: list[TestResult], path: Path) -> None:
+    fieldnames = [
+        "building_id",
+        "reward",
+        "episode_length",
+        "normalized_score",
+    ]
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for r in results:
+            writer.writerow(
+                {
+                    "building_id": r.building_id,
+                    "reward": f"{r.reward:.1f}",
+                    "episode_length": r.episode_length,
+                    "normalized_score": (
+                        f"{r.normalized_score:.4f}"
+                        if r.normalized_score is not None
+                        else ""
+                    ),
+                }
+            )
+    logger.info("Wrote %d results to %s", len(results), path)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Evaluate dynamics adaptation models"
+    )
+    parser.add_argument("--model-path", type=str, required=True)
+    parser.add_argument(
+        "--difficulty",
+        type=str,
+        default="easy",
+        choices=["easy", "medium", "hard"],
+    )
+    parser.add_argument(
+        "--approach",
+        type=str,
+        required=True,
+        choices=["specialist", "baseline", "parameterized"],
+    )
+    parser.add_argument("--task", type=str, default="task1")
+    parser.add_argument("--n-episodes", type=int, default=1)
+    parser.add_argument("--output", type=str, default="results_dynamics.csv")
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s: %(message)s",
+    )
+
+    bench = b2b.benchmarks.DynamicsAdaptation(
+        difficulty=args.difficulty, task=args.task
+    )
+    logger.info(
+        "Evaluating %s approach on %s (difficulty=%s, task=%s)",
+        args.approach,
+        bench.building_type,
+        args.difficulty,
+        args.task,
+    )
+
+    if args.approach == "specialist":
+        model_dir = Path(args.model_path)
+        results = evaluate_specialist(
+            model_dir, bench, n_episodes=args.n_episodes
+        )
+    elif args.approach == "baseline":
+        results = evaluate_multi_building(
+            Path(args.model_path),
+            bench,
+            augment_params=False,
+            n_episodes=args.n_episodes,
+        )
+    elif args.approach == "parameterized":
+        results = evaluate_multi_building(
+            Path(args.model_path),
+            bench,
+            augment_params=True,
+            n_episodes=args.n_episodes,
+        )
+    else:
+        raise ValueError(f"Unknown approach: {args.approach!r}")
+
+    write_csv(results, Path(args.output))
+
+    if results:
+        scores = [
+            r.normalized_score
+            for r in results
+            if r.normalized_score is not None
+        ]
+        if scores:
+            logger.info(
+                "Mean normalized score: %.4f (std=%.4f, n=%d)",
+                np.mean(scores),
+                np.std(scores),
+                len(scores),
+            )
+
+
+if __name__ == "__main__":
+    main()

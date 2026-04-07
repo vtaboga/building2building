@@ -1,0 +1,9 @@
+# Task 4: Barrier reward, constant target
+task_name: task4
+reward_type: barrier
+energy_weight: 0.01
+dT: 1.0
+violation_penalty: 10.0
+target_temperature_mode: constant
+target_temperature_occupied: 21.0
+target_temperature_unoccupied: 21.0

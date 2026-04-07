@@ -23,6 +23,7 @@ from building2building.simulator.rewards import (
     BaseReward,
     DeadbandReward,
 )
+from building2building.morphology import build_morphology
 from building2building.types import (
     BarrierRewardConfig,
     BaseRewardConfig,
@@ -178,6 +179,14 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     all_zones = set(str(z) for z in ont.zones())
     uncontrolled_zones = sorted(all_zones.difference(set(controlled_zones)))
 
+    morphology = build_morphology(
+        hvac_equipment=building_config.hvac_equipment,
+        observation_names=obs_info.slot_names,
+        action_names=action_names,
+        controlled_zones=controlled_zones,
+        all_zone_names=sorted(all_zones),
+    )
+
     gymenv = EnergyPlusEnvironment[np.ndarray, np.ndarray](
         make_energyplus,
         reward_function,
@@ -200,6 +209,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         if isinstance(building_config.source_metadata, dict)
         else {},
         "target_temperature_mode": task_config.target_temperature_mode,
+        "morphology": morphology,
     }
 
     return gymenv

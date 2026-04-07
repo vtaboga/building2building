@@ -18,8 +18,6 @@ building2building.egg-info/
 results/
 !tests/fixtures/results/
 wandb/
-!configs/wandb/
-configs/energyplus_simulator.json
 notebooks/
 OfflineRL-Kit/
 jobs/
@@ -42,6 +40,8 @@ dataset/
 *.zip
 scrap/
 refactoring/
+/scripts/
+/configs/
 
 # temporary
 simulator/patched_minergym_simulation.py

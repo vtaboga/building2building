@@ -1,4 +1,0 @@
-reward_type: BarrierRewardConfig
-energy_weight: 1.0
-dT: 1.0
-violation_penalty: 10.0
