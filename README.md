@@ -216,8 +216,7 @@ B2B_RUN_LONG_TESTS=1 pytest              # Full suite
 @article{b2b2025,
   title   = {Building2Building: A Large-Scale Benchmark for Transfer and
              Multi-Task Reinforcement Learning in HVAC Control},
-  author  = {TODO},
-  journal = {TODO},
+  author  = {Vincent Taboga, Justin Veilleux, Doseok Jang, Anushree Rankawat, Pierre-Luc Bacon},
   year    = {2025},
 }
 ```
