@@ -4,75 +4,71 @@
 
 ---
 
-Reinforcement learning (RL) has achieved strong results in control, yet learned policies remain brittle to changes in dynamics, action spaces, observation spaces, or reward changes. **Building2Building** (B2B) is a large-scale suite of realistic HVAC control environments built on EnergyPlus. Starting from ASHRAE 90.1-2022 building prototypes, B2B parametrically generates over **7,000 buildings** spanning **7 commercial and residential building types**, **16 climate zones**, and **3 distinct HVAC system types**.
+Reinforcement learning has achieved strong results in control, yet learned
+policies remain brittle to changes in dynamics, action spaces, or reward
+functions. **Building2Building** (B2B) is a large-scale suite of realistic HVAC
+control environments built on EnergyPlus. Starting from ASHRAE 90.1-2022
+building prototypes, B2B parametrically generates over **7,000 buildings**
+spanning **6 building types**, **16 climate zones**, and **3 distinct HVAC
+system types**.
 
-B2B is designed to accelerate research in **transfer learning**, **multi-task RL**, and **meta-learning** for building energy management.
+B2B is designed to accelerate research in **transfer learning**, **multi-task
+RL**, and **meta-learning** for building energy management.
 
 ---
 
 ## Feature Highlights
 
 - **7,000+ parametrically generated buildings** across commercial and residential archetypes
-- **7 building types**: Warehouse, HotelSmall, RetailStandalone, RestaurantFastFood, OfficeMedium, OfficeSmall, and single-zone houses
-- **16 ASHRAE climate zones** with real TMY3 weather files
-- **3 HVAC system types**: VAV (Variable Air Volume), Unitary, and Heating-Only (unit heaters, baseboards, radiant)
-- **Gymnasium-compatible** environments registered as `EnergyPlus-v0`
-- **Flexible reward functions**: BaseReward (MSE + energy), BarrierReward (deadband + violation), DeadbandReward (quadratic/linear)
-- **Observation & action wrappers** for normalization, padding, and building-parameter augmentation
-- **Multi-building training** with `ResampleBuildingOnResetWrapper` for zero-shot generalization
-- **Hydra + typed dataclass** configuration with full CLI override support
-- **SB3 integration**: PPO, SAC, TRPO, DQN out of the box
-- **W&B logging** for experiment tracking and visualization
-- **SLURM-ready** for large-scale cluster training
+- **6 building types**: `SingleFamilyHouse`, `OfficeSmall`, `OfficeMedium`, `RetailStandalone`, `RestaurantFastFood`, `Warehouse`
+- **3 HVAC system types**: VAV (Variable Air Volume), Unitary, and Heating-Only
+- **4 named task presets** reproducing exact paper conditions
+- **4 benchmark problems**: dynamics adaptation, cross-domain generalization, goal adaptation, action-space transfer
+- **Morphology graph** for structured per-node observation/action decomposition
+- **Normalized scoring** against reactive-controller baselines
+- **Gymnasium-compatible** environments with full SB3 integration
+- **Hydra + typed dataclass** configuration with CLI override support
+- **Pre-processed buildings** downloadable from HuggingFace
+- **W&B integration** for experiment tracking
+- **SLURM-ready** baseline scripts for cluster training
 
 ---
 
 ## Quick Start
 
 ```python
-from b2b.api import make_env
-from b2b.config.models import DatasetSelectionConfig, EnvBuildConfig
-from b2b.types import TaskConfig, reward_config_from_dict
+import building2building as b2b
 
-cfg = EnvBuildConfig(
-    dataset_selection=DatasetSelectionConfig(
-        dataset="single_zone_houses",
-        split="train",
-        mode="split_index",
-        split_index=0,
-    ),
-    task=TaskConfig.from_dict({"run_period": "winter"}),
-    reward=reward_config_from_dict({"reward_type": "BarrierRewardConfig"}),
-)
-env = make_env(cfg, eplus_output_dir="outputs/eplus")
+# Create a Gymnasium environment
+env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task1")
 
 obs, info = env.reset()
-for _ in range(100):
+done = False
+while not done:
     action = env.action_space.sample()
     obs, reward, terminated, truncated, info = env.step(action)
-    if terminated or truncated:
-        obs, info = env.reset()
+    done = terminated or truncated
 env.close()
 ```
 
-!!! tip "Convenience functions"
+### Benchmarks
 
-    For common use cases, B2B provides shorthand factory functions:
+```python
+# Dynamics adaptation: same building type, different instances
+bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task1")
+train_envs = bench.make_train_envs(n=4)
+test_envs = bench.make_test_envs(n=4)
+```
 
-    ```python
-    from b2b.api import make_single_zone_env, make_multizones_env
+### Normalized Scoring
 
-    # Single-zone house
-    env = make_single_zone_env(split="train", split_index=0, eplus_output_dir="outputs/eplus")
-
-    # Multi-zone office
-    env = make_multizones_env(
-        building_type="OfficeSmall",
-        split="train",
-        split_index=0,
-        eplus_output_dir="outputs/eplus",
-    )
-    ```
+```python
+score = b2b.compute_normalized_score(
+    cumulative_return=-5000.0,
+    building_type="OfficeSmall",
+    task="task1",
+)
+```
 
 ---
 
@@ -81,26 +77,45 @@ env.close()
 | Section | Description |
 |---|---|
 | [Getting Started](getting-started.md) | End-to-end tutorial from installation to training |
-| [Installation](guide/installation.md) | System requirements, installation, and verification |
-| [Environments](guide/environments.md) | Architecture, factory functions, and lifecycle |
-| [Building Types & Climate Zones](guide/buildings.md) | The 7,000+ building dataset |
-| [HVAC Systems](guide/hvac-systems.md) | VAV, Unitary, and Heating-Only zone control interfaces |
-| [Observations](guide/observations.md) | Observation space structure and bounds |
-| [Actions](guide/actions.md) | Action space per HVAC type |
-| [Rewards](guide/rewards.md) | Reward function definitions and math |
-| [Wrappers](guide/wrappers.md) | Normalization, padding, and augmentation |
-| [Configuration](guide/configuration.md) | Hydra config system walkthrough |
-| [Custom Policies](guide/custom-policies.md) | Writing and loading your own controllers |
+| [User Guide](guide/installation.md) | Environments, buildings, HVAC, rewards, wrappers, configuration |
+| [Benchmarks](benchmarks/overview.md) | Four benchmark problems from the paper |
+| [Baselines](baselines/overview.md) | Rule-based controllers, PPO training, Amorpheus |
+| [Tutorials](tutorials/quick-tour.md) | Hands-on examples and runnable scripts |
+| [API Reference](api/api.md) | Full module-level API documentation |
+| [Known Issues](about/known-issues.md) | Confirmed bugs, limitations, and roadmap |
+
+---
+
+## Architecture
+
+```mermaid
+graph TD
+    B2B["building2building (pip package)"]
+    API["b2b.new_make_env()"]
+    Benchmarks["b2b.benchmarks (4 classes)"]
+    Scoring["b2b.compute_normalized_score()"]
+    Wrappers["Wrappers (Pad, Normalize, Augment, Resample)"]
+    Morph["b2b.Morphology"]
+    Baselines["baselines/ (external scripts)"]
+
+    B2B --> API
+    B2B --> Benchmarks
+    B2B --> Scoring
+    B2B --> Wrappers
+    B2B --> Morph
+    Baselines -->|"uses public API only"| B2B
+```
 
 ---
 
 ## Citing B2B
 
-If you use Building2Building in your research, please cite:
-
 ```bibtex
-@inproceedings{b2b2025,
-  title={Building2Building: A Large-Scale RL Benchmark for HVAC Control},
-  year={2025},
+@article{b2b2025,
+  title   = {Building2Building: A Large-Scale Benchmark for Transfer and
+             Multi-Task Reinforcement Learning in HVAC Control},
+  author  = {TODO},
+  journal = {TODO},
+  year    = {2025},
 }
 ```

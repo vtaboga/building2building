@@ -1,0 +1,16 @@
+defaults:
+  - _self_
+  - experiment: ???
+  - policy: ppo
+  - reward: task1
+  - training: default
+  - wandb: default
+
+seed: 0
+output_dir: outputs/${experiment.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+hydra:
+  run:
+    dir: ${output_dir}
+  job:
+    chdir: false

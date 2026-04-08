@@ -1,0 +1,17 @@
+# Default unitary HVAC controller parameters
+type: unitary_hvac
+heating_setpoint_c: 20.0
+cooling_setpoint_c: 22.0
+kp: 0.8
+ki: 0.02
+integral_max: 5.0
+min_fan_fraction: 0.3
+sat_min_c: 12.0
+sat_max_c: 40.0
+sat_initial_c: 14.0
+sat_trim: 0.2
+sat_respond: 0.5
+demand_deadband: 0.5
+availability_on: 1.0
+target_schedule:
+  enabled: false

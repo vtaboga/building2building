@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from b2b.config.models import DatasetSelectionConfig, EnvBuildConfig
-from b2b.envs.factory import make_env_from_config
-from b2b.types import BaseRewardConfig, TaskConfig
+from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
+from building2building.envs.factory import make_env_from_config
+from building2building.types import BaseRewardConfig, TaskConfig
 
 
 pytestmark = pytest.mark.long
@@ -49,7 +49,6 @@ def _make_env(
     )
     config = EnvBuildConfig(
         dataset_selection=DatasetSelectionConfig(
-            dataset="multizones_reference_buildings",
             building_type="OfficeSmall",
             split="train",
             mode="split_index",

@@ -1,211 +1,129 @@
 # Installation
 
-This page covers system requirements, installation steps, environment variable configuration, and verification.
-
----
-
 ## System Requirements
 
-| Requirement | Version |
-|---|---|
-| Python | 3.10 or higher |
-| EnergyPlus | 24.1 |
-| OS | Linux (recommended), macOS |
-| RAM | 4 GB minimum, 8 GB+ recommended for multizone buildings |
+- Python 3.10 or later
+- EnergyPlus 24.1 (downloaded automatically or installed manually)
+- Linux or macOS (Windows is not tested)
 
----
-
-## Installing B2B
-
-### 1. Create a Virtual Environment
+## Install the Package
 
 ```bash
+git clone <repo-url> && cd Building2Building
 python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 2. Install in Editable Mode
+### Install Variants
 
-=== "Core only"
-
-    ```bash
-    pip install -e .
-    ```
-
-=== "With test dependencies"
-
-    ```bash
-    pip install -e ".[test]"
-    ```
-
-=== "With dev tools"
-
-    ```bash
-    pip install -e ".[dev]"
-    ```
-
-=== "With docs"
-
-    ```bash
-    pip install -e ".[docs]"
-    ```
-
-=== "Everything"
-
-    ```bash
-    pip install -e ".[all]"
-    ```
+| Command | What it installs |
+|---|---|
+| `pip install -e .` | Core package only (environments, data, benchmarks) |
+| `pip install -e ".[training]"` | + PyTorch, SB3, Hydra, Optuna, W&B, scipy |
+| `pip install -e ".[test]"` | + pytest, deepdiff, pytest-mock |
+| `pip install -e ".[dev]"` | + black, pyright |
+| `pip install -e ".[docs]"` | + mkdocs-material, mkdocstrings |
+| `pip install -e ".[all]"` | Everything above |
 
 ### Core Dependencies
 
-B2B installs the following core dependencies automatically:
+| Package | Purpose |
+|---|---|
+| `minergym` | EnergyPlus simulation backend |
+| `gymnasium` | RL environment interface |
+| `numpy` | Numerical arrays |
+| `huggingface-hub` | Dataset download |
+| `duckdb` / `pyarrow` | Building registry queries |
+| `cattrs` | Structured deserialization |
+| `rdflib` | Ontology-based equipment discovery |
+
+### Training Dependencies
 
 | Package | Purpose |
 |---|---|
-| `minergym` | EnergyPlus-Gymnasium bridge |
-| `gymnasium` | RL environment interface |
-| `stable-baselines3` | RL algorithms (PPO, SAC, DQN) |
-| `sb3-contrib` | Additional algorithms (TRPO) |
-| `hydra-core` | Configuration management |
+| `torch` | Neural network training |
+| `stable-baselines3` / `sb3-contrib` | RL algorithm implementations |
+| `hydra-core` / `omegaconf` | Configuration management |
+| `optuna` | Hyperparameter tuning |
 | `wandb` | Experiment tracking |
-| `numpy`, `pandas` | Numerical and data handling |
-| `rdflib` | Ontology-based HVAC equipment discovery |
-| `cattrs` | Structured serialization of equipment configs |
 
-### Optional Dependency Groups
+## EnergyPlus Setup
 
-| Extra | Packages | Purpose |
-|---|---|---|
-| `test` | `pytest`, `pytest-mock`, `deepdiff` | Running the test suite |
-| `dev` | `black`, `pyright` | Code formatting and type checking |
-| `docs` | `mkdocs-material`, `mkdocstrings`, `pymdown-extensions` | Building documentation |
-| `all` | All of the above | Full development environment |
+### Option 1: Automatic
 
----
+The package can download and cache EnergyPlus automatically. No action needed.
 
-## Installing EnergyPlus
+### Option 2: Manual Install
 
-B2B requires EnergyPlus 24.1 to be installed on your system.
-
-### Linux
-
-```bash
-wget https://github.com/NREL/EnergyPlus/releases/download/v24.1.0/EnergyPlus-24.1.0-SHA-Linux-Ubuntu22.04-x86_64.tar.gz
-tar -xzf EnergyPlus-24.1.0-*.tar.gz
-sudo mv EnergyPlus-24-1-0 /usr/local/
-```
-
-### macOS
-
-```bash
-wget https://github.com/NREL/EnergyPlus/releases/download/v24.1.0/EnergyPlus-24.1.0-SHA-macOS-x86_64.tar.gz
-tar -xzf EnergyPlus-24.1.0-*.tar.gz
-sudo mv EnergyPlus-24-1-0 /usr/local/
-```
-
-!!! warning "Version matters"
-
-    B2B relies on EnergyPlus 24.1 APIs and IDD schema. Other versions may cause compatibility issues with the building models and simulation outputs.
-
----
-
-## Environment Variables
-
-B2B uses two environment variables for path resolution:
-
-### `ENERGYPLUS_PATH`
-
-Path to the EnergyPlus installation directory. Required for running simulations.
+Download EnergyPlus 24.1 from
+[energyplus.net](https://energyplus.net/downloads) and set the path:
 
 ```bash
 export ENERGYPLUS_PATH=/usr/local/EnergyPlus-24-1-0
 ```
 
-### `STORE_PATH`
+### Environment Variables
 
-Path to the B2B data store where datasets, intermediate build artifacts, and cached pipeline outputs are stored. Defaults to `~/.b2b_store` if not set.
+| Variable | Purpose | Default |
+|---|---|---|
+| `ENERGYPLUS_PATH` | Path to EnergyPlus installation | Auto-detected |
+| `STORE_PATH` | Dataset and cache storage location | `~/.cache/building2building` |
 
-```bash
-export STORE_PATH=/path/to/b2b/data/store
-```
+## Baselines Dependencies
 
-!!! tip "Persisting environment variables"
-
-    Add these exports to your `~/.bashrc` or `~/.zshrc`:
-
-    ```bash
-    echo 'export ENERGYPLUS_PATH=/usr/local/EnergyPlus-24-1-0' >> ~/.bashrc
-    echo 'export STORE_PATH=/path/to/b2b/data/store' >> ~/.bashrc
-    source ~/.bashrc
-    ```
-
----
-
-## Verifying the Installation
-
-### Quick Tests (No Simulation)
-
-Run the fast test suite that does not require EnergyPlus:
+The `baselines/` scripts require training dependencies. If you install via the
+main package extras, everything is covered:
 
 ```bash
-pytest -m quick
+pip install -e ".[training]"
 ```
 
-These tests validate configuration parsing, data structures, and utility functions without launching EnergyPlus.
-
-### Full Tests (With Simulation)
-
-Run the complete test suite including simulation-based tests:
+Alternatively, from the baselines directory:
 
 ```bash
-pytest
+pip install -r baselines/requirements.txt
 ```
 
-!!! note "Simulation tests"
+!!! warning
 
-    Tests marked `long` launch EnergyPlus simulations and may take several minutes. Use `-m quick` during development for rapid iteration.
+    `baselines/requirements.txt` is incomplete -- it does not list `hydra-core`,
+    `omegaconf`, `optuna`, or `matplotlib`. Use `pip install -e ".[training]"`
+    from the main package instead.
 
-### Smoke Test
+## Verification
 
-Verify that B2B can import and create an environment:
+### Quick Smoke Test
 
-```python
-from b2b.api import make_single_zone_env
-
-env = make_single_zone_env(
-    split="train",
-    split_index=0,
-    eplus_output_dir="/tmp/b2b_smoke_test",
-)
-obs, info = env.reset()
-print(f"Success! Observation shape: {obs.shape}")
-env.close()
+```bash
+python -c "import building2building as b2b; print(b2b.list_building_types())"
 ```
 
----
+Expected output:
+
+```
+['SingleFamilyHouse', 'Warehouse', 'RetailStandalone', 'RestaurantFastFood', 'OfficeMedium', 'OfficeSmall']
+```
+
+### Run the Test Suite
+
+```bash
+pytest -m quick                           # Fast tests (no EnergyPlus simulation)
+B2B_RUN_LONG_TESTS=1 pytest -m long      # Simulation-heavy tests
+B2B_RUN_LONG_TESTS=1 pytest              # Full suite
+```
 
 ## Troubleshooting
 
-### `EnergyPlus not found`
+**`ModuleNotFoundError: minergym`** -- minergym is installed from a Git
+dependency. Run `pip install -e .` again to ensure it is fetched.
 
-Ensure `ENERGYPLUS_PATH` points to the directory containing the `energyplus` binary:
+**`FileNotFoundError: EnergyPlus not found`** -- set `ENERGYPLUS_PATH` to point
+to your EnergyPlus installation directory.
 
-```bash
-ls $ENERGYPLUS_PATH/energyplus
-```
+**Download errors** -- B2B downloads building data from HuggingFace on first
+use. Ensure network access is available, or pre-download with:
 
-### `minergym` installation fails
-
-`minergym` is installed from a Git repository. Ensure `git` is available and you have network access:
-
-```bash
-pip install "minergym @ git+https://github.com/Terramorpha/minergym.git@actuators"
-```
-
-### Import errors for `rdflib` or `cattrs`
-
-These are pinned dependencies. Reinstall with:
-
-```bash
-pip install -e ".[all]" --force-reinstall
+```python
+from building2building.data.download import download_building_type
+download_building_type("OfficeSmall")
 ```

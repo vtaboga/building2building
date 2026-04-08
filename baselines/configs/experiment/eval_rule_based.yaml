@@ -1,0 +1,20 @@
+# @package _global_
+# Evaluate rule-based controllers on all buildings (Section 5, Appendix E.1)
+name: eval_rule_based
+
+defaults:
+  - /reward: task1
+
+building_types:
+  - OfficeSmall
+  - OfficeMedium
+  - RetailStandalone
+  - RestaurantFastFood
+  - Warehouse
+  - SingleFamilyHouse
+
+split: test
+max_buildings_per_type: null
+tasks: [task1, task2, task3, task4]
+n_runs: 1
+output_csv: baseline_returns.csv

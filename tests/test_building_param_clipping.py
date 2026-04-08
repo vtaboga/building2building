@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import gymnasium as gym
 import numpy as np
 
-from b2b.simulator.wrappers import AugmentObservationWithBuildingParams
+from building2building.simulator.wrappers import AugmentObservationWithBuildingParams
 
 
 def test_normalized_values_are_clipped():

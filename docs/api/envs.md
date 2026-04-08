@@ -1,7 +1,8 @@
-# b2b.envs
+# building2building.envs
 
-The canonical environment factory. This module registers and creates
-Gymnasium-compatible environments for HVAC control, handling all the wiring
-between configuration, simulator, and wrappers.
+Environment registration and factory. Registers B2B environments as Gymnasium
+environments and provides the `make_env_from_config` factory function.
 
-::: b2b.envs.factory
+::: building2building.envs.factory
+
+::: building2building.envs.registration

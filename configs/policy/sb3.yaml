@@ -1,3 +1,0 @@
-type: sb3
-algorithm: ppo          # SB3 / sb3-contrib algorithm name (ppo, sac, dqn, trpo, …)
-checkpoint_path: ???     # path to the saved .zip model file

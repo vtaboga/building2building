@@ -1,5 +1,0 @@
-algorithm: "dqn"
-policy_type: "MlpPolicy"
-learning_rate: 0.0005
-buffer_size: 100000
-learning_starts: 15000

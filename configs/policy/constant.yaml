@@ -1,9 +1,0 @@
-# Constant policy configuration
-# Options:
-# 1. Use default (midpoint of action space): omit constant_value or set to null
-# 2. Use same value for all actuators: constant_value: 5.0
-# 3. Use different values per actuator: constant_value: [21.0, 1.5, 3.0]
-
-# constant_value: null  # Uses midpoint of action space (default)
-# constant_value: 5.0  # Uses 5.0 for all actuators
-constant_value: null  # Uses midpoint - adapt based on your action space

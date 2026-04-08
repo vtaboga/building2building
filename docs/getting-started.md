@@ -1,6 +1,7 @@
 # Getting Started
 
-This guide walks you through installing B2B, creating your first environment, running a baseline controller, and training an RL agent.
+This guide walks you through installing B2B, creating your first environment,
+running a baseline controller, and training an RL agent.
 
 ---
 
@@ -14,7 +15,7 @@ source .venv/bin/activate
 pip install -e ".[all]"
 ```
 
-B2B requires **EnergyPlus 24.1** to be installed on your system. Set the path:
+B2B requires **EnergyPlus 24.1**. Set the path:
 
 ```bash
 export ENERGYPLUS_PATH=/usr/local/EnergyPlus-24-1-0
@@ -22,11 +23,13 @@ export ENERGYPLUS_PATH=/usr/local/EnergyPlus-24-1-0
 
 !!! info "Detailed installation"
 
-    See [Installation](guide/installation.md) for complete system requirements, optional extras, and troubleshooting.
+    See [Installation](guide/installation.md) for complete system requirements,
+    optional extras, and troubleshooting.
 
 Verify the installation:
 
 ```bash
+python -c "import building2building as b2b; print(b2b.list_building_types())"
 pytest -m quick
 ```
 
@@ -34,19 +37,25 @@ pytest -m quick
 
 ## 2. Creating Your First Environment
 
-### Single-Zone House
-
-The simplest way to get started is with a single-zone house:
+The primary entry point is `b2b.new_make_env()`:
 
 ```python
-from b2b.api import make_single_zone_env
+import building2building as b2b
 
-env = make_single_zone_env(
+# List available building types
+print(b2b.list_building_types())
+# ['SingleFamilyHouse', 'OfficeSmall', 'OfficeMedium', ...]
+
+# List building IDs in a split
+train_ids = b2b.list_buildings("OfficeSmall", split="train")
+print(f"{len(train_ids)} training buildings available")
+
+# Create an environment
+env = b2b.new_make_env(
+    "OfficeSmall",
     split="train",
-    split_index=0,
-    eplus_output_dir="outputs/eplus",
-    task={"run_period": "winter"},
-    reward={"reward_type": "BarrierRewardConfig"},
+    index=0,
+    task="task1",
 )
 
 obs, info = env.reset()
@@ -54,85 +63,53 @@ print(f"Observation shape: {obs.shape}")
 print(f"Action space: {env.action_space}")
 ```
 
-### Multi-Zone Reference Building
+Key parameters of `new_make_env`:
 
-For multi-zone buildings from the ASHRAE 90.1 prototypes:
+| Parameter | Description | Default |
+|---|---|---|
+| `building_type` | One of the 6 building types | (required) |
+| `split` | `"train"` or `"test"` | `"train"` |
+| `index` | Position in the split list | `0` |
+| `building_id` | Explicit building ID (alternative to split+index) | `None` |
+| `task` | `"task1"` through `"task4"` or a `TaskPreset` | `"task1"` |
+| `run_period` | `"full_year"`, `"winter"`, or `"summer"` | `"full_year"` |
+| `timesteps_per_hour` | Simulation resolution | `12` (5-min steps) |
 
-```python
-from b2b.api import make_multizones_env
+---
 
-env = make_multizones_env(
-    building_type="OfficeSmall",
-    split="train",
-    split_index=0,
-    eplus_output_dir="outputs/eplus",
-    task={"run_period": "winter"},
-    reward={"reward_type": "DeadbandRewardConfig", "dT": 1.0, "energy_weight": 0.001},
-)
+## 3. Environment Metadata
 
-obs, info = env.reset()
-print(f"Observation shape: {obs.shape}")
-print(f"Action space: {env.action_space}")
-```
-
-!!! note "Building types"
-
-    Available building types for `make_multizones_env`: `Warehouse`, `HotelSmall`, `RetailStandalone`, `RestaurantFastFood`, `OfficeMedium`, `OfficeSmall`.
-
-### Full Config API
-
-For maximum control, use `EnvBuildConfig` directly:
+Each environment exposes rich metadata:
 
 ```python
-from b2b.api import make_env
-from b2b.config.models import DatasetSelectionConfig, EnvBuildConfig
-from b2b.types import TaskConfig, reward_config_from_dict
+env = b2b.new_make_env("OfficeSmall", task="task1")
 
-cfg = EnvBuildConfig(
-    dataset_selection=DatasetSelectionConfig(
-        dataset="multizones_reference_buildings",
-        building_type="OfficeMedium",
-        split="train",
-        mode="split_index",
-        split_index=5,
-    ),
-    task=TaskConfig.from_dict({
-        "run_period": "summer",
-        "target_temperature_mode": "occupancy",
-        "default_zone_target_temperature": {
-            "occupied_c": 23.0,
-            "unoccupied_c": 28.0,
-        },
-    }),
-    reward=reward_config_from_dict({
-        "reward_type": "BarrierRewardConfig",
-        "energy_weight": 0.1,
-        "deadband_c": 0.5,
-        "violation_penalty": 100.0,
-    }),
-    env_max_steps=8640,
-)
-env = make_env(cfg, eplus_output_dir="outputs/eplus")
+obs_names = env.metadata["observation_names"]  # list[str]
+act_names = env.metadata["action_names"]       # list[str]
+equipment = env.metadata["hvac_equipment"]     # list[Equipment]
+morphology = env.metadata["morphology"]        # Morphology graph
+
+print(f"Obs dim: {env.observation_space.shape[0]}")
+print(f"Act dim: {env.action_space.shape[0]}")
+print(f"Obs names: {obs_names[:5]}...")
+print(f"Action names: {act_names}")
+env.close()
 ```
 
 ---
 
-## 3. Running a Random Agent
+## 4. Running a Random Agent
 
 ```python
-from b2b.api import make_single_zone_env
+import building2building as b2b
 
-env = make_single_zone_env(
-    split="train",
-    split_index=0,
-    eplus_output_dir="outputs/eplus",
-)
+env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task1")
 
 obs, info = env.reset()
 total_reward = 0.0
 steps = 0
-
 done = False
+
 while not done:
     action = env.action_space.sample()
     obs, reward, terminated, truncated, info = env.step(action)
@@ -140,136 +117,111 @@ while not done:
     steps += 1
     done = terminated or truncated
 
-print(f"Episode finished after {steps} steps with total reward {total_reward:.2f}")
+print(f"Episode finished after {steps} steps with return {total_reward:.2f}")
 env.close()
 ```
 
 ---
 
-## 4. Running a Baseline Controller
+## 5. Running a Baseline Controller
 
-B2B includes several hand-crafted baseline controllers. You can run them via Hydra:
+B2B ships rule-based controllers in the `baselines/` directory. Run them via Hydra:
 
 ```bash
-python scripts/baselines.py policy=unitary_g36 \
-    bldg=single_family
+# Evaluate the reactive controller on one building
+python -m baselines.run_rule_based experiment=eval_rule_based \
+    building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=1
 ```
 
-Baseline controllers follow the same `predict(obs, deterministic) -> (action, state)` interface as SB3 policies, so they integrate seamlessly with the rollout infrastructure.
+You can also use the controllers programmatically:
+
+```python
+import building2building as b2b
+from baselines.controllers import UnitaryHvacConfig, UnitaryHvacPolicy
+from baselines.utils.evaluation import run_episode
+
+env = b2b.new_make_env("OfficeSmall", task="task1")
+policy = UnitaryHvacPolicy(UnitaryHvacConfig())
+policy.bind_env(env)
+
+result = run_episode(env, policy)
+print(f"Episode return: {result.total_reward:.1f}")
+env.close()
+```
 
 ---
 
-## 5. Training with PPO
+## 6. Training with PPO
 
 === "Hydra CLI"
 
     ```bash
-    python -m b2b.train \
-        policy=ppo \
-        bldg=single_family \
-        task.run_period=winter \
-        reward=deadband \
-        training.total_timesteps=500000 \
-        wandb.enabled=true
+    python -m baselines.train_ppo experiment=train_ppo \
+        building_types=[OfficeSmall] tasks=[task1] \
+        buildings_per_type=1 training.total_timesteps=100000
     ```
 
 === "Python Script"
 
     ```python
     from stable_baselines3 import PPO
-    from b2b.api import make_single_zone_env
-    from b2b.simulator.wrappers import NormalizeObservation
+    import building2building as b2b
 
-    env = make_single_zone_env(
+    env = b2b.new_make_env(
+        "OfficeSmall",
         split="train",
-        split_index=0,
-        eplus_output_dir="outputs/eplus",
-        task={"run_period": "winter"},
-        reward={"reward_type": "DeadbandRewardConfig", "dT": 1.0, "energy_weight": 0.001},
+        index=0,
+        task="task1",
+        run_period="winter",
     )
-    env = NormalizeObservation(env)
+    env = b2b.NormalizeObservation(env)
 
     model = PPO("MlpPolicy", env, verbose=1, n_steps=2048, batch_size=64)
-    model.learn(total_timesteps=500_000)
-    model.save("ppo_single_zone")
+    model.learn(total_timesteps=100_000)
+    model.save("ppo_office_small")
     env.close()
     ```
 
 ---
 
-## 6. Training with SAC
+## 7. Using a Benchmark
 
-=== "Hydra CLI"
-
-    ```bash
-    python -m b2b.train \
-        policy=sac \
-        bldg=single_family \
-        task.run_period=winter \
-        reward=barrier \
-        training.total_timesteps=500000
-    ```
-
-=== "Python Script"
-
-    ```python
-    from stable_baselines3 import SAC
-    from b2b.api import make_single_zone_env
-    from b2b.simulator.wrappers import NormalizeObservation
-
-    env = make_single_zone_env(
-        split="train",
-        split_index=0,
-        eplus_output_dir="outputs/eplus",
-        task={"run_period": "winter"},
-        reward={"reward_type": "BarrierRewardConfig", "energy_weight": 0.1},
-    )
-    env = NormalizeObservation(env)
-
-    model = SAC("MlpPolicy", env, verbose=1, buffer_size=100_000, batch_size=128)
-    model.learn(total_timesteps=500_000)
-    model.save("sac_single_zone")
-    env.close()
-    ```
-
----
-
-## 7. Evaluating on a Benchmark Split
-
-After training, evaluate your policy on the held-out test split:
+The benchmarks API provides structured train/test splits:
 
 ```python
-from stable_baselines3 import PPO
-from b2b.api import make_single_zone_env
-from b2b.simulator.wrappers import NormalizeObservation
-import numpy as np
+import building2building as b2b
 
-model = PPO.load("ppo_single_zone")
+bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task1")
+print(f"Train buildings: {len(bench.train_building_ids())}")
+print(f"Test buildings: {len(bench.test_building_ids())}")
 
-returns = []
-for idx in range(10):
-    env = make_single_zone_env(
-        split="test",
-        split_index=idx,
-        eplus_output_dir=f"outputs/eval/{idx}",
-        task={"run_period": "winter"},
-        reward={"reward_type": "DeadbandRewardConfig", "dT": 1.0, "energy_weight": 0.001},
-    )
-    env = NormalizeObservation(env)
+# Create environments
+train_envs = bench.make_train_envs(n=2)
+test_envs = bench.make_test_envs(n=2)
 
-    obs, _ = env.reset()
-    total_reward = 0.0
-    done = False
-    while not done:
-        action, _ = model.predict(obs, deterministic=True)
-        obs, reward, terminated, truncated, _ = env.step(action)
-        total_reward += reward
-        done = terminated or truncated
+# ... train and evaluate ...
 
-    returns.append(total_reward)
+for env in train_envs + test_envs:
     env.close()
+```
 
-print(f"Mean return over 10 test buildings: {np.mean(returns):.2f} ± {np.std(returns):.2f}")
+---
+
+## 8. Normalized Scoring
+
+After generating `baseline_returns.csv` (see step 5), compute normalized
+scores:
+
+```python
+import building2building as b2b
+
+score = b2b.compute_normalized_score(
+    cumulative_return=-5000.0,
+    building_type="OfficeSmall",
+    task="task1",
+)
+print(f"Normalized score: {score:.3f}")
+# > 1.0 means the agent outperforms the reactive baseline
 ```
 
 ---
@@ -278,6 +230,6 @@ print(f"Mean return over 10 test buildings: {np.mean(returns):.2f} ± {np.std(re
 
 - Learn about the [environment architecture](guide/environments.md)
 - Explore the [7,000+ buildings](guide/buildings.md) in the dataset
-- Understand the [reward functions](guide/rewards.md) available
+- Understand the [morphology graph](guide/morphology.md) for structured representations
 - Configure experiments with [Hydra](guide/configuration.md)
-- Write [custom policies](guide/custom-policies.md)
+- Follow the [tutorials](tutorials/quick-tour.md) for hands-on examples

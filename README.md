@@ -1,307 +1,222 @@
-## Building2Building (B2B)
+# Building2Building
 
-Building2Building is a reinforcement learning framework for EnergyPlus building simulation, built on top of Gymnasium and `minergym`.
+Building2Building (B2B) is a large-scale reinforcement learning benchmark for
+HVAC control in buildings. It exposes over 7,000 parametrically generated
+EnergyPlus building models as Gymnasium environments, spanning 6 building types,
+16 ASHRAE climate zones, and 3 HVAC system types.
 
-It provides:
+B2B is designed to accelerate research in **transfer learning**, **multi-task
+RL**, and **meta-learning** for building energy management.
 
-- typed environment construction (`b2b.api`, `b2b.config`, `b2b.envs`)
-- dataset selection across single-zone and multizone building sources
-- benchmark problem orchestration
-- baseline controllers and SB3 training entrypoints
-- reproducible quick vs long test suites
+**Key features:**
+
+- 7,000+ buildings from ASHRAE 90.1-2022 prototypes and residential archetypes
+- 6 building types: `SingleFamilyHouse`, `OfficeSmall`, `OfficeMedium`, `RetailStandalone`, `RestaurantFastFood`, `Warehouse`
+- 4 named task presets reproducing exact paper conditions
+- 4 benchmark problems testing dynamics adaptation, cross-domain generalization, goal adaptation, and action-space transfer
+- Normalized scoring against reactive-controller baselines
+- Morphology graph for structured observation/action decomposition
+- Gymnasium-compatible with full SB3 integration
+- Pre-processed buildings downloadable from HuggingFace
 
 ---
 
-## Architecture (Current)
+## Installation
 
-Core package boundaries:
+```bash
+pip install -e .                          # Core (environments only)
+pip install -e ".[training]"              # + PyTorch, SB3, Hydra, Optuna, W&B
+pip install -e ".[all]"                   # Everything (training + test + dev + docs)
+```
 
-- `b2b.api`: public importable API for building environments
-- `b2b.config`: typed config models and validation
-- `b2b.datasets`: unified building selection and dataset access
-- `b2b.envs`: canonical typed env factory
-- `b2b.benchmark`: benchmark orchestration and problem definitions
-- `b2b.baselines`: baseline policy implementations + policy registry
-- `b2b.training`: training entrypoints callable from scripts or Python
-- `scripts/`: thin Hydra adapters only
+EnergyPlus 24.1 is required. Set the path if it is not on your system `PATH`:
 
-Design principles used in the current refactor:
+```bash
+export ENERGYPLUS_PATH=/path/to/EnergyPlus-24-1-0
+```
 
-- typed config objects in core internals
-- Hydra/OmegaConf only at script/adaptation boundaries
-- benchmark orchestration separated from policy construction
-- environment creation separated from benchmark and baseline logic
+Building data is hosted on HuggingFace (`vtaboga/building2building_dataset`) and
+downloaded automatically on first use.
 
 ---
 
 ## Quick Start
 
-### 1) Create and activate virtual environment
+```python
+import building2building as b2b
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
+# List available building types
+print(b2b.list_building_types())
+# ['SingleFamilyHouse', 'OfficeSmall', 'OfficeMedium', ...]
 
-### 2) Install package
+# Create a Gymnasium environment
+env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task1")
 
-```bash
-pip install -e .
-```
+obs, info = env.reset()
+done = False
+total_reward = 0.0
+while not done:
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
+    total_reward += reward
+    done = terminated or truncated
 
-### 3) Optional: test dependencies
-
-```bash
-pip install -e ".[test,dev]"
-```
-
-### 4) EnergyPlus setup
-
-B2B can download/cache EnergyPlus automatically through the store layer.
-
-Optional environment variables:
-
-- `ENERGYPLUS_PATH`: use an existing local EnergyPlus install
-- `STORE_PATH`: choose cache/download location
-
----
-
-## Coding Standard
-
-Formatting standard:
-
-- formatter: `black`
-- line length: `88`
-- target version: `py310`
-
-Run formatting:
-
-```bash
-python3 -m black b2b scripts tests
+print(f"Episode return: {total_reward:.2f}")
+env.close()
 ```
 
 ---
 
-## Public Python API
+## Building Types
+
+| Type | Zones | HVAC System | Description |
+|---|---|---|---|
+| `SingleFamilyHouse` | 1 | Unitary | Residential single-zone houses |
+| `OfficeSmall` | 5 | Unitary | Small office prototype |
+| `OfficeMedium` | 15+ | VAV air-loop | Medium office prototype |
+| `RetailStandalone` | 4 | Unitary | Standalone retail store |
+| `RestaurantFastFood` | 2 | Unitary | Fast food restaurant |
+| `Warehouse` | 3 | Unitary | Warehouse prototype |
+
+---
+
+## Task Presets
+
+The paper defines four named task presets that control the reward function and
+target temperature behaviour:
+
+| Task | Reward | Energy Weight | Temperature Mode | dT |
+|---|---|---|---|---|
+| `task1` | Deadband | 0.01 | Constant | 1.0 |
+| `task2` | Deadband | 0.10 | Constant | 1.0 |
+| `task3` | Deadband | 0.01 | Occupancy | 1.0 |
+| `task4` | Barrier | 0.01 | Constant | 1.0 |
 
 ```python
-from pathlib import Path
+env = b2b.new_make_env("OfficeSmall", task="task2")
+```
 
-from b2b.api import make_env
-from b2b.config import DatasetSelectionConfig, EnvBuildConfig
-from b2b.types import TaskConfig, reward_config_from_dict
+---
 
-cfg = EnvBuildConfig(
-    dataset_selection=DatasetSelectionConfig(
-        dataset="single_zone_houses",
-        split="train",
-        mode="split_index",
-        split_index=0,
-    ),
-    task=TaskConfig.from_dict({"run_period": "winter"}),
-    reward=reward_config_from_dict({"reward_type": "BarrierRewardConfig"}),
+## Benchmark Problems
+
+Each benchmark class tests a different generalization axis:
+
+| Class | What varies | What stays fixed |
+|---|---|---|
+| `DynamicsAdaptation` | Building dynamics (different instances) | Reward, action space |
+| `CrossDomainGeneralization` | Building type (train type A, test type B) | Reward, action space |
+| `GoalAdaptation` | Reward / task | Building, action space |
+| `ActionSpaceTransfer` | Controllable actuators | Building, reward |
+
+```python
+bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task1")
+train_ids = bench.train_building_ids()
+test_ids = bench.test_building_ids()
+train_envs = bench.make_train_envs(n=4)
+test_envs = bench.make_test_envs(n=4)
+```
+
+---
+
+## Baselines
+
+Reference experiment scripts live in `baselines/` and use only the public
+`building2building` API. They include rule-based controllers, PPO training,
+dynamics adaptation, cross-domain transfer with Amorpheus, and evaluation /
+plotting.
+
+```bash
+# Rule-based baseline evaluation
+python -m baselines.run_rule_based experiment=eval_rule_based
+
+# Train per-building PPO specialists
+python -m baselines.train_ppo experiment=train_ppo
+
+# Dynamics adaptation with building-parameter augmentation
+python -m baselines.train_dynamics_adaptation experiment=train_dynamics_parameterized
+```
+
+See [`baselines/README.md`](baselines/README.md) for the full reference.
+
+---
+
+## Normalized Scoring
+
+Score an agent relative to the reactive-controller baseline:
+
+```python
+score = b2b.compute_normalized_score(
+    cumulative_return=-5000.0,
+    building_type="OfficeSmall",
+    task="task1",
 )
-env = make_env(cfg, eplus_output_dir=Path("outputs/eplus"))
+# score > 1.0 means the agent outperforms the baseline
 ```
+
+> **Note:** `baseline_returns.csv` must be generated first by running
+> `python -m baselines.run_rule_based experiment=eval_rule_based`.
 
 ---
 
-## Task and Reward Configuration
+## Documentation
 
-Task config (`configs/task/default.yaml`) supports:
-
-- `task.run_period`: `full_year`, `winter`, `summer`
-- `task.target_temperature_mode`: `constant`, `occupancy`
-- `task.default_zone_target_temperature`
-- `task.zone_target_temperatures` (per-zone overrides)
-
-Reward configs:
-
-- deadband: `configs/reward/deadband.yaml`
-- barrier: `configs/reward/barrier.yaml`
-
-Examples:
+Full documentation is built with MkDocs Material:
 
 ```bash
-# Occupancy-driven targets + barrier reward
-python scripts/train_single_zone_houses.py task.target_temperature_mode=occupancy reward=barrier
-
-# Summer run period with deadband reward
-python scripts/train_single_zone_houses.py task.run_period=summer reward=deadband
-```
-
----
-
-## Training Entry Points
-
-### A) Single-zone houses training (general entrypoint)
-
-Script: `scripts/train_single_zone_houses.py`  
-Config root: `configs/base.yaml`
-
-```bash
-python scripts/train_single_zone_houses.py
-python scripts/train_single_zone_houses.py policy=ppo
-python scripts/train_single_zone_houses.py policy=sac
-python scripts/train_single_zone_houses.py training.num_train_envs=4
-python scripts/train_single_zone_houses.py env.max_steps=672
-```
-
-### B) Multizones single-building training
-
-Script: `scripts/train_multizones.py`  
-Config root: `configs/train_multizones.yaml`
-
-```bash
-python scripts/train_multizones.py
-python scripts/train_multizones.py bldg.building_type=OfficeMedium bldg.split=train bldg.index=2
-python scripts/train_multizones.py policy=sac
-python scripts/train_multizones.py training.total_timesteps=10000 env.max_steps=2880
-```
-
----
-
-## Benchmark Problems and Rollouts
-
-### 1) Adaptive Dynamics Benchmark (single-zone houses)
-
-Script: `scripts/bm_adaptive_dynamics.py`  
-Config: `configs/bm_adaptive_dynamics.yaml`
-
-```bash
-# fast smoke
-python scripts/bm_adaptive_dynamics.py benchmark.limit=1 benchmark.max_steps=1
-
-# full split run
-python scripts/bm_adaptive_dynamics.py benchmark.split=train benchmark.start=0 benchmark.limit=0
-
-# change baseline policy
-python scripts/bm_adaptive_dynamics.py policy=unitary_g36
-python scripts/bm_adaptive_dynamics.py policy=ashrae_air_loop
-```
-
-### 2) Multizones Split Benchmark Interface
-
-Script: `scripts/benchmark_multizones_splits.py`  
-Configs:
-
-- `configs/benchmark_multizones_splits.yaml`
-- `configs/benchmark_interface/single_type.yaml`
-- `configs/benchmark_interface/multi_type.yaml`
-- `configs/benchmark_multizones_officemedium_actuator_shift.yaml`
-
-Single-type train/test split:
-
-```bash
-python scripts/benchmark_multizones_splits.py benchmark_interface=single_type benchmark_interface.building_type=OfficeSmall
-```
-
-Multi-type split:
-
-```bash
-python scripts/benchmark_multizones_splits.py benchmark_interface=multi_type 'benchmark_interface.train.types=[OfficeSmall,Warehouse]' 'benchmark_interface.test.types=[OfficeMedium,RetailStandalone]'
-```
-
-OfficeMedium actuator-shift benchmark:
-
-```bash
-python scripts/benchmark_multizones_splits.py --config-name benchmark_multizones_officemedium_actuator_shift
-```
-
-Reverse actuator shift direction:
-
-```bash
-python scripts/benchmark_multizones_splits.py --config-name benchmark_multizones_officemedium_actuator_shift benchmark_interface.train.config.actuator_access.include_zone_heating_setpoints=true benchmark_interface.test.config.actuator_access.include_zone_heating_setpoints=false
-```
-
-### 3) Multizones Rollout Driver
-
-Script: `scripts/rollout_multizones.py`  
-Config: `configs/rollout_multizones.yaml`
-
-```bash
-# default rollout
-python scripts/rollout_multizones.py
-
-# choose types and count
-python scripts/rollout_multizones.py 'multizones.types=[OfficeSmall,Warehouse]' multizones.n_per_type=3
-
-# evaluate SB3 checkpoint
-python scripts/rollout_multizones.py policy=sb3 policy.algorithm=ppo policy.checkpoint_path=/path/to/best_model.zip
-
-# evaluate custom policy class
-python scripts/rollout_multizones.py policy=custom policy.module=my_package.policies policy.class_name=MyPolicy
-```
-
-### 4) Baseline Rollout Entry (general)
-
-Script: `scripts/baselines.py`  
-Config: `configs/baseline.yaml`
-
-```bash
-python scripts/baselines.py
-python scripts/baselines.py policy=unitary_g36
-python scripts/baselines.py policy=ashrae_air_loop
-python scripts/baselines.py env.max_steps=672 n_episodes=1
+pip install -e ".[docs]"
+mkdocs serve          # http://localhost:8000
 ```
 
 ---
 
 ## Tests
 
-Two test levels are defined:
-
-- `quick`: no EnergyPlus simulation required
-- `long`: simulation/data-heavy tests
-
-Run quick tests:
-
 ```bash
-pytest -m quick
-```
-
-Run long tests:
-
-```bash
-B2B_RUN_LONG_TESTS=1 pytest -m long
-```
-
-Run full suite:
-
-```bash
-B2B_RUN_LONG_TESTS=1 pytest
+pytest -m quick                           # Fast tests (no EnergyPlus)
+B2B_RUN_LONG_TESTS=1 pytest -m long      # Simulation-heavy tests
+B2B_RUN_LONG_TESTS=1 pytest              # Full suite
 ```
 
 ---
 
-## Data/Processing Utilities
+## Known Issues and Limitations
 
-Repository data prep utilities remain available in `scripts/processing/` and `scripts/generate_dataset.py` for dataset workflows. These are utility scripts, not benchmark problem entrypoints.
+### Confirmed Bugs
+
+- **`compute_normalized_score` argument order swapped** in
+  `baselines/eval_ppo.py` and `baselines/eval_dynamics_adaptation.py`: the first
+  two positional arguments (cumulative return and building type) are reversed.
+- **`eval_ppo.py` model path mismatch**: `train_ppo.py` saves models in
+  nested directories (`models/<type>/<task>/ppo_<id>.zip`) but `eval_ppo.py`
+  expects flat filenames (`ppo_<type>_<id>_<task>.zip`).
+- **`plot_ppo_specialist.py` CSV schema mismatch**: expects a `reward_mean`
+  column but `eval_ppo.py` outputs `reward`.
+
+### Missing Dependencies
+
+`baselines/requirements.txt` is incomplete. It does not list `hydra-core`,
+`omegaconf`, `optuna`, `matplotlib`, or `pyyaml`. These are covered by
+`pip install -e ".[training]"` from the main package.
+
+### Other Limitations
+
+- `baseline_returns.csv` must be generated before `compute_normalized_score`
+  can be used.
+- `eval_dynamics_adaptation.py` hard-codes `PadObservation(env, target_size=20)`
+  which may not match the value computed during training.
+- No tests exist for `baselines/` code (controllers, training, evaluation).
+- License is not yet selected.
 
 ---
 
-## Documentation
+## Citation
 
-The project documentation is built with [MkDocs](https://www.mkdocs.org/) and [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/). It covers the full API reference, user guide, benchmark tasks, baselines, and training workflows.
-
-### Viewing the docs locally
-
-```bash
-# Install docs dependencies (one-time, from the venv)
-uv pip install -e ".[docs]"
-
-# Live preview with auto-reload (http://localhost:8000)
-mkdocs serve
-
-# Or build a static site to site/
-mkdocs build
+```bibtex
+@article{b2b2025,
+  title   = {Building2Building: A Large-Scale Benchmark for Transfer and
+             Multi-Task Reinforcement Learning in HVAC Control},
+  author  = {Vincent Taboga, Justin Veilleux, Doseok Jang, Anushree Rankawat, Pierre-Luc Bacon},
+  year    = {2025},
+}
 ```
-
-The documentation source lives in `docs/` (Markdown) and `mkdocs.yml` (config). API reference pages are auto-generated from Python docstrings.
-
----
-
-## Notes
-
-- Hydra run directories are enabled in script configs (`hydra.run.dir`), so output files are typically written under `outputs/...`.
-- For development, prefer running quick tests continuously and long tests before merge/release.

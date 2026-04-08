@@ -1,0 +1,8 @@
+# Task 3: Deadband reward, low energy weight, occupancy-based target
+task_name: task3
+reward_type: deadband
+energy_weight: 0.01
+dT: 1.0
+target_temperature_mode: occupancy
+target_temperature_occupied: 21.0
+target_temperature_unoccupied: 18.0
