@@ -11,8 +11,6 @@ from building2building.api import (
     list_building_types,
     list_buildings,
     make_env,
-    make_multizones_env,
-    make_single_zone_env,
     new_make_env,
 )
 from building2building.morphology import (
@@ -67,8 +65,6 @@ __all__ = [
     "list_building_types",
     "list_buildings",
     "make_env",
-    "make_multizones_env",
-    "make_single_zone_env",
     "new_make_env",
     # Scoring
     "compute_normalized_score",

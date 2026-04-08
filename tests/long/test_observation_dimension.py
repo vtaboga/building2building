@@ -49,7 +49,6 @@ def _make_env(
     )
     config = EnvBuildConfig(
         dataset_selection=DatasetSelectionConfig(
-            dataset="multizones_reference_buildings",
             building_type="OfficeSmall",
             split="train",
             mode="split_index",

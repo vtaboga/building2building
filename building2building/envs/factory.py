@@ -1,46 +1,31 @@
 """Factory for creating Gymnasium environments from build configs.
 
 Bridges the configuration layer (:mod:`building2building.config.models`) with the
-dataset access and EnergyPlus simulator layers.
+unified dataset registry and EnergyPlus simulator.
 """
 
 from __future__ import annotations
 
-import gymnasium as gym
+import json
+import tempfile
 from pathlib import Path
 
-from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig, reward_to_dict
-from building2building.datasets import access as dataset_access
+import gymnasium as gym
+from cattrs import structure
+
+from building2building.config.models import EnvBuildConfig, reward_to_dict
+from building2building.data.registry import get_registry
+from building2building.pipeline.actuators import AnyEquipment
 from building2building.simulator import create_simulator
-
-
-def _build_bldg_section(selection: DatasetSelectionConfig, building_id: int) -> dict[str, object]:
-    """Build the ``"bldg"`` section of the search config dict.
-
-    For single_zone_houses the query filters go under a ``"query"`` sub-key.
-    For multizones_reference_buildings the filters are top-level keys.
-    """
-    if selection.dataset == "single_zone_houses":
-        return {
-            "query": {
-                "idf_filename": f"IDFsAndSchedules/{building_id}/in.idf",
-                "schedule_filename": f"IDFsAndSchedules/{building_id}/in.schedules.csv",
-            },
-        }
-    if selection.dataset == "multizones_reference_buildings":
-        out: dict[str, object] = {"building_id": int(building_id)}
-        if selection.building_type is not None:
-            out["building_type"] = selection.building_type
-        return out
-    raise ValueError(f"Unsupported dataset: {selection.dataset!r}")
+from building2building.types import BuildingConfig, TaskConfig
 
 
 def make_env_from_config(config: EnvBuildConfig, eplus_output_dir: str | Path) -> gym.Env:
     """Construct a time-limited Gymnasium environment from an ``EnvBuildConfig``.
 
-    The function selects a building from the configured dataset, builds a
-    search config for the dataset access layer, creates an EnergyPlus
-    simulator, and wraps it in a :class:`gymnasium.wrappers.TimeLimit`.
+    Resolves the building via the unified :class:`BuildingRegistry`, then
+    creates an EnergyPlus simulator and wraps it in a
+    :class:`gymnasium.wrappers.TimeLimit`.
 
     Args:
         config: Fully specified environment build configuration.
@@ -50,55 +35,39 @@ def make_env_from_config(config: EnvBuildConfig, eplus_output_dir: str | Path) -
     Returns:
         A :class:`gymnasium.wrappers.TimeLimit`-wrapped EnergyPlus
         environment.
-
-    Raises:
-        RuntimeError: If the dataset selection yields zero buildings.
-        ValueError: If the configured dataset is not supported.
     """
     out_dir = Path(eplus_output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    selected_ids = dataset_access.select_building_ids(config.dataset_selection)
-    if len(selected_ids) < 1:
-        raise RuntimeError("dataset selection produced zero buildings")
-    selected_building_id = int(selected_ids[0])
-    bldg_section = _build_bldg_section(config.dataset_selection, selected_building_id)
-    search_cfg = {
-        "bldg": bldg_section,
-        "reward": reward_to_dict(config.reward),
-        "task": {
-            "run_period": config.task.run_period.name,
-            "target_temperature_mode": config.task.target_temperature_mode,
-            "timesteps_per_hour": config.task.timesteps_per_hour,
-            "default_zone_target_temperature": {
-                "occupied_c": config.task.default_zone_target_temperature.occupied_c,
-                "unoccupied_c": config.task.default_zone_target_temperature.unoccupied_c,
-            },
-            "zone_target_temperatures": {
-                zone: {
-                    "occupied_c": tgt.occupied_c,
-                    "unoccupied_c": tgt.unoccupied_c,
-                }
-                for zone, tgt in config.task.zone_target_temperatures.items()
-            },
-        },
-        "expose_heating_only_zones": config.expose_heating_only_zones,
-    }
+    sel = config.dataset_selection
+    registry = get_registry()
 
-    if config.dataset_selection.dataset == "single_zone_houses":
-        built = dataset_access.search_config(
-            dataset="single_zone_houses",
-            config=search_cfg,
-            eplus_output_dir=out_dir,
-        )
+    if sel.mode == "building_id" and sel.building_id is not None:
+        info = registry.get_building_by_id(sel.building_type, sel.building_id)
     else:
-        built = dataset_access.search_config(
-            dataset="multizones_reference_buildings",
-            building_type=config.dataset_selection.building_type,
-            config=search_cfg,
-            eplus_output_dir=out_dir,
+        split = sel.split or "train"
+        info = registry.get_building_by_index(
+            sel.building_type, split, sel.split_index
         )
-    env = create_simulator(built)
+
+    epjson_path = info.building_dir / "building.epjson"
+    equipment_path = info.building_dir / "equipment.json"
+    weather_path = info.building_dir / info.weather_file
+    equipment_data = structure(json.loads(equipment_path.read_text()), list[AnyEquipment])
+
+    building_config = BuildingConfig(
+        path_to_building=epjson_path,
+        path_to_weather=weather_path,
+        reward_config=config.reward,
+        eplus_output_dir=out_dir,
+        warmup_phases=info.warmup_phases,
+        area=info.net_conditioned_area_m2,
+        hvac_equipment=equipment_data,
+        task_config=config.task,
+        expose_heating_only_zones=config.expose_heating_only_zones,
+    )
+
+    env = create_simulator(building_config)
     max_steps = config.env_max_steps
     if max_steps is None:
         max_steps = config.task.expected_steps()

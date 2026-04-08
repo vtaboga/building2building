@@ -107,7 +107,7 @@ def train_and_eval(
             total_reward,
             building_type,
             task,
-            building_id=int(building_id) if building_id.isdigit() else None,
+            building_id=building_id,
         )
         logger.info("Normalized score for %s: %.4f", tag, normalized_score)
     finally:

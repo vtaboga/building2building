@@ -1,8 +1,8 @@
 """HuggingFace dataset download and cache management.
 
-Downloads building data from the ``vtaboga/building2building`` HuggingFace
-repository.  Each building type is stored as a separate zip archive,
-enabling partial downloads.
+Downloads building data from the ``vtaboga/building2building_dataset``
+HuggingFace repository.  Each building type is stored as a separate zip
+archive, enabling partial downloads.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from huggingface_hub import hf_hub_download
 
 logger = logging.getLogger(__name__)
 
-REPO_ID = "vtaboga/building2building"
+REPO_ID = "vtaboga/building2building_dataset"
 REVISION = "main"
 
 BuildingType = Literal[

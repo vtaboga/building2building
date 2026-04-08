@@ -14,30 +14,7 @@ from building2building import scoring
 def _clear_baseline_cache() -> None:
     """Ensure each test starts with a clean cache."""
     scoring._baseline_cache = None
-
-
-@pytest.mark.quick
-class TestLoadBaselineReturns:
-    def test_loads_from_fixture(self, baseline_csv_path: Path) -> None:
-        with patch.object(
-            scoring,
-            "_load_baseline_returns",
-            wraps=scoring._load_baseline_returns,
-        ):
-            real_csv_path = Path(scoring.__file__).parent.parent / "baseline_returns.csv"
-            with patch("building2building.scoring.Path") as mock_path_cls:
-                mock_path_cls.return_value.__truediv__ = (
-                    Path.__truediv__.__get__(baseline_csv_path.parent)
-                )
-                baselines = scoring._load_baseline_returns()
-                scoring._baseline_cache = None
-
-    def test_file_not_found_raises(self, tmp_path: Path) -> None:
-        with patch(
-            "building2building.scoring.Path.__new__",
-            return_value=tmp_path / "nonexistent",
-        ):
-            scoring._baseline_cache = None
+    scoring._baseline_cache_no_task = None
 
 
 @pytest.mark.quick
@@ -46,10 +23,16 @@ class TestComputeNormalizedScore:
     def _inject_baselines(self) -> None:
         """Inject a controlled baseline cache for deterministic tests."""
         scoring._baseline_cache = {
-            ("OfficeSmall", 1): -30000.0,
-            ("OfficeSmall", 2): -25000.0,
-            ("Warehouse", 1): -40000.0,
-            ("SingleFamilyHouse", 1): -10000.0,
+            ("OfficeSmall", "task1", "OfficeSmall-0001"): -30000.0,
+            ("OfficeSmall", "task1", "OfficeSmall-0002"): -25000.0,
+            ("Warehouse", "task1", "Warehouse-0001"): -40000.0,
+            ("SingleFamilyHouse", "task1", "SingleFamilyHouse-0001"): -10000.0,
+        }
+        scoring._baseline_cache_no_task = {
+            ("OfficeSmall", "OfficeSmall-0001"): -30000.0,
+            ("OfficeSmall", "OfficeSmall-0002"): -25000.0,
+            ("Warehouse", "Warehouse-0001"): -40000.0,
+            ("SingleFamilyHouse", "SingleFamilyHouse-0001"): -10000.0,
         }
 
     def test_by_building_id(self) -> None:
@@ -57,7 +40,7 @@ class TestComputeNormalizedScore:
             cumulative_return=-30000.0,
             building_type="OfficeSmall",
             task="task1",
-            building_id=1,
+            building_id="OfficeSmall-0001",
         )
         assert score == pytest.approx(1.0)
 
@@ -75,7 +58,7 @@ class TestComputeNormalizedScore:
             cumulative_return=-15000.0,
             building_type="OfficeSmall",
             task="task1",
-            building_id=1,
+            building_id="OfficeSmall-0001",
         )
         assert score == pytest.approx(-15000.0 / -30000.0)
 
@@ -85,7 +68,7 @@ class TestComputeNormalizedScore:
                 cumulative_return=-1.0,
                 building_type="OfficeSmall",
                 task="task1",
-                building_id=999,
+                building_id="OfficeSmall-9999",
             )
 
     def test_missing_building_type_raises(self) -> None:
@@ -97,11 +80,12 @@ class TestComputeNormalizedScore:
             )
 
     def test_zero_baseline_returns_raw(self) -> None:
-        scoring._baseline_cache = {("ZeroType", 1): 0.0}
+        scoring._baseline_cache = {("ZeroType", "task1", "ZT-001"): 0.0}
+        scoring._baseline_cache_no_task = {("ZeroType", "ZT-001"): 0.0}
         score = scoring.compute_normalized_score(
             cumulative_return=-500.0,
             building_type="ZeroType",  # type: ignore[arg-type]
             task="task1",
-            building_id=1,
+            building_id="ZT-001",
         )
         assert score == -500.0

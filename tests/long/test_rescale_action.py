@@ -35,7 +35,6 @@ def _requires_long_runtime() -> None:
 def _make_office_env(tmp_path: Path, suffix: str = "") -> gym.Env:
     config = EnvBuildConfig(
         dataset_selection=DatasetSelectionConfig(
-            dataset="multizones_reference_buildings",
             building_type="OfficeSmall",
             split="train",
             mode="split_index",
@@ -53,7 +52,7 @@ def _make_office_env(tmp_path: Path, suffix: str = "") -> gym.Env:
 def _make_single_zone_env(tmp_path: Path, suffix: str = "") -> gym.Env:
     config = EnvBuildConfig(
         dataset_selection=DatasetSelectionConfig(
-            dataset="single_zone_houses",
+            building_type="SingleFamilyHouse",
             split="train",
             mode="split_index",
             split_index=0,

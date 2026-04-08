@@ -1,102 +1,102 @@
 # Baselines Overview
 
-B2B ships a suite of rule-based baseline controllers alongside support for
-Stable-Baselines3 (SB3) RL policies.  Baselines are run through a unified
-rollout pipeline that records observations, actions, rewards, and optional
-Weights & Biases logging.
+## Architecture
 
-## Policy Registry
+The `baselines/` directory contains reference implementations of the control
+baselines and transfer experiments from the Building2Building paper. It is
+**separate from the `building2building` package** and uses only the public API.
 
-The baseline rollout system selects a controller based on the `policy.type`
-field in the Hydra config.  The dispatch lives in
-`building2building.benchmark.baseline_rollout._build_controller_policy()`:
+```mermaid
+graph TD
+    Baselines["baselines/"]
+    Controllers["controllers/ (UnitaryHvac, AirLoop)"]
+    Models["models/ (Amorpheus)"]
+    Training["train_ppo, train_dynamics, train_cross_domain"]
+    Eval["eval_ppo, eval_dynamics, eval_cross_domain"]
+    RuleBased["run_rule_based"]
+    Tuning["tune_controller"]
+    Plotting["plotting/"]
+    B2B["building2building (public API)"]
 
-| `policy.type` | Controller class | Description |
-|---|---|---|
-| `unitary_g36` | `UnitaryG36Policy` | G36-inspired PI airflow + Trim-and-Respond SAT for PSZ |
-| `ashrae_air_loop` | `AshraeAirLoopPolicy` | ASHRAE air-loop controller for VAV systems |
-| `air_loop_sat` | `AirLoopSatPolicy` | SAT-based air-loop controller for VAV systems |
-
-Additional policy types used through SB3 training scripts:
-
-| Config file | Algorithm |
-|---|---|
-| `configs/policy/ppo.yaml` | PPO |
-| `configs/policy/sac.yaml` | SAC |
-| `configs/policy/sb3.yaml` | Generic SB3 checkpoint |
-| `configs/policy/custom.yaml` | User-defined policy |
-
-## Running Baselines
-
-The entry point is `scripts/baselines.py`, which uses the Hydra config
-`configs/baseline.yaml`:
-
-```yaml title="configs/baseline.yaml"
-defaults:
-  - _self_
-  - bldg: single_family
-  - policy: unitary_g36
-  - reward: deadband
-  - wandb: default
-
-hydra:
-  run:
-    dir: outputs/${policy.type}/${now:%d-%m-%Y}/${now:%H-%M-%S}
-
-env:
-  normalize_obs: false
-  max_steps: 35040
-
-n_episodes: 1
+    Baselines --> Controllers
+    Baselines --> Models
+    Baselines --> Training
+    Baselines --> Eval
+    Baselines --> RuleBased
+    Baselines --> Tuning
+    Baselines --> Plotting
+    Controllers -->|uses| B2B
+    Training -->|uses| B2B
+    Eval -->|uses| B2B
+    RuleBased -->|uses| B2B
 ```
 
-### Examples
+## Directory Structure
+
+```
+baselines/
+├── controllers/           # Rule-based reactive controllers
+│   ├── unitary_hvac.py    # PI + Trim-and-Respond for unitary systems
+│   └── air_loop.py        # VAV air-loop controller
+├── models/
+│   └── amorpheus.py       # Type-heterogeneous transformer (Section 6.2)
+├── utils/
+│   ├── training.py        # SB3 PPO builder, vectorized envs
+│   ├── evaluation.py      # Episode rollout functions
+│   ├── metadata.py        # Observation/action name helpers
+│   └── callbacks.py       # W&B training callbacks
+├── plotting/              # Matplotlib figure scripts
+├── configs/               # Hydra configuration
+├── run_rule_based.py      # Baseline CSV generation
+├── train_ppo.py           # Per-building PPO specialist (Section 5)
+├── train_dynamics_adaptation.py  # Section 6.1
+├── train_cross_domain.py  # Section 6.2 (Amorpheus)
+├── eval_*.py              # Evaluation scripts
+├── tune_controller.py     # Optuna-based controller tuning
+└── requirements.txt
+```
+
+## Installation
 
 ```bash
-# Default: unitary_g36 on a single-family house
-python scripts/baselines.py
-
-# G36 controller on OfficeSmall
-python scripts/baselines.py policy=unitary_g36 \
-    bldg.building_type=OfficeSmall
-
-# ASHRAE air-loop controller
-python scripts/baselines.py policy=ashrae_air_loop
-
-# Override episode length
-python scripts/baselines.py env.max_steps=8760
-
-# Disable W&B logging
-python scripts/baselines.py wandb.enabled=false
+pip install -e ".[training]"   # Installs all required dependencies
 ```
 
-## Rollout Pipeline
+## Quick Start
 
-`run_baseline_rollout()` in `building2building.benchmark.baseline_rollout` orchestrates:
+```bash
+# 1. Generate baseline returns CSV (needed for scoring)
+python -m baselines.run_rule_based experiment=eval_rule_based \
+    building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=5
 
-1. **Environment creation** — builds the EnergyPlus Gymnasium environment from
-   the Hydra config.
-2. **Policy binding** — calls `policy.bind_env(env)` so the controller
-   discovers observation/action indices.
-3. **Episode rollout** — runs `n_episodes` episodes up to `max_steps` per
-   episode.
-4. **Data recording** — saves a CSV and compressed NPZ file with observations,
-   actions, rewards, and per-step metrics.
-5. **W&B logging** — optionally logs temperature, action, energy, and reward
-   time-series plots plus summary statistics.
+# 2. Train per-building PPO specialists
+python -m baselines.train_ppo experiment=train_ppo \
+    building_types=[OfficeSmall] tasks=[task1] buildings_per_type=1
 
-## Output Structure
-
-Each rollout produces:
-
-```
-outputs/<policy_type>/<date>/<time>/
-├── config.json          # Resolved Hydra config
-├── rollout.csv          # Full rollout data (obs, actions, reward, metrics)
-├── rollout.npz          # Compressed NumPy archive
-└── eplus_outputs/       # Raw EnergyPlus simulation output
+# 3. Train dynamics adaptation with building parameters
+python -m baselines.train_dynamics_adaptation \
+    experiment=train_dynamics_parameterized difficulty=easy
 ```
 
-## Controller Details
+## Configuration
 
-- [G36 Controller (unitary_g36)](unitary-g36.md)
+All scripts use [Hydra](https://hydra.cc/) for configuration. Every script
+follows the pattern:
+
+```bash
+python -m baselines.<script> experiment=<name> [overrides...]
+```
+
+See [Configuration (Hydra)](../guide/configuration.md) for the full config
+reference.
+
+## Components
+
+| Page | Description |
+|---|---|
+| [Rule-Based Controllers](controllers.md) | UnitaryHvac and AirLoop controllers |
+| [PPO Specialist](ppo-specialist.md) | Per-building PPO training (Section 5) |
+| [Dynamics Adaptation](dynamics-adaptation.md) | Multi-building training (Section 6.1) |
+| [Cross-Domain Transfer](cross-domain.md) | Amorpheus transformer (Section 6.2) |
+| [Controller Tuning](tuning.md) | Optuna hyperparameter optimization |
+| [Plotting](plotting.md) | Paper figure generation |

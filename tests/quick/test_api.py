@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from building2building.api import _infer_dataset_selection, list_building_types
-from building2building.config.models import DatasetSelectionConfig
+from building2building.api import list_building_types
 
 
 @pytest.mark.quick
@@ -37,41 +35,3 @@ class TestListBuildings:
             mock_registry.list_buildings.assert_called_once_with(
                 "OfficeSmall", "train"
             )
-
-
-@pytest.mark.quick
-class TestInferDatasetSelection:
-    def test_default_single_zone(self) -> None:
-        cfg = _infer_dataset_selection({})
-        assert cfg.dataset == "single_zone_houses"
-        assert cfg.mode == "split_index"
-        assert cfg.split_index == 0
-
-    def test_explicit_bldg_section(self) -> None:
-        cfg = _infer_dataset_selection({
-            "bldg": {
-                "dataset": "multizones_reference_buildings",
-                "building_type": "OfficeSmall",
-                "split": "test",
-                "index": 3,
-            }
-        })
-        assert cfg.dataset == "multizones_reference_buildings"
-        assert cfg.building_type == "OfficeSmall"
-        assert cfg.split == "test"
-        assert cfg.split_index == 3
-
-    def test_query_mode(self) -> None:
-        cfg = _infer_dataset_selection({
-            "bldg": {
-                "dataset": "single_zone_houses",
-                "query": {"hvac_type": "baseboard"},
-            }
-        })
-        assert cfg.mode == "metadata_query"
-        assert cfg.metadata_query == {"hvac_type": "baseboard"}
-
-    def test_non_dict_bldg_fallback(self) -> None:
-        cfg = _infer_dataset_selection({"bldg": "not_a_dict"})
-        assert cfg.dataset == "single_zone_houses"
-        assert cfg.mode == "split_index"

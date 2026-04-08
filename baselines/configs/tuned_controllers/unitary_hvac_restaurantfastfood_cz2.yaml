@@ -1,0 +1,16 @@
+type: unitary_hvac
+heating_setpoint_c: 20.25
+cooling_setpoint_c: 21.75
+kp: 0.0345
+ki: 0.000137
+integral_max: 38.7
+min_fan_fraction: 0.0915
+sat_min_c: 6.69
+sat_max_c: 26.18
+sat_initial_c: 13.87
+sat_trim: 0.124
+sat_respond: 1.395
+demand_deadband: 0.068
+availability_on: 2.0
+target_schedule:
+  enabled: false

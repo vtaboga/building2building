@@ -43,7 +43,6 @@ def _make_office_small_env(tmp_path: Path) -> tuple:
     )
     config = EnvBuildConfig(
         dataset_selection=DatasetSelectionConfig(
-            dataset="multizones_reference_buildings",
             building_type="OfficeSmall",
             split="train",
             mode="split_index",

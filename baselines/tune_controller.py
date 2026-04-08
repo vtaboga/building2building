@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tune rule-based controller parameters with Optuna.
 
-Supports both unitary G36 (single-zone packaged systems) and ASHRAE
+Supports both unitary HVAC (single-zone packaged systems) and
 air-loop (VAV multi-zone systems) controllers. Optimizes the total
 episode reward on a single building.
 
@@ -27,11 +27,11 @@ import yaml
 from omegaconf import DictConfig
 
 import building2building as b2b
-from baselines.controllers.ashrae_air_loop import (
-    AshraeAirLoopConfig,
-    AshraeAirLoopPolicy,
+from baselines.controllers.air_loop import (
+    AirLoopConfig,
+    AirLoopPolicy,
 )
-from baselines.controllers.unitary_g36 import UnitaryG36Config, UnitaryG36Policy
+from baselines.controllers.unitary_hvac import UnitaryHvacConfig, UnitaryHvacPolicy
 from baselines.utils.evaluation import run_episode
 
 logger = logging.getLogger(__name__)
@@ -39,8 +39,8 @@ logger = logging.getLogger(__name__)
 VAV_BUILDING_TYPES = {"OfficeMedium"}
 
 
-def _suggest_g36(trial: optuna.Trial) -> UnitaryG36Config:
-    return UnitaryG36Config(
+def _suggest_unitary_hvac(trial: optuna.Trial) -> UnitaryHvacConfig:
+    return UnitaryHvacConfig(
         heating_setpoint_c=trial.suggest_float("heating_setpoint_c", 18.0, 22.0),
         cooling_setpoint_c=trial.suggest_float("cooling_setpoint_c", 20.0, 26.0),
         kp=trial.suggest_float("kp", 0.01, 3.0, log=True),
@@ -57,8 +57,8 @@ def _suggest_g36(trial: optuna.Trial) -> UnitaryG36Config:
     )
 
 
-def _suggest_air_loop(trial: optuna.Trial) -> AshraeAirLoopConfig:
-    return AshraeAirLoopConfig(
+def _suggest_air_loop(trial: optuna.Trial) -> AirLoopConfig:
+    return AirLoopConfig(
         target_temp=trial.suggest_float("target_temp", 18.0, 24.0),
         deadband=trial.suggest_float("deadband", 0.5, 3.0),
         sat_neutral=trial.suggest_float("sat_neutral", 14.0, 24.0),
@@ -88,15 +88,15 @@ def _suggest_air_loop(trial: optuna.Trial) -> AshraeAirLoopConfig:
     )
 
 
-def _config_to_dict(cfg: UnitaryG36Config | AshraeAirLoopConfig) -> dict[str, Any]:
+def _config_to_dict(cfg: UnitaryHvacConfig | AirLoopConfig) -> dict[str, Any]:
     """Serialize config to a flat dict for YAML output."""
     from dataclasses import asdict
 
     d = asdict(cfg)
-    if isinstance(cfg, UnitaryG36Config):
-        d["type"] = "unitary_g36"
+    if isinstance(cfg, UnitaryHvacConfig):
+        d["type"] = "unitary_hvac"
     else:
-        d["type"] = "ashrae_air_loop"
+        d["type"] = "air_loop"
     return d
 
 
@@ -110,10 +110,10 @@ def _make_objective(
     def objective(trial: optuna.Trial) -> float:
         if is_vav:
             cfg = _suggest_air_loop(trial)
-            policy = AshraeAirLoopPolicy(cfg)
+            policy = AirLoopPolicy(cfg)
         else:
-            cfg = _suggest_g36(trial)
-            policy = UnitaryG36Policy(cfg)
+            cfg = _suggest_unitary_hvac(trial)
+            policy = UnitaryHvacPolicy(cfg)
 
         env = b2b.new_make_env(building_type, building_id=building_id, task=task)
         try:
@@ -144,6 +144,8 @@ def main(cfg: DictConfig) -> None:
     task: str = cfg.get("reward", {}).get("task_name", "task1")
     output_dir = Path(str(cfg.get("output_dir", "configs/tuned_controllers")))
 
+    from baselines.run_rule_based import _get_climate_zone
+
     building_ids = b2b.list_buildings(building_type, split="train")
     if not building_ids:
         logger.error("No buildings found for %s", building_type)
@@ -151,17 +153,14 @@ def main(cfg: DictConfig) -> None:
 
     building_id = building_ids[0]
     for bid in building_ids:
-        try:
-            cz = int(bid) % 8 + 1
-            if cz == climate_zone:
-                building_id = bid
-                break
-        except (ValueError, TypeError):
-            continue
+        cz = _get_climate_zone(building_type, bid)
+        if cz == climate_zone:
+            building_id = bid
+            break
 
     logger.info(
         "Tuning %s controller for %s (cz=%d, building=%s, task=%s)",
-        "air_loop" if building_type in VAV_BUILDING_TYPES else "g36",
+        "air_loop" if building_type in VAV_BUILDING_TYPES else "unitary_hvac",
         building_type,
         climate_zone,
         building_id,
@@ -188,19 +187,19 @@ def main(cfg: DictConfig) -> None:
 
     is_vav = building_type in VAV_BUILDING_TYPES
     if is_vav:
-        best_cfg = AshraeAirLoopConfig(**{
+        best_cfg = AirLoopConfig(**{
             k: v
             for k, v in study.best_params.items()
             if k != "sat_aware_flow"
         }, sat_aware_flow=study.best_params.get("sat_aware_flow", True))
     else:
-        best_cfg = UnitaryG36Config(**study.best_params)
+        best_cfg = UnitaryHvacConfig(**study.best_params)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     if is_vav:
-        fname = f"ashrae_air_loop_{building_type.lower()}_cz{climate_zone}.yaml"
+        fname = f"air_loop_{building_type.lower()}_cz{climate_zone}.yaml"
     else:
-        fname = f"unitary_g36_{building_type.lower()}_cz{climate_zone}.yaml"
+        fname = f"unitary_hvac_{building_type.lower()}_cz{climate_zone}.yaml"
 
     out_path = output_dir / fname
     cfg_dict = _config_to_dict(best_cfg)

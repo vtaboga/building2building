@@ -10,25 +10,17 @@ from __future__ import annotations
 import csv
 import logging
 from pathlib import Path
-from typing import Literal
+
+from building2building.data.download import BuildingType
 
 logger = logging.getLogger(__name__)
 
-BuildingType = Literal[
-    "SingleFamilyHouse",
-    "Warehouse",
-    "RetailStandalone",
-    "RestaurantFastFood",
-    "OfficeMedium",
-    "OfficeSmall",
-]
-
-_baseline_cache: dict[tuple[str, str, int], float] | None = None
-_baseline_cache_no_task: dict[tuple[str, int], float] | None = None
+_baseline_cache: dict[tuple[str, str, str], float] | None = None
+_baseline_cache_no_task: dict[tuple[str, str], float] | None = None
 
 
 def _load_baseline_returns() -> (
-    tuple[dict[tuple[str, str, int], float], dict[tuple[str, int], float]]
+    tuple[dict[tuple[str, str, str], float], dict[tuple[str, str], float]]
 ):
     """Load baseline returns from the package-shipped CSV.
 
@@ -50,8 +42,8 @@ def _load_baseline_returns() -> (
             "This file should ship with the repository."
         )
 
-    with_task: dict[tuple[str, str, int], float] = {}
-    no_task: dict[tuple[str, int], float] = {}
+    with_task: dict[tuple[str, str, str], float] = {}
+    no_task: dict[tuple[str, str], float] = {}
 
     with csv_path.open(newline="") as f:
         reader = csv.DictReader(f)
@@ -59,7 +51,7 @@ def _load_baseline_returns() -> (
 
         for row in reader:
             bt = row["building_type"]
-            bid = int(row["building_id"])
+            bid = str(row["building_id"])
             mean_return = float(row["reward_mean"])
 
             if has_task_col and row.get("task"):
@@ -76,7 +68,7 @@ def compute_normalized_score(
     cumulative_return: float,
     building_type: BuildingType,
     task: str,
-    building_id: int | None = None,
+    building_id: str | None = None,
 ) -> float:
     """Compute a normalized score relative to the reactive-controller baseline.
 
@@ -120,7 +112,7 @@ def compute_normalized_score(
             else:
                 raise KeyError(
                     f"No baseline return found for building_type={building_type!r}, "
-                    f"task={task!r}, building_id={building_id}"
+                    f"task={task!r}, building_id={building_id!r}"
                 )
     else:
         task_baselines = [

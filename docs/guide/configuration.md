@@ -1,159 +1,74 @@
 # Configuration (Hydra)
 
-B2B uses [Hydra](https://hydra.cc/) with typed dataclasses for configuration management. This page describes the configuration hierarchy, config groups, key config files, and how to override settings from the CLI.
+The `baselines/` scripts use [Hydra](https://hydra.cc/) for configuration
+management. This page describes the Hydra config structure, config groups, and
+CLI override patterns.
+
+!!! note
+
+    Hydra configuration is used by the `baselines/` experiment scripts, not by
+    the core `building2building` package. The package API uses typed dataclasses
+    directly (see [API Reference](../api/config.md)).
 
 ---
 
-## Config Hierarchy
+## Config Structure
 
-The base configuration file composes default config groups:
+All Hydra configs live in `baselines/configs/`:
 
-```yaml
-# configs/base.yaml
-defaults:
-  - _self_
-  - wandb: default
-  - training: default
-  - policy: ppo
-  - reward: deadband
-  - task: default
-  - bldg: single_family
-  - rollout: default
-
-env:
-  normalize_obs: true
-  normalize_action: false
-  max_steps: null
-
-n_episodes: 1
-seed: 42
-
-benchmark:
-  split: train
-  start: 0
-  limit: 0
-  max_steps: null
+```
+baselines/configs/
+├── config.yaml           # Root config with defaults
+├── experiment/           # Per-script experiment settings
+│   ├── eval_rule_based.yaml
+│   ├── train_ppo.yaml
+│   ├── train_dynamics_specialist.yaml
+│   ├── train_dynamics_baseline.yaml
+│   ├── train_dynamics_parameterized.yaml
+│   ├── train_cross_domain.yaml
+│   └── tune_controller.yaml
+├── policy/               # Algorithm / controller hyperparameters
+│   ├── ppo.yaml
+│   ├── ppo_parameterized.yaml
+│   ├── unitary_hvac.yaml
+│   └── air_loop.yaml
+├── reward/               # Task reward definitions
+│   ├── task1.yaml ... task4.yaml
+├── training/
+│   └── default.yaml      # Training loop parameters
+├── tuned_controllers/    # Optuna-optimized controller configs
+│   └── (45 YAML files per building_type x climate_zone)
+└── wandb/
+    └── default.yaml      # W&B logging settings
 ```
 
-### Config Groups
+## Usage Pattern
 
-| Group | Directory | Purpose |
-|---|---|---|
-| `task` | `configs/task/` | Run period, target temperature mode |
-| `reward` | `configs/reward/` | Reward function type and parameters |
-| `policy` | `configs/policy/` | RL algorithm or baseline controller settings |
-| `training` | `configs/training/` | Training hyperparameters |
-| `wandb` | `configs/wandb/` | Weights & Biases logging settings |
-| `bldg` | `configs/bldg/` | Building/dataset selection |
-| `rollout` | `configs/rollout/` | Rollout execution settings |
-| `benchmark_interface` | `configs/benchmark_interface/` | Benchmark evaluation configs |
-
----
-
-## Task Configuration
-
-Controls the simulation period and target temperatures.
-
-```yaml
-# configs/task/default.yaml
-run_period: full_year        # full_year | winter | summer
-target_temperature_mode: constant  # constant | occupancy
-timesteps_per_hour: 12       # 5-min steps (valid: 1,2,3,4,5,6,10,12,15,20,30,60)
-
-default_zone_target_temperature:
-  occupied_c: 21.0
-  unoccupied_c: 21.0
-
-zone_target_temperatures: {}
-```
-
-### Run Periods
-
-| Period | Start | End | Steps (5 min) |
-|---|---|---|---|
-| `full_year` | Jan 1 | Dec 31 | 105,120 |
-| `winter` | Jan 1 | Mar 31 | 25,920 |
-| `summer` | Jun 1 | Aug 31 | 26,496 |
-
-### Simulation Timestep
-
-The `timesteps_per_hour` parameter controls the EnergyPlus simulation resolution.
-Higher values give finer control but produce longer episodes. The value must be a
-divisor of 60 accepted by EnergyPlus.
-
-| `timesteps_per_hour` | Step duration | Full-year steps |
-|---|---|---|
-| 4 | 15 min | 35,040 |
-| **12** (default) | **5 min** | **105,120** |
-| 60 | 1 min | 525,600 |
-
-### Target Temperature Modes
-
-- **`constant`**: Target is always `occupied_c` regardless of occupancy
-- **`occupancy`**: Target switches to `unoccupied_c` when zone occupancy is zero
-
-### CLI Override Examples
+Every baseline script follows this pattern:
 
 ```bash
-# Run for winter only
-python -m building2building.train task.run_period=winter
-
-# Use 15-minute timestep (legacy default)
-python -m building2building.train task.timesteps_per_hour=4
-
-# Occupancy-based targets with setback
-python -m building2building.train \
-    task.target_temperature_mode=occupancy \
-    task.default_zone_target_temperature.occupied_c=22.0 \
-    task.default_zone_target_temperature.unoccupied_c=16.0
+python -m baselines.<script> experiment=<name> [overrides...]
 ```
 
----
-
-## Reward Configuration
-
-### BarrierReward
-
-```yaml
-# configs/reward/barrier.yaml
-reward_type: BarrierRewardConfig
-energy_weight: 0.1
-deadband_c: 0.5
-violation_penalty: 100.0
-```
-
-### DeadbandReward
-
-```yaml
-# configs/reward/deadband.yaml
-reward_type: DeadbandRewardConfig
-dT: 1.0
-energy_weight: 0.001
-```
-
-### CLI Override Examples
+Examples:
 
 ```bash
-# Switch reward function
-python -m building2building.train reward=barrier
-
-# Override reward parameters
-python -m building2building.train reward=barrier reward.energy_weight=0.5 reward.violation_penalty=200.0
+python -m baselines.run_rule_based experiment=eval_rule_based
+python -m baselines.train_ppo experiment=train_ppo seed=42
+python -m baselines.train_dynamics_adaptation \
+    experiment=train_dynamics_parameterized difficulty=medium
 ```
 
----
+## Key Config Groups
 
-## Policy Configuration
+### Policy
 
-B2B supports RL algorithms, baseline controllers, and custom policies.
-
-### PPO
+PPO hyperparameters (from the paper's Table 5):
 
 ```yaml
-# configs/policy/ppo.yaml
+# baselines/configs/policy/ppo.yaml
 algorithm: "ppo"
 policy_type: "MlpPolicy"
-device: "cpu"
 n_steps: 2048
 batch_size: 64
 gamma: 0.99
@@ -163,262 +78,78 @@ ent_coef: 0.0
 vf_coef: 0.5
 max_grad_norm: 0.5
 gae_lambda: 0.95
-verbose: 1
 ```
 
-### SAC
+### Reward
+
+Task presets are mirrored as Hydra configs:
 
 ```yaml
-# configs/policy/sac.yaml
-algorithm: "sac"
-buffer_size: 100000
-batch_size: 128
-learning_starts: 1000
-tau: 0.005
-gamma: 0.99
-learning_rate: 0.0003
-policy_type: "MlpPolicy"
+# baselines/configs/reward/task1.yaml
+reward_type: DeadbandRewardConfig
+energy_weight: 0.01
+dT: 1.0
 ```
 
-### SB3 Checkpoint
+### Training
 
 ```yaml
-# configs/policy/sb3.yaml
-type: sb3
-algorithm: ppo              # SB3 algorithm name
-checkpoint_path: ???        # Path to saved .zip model
-```
-
-### Custom Policy
-
-```yaml
-# configs/policy/custom.yaml
-type: custom
-module: ???                 # Fully-qualified Python module
-class_name: ???             # Class with predict(obs, deterministic) -> (action, state)
-kwargs: {}                  # Constructor keyword arguments
-```
-
-### Baseline Controllers
-
-```yaml
-# configs/policy/unitary_g36.yaml
-# configs/policy/ashrae_air_loop.yaml
-# configs/policy/air_loop_sat.yaml
-```
-
-### CLI Override Examples
-
-```bash
-# Switch algorithm
-python -m building2building.train policy=sac
-
-# Override hyperparameters
-python -m building2building.train policy=ppo policy.learning_rate=0.001 policy.n_steps=4096
-
-# Load a trained checkpoint
-python -m building2building.benchmark.baseline_rollout policy=sb3 policy.checkpoint_path=checkpoints/ppo.zip
-```
-
----
-
-## Training Configuration
-
-```yaml
-# configs/training/default.yaml
+# baselines/configs/training/default.yaml
 total_timesteps: 1000000
+n_envs: 4
 eval_freq: 262144
 eval_episodes: 20
-num_train_envs: 4
-cb_gradient_save_freq: 500
 ```
 
-| Parameter | Default | Description |
-|---|---|---|
-| `total_timesteps` | 1,000,000 | Total training steps |
-| `eval_freq` | 262,144 | Steps between evaluations |
-| `eval_episodes` | 20 | Episodes per evaluation |
-| `num_train_envs` | 4 | Parallel training environments (SubprocVecEnv) |
-| `cb_gradient_save_freq` | 500 | Gradient logging frequency |
-
-### CLI Override Examples
-
-```bash
-python -m building2building.train training.total_timesteps=2000000 training.num_train_envs=8
-```
-
----
-
-## W&B Configuration
+### W&B
 
 ```yaml
-# configs/wandb/default.yaml
+# baselines/configs/wandb/default.yaml
 enabled: true
 project: "building2building"
-entity: "your-org"
+entity: "pierre-luc-bacon-mila-org"
 tags: []
 ```
 
-| Parameter | Default | Description |
-|---|---|---|
-| `enabled` | `true` | Enable/disable W&B logging |
-| `project` | `"building2building"` | W&B project name |
-| `entity` | — | W&B team/organization |
-| `tags` | `[]` | Tags for organizing runs |
-
-### CLI Override Examples
+## CLI Override Examples
 
 ```bash
-# Disable wandb
-python -m building2building.train wandb.enabled=false
+# Override training hyperparameters
+python -m baselines.train_ppo experiment=train_ppo \
+    training.total_timesteps=500000 policy.learning_rate=1e-4
 
-# Custom project
-python -m building2building.train wandb.project=my-experiment wandb.tags="[transfer,vav]"
+# Disable W&B
+python -m baselines.train_ppo experiment=train_ppo wandb.enabled=false
+
+# Multi-run sweep
+python -m baselines.train_ppo --multirun \
+    experiment=train_ppo seed=1,2,3 \
+    building_types=[OfficeSmall],[Warehouse]
 ```
 
----
+## Output Directory
 
-## Building Configuration
-
-### Single-Family Houses
-
-```yaml
-# configs/bldg/single_family.yaml
-# (dataset-specific building selection)
-```
-
-### Multi-Zone Buildings
-
-```yaml
-# configs/bldg/multi_zone.yaml
-# (building type, climate zone, split selection)
-```
-
----
-
-## Benchmark Interface Configuration
-
-For structured train/test benchmarks:
-
-### Single-Type Benchmark
-
-```yaml
-# configs/benchmark_interface/single_type.yaml
-mode: single_type
-building_type: OfficeSmall
-train:
-  selection:
-    mode: random
-    n: 50
-    seed: 42
-  config:
-    task:
-      run_period: winter
-    reward:
-      reward_type: BarrierRewardConfig
-      energy_weight: 0.1
-test:
-  selection:
-    mode: random
-    n: 10
-    seed: 123
-  config:
-    task:
-      run_period: winter
-    reward:
-      reward_type: BarrierRewardConfig
-      energy_weight: 0.1
-```
-
-### Multi-Type Benchmark
-
-```yaml
-# configs/benchmark_interface/multi_type.yaml
-mode: multi_type
-train:
-  types: [OfficeSmall, RetailStandalone, Warehouse]
-  selection:
-    mode: random
-    n: 30
-  config:
-    task:
-      run_period: winter
-test:
-  types: [OfficeMedium]
-  selection:
-    mode: random
-    n: 10
-  config:
-    task:
-      run_period: winter
-```
-
----
-
-## CLI Patterns
-
-### Overriding Nested Values
-
-```bash
-python -m building2building.train task.default_zone_target_temperature.occupied_c=23.0
-```
-
-### Switching Config Groups
-
-```bash
-python -m building2building.train policy=sac reward=barrier bldg=multi_zone
-```
-
-### Multi-Run Sweeps
-
-```bash
-python -m building2building.train --multirun \
-    policy=ppo,sac \
-    reward=barrier,deadband \
-    seed=1,2,3
-```
-
-### Output Directory
-
-Hydra creates timestamped output directories by default:
+Hydra creates timestamped output directories:
 
 ```
 outputs/
-└── 2025-01-15/
-    └── 14-30-00/
-        ├── .hydra/
-        │   ├── config.yaml
-        │   ├── hydra.yaml
-        │   └── overrides.yaml
-        ├── checkpoints/
-        └── eplus_outputs/
+└── train_ppo/
+    └── 2025-01-15/
+        └── 14-30-00/
+            ├── .hydra/
+            │   ├── config.yaml
+            │   ├── hydra.yaml
+            │   └── overrides.yaml
+            ├── models/
+            └── results.csv
 ```
 
----
+## Typed Configuration (Package API)
 
-## Typed Configuration with Dataclasses
+The core package uses frozen dataclasses for configuration, independent of
+Hydra. See the [config API reference](../api/config.md) for:
 
-All configuration is backed by frozen dataclasses in `building2building.config.models` and `building2building.types`, ensuring type safety:
-
-```python
-from building2building.config.models import EnvBuildConfig
-
-# From YAML/dict — validates all fields
-cfg = EnvBuildConfig.from_dict({
-    "dataset_selection": {"dataset": "single_zone_houses", "split": "train"},
-    "task": {"run_period": "winter"},
-    "reward": {"reward_type": "BarrierRewardConfig"},
-})
-
-# Invalid values raise immediately
-EnvBuildConfig.from_dict({"task": {"run_period": "spring"}})
-# ValueError: task.run_period must be one of {'full_year', 'winter', 'summer'}
-```
-
----
-
-## Next Steps
-
-- Write [custom policies](custom-policies.md) and load them via configuration
-- See the full [API reference](../index.md) for config dataclasses
-- Follow the [Getting Started](../getting-started.md) guide for end-to-end examples
+- `DatasetSelectionConfig` -- building selection
+- `EnvBuildConfig` -- complete environment specification
+- `TaskConfig` -- run period, temperature targets, timestep
+- `RewardConfig` -- reward function parameters

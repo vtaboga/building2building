@@ -4,9 +4,8 @@ import os
 from pathlib import Path
 
 import pytest
-from omegaconf import OmegaConf
 
-from building2building.api import make_env_from_hydra_config as make_env
+import building2building as b2b
 
 
 pytestmark = pytest.mark.long
@@ -17,21 +16,16 @@ def _requires_long_runtime() -> None:
         pytest.skip("Set B2B_RUN_LONG_TESTS=1 to run long simulation tests")
 
 
-def test_single_zone_pipeline_selection_and_env_creation(tmp_path: Path) -> None:
+def test_single_family_house_env_creation(tmp_path: Path) -> None:
     _requires_long_runtime()
-    cfg = OmegaConf.create(
-        {
-            "env": {"max_steps": 8, "normalize_obs": False},
-            "reward": {"reward_type": "BaseRewardConfig"},
-            "task": {"run_period": "winter"},
-            "bldg": {
-                "dataset": "single_zone_houses",
-                "split": "train",
-                "index": 0,
-            },
-        }
+    env = b2b.new_make_env(
+        "SingleFamilyHouse",
+        split="train",
+        index=0,
+        task="task1",
+        eplus_output_dir=tmp_path / "eplus_outputs",
+        max_episode_steps=8,
     )
-    env = make_env(config=cfg, eplus_output_dir=tmp_path / "eplus_outputs")
     try:
         obs, _ = env.reset()
         assert obs is not None

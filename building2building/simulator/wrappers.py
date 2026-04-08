@@ -605,7 +605,7 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
             }
             bid = src.get("building_id")
             if bid is not None:
-                payload[f"{p}/building/id"] = int(bid)
+                payload[f"{p}/building/id"] = str(bid)
 
             wandb.log(payload)
         except Exception as exc:

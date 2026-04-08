@@ -1,15 +1,16 @@
 # Building2Building Baselines
 
 Reference implementations of the control baselines and transfer experiments
-from the Building2Building paper.
+from the Building2Building paper. See the
+[full documentation](../docs/baselines/overview.md) for detailed guides.
 
 ## Structure
 
 ```
 baselines/
 ├── controllers/           # Rule-based reactive controllers
-│   ├── unitary_g36.py     # ASHRAE G36 for single-zone unitary systems
-│   └── ashrae_air_loop.py # ASHRAE-style VAV air-loop controller
+│   ├── unitary_hvac.py    # Controller for single-zone unitary systems
+│   └── air_loop.py        # VAV air-loop controller
 ├── models/
 │   └── amorpheus.py       # Type-heterogeneous transformer (Section 6.2)
 ├── utils/

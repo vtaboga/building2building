@@ -1,9 +1,8 @@
 # building2building.simulator
 
 Core simulator components that bridge Gymnasium and EnergyPlus. This module
-provides the factory functions for creating simulators, along with the
-observation spaces, action spaces, reward functions, wrappers, and building
-generator used to configure and run building energy simulations.
+provides the factory function for creating simulators, along with observation
+spaces, action spaces, reward functions, and wrappers.
 
 ::: building2building.simulator
 
@@ -22,7 +21,3 @@ generator used to configure and run building energy simulations.
 ## Wrappers
 
 ::: building2building.simulator.wrappers
-
-## Building Generator
-
-::: building2building.simulator.generator

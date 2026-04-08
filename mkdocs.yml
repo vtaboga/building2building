@@ -69,49 +69,47 @@ nav:
   - Getting Started: getting-started.md
   - User Guide:
       - Installation: guide/installation.md
-      - Environment Overview: guide/environments.md
-      - Building Types & Climate Zones: guide/buildings.md
-      - HVAC System Types: guide/hvac-systems.md
-      - Observation Space: guide/observations.md
-      - Action Space: guide/actions.md
-      - Reward Functions: guide/rewards.md
+      - Environments: guide/environments.md
+      - Building Types: guide/buildings.md
+      - HVAC Systems: guide/hvac-systems.md
+      - Observations: guide/observations.md
+      - Actions: guide/actions.md
+      - Rewards: guide/rewards.md
       - Wrappers: guide/wrappers.md
+      - Morphology Graph: guide/morphology.md
       - Configuration (Hydra): guide/configuration.md
-      - Using Custom Policies: guide/custom-policies.md
-  - Benchmark Tasks:
+  - Benchmarks:
       - Overview: benchmarks/overview.md
-      - Multi-Task Learning: benchmarks/multi-task.md
-      - Cross-Environment Generalization: benchmarks/cross-env.md
-      - Action-Space Shift: benchmarks/action-shift.md
-      - Adaptive Dynamics: benchmarks/adaptive-dynamics.md
+      - Dynamics Adaptation: benchmarks/dynamics-adaptation.md
+      - Cross-Domain Generalization: benchmarks/cross-domain.md
+      - Goal Adaptation: benchmarks/goal-adaptation.md
+      - Action-Space Transfer: benchmarks/action-transfer.md
   - Baselines:
       - Overview: baselines/overview.md
-      - PI Controller: baselines/unitary-pi.md
-      - SAT Controller: baselines/unitary-sat.md
-      - G36 Controller: baselines/unitary-g36.md
-      - Fan Coil Constant: baselines/fan-coil-constant.md
-  - Training:
-      - Single-Zone Training: training/single-zone.md
-      - Multizone Training: training/multizone.md
-      - RL Algorithms (PPO, SAC): training/algorithms.md
-      - SLURM Cluster Execution: training/slurm.md
-      - W&B Integration: training/wandb.md
+      - Rule-Based Controllers: baselines/controllers.md
+      - PPO Specialist: baselines/ppo-specialist.md
+      - Dynamics Adaptation: baselines/dynamics-adaptation.md
+      - Cross-Domain Transfer: baselines/cross-domain.md
+      - Controller Tuning: baselines/tuning.md
+      - Plotting: baselines/plotting.md
+  - Tutorials:
+      - Quick Tour: tutorials/quick-tour.md
+      - Train a PPO Agent: tutorials/train-ppo.md
+      - Reproduce Dynamics Benchmark: tutorials/dynamics-benchmark.md
+      - Cross-Domain with Amorpheus: tutorials/cross-domain.md
+      - Write a Custom Controller: tutorials/custom-controller.md
   - API Reference:
       - building2building.api: api/api.md
       - building2building.config: api/config.md
       - building2building.types: api/types.md
+      - building2building.benchmarks: api/benchmarks.md
+      - building2building.scoring: api/scoring.md
+      - building2building.morphology: api/morphology.md
       - building2building.simulator: api/simulator.md
-      - building2building.pipeline: api/pipeline.md
-      - building2building.benchmark: api/benchmark.md
-      - building2building.baselines: api/baselines.md
       - building2building.envs: api/envs.md
-      - building2building.datasets: api/datasets.md
-  - Developer Guide:
-      - Contributing: dev/contributing.md
-      - Code Style: dev/code-style.md
-      - Testing: dev/testing.md
-      - Adding Building Types: dev/new-buildings.md
-      - Adding HVAC Systems: dev/new-hvac.md
+      - building2building.data: api/data.md
+      - baselines: api/baselines.md
   - About:
-      - Citing B2B: about/citing.md
+      - Known Issues: about/known-issues.md
+      - Citing: about/citing.md
       - License: about/license.md

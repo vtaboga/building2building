@@ -1,7 +1,7 @@
 """Unified dataset access for Building2Building.
 
 Provides download, caching, and metadata queries for the unified
-HuggingFace dataset (``vtaboga/building2building``).
+HuggingFace dataset (``vtaboga/building2building_dataset``).
 """
 
 from building2building.data.download import (

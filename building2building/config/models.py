@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from building2building.data.download import ALL_BUILDING_TYPES, BuildingType
 from building2building.types import (
     BarrierRewardConfig,
     BaseRewardConfig,
@@ -18,20 +19,9 @@ from building2building.types import (
     reward_config_from_dict,
 )
 
-DatasetName = Literal["single_zone_houses", "multizones_reference_buildings"]
-SplitName = Literal["train", "test", "test_small"]
-BuildingType = Literal[
-    "Warehouse",
-    "RetailStandalone",
-    "RestaurantFastFood",
-    "OfficeMedium",
-    "OfficeSmall",
-]
+SplitName = Literal["train", "test"]
 SelectionMode = Literal[
     "split_index",
-    "split_indices",
-    "random",
-    "metadata_query",
     "building_id",
 ]
 BenchmarkMode = Literal["single_type", "multi_type"]
@@ -47,35 +37,21 @@ def _require_mapping(name: str, value: Any) -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class DatasetSelectionConfig:
-    """Specifies which building(s) to select from a dataset.
+    """Specifies which building to select from the unified dataset.
 
     Attributes:
-        dataset: Name of the target dataset.
+        building_type: Building archetype (e.g. ``"OfficeSmall"``).
         split: Train / test split (``None`` to ignore splits).
-        mode: Selection strategy (e.g. by index, random sample, …).
+        mode: Selection strategy: ``"split_index"`` or ``"building_id"``.
         split_index: Index when ``mode="split_index"``.
-        split_indices: Indices when ``mode="split_indices"``.
-        building_id: Explicit building id when ``mode="building_id"``.
-        sample_size: Number of buildings to sample when
-            ``mode="random"``.
-        seed: RNG seed for reproducible random selection.
-        replace: Whether to sample with replacement.
-        metadata_query: Filter dict when ``mode="metadata_query"``.
-        building_type: Building archetype filter for multi-zone
-            datasets.
+        building_id: Explicit building ID string when ``mode="building_id"``.
     """
 
-    dataset: DatasetName
+    building_type: BuildingType
     split: SplitName | None = "train"
     mode: SelectionMode = "split_index"
     split_index: int = 0
-    split_indices: list[int] = field(default_factory=list)
-    building_id: int | None = None
-    sample_size: int = 1
-    seed: int | None = None
-    replace: bool = False
-    metadata_query: dict[str, Any] = field(default_factory=dict)
-    building_type: BuildingType | None = None
+    building_id: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "DatasetSelectionConfig":
@@ -88,16 +64,19 @@ class DatasetSelectionConfig:
             A validated ``DatasetSelectionConfig``.
 
         Raises:
-            ValueError: On invalid dataset, split, or mode values.
-            TypeError: On wrong-typed fields.
+            ValueError: On invalid split, mode, or building_type values.
         """
         raw = _require_mapping("dataset_selection", data)
-        dataset = str(raw.get("dataset", "single_zone_houses")).strip().lower()
-        if dataset not in {"single_zone_houses", "multizones_reference_buildings"}:
+        building_type_raw = raw.get("building_type")
+        if building_type_raw is None:
+            raise ValueError("dataset_selection.building_type is required")
+        building_type = str(building_type_raw)
+        if building_type not in ALL_BUILDING_TYPES:
             raise ValueError(
-                "dataset_selection.dataset must be one of "
-                "{'single_zone_houses', 'multizones_reference_buildings'}"
+                f"dataset_selection.building_type must be one of "
+                f"{ALL_BUILDING_TYPES}, got {building_type!r}"
             )
+
         split_raw = raw.get("split", "train")
         split: SplitName | None
         if split_raw is None:
@@ -109,48 +88,24 @@ class DatasetSelectionConfig:
                     "dataset_selection.split must be one of {'train', 'test'} or null"
                 )
             split = split_norm  # type: ignore[assignment]
+
         mode = str(raw.get("mode", "split_index")).strip().lower()
-        if mode not in {
-            "split_index",
-            "split_indices",
-            "random",
-            "metadata_query",
-            "building_id",
-        }:
+        if mode not in {"split_index", "building_id"}:
             raise ValueError(
                 "dataset_selection.mode must be one of "
-                "{'split_index', 'split_indices', 'random', 'metadata_query', 'building_id'}"
+                "{'split_index', 'building_id'}"
             )
+
         building_id_raw = raw.get("building_id")
-        building_id = int(building_id_raw) if building_id_raw is not None else None
+        building_id = str(building_id_raw) if building_id_raw is not None else None
         split_index = int(raw.get("split_index", 0))
-        split_indices_raw = raw.get("split_indices", [])
-        if not isinstance(split_indices_raw, list) or not all(
-            isinstance(x, int) for x in split_indices_raw
-        ):
-            raise TypeError("dataset_selection.split_indices must be list[int]")
-        sample_size = int(raw.get("sample_size", 1))
-        if sample_size < 0:
-            raise ValueError("dataset_selection.sample_size must be >= 0")
-        seed_raw = raw.get("seed")
-        seed = int(seed_raw) if seed_raw is not None else None
-        metadata_query = _require_mapping(
-            "dataset_selection.metadata_query", raw.get("metadata_query", {})
-        )
-        building_type_raw = raw.get("building_type")
-        building_type = str(building_type_raw) if building_type_raw is not None else None
+
         return cls(
-            dataset=dataset,  # type: ignore[arg-type]
+            building_type=building_type,  # type: ignore[arg-type]
             split=split,
             mode=mode,  # type: ignore[arg-type]
             split_index=split_index,
-            split_indices=[int(x) for x in split_indices_raw],
             building_id=building_id,
-            sample_size=sample_size,
-            seed=seed,
-            replace=bool(raw.get("replace", False)),
-            metadata_query=dict(metadata_query),
-            building_type=building_type,  # type: ignore[arg-type]
         )
 
 

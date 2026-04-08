@@ -1,17 +1,17 @@
 """Baseline controllers for rule-based HVAC control."""
 
-from baselines.controllers.ashrae_air_loop import (
-    AshraeAirLoopConfig,
-    AshraeAirLoopPolicy,
+from baselines.controllers.air_loop import (
+    AirLoopConfig,
+    AirLoopPolicy,
 )
-from baselines.controllers.unitary_g36 import (
-    UnitaryG36Config,
-    UnitaryG36Policy,
+from baselines.controllers.unitary_hvac import (
+    UnitaryHvacConfig,
+    UnitaryHvacPolicy,
 )
 
 __all__ = [
-    "AshraeAirLoopConfig",
-    "AshraeAirLoopPolicy",
-    "UnitaryG36Config",
-    "UnitaryG36Policy",
+    "AirLoopConfig",
+    "AirLoopPolicy",
+    "UnitaryHvacConfig",
+    "UnitaryHvacPolicy",
 ]

@@ -1,90 +1,58 @@
-# Environment Overview
+# Environments
 
-B2B environments wrap EnergyPlus building simulations in the Gymnasium interface. This page describes the architecture, factory functions, configuration, and environment lifecycle.
+## Overview
 
----
-
-## Architecture
+B2B environments are standard Gymnasium environments backed by EnergyPlus
+simulations. Each environment simulates a building with controllable HVAC
+actuators, returning observations (temperatures, energy use, weather) and a
+scalar reward at each timestep.
 
 ```mermaid
-flowchart LR
-    A[Dataset<br/>7000+ buildings] --> B[Pipeline<br/>epJSON processing]
-    B --> C[EnergyPlus<br/>simulation engine]
-    C --> D[Gymnasium Env<br/>obs / action / reward]
-    D --> E[Wrappers<br/>normalize, pad, augment]
-    E --> F[Agent<br/>RL policy]
-    F -->|action| D
+graph LR
+    Agent -->|action| B2BEnv
+    B2BEnv -->|"obs, reward"| Agent
+    B2BEnv --> EnergyPlus["EnergyPlus Simulation"]
+    EnergyPlus --> B2BEnv
 ```
 
-The B2B environment pipeline:
+## Creating Environments
 
-1. **Dataset**: Select a building from `single_zone_houses` or `multizones_reference_buildings` by split and index
-2. **Pipeline**: Process the building's epJSON file — discover HVAC equipment, install controllable actuators, add observation meters, set the simulation timestep
-3. **EnergyPlus**: Launch the EnergyPlus simulator with the modified building model and weather file
-4. **Gymnasium Env**: Wrap the simulation in a standard `gym.Env` with `Box` observation and action spaces
-5. **Wrappers**: Optionally normalize observations, pad to fixed size, augment with building parameters
-6. **Agent**: The RL policy receives observations and returns actions at each simulation timestep (default: 5 minutes)
+### `new_make_env` (recommended)
 
----
-
-## Environment Registration
-
-B2B environments are registered with Gymnasium as `EnergyPlus-v0`. However, the recommended way to create environments is through the factory functions in `building2building.api`, which handle all configuration and pipeline setup.
-
----
-
-## Factory Functions
-
-B2B provides four levels of environment creation, from high-level convenience to low-level control:
-
-### `make_single_zone_env`
-
-Create a single-zone house environment from scalar arguments:
+The primary user-facing API. Downloads pre-processed buildings from HuggingFace,
+resolves named task presets, and constructs the environment:
 
 ```python
-from building2building.api import make_single_zone_env
+import building2building as b2b
 
-env = make_single_zone_env(
+env = b2b.new_make_env(
+    "OfficeSmall",
     split="train",
-    split_index=0,
-    eplus_output_dir="outputs/eplus",
-    task={"run_period": "winter"},
-    reward={"reward_type": "BarrierRewardConfig"},
-    max_steps=8640,
+    index=0,
+    task="task1",
+    run_period="winter",
 )
 ```
+
+**Parameters:**
 
 | Parameter | Type | Description |
 |---|---|---|
-| `split` | `"train"` \| `"test"` | Dataset split |
-| `split_index` | `int` | Zero-based index into the split |
-| `eplus_output_dir` | `str \| Path` | EnergyPlus output directory |
-| `task` | `dict \| None` | Task config (run period, target temps) |
-| `reward` | `dict \| None` | Reward config (type, weights) |
-| `max_steps` | `int \| None` | Max episode length (defaults to run period) |
+| `building_type` | `str` | One of the 6 building types |
+| `split` | `"train"` / `"test"` | Dataset split |
+| `index` | `int` | Zero-based index into the split |
+| `building_id` | `str` | Explicit building ID (overrides split+index) |
+| `task` | `str` / `TaskPreset` | `"task1"`--`"task4"` or a `TaskPreset` |
+| `reward` | `RewardConfig` | Override reward (default: from task preset) |
+| `run_period` | `str` | `"full_year"`, `"winter"`, or `"summer"` |
+| `timesteps_per_hour` | `int` | Simulation resolution (default: 12 = 5 min) |
+| `target_temperature_mode` | `str` | `"constant"` or `"occupancy"` |
+| `eplus_output_dir` | `str` / `Path` | EnergyPlus output directory |
+| `max_episode_steps` | `int` | Override episode length |
 
-### `make_multizones_env`
+### `make_env` (config-based)
 
-Create a multi-zone reference building environment:
-
-```python
-from building2building.api import make_multizones_env
-
-env = make_multizones_env(
-    building_type="OfficeSmall",
-    split="train",
-    split_index=0,
-    eplus_output_dir="outputs/eplus",
-    task={"run_period": "summer"},
-    reward={"reward_type": "DeadbandRewardConfig", "dT": 1.0},
-)
-```
-
-Takes the same parameters as `make_single_zone_env` plus `building_type`.
-
-### `make_env`
-
-Create an environment from a fully-specified `EnvBuildConfig`:
+For full control, construct an `EnvBuildConfig` manually:
 
 ```python
 from building2building.api import make_env
@@ -93,126 +61,64 @@ from building2building.types import TaskConfig, reward_config_from_dict
 
 cfg = EnvBuildConfig(
     dataset_selection=DatasetSelectionConfig(
-        dataset="multizones_reference_buildings",
-        building_type="Warehouse",
+        building_type="OfficeMedium",
         split="train",
         mode="split_index",
-        split_index=0,
+        split_index=5,
     ),
-    task=TaskConfig.from_dict({"run_period": "full_year"}),
-    reward=reward_config_from_dict({"reward_type": "BaseRewardConfig", "energy_weight": 1.0}),
+    task=TaskConfig.from_dict({"run_period": "summer"}),
+    reward=reward_config_from_dict({"reward_type": "BarrierRewardConfig", "energy_weight": 0.1}),
+    env_max_steps=8640,
 )
 env = make_env(cfg, eplus_output_dir="outputs/eplus")
 ```
 
-### `make_env_from_config`
+### Gymnasium Registration
 
-The lowest-level factory used internally by all other functions. Handles dataset lookup, pipeline execution, and `TimeLimit` wrapping.
-
----
-
-## `EnvBuildConfig`
-
-The central configuration dataclass that specifies how to build an environment:
+B2B environments are also registered as Gymnasium environments:
 
 ```python
-@dataclass(frozen=True)
-class EnvBuildConfig:
-    dataset_selection: DatasetSelectionConfig  # Which building(s) to use
-    task: TaskConfig                           # Run period, target temperatures
-    reward: RewardConfig                       # Reward function type and weights
-    actuator_access: ActuatorAccessConfig       # Which actuators to expose
-    env_max_steps: int | None = None           # Override max episode steps
+import gymnasium as gym
+
+env = gym.make("b2b/OfficeSmall-v0", split="train", index=0, task="task1")
 ```
-
-### `DatasetSelectionConfig`
-
-Controls which building is selected from the dataset:
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `dataset` | `"single_zone_houses"` \| `"multizones_reference_buildings"` | — | Dataset to query |
-| `split` | `"train"` \| `"test"` \| `"test_small"` \| `None` | `"train"` | Dataset split (`test_small`: one per climate zone, multizones only) |
-| `mode` | `SelectionMode` | `"split_index"` | How to select buildings |
-| `split_index` | `int` | `0` | Index when mode is `split_index` |
-| `split_indices` | `list[int]` | `[]` | Indices when mode is `split_indices` |
-| `building_id` | `int \| None` | `None` | Direct building ID |
-| `sample_size` | `int` | `1` | Number of buildings for `random` mode |
-| `seed` | `int \| None` | `None` | RNG seed for `random` mode |
-| `building_type` | `BuildingType \| None` | `None` | Filter by building type |
-
-### `TaskConfig`
-
-Controls the simulation task:
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `run_period` | `RunPeriodConfig` | `full_year` | Simulation period |
-| `target_temperature_mode` | `"constant"` \| `"occupancy"` | `"constant"` | How target temps are determined |
-| `timesteps_per_hour` | `int` | `12` | Simulation steps per hour (5-min default) |
-| `default_zone_target_temperature` | `ZoneTargetTemperatureConfig` | `21.0°C / 21.0°C` | Default occupied/unoccupied targets |
-| `zone_target_temperatures` | `dict[str, ZoneTargetTemperatureConfig]` | `{}` | Per-zone overrides |
-
-### Run Periods
-
-| Name | Period | Days | Steps (at 5 min) |
-|---|---|---|---|
-| `full_year` | Jan 1 – Dec 31 | 365 | 105,120 |
-| `winter` | Jan 1 – Mar 31 | 90 | 25,920 |
-| `summer` | Jun 1 – Aug 31 | 92 | 26,496 |
-
----
 
 ## Environment Lifecycle
 
-### Reset
-
 ```python
-obs, info = env.reset()
+env = b2b.new_make_env("OfficeSmall", task="task1")
+
+obs, info = env.reset()         # Start EnergyPlus simulation
+for _ in range(100):
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
+    if terminated or truncated:
+        obs, info = env.reset()
+env.close()                     # Clean up EnergyPlus process
 ```
 
-Calling `reset()` initializes (or re-initializes) the EnergyPlus simulation. The first observation is returned after the simulation warmup completes. The `info` dict may contain metadata about the building.
-
-### Step
-
-```python
-obs, reward, terminated, truncated, info = env.step(action)
-```
-
-Each `step()` advances the EnergyPlus simulation by one timestep (default: 5 minutes, configurable via `task.timesteps_per_hour`). The action is applied to the HVAC actuators, and the resulting observation, reward, and termination signals are returned.
-
-- **`terminated`**: Always `False` (the simulation does not terminate early)
-- **`truncated`**: `True` when `max_episode_steps` is reached (via `TimeLimit` wrapper)
-
-### Close
-
-```python
-env.close()
-```
-
-Shuts down the EnergyPlus process and cleans up resources. Always call `close()` when finished with an environment.
-
----
+- `reset()` starts a new EnergyPlus simulation and runs warmup.
+- `step(action)` advances the simulation by one timestep.
+- `close()` terminates the EnergyPlus process and cleans up.
+- `terminated` is True when the simulation run period ends.
 
 ## Environment Metadata
 
-B2B environments expose metadata through `env.metadata`:
+Every environment provides structured metadata:
 
 ```python
-meta = env.metadata
-print(meta["observation_names"])   # List of observation feature names
-print(meta["action_names"])        # List of actuator names
-print(meta["controlled_zones"])    # List of zone names under control
-print(meta["area"])                # Building floor area (m²)
-print(meta["building_source_metadata"])  # Dataset provenance info
+env.metadata["observation_names"]      # list[str] -- named observation channels
+env.metadata["action_names"]           # list[str] -- named action channels
+env.metadata["hvac_equipment"]         # list[Equipment] -- HVAC equipment descriptions
+env.metadata["morphology"]             # Morphology -- structured graph representation
+env.metadata["total_conditioned_area"] # float -- building floor area (m^2)
+env.metadata["zone_names"]             # list[str] -- thermal zone names
 ```
 
-This metadata is used by wrappers (e.g., `PadObservation` uses zone temperature names for intelligent padding) and by baseline controllers for actuator indexing.
+## Run Periods
 
----
-
-## Next Steps
-
-- Learn about the [7,000+ buildings](buildings.md) in the dataset
-- Understand the [HVAC systems](hvac-systems.md) and their control interfaces
-- Explore the [observation space](observations.md) and [action space](actions.md)
+| Period | Start | End | Steps (5-min) |
+|---|---|---|---|
+| `full_year` | Jan 1 | Dec 31 | 105,120 |
+| `winter` | Jan 1 | Mar 31 | 25,920 |
+| `summer` | Jun 1 | Aug 31 | 26,496 |

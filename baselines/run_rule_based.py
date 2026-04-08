@@ -22,11 +22,11 @@ import yaml
 from omegaconf import DictConfig
 
 import building2building as b2b
-from baselines.controllers.ashrae_air_loop import (
-    AshraeAirLoopConfig,
-    AshraeAirLoopPolicy,
+from baselines.controllers.air_loop import (
+    AirLoopConfig,
+    AirLoopPolicy,
 )
-from baselines.controllers.unitary_g36 import UnitaryG36Config, UnitaryG36Policy
+from baselines.controllers.unitary_hvac import UnitaryHvacConfig, UnitaryHvacPolicy
 from baselines.utils.evaluation import EpisodeResult, run_episode
 
 logger = logging.getLogger(__name__)
@@ -44,48 +44,83 @@ class RunResult:
     reward_mean: float
 
 
-def _load_tuned_g36(bt: str, cz: int | None) -> UnitaryG36Config:
+def _load_tuned_unitary_hvac(bt: str, cz: int | None) -> UnitaryHvacConfig:
     if cz is not None:
-        p = TUNED_CONFIGS_DIR / f"unitary_g36_{bt.lower()}_cz{cz}.yaml"
+        p = TUNED_CONFIGS_DIR / f"unitary_hvac_{bt.lower()}_cz{cz}.yaml"
         if p.exists():
             raw = yaml.safe_load(p.read_text())
             raw.pop("type", None)
-            return UnitaryG36Config(**{
+            return UnitaryHvacConfig(**{
                 k: float(v) if isinstance(v, (int, float)) else v
                 for k, v in raw.items()
                 if k != "target_schedule"
             })
-    return UnitaryG36Config()
+    return UnitaryHvacConfig()
 
 
-def _load_tuned_air_loop(bt: str, cz: int | None) -> AshraeAirLoopConfig:
+def _load_tuned_air_loop(bt: str, cz: int | None) -> AirLoopConfig:
     if cz is not None:
-        p = TUNED_CONFIGS_DIR / f"ashrae_air_loop_{bt.lower()}_cz{cz}.yaml"
+        p = TUNED_CONFIGS_DIR / f"air_loop_{bt.lower()}_cz{cz}.yaml"
         if p.exists():
             raw = yaml.safe_load(p.read_text())
             raw.pop("type", None)
-            return AshraeAirLoopConfig(**raw)
-    return AshraeAirLoopConfig()
+            return AirLoopConfig(**raw)
+    return AirLoopConfig()
+
+
+PLACE_TO_CLIMATE_ZONE: dict[str, int] = {
+    "Miami": 1,
+    "Houston": 2,
+    "Tampa": 2,
+    "Tucson": 2,
+    "Atlanta": 3,
+    "ElPaso": 3,
+    "SanDiego": 3,
+    "SanFrancisco": 3,
+    "Albuquerque": 4,
+    "Baltimore": 4,
+    "NewYork": 4,
+    "PortAngeles": 4,
+    "Seattle": 4,
+    "Buffalo": 5,
+    "Chicago": 5,
+    "Denver": 5,
+    "Vancouver": 5,
+    "GreatFalls": 6,
+    "Rochester": 6,
+    "Duluth": 7,
+    "InternationalFalls": 7,
+    "Fairbanks": 8,
+}
 
 
 def _get_climate_zone(bt: str, bid: str) -> int | None:
+    """Best-effort climate zone lookup from the building's weather filename.
+
+    Returns ``None`` when no place-to-CZ mapping is available (e.g.
+    for SingleFamilyHouse buildings that use per-building weather).
+    """
     try:
-        from building2building.sources.multizones_reference_buildings import (
-            climate_zone_for_building,
-        )
-        return climate_zone_for_building(bt, int(bid))
+        from building2building.data.registry import get_registry
+
+        info = get_registry().get_building_by_id(bt, bid)
+        weather = info.weather_file
+        if not weather:
+            return None
+        place = Path(weather).stem.split("_")[0]
+        return PLACE_TO_CLIMATE_ZONE.get(place)
     except Exception:
         return None
 
 
 def _select_policy(
     building_type: str, building_id: str, env: Any
-) -> UnitaryG36Policy | AshraeAirLoopPolicy:
+) -> UnitaryHvacPolicy | AirLoopPolicy:
     cz = _get_climate_zone(building_type, building_id)
     if building_type in VAV_BUILDING_TYPES:
-        policy = AshraeAirLoopPolicy(_load_tuned_air_loop(building_type, cz))
+        policy = AirLoopPolicy(_load_tuned_air_loop(building_type, cz))
     else:
-        policy = UnitaryG36Policy(_load_tuned_g36(building_type, cz))
+        policy = UnitaryHvacPolicy(_load_tuned_unitary_hvac(building_type, cz))
     policy.bind_env(env)
     return policy
 

@@ -14,49 +14,51 @@ from building2building.config.models import (
 @pytest.mark.quick
 class TestDatasetSelectionConfig:
     def test_defaults(self) -> None:
-        cfg = DatasetSelectionConfig.from_dict({"dataset": "single_zone_houses"})
-        assert cfg.dataset == "single_zone_houses"
+        cfg = DatasetSelectionConfig.from_dict({"building_type": "OfficeSmall"})
+        assert cfg.building_type == "OfficeSmall"
         assert cfg.split == "train"
         assert cfg.mode == "split_index"
         assert cfg.split_index == 0
 
-    def test_multizones_dataset(self) -> None:
+    def test_building_id_mode(self) -> None:
         cfg = DatasetSelectionConfig.from_dict({
-            "dataset": "multizones_reference_buildings",
-            "mode": "building_id",
-            "building_id": 42,
             "building_type": "OfficeSmall",
+            "mode": "building_id",
+            "building_id": "OfficeSmall-0042",
         })
-        assert cfg.dataset == "multizones_reference_buildings"
         assert cfg.mode == "building_id"
-        assert cfg.building_id == 42
+        assert cfg.building_id == "OfficeSmall-0042"
 
-    def test_invalid_dataset_raises(self) -> None:
-        with pytest.raises(ValueError, match="dataset_selection.dataset"):
-            DatasetSelectionConfig.from_dict({"dataset": "imagenet"})
+    def test_invalid_building_type_raises(self) -> None:
+        with pytest.raises(ValueError, match="dataset_selection.building_type"):
+            DatasetSelectionConfig.from_dict({"building_type": "UnknownType"})
+
+    def test_missing_building_type_raises(self) -> None:
+        with pytest.raises(ValueError, match="dataset_selection.building_type"):
+            DatasetSelectionConfig.from_dict({})
 
     def test_frozen(self) -> None:
-        cfg = DatasetSelectionConfig(dataset="single_zone_houses")
+        cfg = DatasetSelectionConfig(building_type="OfficeSmall")
         with pytest.raises(AttributeError):
-            cfg.dataset = "multizones_reference_buildings"  # type: ignore[misc]
+            cfg.building_type = "Warehouse"  # type: ignore[misc]
 
 
 @pytest.mark.quick
 class TestEnvBuildConfig:
     def test_from_dict_minimal(self) -> None:
         raw = {
-            "dataset_selection": {"dataset": "single_zone_houses"},
+            "dataset_selection": {"building_type": "OfficeSmall"},
             "task": {},
             "reward": {"reward_type": "DeadbandRewardConfig"},
         }
         cfg = EnvBuildConfig.from_dict(raw)
-        assert cfg.dataset_selection.dataset == "single_zone_houses"
+        assert cfg.dataset_selection.building_type == "OfficeSmall"
         assert cfg.env_max_steps is None
         assert cfg.expose_heating_only_zones is True
 
     def test_from_dict_with_max_steps(self) -> None:
         raw = {
-            "dataset_selection": {"dataset": "single_zone_houses"},
+            "dataset_selection": {"building_type": "Warehouse"},
             "task": {"run_period": "winter"},
             "reward": {"reward_type": "BaseRewardConfig"},
             "env_max_steps": 1000,
@@ -67,7 +69,7 @@ class TestEnvBuildConfig:
 
     def test_frozen(self) -> None:
         raw = {
-            "dataset_selection": {"dataset": "single_zone_houses"},
+            "dataset_selection": {"building_type": "OfficeSmall"},
             "task": {},
             "reward": {"reward_type": "DeadbandRewardConfig"},
         }

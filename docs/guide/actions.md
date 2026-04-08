@@ -1,178 +1,94 @@
 # Action Space
 
-B2B environments expose continuous action spaces whose structure depends on the HVAC system type. This page describes the action space for each system type, the agent-facing vs. full action space distinction, and how actuators map to EnergyPlus.
+## Structure
 
----
+Actions are flat `numpy` arrays of continuous values. Each element controls one
+HVAC actuator. The action dimension varies by building type and HVAC system.
 
-## Action Space by HVAC Type
-
-### Unitary Systems
-
-Each unitary system exposes **2 actuators** per zone:
-
-| Index | Actuator | Units | Lower | Upper |
-|---|---|---|---|---|
-| 0 | Fan Air Mass Flow Rate | kg/s | 0.0 | *design max* |
-| 1 | Supply Air Temperature Setpoint | °C | 5.0 | *max supply temp* |
-
-```python
-# Example for a single-zone house
-env.action_space
-# Box(low=[0.0, 5.0], high=[0.48, 40.0], shape=(2,))
-```
-
-!!! info "Design-based bounds"
-
-    The fan upper bound is read from the building's fan design data (converted from m³/s to kg/s at standard air density of 1.2 kg/m³). The SAT upper bound comes from `maximum_supply_air_temperature`, defaulting to 40°C.
-
-### VAV Systems
-
-VAV systems have a **shared supply temperature setpoint** plus **per-zone terminal actuators**:
-
-| Actuator | Units | Lower | Upper | Count |
-|---|---|---|---|---|
-| Supply Air Temperature Setpoint | °C | 10.0 | 55.0 | 1 per AHU |
-| Terminal Flow Fraction | fraction | 0.0 | 1.0 | 1 per zone |
-| Zone Heating Setpoint | °C | 10.0 | 35.0 | 1 per zone |
-| Zone Cooling Setpoint | °C | 18.0 | 40.0 | 1 per zone* |
-
-For an OfficeMedium with 15 zones and 1 AHU, the full action space has:
-
-- 1 supply temp + 15 flow fractions + 15 heating setpoints + 15 cooling setpoints = **46 dimensions**
-
-!!! warning "Fixed cooling setpoints"
-
-    VAV **cooling setpoints are removed from the agent-facing action space** and pinned at 40°C for simulation stability. The agent action space is therefore 1 + 15 + 15 = **31 dimensions** for this example.
-
-### Heating-Only Zones
-
-Each heating-only zone exposes **1 continuous actuator** — the zone thermostat heating setpoint:
-
-| Index | Actuator | Units | Lower | Upper |
-|---|---|---|---|---|
-| 0 | Zone Heating Setpoint | °C | 10.0 | 35.0 |
-
-!!! note "Mixed systems"
-
-    Buildings like `Warehouse` may have both unitary and heating-only equipment. In that case, the action space concatenates all actuators from all equipment in discovery order.
-
-!!! info "Expose / hide toggle"
-
-    When `expose_heating_only_zones=False`, heating-only actuators are **removed** from the agent action space and pinned at 18 °C. This is analogous to how VAV cooling setpoints are fixed.
-
----
-
-## Agent-Facing vs. Full Action Space
-
-B2B distinguishes between two action spaces via the `HvacActionSpace` class:
-
-### Full Action Space
-
-The complete set of actuators needed by EnergyPlus, including fixed actuators. Used internally to drive the simulation.
-
-### Agent Action Space
-
-The reduced set of actuators exposed to the RL agent. Fixed actuators (VAV cooling setpoints and, optionally, heating-only zone setpoints) are removed and their values are pinned automatically.
-
-```mermaid
-flowchart LR
-    A[Agent Action<br/>reduced dim] --> H[HvacActionSpace<br/>assemble_full_action]
-    H --> F[Full Action<br/>all actuators]
-    F --> E[EnergyPlus]
-    P[Fixed Values<br/>cooling SP = 40°C<br/>heating-only SP = 18°C] --> H
-```
-
-The `assemble_full_action` method on `HvacActionSpace` takes the agent's action vector and inserts fixed values at the appropriate indices:
-
-```python
-# Agent produces a 31-dim action (no cooling setpoints)
-agent_action = policy.predict(obs)
-
-# HvacActionSpace expands to 46-dim with cooling SPs = 40°C
-full_action = action_space.assemble_full_action(agent_action)
-```
-
----
-
-## `ActuatorDescription`
-
-Each actuator in the action space is described by an `ActuatorDescription`:
-
-```python
-@dataclass(frozen=True)
-class ActuatorDescription:
-    component_type: str      # e.g. "Fan", "Schedule:Constant"
-    control_type: str        # e.g. "Fan Air Mass Flow Rate", "Schedule Value"
-    component_name: str      # Unique EnergyPlus object name
-    units: str               # e.g. "[kg/s]", "Temperature", "Availability"
-    lower_bound: float       # Action minimum
-    upper_bound: float       # Action maximum
-```
-
-### Actuator Types by System
+## Actions by HVAC System Type
 
 === "Unitary"
 
-    | component_type | control_type | units |
+    Each zone has 2 actuators:
+
+    | Actuator | Range | Unit |
     |---|---|---|
-    | `Fan` | `Fan Air Mass Flow Rate` | `[kg/s]` |
-    | `Schedule:Constant` | `Schedule Value` | `Temperature` |
+    | Fan air mass flow rate | `[0, design_max]` | kg/s |
+    | Supply air temperature setpoint | `[12, 50]` | C |
+
+    For an `OfficeSmall` with 5 zones: action dim = 10.
 
 === "VAV"
 
-    | component_type | control_type | units |
+    Central supply + per-zone terminals:
+
+    | Actuator | Range | Unit |
     |---|---|---|
-    | `Schedule:Constant` | `Schedule Value` | `[C]` (supply temp) |
-    | `Schedule:Constant` | `Schedule Value` | `[frac]` (flow fraction) |
-    | `Schedule:Constant` | `Schedule Value` | `[C]` (heating SP) |
-    | `Schedule:Constant` | `Schedule Value` | `[C]` (cooling SP, fixed) |
+    | Supply air temperature setpoint (central) | `[12, 50]` | C |
+    | Damper position (per zone) | `[0, 1]` | fraction |
+    | Heating setpoint (per zone) | `[15, 30]` | C |
+    | Cooling setpoint (per zone) | `[15, 30]` | C |
 
-=== "Heating-Only Zone"
+    For `OfficeMedium` with ~10 VAV zones: action dim ~ 33.
 
-    | component_type | control_type | units |
+=== "Heating-Only"
+
+    Each zone has 1 actuator:
+
+    | Actuator | Range | Unit |
     |---|---|---|
-    | `Schedule:Constant` | `Schedule Value` | `[C]` (heating SP) |
+    | Heating setpoint | `[15, 30]` | C |
 
----
+## Action Dimensions by Building Type
+
+| Building Type | HVAC | Typical Action Dim |
+|---|---|---|
+| `SingleFamilyHouse` | Unitary | 2 |
+| `OfficeSmall` | Unitary | 10 |
+| `OfficeMedium` | VAV | ~33 |
+| `RetailStandalone` | Unitary | 8 |
+| `RestaurantFastFood` | Unitary | 4 |
+| `Warehouse` | Unitary | 6 |
 
 ## Action Names
 
-Action feature names are available via `env.metadata["action_names"]`:
+Each action channel has a human-readable name:
 
 ```python
-meta = env.metadata
-for i, name in enumerate(meta["action_names"]):
+import building2building as b2b
+
+env = b2b.new_make_env("OfficeSmall", task="task1")
+for i, name in enumerate(env.metadata["action_names"]):
     print(f"  [{i}] {name}")
+env.close()
 ```
 
-Example output for a single-zone house:
+## Action Space Bounds
 
+The action space is a Gymnasium `Box` with per-actuator low/high bounds derived
+from the HVAC equipment specifications:
+
+```python
+env = b2b.new_make_env("OfficeSmall", task="task1")
+print(env.action_space)         # Box(low, high, shape=(10,))
+print(env.action_space.low)     # per-actuator lower bounds
+print(env.action_space.high)    # per-actuator upper bounds
+env.close()
 ```
-  [0] Fan Air Mass Flow Rate :: DX HEATING COIL SYSTEM FAN
-  [1] Schedule Value :: B2B outlet temp setpoint schedule (3)
+
+## Morphology-Based Actions
+
+For policies that operate on per-node local action spaces (e.g. the Amorpheus
+transformer), the morphology graph provides `join_actions()`:
+
+```python
+morph = env.metadata["morphology"]
+actions_dict = {
+    node.node_id: np.zeros(node.node_type.action_dim)
+    for node in morph.nodes
+    if node.node_type.action_dim > 0
+}
+flat_action = morph.join_actions(actions_dict)
 ```
 
----
-
-## Action Space Dimensions by Building Type
-
-| Building Type | HVAC | Agent Action Dim | Notes |
-|---|---|---|---|
-| Single-Zone Houses | Unitary | 2 | Fan + SAT |
-| RestaurantFastFood | Unitary | 4 | 2 zones × 2 actuators |
-| Warehouse | Unitary + Heating-Only | 5–6 | 2 unitary zones × 2 + 1 heating-only setpoint |
-| RetailStandalone | Unitary | 8 | 4 zones × 2 actuators |
-| OfficeSmall | Unitary | 10 | 5 zones × 2 actuators |
-| OfficeMedium | VAV | 31+ | 1 SAT + N×(flow + htg SP) |
-
-!!! tip "Handling variable action spaces"
-
-    For multi-building training across different building types, use the `PadObservation` wrapper for observations and consider building-type-specific policy heads or masking strategies for actions.
-
----
-
-## Next Steps
-
-- Learn about [reward functions](rewards.md) that evaluate the agent's actions
-- See how to [normalize observations](wrappers.md) for training
-- Configure action access via [Hydra configuration](configuration.md)
+See [Morphology Graph](morphology.md) for details.
