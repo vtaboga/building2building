@@ -1,11 +1,19 @@
 # @package _global_
-# Optuna-based controller parameter tuning (Appendix E.1)
+# Optuna-based controller parameter tuning
+#
+# Each trial evaluates 5 buildings (worst-of-N objective).  With ~5 min per
+# full-year simulation the cost is ~25 min/trial.  A 24 h job can fit ~55
+# trials, so we set timeout_seconds as the binding constraint and leave
+# n_trials high.  n_startup_trials is ~40 % of the expected budget to ensure
+# broad exploration of the 13-24 dimensional parameter space.
 name: tune_controller
 
 building_type: ???
 climate_zone: ???
 
-n_trials: 200
+n_trials: 10000
 n_startup_trials: 20
-timeout_seconds: null
+timeout_seconds: 82800
+run_period: full_year
+n_eval_buildings: 5
 output_dir: configs/tuned_controllers

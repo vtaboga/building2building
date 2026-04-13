@@ -7,6 +7,8 @@ boilerplate, backed by the unified HuggingFace dataset.
 
 from __future__ import annotations
 
+import json
+import logging
 from pathlib import Path
 from typing import Any, Literal
 
@@ -16,7 +18,9 @@ from building2building.config.models import DatasetSelectionConfig, EnvBuildConf
 from building2building.config.tasks import TASK_PRESETS, TaskPreset, resolve_task_preset
 from building2building.data.download import ALL_BUILDING_TYPES, BuildingType
 from building2building.envs import make_env_from_config
-from building2building.types import RewardConfig, TaskConfig, reward_config_from_dict
+from building2building.types import RewardConfig, RunPeriodConfig, TaskConfig, reward_config_from_dict
+
+logger = logging.getLogger(__name__)
 
 
 def list_building_types() -> list[str]:
@@ -35,6 +39,56 @@ def list_buildings(
     from building2building.data.registry import get_registry
 
     return get_registry().list_buildings(building_type, split)
+
+
+def _patch_epjson_run_period(
+    src_epjson: Path,
+    dst_epjson: Path,
+    run_period_cfg: RunPeriodConfig,
+) -> None:
+    """Rewrite the ``RunPeriod`` section of an epJSON file on disk.
+
+    The pre-built dataset buildings have ``full_year`` baked in.  When the
+    user requests a different run period (``winter``, ``summer``), we must
+    patch the dates so that EnergyPlus actually simulates the right season
+    instead of relying only on the ``TimeLimit`` wrapper.
+    """
+    with src_epjson.open() as f:
+        epjson: dict[str, Any] = json.load(f)
+
+    rp_obj = epjson.setdefault("RunPeriod", {})
+    if not isinstance(rp_obj, dict):
+        raise TypeError(
+            f"Expected epJSON['RunPeriod'] to be a dict, got {type(rp_obj)}"
+        )
+
+    if "Run Period 1" in rp_obj:
+        rp1 = rp_obj["Run Period 1"]
+    elif rp_obj:
+        first_key = next(iter(rp_obj))
+        rp1 = rp_obj.pop(first_key)
+        rp_obj.clear()
+        rp_obj["Run Period 1"] = rp1
+    else:
+        rp1: dict[str, Any] = {
+            "apply_weekend_holiday_rule": "No",
+            "begin_year": 2023,
+            "day_of_week_for_start_day": "Sunday",
+            "end_year": 2023,
+            "use_weather_file_daylight_saving_period": "No",
+            "use_weather_file_holidays_and_special_days": "No",
+            "use_weather_file_rain_indicators": "Yes",
+            "use_weather_file_snow_indicators": "Yes",
+        }
+        rp_obj["Run Period 1"] = rp1
+
+    rp1["begin_day_of_month"] = run_period_cfg.begin_day_of_month
+    rp1["begin_month"] = run_period_cfg.begin_month
+    rp1["end_day_of_month"] = run_period_cfg.end_day_of_month
+    rp1["end_month"] = run_period_cfg.end_month
+
+    with dst_epjson.open("w") as f:
+        json.dump(epjson, f, indent=4)
 
 
 def new_make_env(
@@ -81,7 +135,6 @@ def new_make_env(
     from building2building.data.registry import get_registry
     from building2building.types import (
         BuildingConfig,
-        RunPeriodConfig,
         ZoneTargetTemperatureConfig,
     )
 
@@ -104,13 +157,28 @@ def new_make_env(
         eplus_output_dir = Path(eplus_output_dir)
     eplus_output_dir.mkdir(parents=True, exist_ok=True)
 
-    import json
-
     epjson_path = info.building_dir / "building.epjson"
     equipment_path = info.building_dir / "equipment.json"
     weather_path = info.building_dir / info.weather_file
 
     run_period_cfg = RunPeriodConfig.from_name(run_period)
+
+    # The dataset ships buildings with full_year baked into the epJSON.
+    # Patch the RunPeriod dates when the user requests a different period.
+    if run_period_cfg.name != "full_year":
+        patched_epjson_path = eplus_output_dir / "building.epjson"
+        _patch_epjson_run_period(epjson_path, patched_epjson_path, run_period_cfg)
+        epjson_path = patched_epjson_path
+        logger.debug(
+            "Patched epJSON RunPeriod to %s (%d/%d – %d/%d) → %s",
+            run_period_cfg.name,
+            run_period_cfg.begin_month,
+            run_period_cfg.begin_day_of_month,
+            run_period_cfg.end_month,
+            run_period_cfg.end_day_of_month,
+            patched_epjson_path,
+        )
+
     task_cfg = TaskConfig(
         run_period=run_period_cfg,
         target_temperature_mode=target_temperature_mode,  # type: ignore[arg-type]

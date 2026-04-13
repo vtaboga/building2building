@@ -153,6 +153,7 @@ def hvac_action_space(
     *,
     fixed_heating_only_names: frozenset[str] = frozenset(),
     fixed_heating_only_value: float = FIXED_HEATING_ONLY_VALUE,
+    additional_fixed: dict[str, float] | None = None,
 ) -> HvacActionSpace:
     """Build a split action space where some actuators are fixed.
 
@@ -172,6 +173,10 @@ def hvac_action_space(
             actuators to pin (empty set means none are pinned).
         fixed_heating_only_value: Constant value for pinned
             heating-only actuators (default 18 °C).
+        additional_fixed: Mapping from actuator ``component_name`` to
+            the constant value at which it should be pinned.  Used by
+            the action-space transfer benchmark to selectively remove
+            actuators from the agent's action space.
 
     Returns:
         An ``HvacActionSpace`` with both full and agent transforms.
@@ -189,6 +194,9 @@ def hvac_action_space(
         elif a.component_name in fixed_heating_only_names:
             fixed_indices.append(i)
             fixed_values.append(fixed_heating_only_value)
+        elif additional_fixed and a.component_name in additional_fixed:
+            fixed_indices.append(i)
+            fixed_values.append(additional_fixed[a.component_name])
         else:
             agent_actuators.append(a)
 

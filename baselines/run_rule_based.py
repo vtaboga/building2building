@@ -14,7 +14,7 @@ import csv
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import hydra
 import numpy as np
@@ -130,6 +130,7 @@ def evaluate_building(
     building_id: str,
     task: str,
     *,
+    run_period: Literal["full_year", "winter", "summer"] = "full_year",
     n_runs: int = 1,
 ) -> RunResult:
     """Run the rule-based controller on one building and return results."""
@@ -140,6 +141,7 @@ def evaluate_building(
             building_type,
             building_id=building_id,
             task=task,
+            run_period=run_period,
         )
         try:
             policy = _select_policy(building_type, building_id, env)
@@ -199,6 +201,14 @@ def main(cfg: DictConfig) -> None:
     building_types: list[str] = list(cfg.building_types)
     tasks: list[str] = list(cfg.tasks)
     split: str = cfg.get("split", "test")
+    run_period_raw = str(cfg.get("run_period", "full_year"))
+    allowed_run_periods = {"full_year", "winter", "summer"}
+    if run_period_raw not in allowed_run_periods:
+        raise ValueError(
+            f"Invalid run_period '{run_period_raw}'. "
+            f"Expected one of {sorted(allowed_run_periods)}."
+        )
+    run_period: Literal["full_year", "winter", "summer"] = run_period_raw  # type: ignore[assignment]
     max_bldgs = cfg.get("max_buildings_per_type")
     n_runs: int = int(cfg.get("n_runs", 1))
     output_csv = Path(str(cfg.get("output_csv", "baseline_returns.csv")))
@@ -211,14 +221,19 @@ def main(cfg: DictConfig) -> None:
             building_ids = building_ids[: int(max_bldgs)]
 
         logger.info(
-            "Evaluating %s: %d buildings x %d tasks",
-            bt, len(building_ids), len(tasks),
+            "Evaluating %s: %d buildings x %d tasks (run_period=%s)",
+            bt,
+            len(building_ids),
+            len(tasks),
+            run_period,
         )
 
         for bid in building_ids:
             for task in tasks:
                 try:
-                    result = evaluate_building(bt, bid, task, n_runs=n_runs)
+                    result = evaluate_building(
+                        bt, bid, task, run_period=run_period, n_runs=n_runs
+                    )
                     results.append(result)
                 except Exception:
                     logger.exception("Failed: %s/%s task=%s", bt, bid, task)

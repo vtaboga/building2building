@@ -2,8 +2,9 @@
 """Tune rule-based controller parameters with Optuna.
 
 Supports both unitary HVAC (single-zone packaged systems) and
-air-loop (VAV multi-zone systems) controllers. Optimizes the total
-episode reward on a single building.
+air-loop (VAV multi-zone systems) controllers. For each trial, the
+controller is evaluated on multiple buildings and the *worst* (minimum)
+episode reward across them is used as the Optuna objective.
 
 Usage with Hydra::
 
@@ -17,11 +18,11 @@ Usage with Hydra::
 from __future__ import annotations
 
 import logging
+import random
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Literal
 
 import hydra
-import numpy as np
 import optuna
 import yaml
 from omegaconf import DictConfig
@@ -102,9 +103,15 @@ def _config_to_dict(cfg: UnitaryHvacConfig | AirLoopConfig) -> dict[str, Any]:
 
 def _make_objective(
     building_type: str,
-    building_id: str,
+    building_ids: list[str],
     task: str,
-) -> optuna.Trial:
+    run_period: Literal["full_year", "winter", "summer"],
+) -> Callable[[optuna.Trial], float]:
+    """Return an Optuna objective that evaluates across *building_ids*.
+
+    The score returned is the **worst** (minimum) episode reward across
+    all buildings, so that the tuner optimises for robustness.
+    """
     is_vav = building_type in VAV_BUILDING_TYPES
 
     def objective(trial: optuna.Trial) -> float:
@@ -115,16 +122,25 @@ def _make_objective(
             cfg = _suggest_unitary_hvac(trial)
             policy = UnitaryHvacPolicy(cfg)
 
-        env = b2b.new_make_env(building_type, building_id=building_id, task=task)
-        try:
-            policy.bind_env(env)
-            result = run_episode(env, policy)
-            return result.total_reward
-        except Exception as e:
-            logger.warning("Trial %d failed: %s", trial.number, e)
-            return float("-inf")
-        finally:
-            env.close()
+        rewards: list[float] = []
+        for bid in building_ids:
+            env = b2b.new_make_env(
+                building_type,
+                building_id=bid,
+                task=task,
+                run_period=run_period,
+            )
+            try:
+                policy.bind_env(env)
+                result = run_episode(env, policy)
+                rewards.append(result.total_reward)
+            except Exception as e:
+                logger.warning("Trial %d failed on %s: %s", trial.number, bid, e)
+                return float("-inf")
+            finally:
+                env.close()
+
+        return min(rewards)
 
     return objective
 
@@ -142,30 +158,51 @@ def main(cfg: DictConfig) -> None:
     n_startup: int = int(cfg.get("n_startup_trials", 20))
     timeout: int | None = cfg.get("timeout_seconds")
     task: str = cfg.get("reward", {}).get("task_name", "task1")
+    run_period_raw = str(cfg.get("run_period", "full_year"))
+    allowed_run_periods = {"full_year", "winter", "summer"}
+    if run_period_raw not in allowed_run_periods:
+        raise ValueError(
+            f"Invalid run_period '{run_period_raw}'. "
+            f"Expected one of {sorted(allowed_run_periods)}."
+        )
+    run_period: Literal["full_year", "winter", "summer"] = run_period_raw  # type: ignore[assignment]
     output_dir = Path(str(cfg.get("output_dir", "configs/tuned_controllers")))
+
+    n_eval_buildings: int = int(cfg.get("n_eval_buildings", 5))
 
     from baselines.run_rule_based import _get_climate_zone
 
-    building_ids = b2b.list_buildings(building_type, split="train")
-    if not building_ids:
-        logger.error("No buildings found for %s", building_type)
+    all_test_ids = b2b.list_buildings(building_type, split="test")
+    if not all_test_ids:
+        logger.error("No test buildings found for %s", building_type)
         return
 
-    building_id = building_ids[0]
-    for bid in building_ids:
-        cz = _get_climate_zone(building_type, bid)
-        if cz == climate_zone:
-            building_id = bid
-            break
+    matching_ids = [
+        bid
+        for bid in all_test_ids
+        if _get_climate_zone(building_type, bid) == climate_zone
+    ]
+    # SingleFamilyHouse has no CZ mapping — use all test buildings.
+    if not matching_ids:
+        matching_ids = list(all_test_ids)
+
+    rng = random.Random(42)
+    if len(matching_ids) <= n_eval_buildings:
+        eval_ids = matching_ids
+    else:
+        eval_ids = rng.sample(matching_ids, n_eval_buildings)
 
     logger.info(
-        "Tuning %s controller for %s (cz=%d, building=%s, task=%s)",
+        "Tuning %s controller for %s (cz=%d, %d eval buildings, task=%s, "
+        "run_period=%s)",
         "air_loop" if building_type in VAV_BUILDING_TYPES else "unitary_hvac",
         building_type,
         climate_zone,
-        building_id,
+        len(eval_ids),
         task,
+        run_period,
     )
+    logger.info("Eval building IDs: %s", eval_ids)
 
     sampler = optuna.samplers.TPESampler(
         n_startup_trials=n_startup, seed=42
@@ -176,7 +213,7 @@ def main(cfg: DictConfig) -> None:
         study_name=f"tune_{building_type.lower()}_cz{climate_zone}",
     )
 
-    objective = _make_objective(building_type, building_id, task)
+    objective = _make_objective(building_type, eval_ids, task, run_period)
     study.optimize(objective, n_trials=n_trials, timeout=timeout)
 
     logger.info(
@@ -197,9 +234,11 @@ def main(cfg: DictConfig) -> None:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     if is_vav:
-        fname = f"air_loop_{building_type.lower()}_cz{climate_zone}.yaml"
+        fname = f"air_loop_{building_type.lower()}_{task}_cz{climate_zone}.yaml"
     else:
-        fname = f"unitary_hvac_{building_type.lower()}_cz{climate_zone}.yaml"
+        fname = (
+            f"unitary_hvac_{building_type.lower()}_{task}_cz{climate_zone}.yaml"
+        )
 
     out_path = output_dir / fname
     cfg_dict = _config_to_dict(best_cfg)
