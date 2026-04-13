@@ -130,7 +130,9 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         fixed_heating_only_names = frozenset()
 
     action_space_info = hvac_action_space(
-        actuators, fixed_heating_only_names=fixed_heating_only_names
+        actuators,
+        fixed_heating_only_names=fixed_heating_only_names,
+        additional_fixed=building_config.fixed_actuator_overrides or None,
     )
     action_names = [
         f"{a.component_type}::{a.control_type}::{a.component_name}"

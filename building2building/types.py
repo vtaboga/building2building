@@ -421,3 +421,4 @@ class BuildingConfig:
         default_factory=lambda: TaskConfig.from_dict({})
     )
     expose_heating_only_zones: bool = True
+    fixed_actuator_overrides: dict[str, float] = field(default_factory=dict)
