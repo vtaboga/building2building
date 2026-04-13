@@ -3,8 +3,8 @@
 name: train_ppo
 
 defaults:
-  - /policy: ppo
-  - /training: default
+  - override /policy: ppo
+  - override /training: default
 
 building_types:
   - OfficeSmall

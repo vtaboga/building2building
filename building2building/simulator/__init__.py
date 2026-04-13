@@ -47,6 +47,7 @@ class MakeEnergyPlus:
     verbose: bool
     log_dir: Path
     warmup_phases: int
+    max_steps: int = 200_000
 
     def __call__(self) -> EnergyPlusSimulation:
         sim = EnergyPlusSimulation(
@@ -57,6 +58,7 @@ class MakeEnergyPlus:
             verbose=self.verbose,
             log_dir=self.log_dir,
             warmup_phases=self.warmup_phases,
+            max_steps=self.max_steps,
         )
 
         return sim
@@ -135,6 +137,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         for a in action_space_info.agent_actuators
     ]
 
+    expected_steps = task_config.expected_steps()
     make_energyplus = MakeEnergyPlus(
         building_config.path_to_building,
         building_config.path_to_weather,
@@ -143,6 +146,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         verbose=False,
         log_dir=eplus_output_dir,
         warmup_phases=building_config.warmup_phases,
+        max_steps=expected_steps + 1000,
     )
 
     reward_zones = (

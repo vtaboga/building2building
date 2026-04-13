@@ -1,5 +1,5 @@
 # @package _global_
-# Optuna-based controller parameter tuning (Appendix E.1)
+# Optuna-based controller parameter tuning
 name: tune_controller
 
 building_type: ???
@@ -8,4 +8,5 @@ climate_zone: ???
 n_trials: 200
 n_startup_trials: 20
 timeout_seconds: null
+run_period: full_year
 output_dir: configs/tuned_controllers

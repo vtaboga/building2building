@@ -1,13 +1,13 @@
 defaults:
-  - _self_
-  - experiment: ???
   - policy: ppo
   - reward: task1
   - training: default
   - wandb: default
+  - experiment: ???
+  - _self_
 
 seed: 0
-output_dir: outputs/${experiment.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+output_dir: outputs/${name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 hydra:
   run:

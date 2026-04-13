@@ -3,9 +3,9 @@
 name: dynamics_specialist
 
 defaults:
-  - /policy: ppo
-  - /reward: task1
-  - /training: default
+  - override /policy: ppo
+  - override /reward: task1
+  - override /training: default
 
 difficulty: easy
 approach: specialist

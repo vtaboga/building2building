@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import hydra
 import numpy as np
@@ -104,6 +104,7 @@ def _make_objective(
     building_type: str,
     building_id: str,
     task: str,
+    run_period: Literal["full_year", "winter", "summer"],
 ) -> optuna.Trial:
     is_vav = building_type in VAV_BUILDING_TYPES
 
@@ -115,7 +116,12 @@ def _make_objective(
             cfg = _suggest_unitary_hvac(trial)
             policy = UnitaryHvacPolicy(cfg)
 
-        env = b2b.new_make_env(building_type, building_id=building_id, task=task)
+        env = b2b.new_make_env(
+            building_type,
+            building_id=building_id,
+            task=task,
+            run_period=run_period,
+        )
         try:
             policy.bind_env(env)
             result = run_episode(env, policy)
@@ -142,6 +148,14 @@ def main(cfg: DictConfig) -> None:
     n_startup: int = int(cfg.get("n_startup_trials", 20))
     timeout: int | None = cfg.get("timeout_seconds")
     task: str = cfg.get("reward", {}).get("task_name", "task1")
+    run_period_raw = str(cfg.get("run_period", "full_year"))
+    allowed_run_periods = {"full_year", "winter", "summer"}
+    if run_period_raw not in allowed_run_periods:
+        raise ValueError(
+            f"Invalid run_period '{run_period_raw}'. "
+            f"Expected one of {sorted(allowed_run_periods)}."
+        )
+    run_period: Literal["full_year", "winter", "summer"] = run_period_raw  # type: ignore[assignment]
     output_dir = Path(str(cfg.get("output_dir", "configs/tuned_controllers")))
 
     from baselines.run_rule_based import _get_climate_zone
@@ -159,12 +173,13 @@ def main(cfg: DictConfig) -> None:
             break
 
     logger.info(
-        "Tuning %s controller for %s (cz=%d, building=%s, task=%s)",
+        "Tuning %s controller for %s (cz=%d, building=%s, task=%s, run_period=%s)",
         "air_loop" if building_type in VAV_BUILDING_TYPES else "unitary_hvac",
         building_type,
         climate_zone,
         building_id,
         task,
+        run_period,
     )
 
     sampler = optuna.samplers.TPESampler(
@@ -176,7 +191,7 @@ def main(cfg: DictConfig) -> None:
         study_name=f"tune_{building_type.lower()}_cz{climate_zone}",
     )
 
-    objective = _make_objective(building_type, building_id, task)
+    objective = _make_objective(building_type, building_id, task, run_period)
     study.optimize(objective, n_trials=n_trials, timeout=timeout)
 
     logger.info(
