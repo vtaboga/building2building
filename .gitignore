@@ -42,6 +42,7 @@ scrap/
 refactoring/
 /scripts/
 /configs/
+baselines/scripts/
 
 # temporary
 simulator/patched_minergym_simulation.py
