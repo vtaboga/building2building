@@ -23,9 +23,10 @@ from pathlib import Path
 from typing import Any, Callable, Literal
 
 import hydra
+import numpy as np
 import optuna
 import yaml
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 import building2building as b2b
 from baselines.controllers.air_loop import (
@@ -207,14 +208,86 @@ def main(cfg: DictConfig) -> None:
     sampler = optuna.samplers.TPESampler(
         n_startup_trials=n_startup, seed=42
     )
+    study_name = f"tune_{building_type.lower()}_cz{climate_zone}"
     study = optuna.create_study(
         direction="maximize",
         sampler=sampler,
-        study_name=f"tune_{building_type.lower()}_cz{climate_zone}",
+        study_name=study_name,
     )
 
+    # ── W&B logging ──────────────────────────────────────────────
+    wandb_cfg = cfg.get("wandb", {})
+    use_wandb = bool(OmegaConf.select(wandb_cfg, "enabled", default=False))
+    callbacks: list[Any] = []
+
+    if use_wandb:
+        try:
+            import wandb
+            from optuna.integration.wandb import WeightsAndBiasesCallback
+
+            wandb.init(
+                project=OmegaConf.select(
+                    wandb_cfg, "project", default="b2b-baselines"
+                ),
+                entity=OmegaConf.select(wandb_cfg, "entity", default=None),
+                tags=list(OmegaConf.select(wandb_cfg, "tags", default=[])),
+                name=f"tune_{building_type}_cz{climate_zone}_{task}",
+                group=f"tune_controller_{building_type}",
+                config={
+                    "building_type": building_type,
+                    "climate_zone": climate_zone,
+                    "task": task,
+                    "n_trials": n_trials,
+                    "n_eval_buildings": len(eval_ids),
+                    "eval_building_ids": eval_ids,
+                    "run_period": run_period,
+                },
+            )
+            wandb_callback = WeightsAndBiasesCallback(
+                metric_name="worst_reward",
+            )
+            callbacks.append(wandb_callback)
+            logger.info("W&B logging enabled (project=%s)",
+                        OmegaConf.select(wandb_cfg, "project", default="b2b-baselines"))
+        except ImportError:
+            logger.warning("wandb or optuna[wandb] not installed; skipping W&B logging")
+    else:
+        logger.info("W&B logging disabled (wandb.enabled=false)")
+
+    _best_so_far = float("-inf")
+
+    def _track_best(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
+        nonlocal _best_so_far
+        if trial.value is not None and trial.value > _best_so_far:
+            _best_so_far = trial.value
+        if use_wandb:
+            try:
+                import wandb
+                if wandb.run is not None:
+                    wandb.log({
+                        "best_reward_so_far": _best_so_far,
+                        "trial_number": trial.number,
+                    })
+            except Exception:
+                pass
+
+    callbacks.append(_track_best)
+
     objective = _make_objective(building_type, eval_ids, task, run_period)
-    study.optimize(objective, n_trials=n_trials, timeout=timeout)
+    study.optimize(
+        objective, n_trials=n_trials, timeout=timeout, callbacks=callbacks
+    )
+
+    if use_wandb:
+        try:
+            import wandb
+            if wandb.run is not None:
+                wandb.run.summary["best_trial_number"] = study.best_trial.number
+                wandb.run.summary["best_reward"] = study.best_trial.value
+                wandb.run.summary["best_params"] = study.best_params
+                wandb.finish()
+        except Exception:
+            pass
 
     logger.info(
         "Best trial: #%d  value=%.1f",

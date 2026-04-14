@@ -25,7 +25,6 @@ from omegaconf import DictConfig, OmegaConf
 from stable_baselines3.common.monitor import Monitor
 
 import building2building as b2b
-from baselines.utils.callbacks import TrainingEpisodeRewardCallback
 from baselines.utils.evaluation import run_episode
 from baselines.utils.training import build_ppo, make_vec_env
 
@@ -86,7 +85,6 @@ def train_and_eval(
     )
     model.learn(
         total_timesteps=total_timesteps,
-        callback=[TrainingEpisodeRewardCallback()],
         progress_bar=True,
     )
 
@@ -149,6 +147,17 @@ def write_results_csv(results: list[TrainResult], path: Path) -> None:
     logger.info("Wrote %d results to %s", len(results), path)
 
 
+def _wandb_log(payload: dict[str, Any]) -> None:
+    """Log to wandb if a run is active; silently no-op otherwise."""
+    try:
+        import wandb
+
+        if wandb.run is not None:
+            wandb.log(payload)
+    except Exception:
+        pass
+
+
 @hydra.main(config_path="configs", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> None:
     logging.basicConfig(
@@ -167,11 +176,34 @@ def main(cfg: DictConfig) -> None:
     output_dir = Path(cfg.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    wandb_cfg = cfg.get("wandb", {})
+    use_wandb = bool(OmegaConf.select(wandb_cfg, "enabled", default=False))
+    if use_wandb:
+        try:
+            import wandb
+
+            wandb.init(
+                project=OmegaConf.select(
+                    wandb_cfg, "project", default="b2b-baselines"
+                ),
+                entity=OmegaConf.select(wandb_cfg, "entity", default=None),
+                tags=list(OmegaConf.select(wandb_cfg, "tags", default=[])),
+                config=OmegaConf.to_container(cfg, resolve=True),
+                name=f"train_ppo_{'_'.join(building_types)}_{'_'.join(tasks)}",
+                group="train_ppo",
+                sync_tensorboard=True,
+            )
+        except ImportError:
+            logger.warning("wandb not installed; skipping init")
+            use_wandb = False
+
     overrides = _policy_overrides(cfg.policy)
     results: list[TrainResult] = []
 
     for bt in building_types:
-        building_ids = b2b.list_buildings(bt, split=split)[:buildings_per_type]
+        building_ids = b2b.list_buildings(bt, split=split)[
+            :buildings_per_type
+        ]
         logger.info(
             "Building type %s: %d buildings x %d tasks",
             bt,
@@ -193,6 +225,13 @@ def main(cfg: DictConfig) -> None:
                         seed=seed,
                     )
                     results.append(result)
+                    _wandb_log({
+                        "eval/total_reward": result.total_reward,
+                        "eval/normalized_score": result.normalized_score,
+                        "eval/building_type": result.building_type,
+                        "eval/building_id": result.building_id,
+                        "eval/task": result.task,
+                    })
                 except Exception:
                     logger.exception("Failed: %s/%s task=%s", bt, bid, task)
 
@@ -200,6 +239,15 @@ def main(cfg: DictConfig) -> None:
         write_results_csv(results, output_dir / "results.csv")
     else:
         logger.warning("No results to write.")
+
+    if use_wandb:
+        try:
+            import wandb
+
+            if wandb.run is not None:
+                wandb.finish()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

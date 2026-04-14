@@ -6,6 +6,12 @@ Usage with Hydra::
     python -m baselines.run_rule_based experiment=eval_rule_based
     python -m baselines.run_rule_based experiment=eval_rule_based \
         building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=5
+
+Save trajectories and plot temperature / actuator time-series::
+
+    python -m baselines.run_rule_based experiment=eval_rule_based \
+        save_trajectories=true plot_trajectories=true \
+        building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=1
 """
 
 from __future__ import annotations
@@ -27,6 +33,10 @@ from baselines.controllers.air_loop import (
     AirLoopPolicy,
 )
 from baselines.controllers.unitary_hvac import UnitaryHvacConfig, UnitaryHvacPolicy
+from baselines.plotting.plot_trajectory import (
+    extract_trajectory_data,
+    plot_trajectory,
+)
 from baselines.utils.evaluation import EpisodeResult, run_episode
 
 logger = logging.getLogger(__name__)
@@ -132,8 +142,18 @@ def evaluate_building(
     *,
     run_period: Literal["full_year", "winter", "summer"] = "full_year",
     n_runs: int = 1,
+    save_trajectories: bool = False,
+    plot_trajectories: bool = False,
+    trajectory_dir: Path | None = None,
+    plot_dir: Path | None = None,
 ) -> RunResult:
-    """Run the rule-based controller on one building and return results."""
+    """Run the rule-based controller on one building and return results.
+
+    When *save_trajectories* is ``True``, each episode's full observation /
+    action / reward arrays are written as ``.npz`` files under *trajectory_dir*.
+    When *plot_trajectories* is ``True``, temperature and actuator time-series
+    figures are saved under *plot_dir*.
+    """
     rewards: list[float] = []
 
     for run_idx in range(n_runs):
@@ -155,6 +175,28 @@ def evaluate_building(
                 run_idx,
                 result.total_reward,
             )
+
+            if save_trajectories or plot_trajectories:
+                traj = extract_trajectory_data(
+                    result.observations,
+                    result.actions,
+                    result.rewards,
+                    env.metadata,
+                    building_type=building_type,
+                    building_id=building_id,
+                    task=task,
+                )
+                stem = f"{building_type}_{building_id}_{task}_run{run_idx}"
+
+                if save_trajectories and trajectory_dir is not None:
+                    traj_path = trajectory_dir / f"{stem}.npz"
+                    traj.save(traj_path)
+                    logger.info("    Saved trajectory → %s", traj_path)
+
+                if plot_trajectories and plot_dir is not None:
+                    fig_path = plot_dir / stem
+                    plot_trajectory(traj, output_path=fig_path)
+                    logger.info("    Saved plot → %s.*", fig_path)
         finally:
             env.close()
 
@@ -213,6 +255,18 @@ def main(cfg: DictConfig) -> None:
     n_runs: int = int(cfg.get("n_runs", 1))
     output_csv = Path(str(cfg.get("output_csv", "baseline_returns.csv")))
 
+    save_trajectories: bool = bool(cfg.get("save_trajectories", False))
+    plot_trajectories: bool = bool(cfg.get("plot_trajectories", False))
+    trajectory_dir = Path(str(cfg.get("trajectory_dir", "trajectories")))
+    plot_dir = Path(str(cfg.get("plot_dir", "plots")))
+
+    if save_trajectories:
+        trajectory_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Trajectories will be saved to %s", trajectory_dir)
+    if plot_trajectories:
+        plot_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Trajectory plots will be saved to %s", plot_dir)
+
     results: list[RunResult] = []
 
     for bt in building_types:
@@ -232,7 +286,15 @@ def main(cfg: DictConfig) -> None:
             for task in tasks:
                 try:
                     result = evaluate_building(
-                        bt, bid, task, run_period=run_period, n_runs=n_runs
+                        bt,
+                        bid,
+                        task,
+                        run_period=run_period,
+                        n_runs=n_runs,
+                        save_trajectories=save_trajectories,
+                        plot_trajectories=plot_trajectories,
+                        trajectory_dir=trajectory_dir,
+                        plot_dir=plot_dir,
                     )
                     results.append(result)
                 except Exception:
