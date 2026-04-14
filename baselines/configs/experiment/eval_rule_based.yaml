@@ -16,3 +16,8 @@ max_buildings_per_type: null
 tasks: [task1, task2, task3, task4]
 n_runs: 1
 output_csv: baseline_returns.csv
+
+save_trajectories: false
+plot_trajectories: false
+trajectory_dir: trajectories
+plot_dir: plots

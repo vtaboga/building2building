@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train PPO on the dynamics adaptation benchmark (Section 6.1).
+"""Train PPO on the dynamics adaptation benchmark.
 
 Implements three approaches from the paper:
   1. **Per-building specialist**: One PPO per building (simplest baseline).
