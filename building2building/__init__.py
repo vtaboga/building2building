@@ -27,6 +27,7 @@ from building2building.morphology import (
     UNITARY_ZONE,
     VAV_SUPPLY,
     VAV_ZONE,
+    VAV_ZONE_NO_COOLING,
     WEATHER,
 )
 from building2building.pipeline.actuators import (
@@ -84,6 +85,7 @@ __all__ = [
     "UNITARY_ZONE",
     "VAV_SUPPLY",
     "VAV_ZONE",
+    "VAV_ZONE_NO_COOLING",
     "WEATHER",
     # Equipment types
     "HeatingOnlyZone",

@@ -7,16 +7,17 @@ spaces and per-node local spaces.
 
 The morphological universe is fixed across all B2B environments::
 
-    Node type          | Local obs                          | Local action
-    -------------------|------------------------------------|---------------------------
-    weather            | outdoor_temp, outdoor_humidity     | (none)
-    calendar           | time_of_day, day_of_week, day_year | (none)
-    energy             | hvac_electricity, hvac_gas         | (none)
-    unitary_zone       | zone_temp                          | fan_flow, sat_setpoint
-    vav_zone           | zone_temp                          | damper, heating_sp, cooling_sp
-    vav_supply         | (none)                             | sat_setpoint
-    heating_zone       | zone_temp                          | heating_sp
-    uncontrolled_zone  | zone_temp                          | (none)
+    Node type              | Local obs                          | Local action
+    -----------------------|------------------------------------|---------------------------
+    weather                | outdoor_temp, outdoor_humidity     | (none)
+    calendar               | time_of_day, day_of_week, day_year | (none)
+    energy                 | hvac_electricity, hvac_gas         | (none)
+    unitary_zone           | zone_temp                          | fan_flow, sat_setpoint
+    vav_zone               | zone_temp                          | damper, heating_sp, cooling_sp
+    vav_zone_no_cooling    | zone_temp                          | damper, heating_sp
+    vav_supply             | (none)                             | sat_setpoint
+    heating_zone           | zone_temp                          | heating_sp
+    uncontrolled_zone      | zone_temp                          | (none)
 
 Usage::
 
@@ -113,6 +114,9 @@ UNITARY_ZONE = NodeType("unitary_zone",
 VAV_ZONE = NodeType("vav_zone",
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
     _act_low=(0.0, 10.0, 18.0), _act_high=(1.0, 35.0, 40.0)) # flow_frac, htg_sp (°C), clg_sp (°C)
+VAV_ZONE_NO_COOLING = NodeType("vav_zone_no_cooling",
+    _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
+    _act_low=(0.0, 10.0), _act_high=(1.0, 35.0))              # flow_frac, htg_sp (°C) — clg_sp fixed
 VAV_SUPPLY = NodeType("vav_supply",
     _act_low=(10.0,),  _act_high=(55.0,))                     # supply_air_temp (°C)
 HEATING_ZONE = NodeType("heating_zone",
@@ -128,6 +132,7 @@ ALL_NODE_TYPES: tuple[NodeType, ...] = (
     ENERGY,
     UNITARY_ZONE,
     VAV_ZONE,
+    VAV_ZONE_NO_COOLING,
     VAV_SUPPLY,
     HEATING_ZONE,
     UNCONTROLLED_ZONE,
@@ -310,6 +315,11 @@ def _find_action_index_for_actuator(
     return None
 
 
+def _ad_triple(ad: Any) -> tuple[str, str, str]:
+    """Extract the (component_type, control_type, component_name) triple."""
+    return ad.component_type, ad.control_type, ad.component_name
+
+
 def build_morphology(
     hvac_equipment: Sequence[Equipment],
     observation_names: list[str],
@@ -429,25 +439,27 @@ def build_morphology(
                 temp_idx = _find_zone_temp_index(observation_names, zone)
                 o_idx = [temp_idx] if temp_idx is not None else []
 
-                a_idx = []
-                for ad in (
-                    terminal.flow_fraction,
-                    terminal.heating_setpoint,
-                    terminal.cooling_setpoint,
-                ):
-                    ai = _find_action_index_for_actuator(
-                        action_names,
-                        ad.component_type,
-                        ad.control_type,
-                        ad.component_name,
-                    )
-                    if ai is not None:
-                        a_idx.append(ai)
+                # Check which actuators are in the agent action space.
+                flow_ai = _find_action_index_for_actuator(
+                    action_names, *_ad_triple(terminal.flow_fraction))
+                htg_ai = _find_action_index_for_actuator(
+                    action_names, *_ad_triple(terminal.heating_setpoint))
+                clg_ai = _find_action_index_for_actuator(
+                    action_names, *_ad_triple(terminal.cooling_setpoint))
+
+                if clg_ai is not None:
+                    # All three actuators present.
+                    a_idx = [i for i in (flow_ai, htg_ai, clg_ai) if i is not None]
+                    nt = VAV_ZONE
+                else:
+                    # Cooling setpoint is fixed — use the reduced type.
+                    a_idx = [i for i in (flow_ai, htg_ai) if i is not None]
+                    nt = VAV_ZONE_NO_COOLING
 
                 node_id = f"zone:{zone}"
                 nodes.append(
                     MorphologyNode(
-                        node_id, VAV_ZONE, tuple(o_idx), tuple(a_idx)
+                        node_id, nt, tuple(o_idx), tuple(a_idx)
                     )
                 )
                 assigned_obs.update(o_idx)
