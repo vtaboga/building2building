@@ -235,7 +235,7 @@ class Policy:
 
     @property
     def total_action_dim(self) -> int:
-        return sum(n.node_type.action_dim for n in self.nodes)
+        return sum(len(n.action_indices) for n in self.nodes)
 
     def forward(
         self,
@@ -265,14 +265,20 @@ class Policy:
         high_parts: list[torch.Tensor] = []
         for i, (node, dec) in enumerate(zip(self.nodes, self.decoders)):
             nt = node.node_type
-            if nt.action_dim == 0:
+            # Effective action dim: some actuators may be fixed (removed
+            # from the agent action space), so action_indices can be
+            # shorter than NodeType.action_dim.  The decoder still uses
+            # the full NodeType dim for weight sharing; we slice its
+            # output to the active actuator count.
+            n_act = len(node.action_indices)
+            if n_act == 0:
                 continue
-            params = dec(encoded[:, i, :])  # (B, 2 * action_dim)
-            alpha_parts.append(params[:, : nt.action_dim])
-            beta_parts.append(params[:, nt.action_dim :])
+            params = dec(encoded[:, i, :])  # (B, 2 * nt.action_dim)
+            alpha_parts.append(params[:, :n_act])
+            beta_parts.append(params[:, nt.action_dim : nt.action_dim + n_act])
             space = nt.local_action_space
-            low_parts.append(torch.tensor(space.low, device=device))
-            high_parts.append(torch.tensor(space.high, device=device))
+            low_parts.append(torch.tensor(space.low[:n_act], device=device))
+            high_parts.append(torch.tensor(space.high[:n_act], device=device))
 
         assert alpha_parts, "morphology has no action-producing nodes"
 
@@ -319,11 +325,11 @@ def join_action(
     per_node: dict[str, np.ndarray] = {}
     offset = 0
     for node in morphology.nodes:
-        nt = node.node_type
-        if nt.action_dim == 0:
+        n_act = len(node.action_indices)
+        if n_act == 0:
             continue
-        per_node[node.node_id] = flat_action[offset : offset + nt.action_dim]
-        offset += nt.action_dim
+        per_node[node.node_id] = flat_action[offset : offset + n_act]
+        offset += n_act
     return morphology.join_actions(per_node)
 
 

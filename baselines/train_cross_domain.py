@@ -394,6 +394,8 @@ def _run_rollout_job(job: RolloutJob) -> tuple:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     torch.set_num_threads(1)
 
+    t_start = time.time()
+
     env = b2b.new_make_env(
         job.spec.building_type,
         split=job.spec.split,
@@ -408,6 +410,8 @@ def _run_rollout_job(job: RolloutJob) -> tuple:
     policy = model.condition(morphology)
 
     obs, _info = env.reset()
+    t_env_ready = time.time()
+
     env_state = EnvState(
         env=env,
         morphology=morphology,
@@ -417,7 +421,12 @@ def _run_rollout_job(job: RolloutJob) -> tuple:
     )
 
     traj, completed = collect_n_steps(env_state, torch.device("cpu"), job.n_steps)
+    t_collect_done = time.time()
+
     env.close()
+
+    env_setup_s = t_env_ready - t_start
+    collect_s = t_collect_done - t_env_ready
 
     return (
         job.spec.building_id,
@@ -432,6 +441,8 @@ def _run_rollout_job(job: RolloutJob) -> tuple:
         traj.last_value,
         traj.building_type_index,
         completed,
+        env_setup_s,
+        collect_s,
     )
 
 
@@ -645,6 +656,8 @@ def train(cfg: TrainConfig) -> None:
 
         trajectories: list[Trajectory] = []
         ep_rewards: list[float] = []
+        env_setup_times: list[float] = []
+        collect_times: list[float] = []
         for (
             building_id,
             morphology,
@@ -658,6 +671,8 @@ def train(cfg: TrainConfig) -> None:
             last_value,
             bt_idx,
             completed,
+            env_setup_s,
+            collect_s,
         ) in results:
             if building_id not in policies:
                 policies[building_id] = model.condition(morphology)
@@ -675,6 +690,8 @@ def train(cfg: TrainConfig) -> None:
                 )
             )
             ep_rewards.extend(completed)
+            env_setup_times.append(env_setup_s)
+            collect_times.append(collect_s)
 
         model.train()
         stats = ppo_update(
@@ -692,15 +709,22 @@ def train(cfg: TrainConfig) -> None:
             target_kl=cfg.target_kl,
         )
 
-        elapsed = time.time() - t0
+        t_ppo_done = time.time()
+        elapsed = t_ppo_done - t0
+        ppo_s = t_ppo_done - t0 - max(
+            s + c for s, c in zip(env_setup_times, collect_times)
+        ) if env_setup_times else 0.0
         if iteration % cfg.log_interval == 0:
             mean_r = np.mean([t.rewards.mean() for t in trajectories])
             ep_str = (
                 f"{np.mean(ep_rewards):.1f}" if ep_rewards else "n/a"
             )
+            mean_setup = np.mean(env_setup_times)
+            mean_collect = np.mean(collect_times)
             logger.info(
                 "iter %4d | r/step %.3f | ep_reward %s (%d eps) | "
-                "pg %.4f | v %.4f | ent %.4f | %.1fs",
+                "pg %.4f | v %.4f | ent %.4f | "
+                "env_setup %.1fs | collect %.1fs | ppo %.1fs | total %.1fs",
                 iteration,
                 mean_r,
                 ep_str,
@@ -708,6 +732,9 @@ def train(cfg: TrainConfig) -> None:
                 stats["policy_loss"],
                 stats["value_loss"],
                 stats["entropy"],
+                mean_setup,
+                mean_collect,
+                ppo_s,
                 elapsed,
             )
             if wandb_run is not None:
