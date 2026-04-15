@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Sequence
 
 import numpy as np
+from gymnasium.spaces import Box
 
 if TYPE_CHECKING:
     from building2building.types import Equipment
@@ -50,23 +51,76 @@ logger = logging.getLogger(__name__)
 class NodeType:
     """A node type in the morphological universe.
 
-    Each type defines a fixed local observation and action dimensionality
-    so that type-specific encoders / decoders have stable input sizes.
+    Each type carries its local observation and action spaces (with
+    physical bounds) so that type-specific encoders / decoders have stable
+    input sizes and policies can rescale outputs without depending on
+    per-environment metadata.
+
+    The bounds are stored as tuples of floats to keep the dataclass
+    frozen and hashable.  Use the :attr:`local_observation_space` and
+    :attr:`local_action_space` properties to obtain ``gymnasium.spaces.Box``
+    objects.
     """
 
     name: str
-    observation_dim: int
-    action_dim: int
+    _obs_low: tuple[float, ...] = ()
+    _obs_high: tuple[float, ...] = ()
+    _act_low: tuple[float, ...] = ()
+    _act_high: tuple[float, ...] = ()
+
+    @property
+    def observation_dim(self) -> int:
+        return len(self._obs_low)
+
+    @property
+    def action_dim(self) -> int:
+        return len(self._act_low)
+
+    @property
+    def local_observation_space(self) -> Box:
+        """Gymnasium Box for the local observation space."""
+        return Box(
+            low=np.array(self._obs_low, dtype=np.float32),
+            high=np.array(self._obs_high, dtype=np.float32),
+        )
+
+    @property
+    def local_action_space(self) -> Box:
+        """Gymnasium Box for the local action space."""
+        return Box(
+            low=np.array(self._act_low, dtype=np.float32),
+            high=np.array(self._act_high, dtype=np.float32),
+        )
 
 
-WEATHER = NodeType("weather", observation_dim=2, action_dim=0)
-CALENDAR = NodeType("calendar", observation_dim=3, action_dim=0)
-ENERGY = NodeType("energy", observation_dim=2, action_dim=0)
-UNITARY_ZONE = NodeType("unitary_zone", observation_dim=1, action_dim=2)
-VAV_ZONE = NodeType("vav_zone", observation_dim=1, action_dim=3)
-VAV_SUPPLY = NodeType("vav_supply", observation_dim=0, action_dim=1)
-HEATING_ZONE = NodeType("heating_zone", observation_dim=1, action_dim=1)
-UNCONTROLLED_ZONE = NodeType("uncontrolled_zone", observation_dim=1, action_dim=0)
+# fmt: off
+# NOTE: The bounds below are hardcoded to match the values produced by the
+# building pipeline (building2building/pipeline/actuators.py) and the
+# observation space construction (building2building/simulator/observation_spaces.py).
+# There is currently no single source of truth — if the pipeline changes
+# actuator bounds (e.g. a new equipment type or different setpoint ranges),
+# these must be updated manually to match.  A future refactor should unify
+# these so the morphological universe is derived from the pipeline definitions.
+WEATHER = NodeType("weather",
+    _obs_low=(-30.0, 0.0),   _obs_high=(50.0, 100.0))      # outdoor_temp (°C), outdoor_humidity (%)
+CALENDAR = NodeType("calendar",
+    _obs_low=(1.0, 1.0, 1.0), _obs_high=(25.0, 7.0, 366.0)) # time_of_day, day_of_week, day_of_year
+ENERGY = NodeType("energy",
+    _obs_low=(0.0, 0.0),      _obs_high=(200.0, 200.0))      # electricity, gas (Wh/m²/timestep)
+UNITARY_ZONE = NodeType("unitary_zone",
+    _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
+    _act_low=(0.0, 5.0), _act_high=(15.0, 60.0))              # fan_flow (kg/s), supply_air_temp (°C)
+VAV_ZONE = NodeType("vav_zone",
+    _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
+    _act_low=(0.0, 10.0, 18.0), _act_high=(1.0, 35.0, 40.0)) # flow_frac, htg_sp (°C), clg_sp (°C)
+VAV_SUPPLY = NodeType("vav_supply",
+    _act_low=(10.0,),  _act_high=(55.0,))                     # supply_air_temp (°C)
+HEATING_ZONE = NodeType("heating_zone",
+    _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
+    _act_low=(10.0,),  _act_high=(35.0,))                     # htg_sp (°C)
+UNCONTROLLED_ZONE = NodeType("uncontrolled_zone",
+    _obs_low=(10.0,),  _obs_high=(45.0,))                     # zone_temp (°C)
+# fmt: on
 
 ALL_NODE_TYPES: tuple[NodeType, ...] = (
     WEATHER,
