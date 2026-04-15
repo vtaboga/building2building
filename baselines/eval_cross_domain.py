@@ -76,6 +76,7 @@ def main() -> None:
         embed_dim=args.embed_dim,
         n_heads=args.n_heads,
         n_layers=args.n_layers,
+        building_type=args.test_building_types[0],
     )
     state = torch.load(args.model_path, map_location="cpu", weights_only=True)
     policy.load_state_dict(state)

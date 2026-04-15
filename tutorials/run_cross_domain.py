@@ -41,16 +41,18 @@ def main() -> None:
     )
     train_morph = train_env.metadata["morphology"]
 
-    policy = AmorpheusPolicy(morphology=train_morph, embed_dim=64)
+    policy = AmorpheusPolicy(
+        morphology=train_morph, building_type=bench.train_type, d_model=64
+    )
     n_params = sum(p.numel() for p in policy.parameters())
     print(f"\nAmorpheus parameters: {n_params:,}")
 
     # -- Forward pass on train type --
     obs_train = torch.randn(1, train_env.observation_space.shape[0])
-    actions_train, values_train = policy(obs_train)
+    dist_train, values_train = policy(obs_train)
     print(
         f"\n{bench.train_type}: "
-        f"actions={actions_train.shape}, values={values_train.shape}"
+        f"action_dist={dist_train}, values={values_train.shape}"
     )
     train_env.close()
 
@@ -60,12 +62,13 @@ def main() -> None:
     )
     test_morph = test_env.metadata["morphology"]
     policy.morphology = test_morph
+    policy.building_type = bench.test_type
 
     obs_test = torch.randn(1, test_env.observation_space.shape[0])
-    actions_test, values_test = policy(obs_test)
+    dist_test, values_test = policy(obs_test)
     print(
         f"{bench.test_type}: "
-        f"actions={actions_test.shape}, values={values_test.shape}"
+        f"action_dist={dist_test}, values={values_test.shape}"
     )
     print("\nSame policy, different building type -- Amorpheus adapts via morphology!")
     test_env.close()
