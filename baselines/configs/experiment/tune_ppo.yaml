@@ -27,7 +27,7 @@ building_type: ???            # e.g. OfficeSmall, OfficeMedium, ...
 task: ???                     # e.g. task1, task2, task3, task4
 
 # Orion / CHS parameters
-n_trials: 200
+n_trials: 100
 n_startup_trials: 20
 ntune_seeds: 3                # seeds per (building, trial) in the sweep
 algorithm: tpe
@@ -44,5 +44,5 @@ reeval_timesteps: 5_000_000
 
 # Override training budget for the sweep (shorter than full training)
 training:
-  total_timesteps: 2_000_000
+  total_timesteps: 4_000_000
   n_envs: 8
