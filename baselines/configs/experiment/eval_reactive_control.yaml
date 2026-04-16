@@ -1,6 +1,6 @@
 # @package _global_
-# Evaluate rule-based controllers on all buildings (Section 5, Appendix E.1)
-name: eval_rule_based
+# Evaluate reactive controllers on all buildings (Section 5, Appendix E.1)
+name: eval_reactive_control
 
 building_types:
   - OfficeSmall

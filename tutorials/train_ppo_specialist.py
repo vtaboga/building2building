@@ -76,7 +76,7 @@ def main() -> None:
         print(f"Normalized score: {score:.3f} (>1.0 = better than baseline)")
     except FileNotFoundError:
         print(
-            "baseline_returns.csv not found. Run baselines.run_rule_based first "
+            "baseline_returns.csv not found. Run baselines.run_reactive_control first "
             "to generate it."
         )
 

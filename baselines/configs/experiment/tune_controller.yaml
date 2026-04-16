@@ -11,7 +11,7 @@ name: tune_controller
 building_type: ???
 climate_zone: ???
 
-n_trials: 10000
+n_trials: 750
 n_startup_trials: 20
 timeout_seconds: 82800
 run_period: full_year

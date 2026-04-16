@@ -1,6 +1,6 @@
-# Rule-Based Controllers
+# Reactive Controllers
 
-B2B includes two rule-based controllers that serve as baselines for comparison
+B2B includes two reactive controllers that serve as baselines for comparison
 with learned policies.
 
 ## UnitaryHvacPolicy
@@ -134,14 +134,14 @@ class PolicyLike:
 
 ```bash
 # Evaluate on all building types and tasks
-python -m baselines.run_rule_based experiment=eval_rule_based
+python -m baselines.run_reactive_control experiment=eval_reactive_control
 
 # Specific building type
-python -m baselines.run_rule_based experiment=eval_rule_based \
+python -m baselines.run_reactive_control experiment=eval_reactive_control \
     building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=5
 
 # Override controller parameters
-python -m baselines.run_rule_based experiment=eval_rule_based \
+python -m baselines.run_reactive_control experiment=eval_reactive_control \
     policy.heating_setpoint_c=19.0 policy.cooling_setpoint_c=24.0
 ```
 
@@ -151,7 +151,7 @@ exist for the building type and climate zone, they are loaded automatically.
 
 ## Output
 
-`run_rule_based.py` generates `baseline_returns.csv` with columns:
+`run_reactive_control.py` generates `baseline_returns.csv` with columns:
 
 | Column | Description |
 |---|---|

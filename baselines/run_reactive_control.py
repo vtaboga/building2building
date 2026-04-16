@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Evaluate rule-based controllers and generate baseline_returns.csv.
+"""Evaluate reactive controllers and generate baseline_returns.csv.
 
 Usage with Hydra::
 
-    python -m baselines.run_rule_based experiment=eval_rule_based
-    python -m baselines.run_rule_based experiment=eval_rule_based \
+    python -m baselines.run_reactive_control experiment=eval_reactive_control
+    python -m baselines.run_reactive_control experiment=eval_reactive_control \
         building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=5
 
 Save trajectories and plot temperature / actuator time-series::
 
-    python -m baselines.run_rule_based experiment=eval_rule_based \
+    python -m baselines.run_reactive_control experiment=eval_reactive_control \
         save_trajectories=true plot_trajectories=true \
         building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=1
 """
@@ -147,7 +147,7 @@ def evaluate_building(
     trajectory_dir: Path | None = None,
     plot_dir: Path | None = None,
 ) -> RunResult:
-    """Run the rule-based controller on one building and return results.
+    """Run the reactive controller on one building and return results.
 
     When *save_trajectories* is ``True``, each episode's full observation /
     action / reward arrays are written as ``.npz`` files under *trajectory_dir*.

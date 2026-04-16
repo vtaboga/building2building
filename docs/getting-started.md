@@ -125,11 +125,11 @@ env.close()
 
 ## 5. Running a Baseline Controller
 
-B2B ships rule-based controllers in the `baselines/` directory. Run them via Hydra:
+B2B ships reactive controllers in the `baselines/` directory. Run them via Hydra:
 
 ```bash
 # Evaluate the reactive controller on one building
-python -m baselines.run_rule_based experiment=eval_rule_based \
+python -m baselines.run_reactive_control experiment=eval_reactive_control \
     building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=1
 ```
 

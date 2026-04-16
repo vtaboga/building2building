@@ -79,7 +79,7 @@ score = b2b.compute_normalized_score(
 | [Getting Started](getting-started.md) | End-to-end tutorial from installation to training |
 | [User Guide](guide/installation.md) | Environments, buildings, HVAC, rewards, wrappers, configuration |
 | [Benchmarks](benchmarks/overview.md) | Four benchmark problems from the paper |
-| [Baselines](baselines/overview.md) | Rule-based controllers, PPO training, Amorpheus |
+| [Baselines](baselines/overview.md) | Reactive controllers, PPO training, Amorpheus |
 | [Tutorials](tutorials/quick-tour.md) | Hands-on examples and runnable scripts |
 | [API Reference](api/api.md) | Full module-level API documentation |
 | [Known Issues](about/known-issues.md) | Confirmed bugs, limitations, and roadmap |

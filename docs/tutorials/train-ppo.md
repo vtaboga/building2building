@@ -78,10 +78,10 @@ eval_env.close()
 
 ## Step 4: Compare with Baseline
 
-Run the rule-based controller on the same building to generate a reference:
+Run the reactive controller on the same building to generate a reference:
 
 ```bash
-python -m baselines.run_rule_based experiment=eval_rule_based \
+python -m baselines.run_reactive_control experiment=eval_reactive_control \
     building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=1
 ```
 

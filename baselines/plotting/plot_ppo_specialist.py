@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Plot per-building-type PPO specialist results (Paper Figure 4).
 
-Reads the PPO evaluation CSV and the rule-based baseline CSV, then
+Reads the PPO evaluation CSV and the reactive control baseline CSV, then
 produces a grouped bar chart comparing normalized scores across
 building types and tasks.
 
@@ -79,12 +79,12 @@ def main() -> None:
         ax,
         labels,
         {
-            "rule_based": (baseline_means, baseline_stds),
+            "reactive_control": (baseline_means, baseline_stds),
             "ppo": (ppo_means, ppo_stds),
         },
     )
     ax.set_ylabel("Episode Return")
-    ax.set_title(f"PPO Specialist vs Rule-Based ({args.task})")
+    ax.set_title(f"PPO Specialist vs Reactive ({args.task})")
 
     save_figure(fig, Path(args.output))
     print(f"Saved to {args.output}")

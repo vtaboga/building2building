@@ -1,6 +1,6 @@
 # Write a Custom Controller
 
-This tutorial shows how to write a custom rule-based controller that works with
+This tutorial shows how to write a custom reactive controller that works with
 the B2B environment and evaluation infrastructure.
 
 A standalone script is available at `tutorials/custom_controller.py`.

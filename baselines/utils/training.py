@@ -39,6 +39,7 @@ def build_ppo(
     *,
     tensorboard_log: str | None = None,
     seed: int | None = None,
+    verbose: int = 1,
     **overrides: Any,
 ) -> PPO:
     """Create a PPO model with the paper's default hyperparameters.
@@ -50,6 +51,7 @@ def build_ppo(
         env: Vectorized environment.
         tensorboard_log: TensorBoard log directory.
         seed: Random seed.
+        verbose: SB3 verbosity level (0=silent, 1=info, 2=debug).
         **overrides: PPO constructor keyword overrides.
 
     Returns:
@@ -74,7 +76,7 @@ def build_ppo(
         policy_kwargs=policy_kwargs,
         tensorboard_log=tensorboard_log,
         seed=seed,
-        verbose=1,
+        verbose=verbose,
         **filtered,
     )
 

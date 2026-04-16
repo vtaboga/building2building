@@ -72,9 +72,9 @@ PLACE_TO_CLIMATE_ZONE: dict[str, int] = {
 }
 
 ORION_SPACE: dict[str, str] = {
-    "/learning_rate": "loguniform(1e-5, 1e-3)",
+    "/learning_rate": "loguniform(1e-5, 3e-4)",
     "/n_steps": "choices([256, 512, 1024, 2048])",
-    "/batch_size": "choices([512, 1024, 2048, 4096])",
+    "/batch_size": "choices([256, 512, 1024, 2048])",
     "/n_epochs": "uniform(3, 15, discrete=True)",
     "/ent_coef": "loguniform(1e-4, 0.05)",
     "/clip_range": "uniform(0.1, 0.4)",
@@ -154,16 +154,21 @@ def _sample_one_per_cz(
 # ── Orion params to PPO hparams ─────────────────────────────────────
 
 
-def _params_to_ppo_hparams(params: dict[str, Any]) -> dict[str, Any]:
+def _params_to_ppo_hparams(
+    params: dict[str, Any], n_envs: int = 1
+) -> dict[str, Any]:
     """Convert flat Orion trial params to PPO constructor kwargs.
 
-    ``gamma`` is fixed at 0.99 (not tuned).
+    ``gamma`` is fixed at 0.99 (not tuned).  ``batch_size`` is clamped
+    to ``n_steps * n_envs`` so SB3 never receives an impossible value.
     """
     arch = _ARCH_MAP[params["/net_arch"]]
+    n_steps = int(params["/n_steps"])
+    batch_size = min(int(params["/batch_size"]), n_steps * n_envs)
     return {
         "learning_rate": params["/learning_rate"],
-        "n_steps": params["/n_steps"],
-        "batch_size": params["/batch_size"],
+        "n_steps": n_steps,
+        "batch_size": batch_size,
         "n_epochs": int(params["/n_epochs"]),
         "ent_coef": params["/ent_coef"],
         "clip_range": params["/clip_range"],
@@ -204,6 +209,7 @@ def _train_and_eval_single(
     n_envs: int,
     seed: int,
     tensorboard_log: str | None = None,
+    verbose: int = 1,
 ) -> float:
     """Train PPO on *train_building_id*, evaluate on *eval_building_id*.
 
@@ -221,7 +227,11 @@ def _train_and_eval_single(
 
     try:
         model = build_ppo(
-            vec_env, seed=seed, tensorboard_log=tensorboard_log, **hparams
+            vec_env,
+            seed=seed,
+            tensorboard_log=tensorboard_log,
+            verbose=verbose,
+            **hparams,
         )
         model.learn(total_timesteps=total_timesteps, progress_bar=False)
     finally:
@@ -318,9 +328,12 @@ def _run_sweep(
     n_envs: int,
     ntune_seeds: int,
     results_dir: Path,
-    tensorboard_log: str | None = None,
 ) -> None:
-    """Orion worker loop: suggest trials, train, observe, repeat."""
+    """Orion worker loop: suggest trials, train, observe, repeat.
+
+    TensorBoard logging is intentionally disabled during the sweep to
+    avoid filling up disk quota across many short training runs.
+    """
     trial_counter = 0
     while not experiment.is_done:
         trial = experiment.suggest()
@@ -329,7 +342,7 @@ def _run_sweep(
             break
 
         params = trial.params
-        hparams = _params_to_ppo_hparams(params)
+        hparams = _params_to_ppo_hparams(params, n_envs=n_envs)
         trial_idx = trial_counter
         trial_counter += 1
 
@@ -356,7 +369,8 @@ def _run_sweep(
                         total_timesteps,
                         n_envs,
                         seed=seed,
-                        tensorboard_log=tensorboard_log,
+                        tensorboard_log=None,
+                        verbose=0,
                     )
                 except Exception as exc:
                     logger.warning(
@@ -499,7 +513,7 @@ def _run_reeval(
         )
         return
 
-    hparams = _params_to_ppo_hparams(best_params)
+    hparams = _params_to_ppo_hparams(best_params, n_envs=n_envs)
     logger.info(
         "Re-evaluating CHS-best trial %s on %d buildings x %d seeds",
         chs_best_id,
@@ -606,6 +620,9 @@ def main(cfg: DictConfig) -> None:
     n_trials: int = int(cfg.get("n_trials", 100))
     n_startup_trials: int = int(cfg.get("n_startup_trials", 20))
     ntune_seeds: int = int(cfg.get("ntune_seeds", 3))
+    n_tune_buildings: int | None = (
+        int(cfg.n_tune_buildings) if cfg.get("n_tune_buildings") is not None else None
+    )
     total_timesteps: int = int(cfg.training.total_timesteps)
     n_envs: int = int(cfg.training.n_envs)
     seed: int = int(cfg.get("seed", 0))
@@ -639,7 +656,7 @@ def main(cfg: DictConfig) -> None:
     eval_building_ids = eval_building_ids[:n_buildings]
 
     logger.info(
-        "CHS PPO tuning for %s / %s (%d buildings)",
+        "CHS PPO tuning for %s / %s (%d buildings sampled)",
         building_type,
         task,
         n_buildings,
@@ -656,7 +673,10 @@ def main(cfg: DictConfig) -> None:
             import wandb
 
             mode_tag = "reeval" if is_reeval else ("analyze" if is_analyze else "sweep")
-            tb_log = str(output_dir / "tensorboard")
+            # Only enable TensorBoard sync for reeval (sweep uses
+            # wandb.log directly to avoid filling disk quota).
+            if is_reeval:
+                tb_log = str(output_dir / "tensorboard")
             wandb.init(
                 project=OmegaConf.select(
                     wandb_cfg, "project", default="b2b-baselines"
@@ -666,7 +686,7 @@ def main(cfg: DictConfig) -> None:
                 config=OmegaConf.to_container(cfg, resolve=True),
                 name=f"chs_{building_type}_{task}_{mode_tag}",
                 group=f"chs_{building_type}_{task}",
-                sync_tensorboard=True,
+                sync_tensorboard=tb_log is not None,
             )
         except ImportError:
             logger.warning("wandb not installed; skipping init")
@@ -721,17 +741,27 @@ def main(cfg: DictConfig) -> None:
         return
 
     # ── Default: sweep worker loop ───────────────────────────────
+    sweep_train_ids = train_building_ids
+    sweep_eval_ids = eval_building_ids
+    if n_tune_buildings is not None and n_tune_buildings < len(sweep_train_ids):
+        sweep_train_ids = train_building_ids[:n_tune_buildings]
+        sweep_eval_ids = eval_building_ids[:n_tune_buildings]
+        logger.info(
+            "Sweep limited to %d buildings (of %d available)",
+            n_tune_buildings,
+            len(train_building_ids),
+        )
+
     _run_sweep(
         experiment,
         building_type,
         task,
-        train_building_ids,
-        eval_building_ids,
+        sweep_train_ids,
+        sweep_eval_ids,
         total_timesteps,
         n_envs,
         ntune_seeds,
         results_dir,
-        tensorboard_log=tb_log,
     )
 
 

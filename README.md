@@ -122,13 +122,13 @@ test_envs = bench.make_test_envs(n=4)
 ## Baselines
 
 Reference experiment scripts live in `baselines/` and use only the public
-`building2building` API. They include rule-based controllers, PPO training,
+`building2building` API. They include reactive controllers, PPO training,
 dynamics adaptation, cross-domain transfer with Amorpheus, and evaluation /
 plotting.
 
 ```bash
-# Rule-based baseline evaluation
-python -m baselines.run_rule_based experiment=eval_rule_based
+# Reactive control baseline evaluation
+python -m baselines.run_reactive_control experiment=eval_reactive_control
 
 # Train per-building PPO specialists
 python -m baselines.train_ppo experiment=train_ppo
@@ -155,7 +155,7 @@ score = b2b.compute_normalized_score(
 ```
 
 > **Note:** `baseline_returns.csv` must be generated first by running
-> `python -m baselines.run_rule_based experiment=eval_rule_based`.
+> `python -m baselines.run_reactive_control experiment=eval_reactive_control`.
 
 ---
 

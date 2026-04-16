@@ -8,7 +8,7 @@ from the Building2Building paper. See the
 
 ```
 baselines/
-├── controllers/           # Rule-based reactive controllers
+├── controllers/           # Reactive controllers
 │   ├── unitary_hvac.py    # Controller for single-zone unitary systems
 │   └── air_loop.py        # VAV air-loop controller
 ├── models/
@@ -31,7 +31,7 @@ baselines/
 │   ├── plot_ppo_specialist.py
 │   ├── plot_dynamics_adaptation.py
 │   └── plot_cross_domain.py
-├── run_rule_based.py      # Evaluate rule-based controllers, generate baseline CSV
+├── run_reactive_control.py      # Evaluate reactive controllers, generate baseline CSV
 ├── train_ppo.py           # Per-building PPO specialist (Section 5)
 ├── train_dynamics_adaptation.py  # Section 6.1 experiments
 ├── train_cross_domain.py  # Section 6.2 Amorpheus cross-domain transfer
@@ -52,16 +52,16 @@ pip install -e ../  # Install building2building in editable mode
 pip install -r requirements.txt
 ```
 
-### 1. Rule-Based Controllers
+### 1. Reactive Controllers
 
 Evaluate the reactive controller on all buildings and generate the
 `baseline_returns.csv` used for normalized scoring:
 
 ```bash
-python -m baselines.run_rule_based experiment=eval_rule_based
+python -m baselines.run_reactive_control experiment=eval_reactive_control
 
 # Subset:
-python -m baselines.run_rule_based experiment=eval_rule_based \
+python -m baselines.run_reactive_control experiment=eval_reactive_control \
     building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=5
 ```
 
@@ -111,7 +111,7 @@ python -m baselines.train_cross_domain experiment=train_cross_domain \
 
 ### 5. Controller Tuning
 
-Tune rule-based controller parameters with Optuna:
+Tune reactive controller parameters with Optuna:
 
 ```bash
 python -m baselines.tune_controller experiment=tune_controller \
