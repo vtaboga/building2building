@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tune rule-based controller parameters with Optuna.
+"""Tune reactive controller parameters with Optuna.
 
 Supports both unitary HVAC (single-zone packaged systems) and
 air-loop (VAV multi-zone systems) controllers. For each trial, the
@@ -43,8 +43,6 @@ VAV_BUILDING_TYPES = {"OfficeMedium"}
 
 def _suggest_unitary_hvac(trial: optuna.Trial) -> UnitaryHvacConfig:
     return UnitaryHvacConfig(
-        heating_setpoint_c=trial.suggest_float("heating_setpoint_c", 18.0, 22.0),
-        cooling_setpoint_c=trial.suggest_float("cooling_setpoint_c", 20.0, 26.0),
         kp=trial.suggest_float("kp", 0.01, 3.0, log=True),
         ki=trial.suggest_float("ki", 1e-4, 0.1, log=True),
         integral_max=trial.suggest_float("integral_max", 1.0, 50.0),
@@ -61,8 +59,6 @@ def _suggest_unitary_hvac(trial: optuna.Trial) -> UnitaryHvacConfig:
 
 def _suggest_air_loop(trial: optuna.Trial) -> AirLoopConfig:
     return AirLoopConfig(
-        target_temp=trial.suggest_float("target_temp", 18.0, 24.0),
-        deadband=trial.suggest_float("deadband", 0.5, 3.0),
         sat_neutral=trial.suggest_float("sat_neutral", 14.0, 24.0),
         sat_kp=trial.suggest_float("sat_kp", 0.1, 5.0),
         sat_min=trial.suggest_float("sat_min", 5.0, 15.0),
@@ -171,7 +167,7 @@ def main(cfg: DictConfig) -> None:
 
     n_eval_buildings: int = int(cfg.get("n_eval_buildings", 5))
 
-    from baselines.run_rule_based import _get_climate_zone
+    from baselines.run_reactive_control import _get_climate_zone
 
     all_test_ids = b2b.list_buildings(building_type, split="test")
     if not all_test_ids:
@@ -275,7 +271,11 @@ def main(cfg: DictConfig) -> None:
 
     objective = _make_objective(building_type, eval_ids, task, run_period)
     study.optimize(
-        objective, n_trials=n_trials, timeout=timeout, callbacks=callbacks
+        objective,
+        n_trials=n_trials,
+        timeout=timeout,
+        callbacks=callbacks,
+        catch=(ValueError,),
     )
 
     if use_wandb:

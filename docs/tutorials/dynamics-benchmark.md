@@ -18,7 +18,7 @@ to help the policy generalize.
 First, generate the reactive-controller baseline for scoring:
 
 ```bash
-python -m baselines.run_rule_based experiment=eval_rule_based \
+python -m baselines.run_reactive_control experiment=eval_reactive_control \
     building_types=[SingleFamilyHouse] tasks=[task1] max_buildings_per_type=5
 ```
 

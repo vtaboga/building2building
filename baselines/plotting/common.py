@@ -49,7 +49,7 @@ TASK_LABELS: dict[str, str] = {
 }
 
 APPROACH_COLORS: dict[str, str] = {
-    "rule_based": "#4C72B0",
+    "reactive_control": "#4C72B0",
     "ppo": "#DD8452",
     "specialist": "#55A868",
     "baseline": "#C44E52",
@@ -58,7 +58,7 @@ APPROACH_COLORS: dict[str, str] = {
 }
 
 APPROACH_LABELS: dict[str, str] = {
-    "rule_based": "Rule-based",
+    "reactive_control": "Reactive",
     "ppo": "PPO Specialist",
     "specialist": "Per-building",
     "baseline": "Multi-building",

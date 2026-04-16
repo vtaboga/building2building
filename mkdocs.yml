@@ -86,7 +86,7 @@ nav:
       - Action-Space Transfer: benchmarks/action-transfer.md
   - Baselines:
       - Overview: baselines/overview.md
-      - Rule-Based Controllers: baselines/controllers.md
+      - Reactive Controllers: baselines/controllers.md
       - PPO Specialist: baselines/ppo-specialist.md
       - Dynamics Adaptation: baselines/dynamics-adaptation.md
       - Cross-Domain Transfer: baselines/cross-domain.md

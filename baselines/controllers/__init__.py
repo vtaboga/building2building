@@ -1,4 +1,4 @@
-"""Baseline controllers for rule-based HVAC control."""
+"""Baseline reactive controllers for HVAC control."""
 
 from baselines.controllers.air_loop import (
     AirLoopConfig,

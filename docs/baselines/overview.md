@@ -13,7 +13,7 @@ graph TD
     Models["models/ (Amorpheus)"]
     Training["train_ppo, train_dynamics, train_cross_domain"]
     Eval["eval_ppo, eval_dynamics, eval_cross_domain"]
-    RuleBased["run_rule_based"]
+    ReactiveControl["run_reactive_control"]
     Tuning["tune_controller"]
     Plotting["plotting/"]
     B2B["building2building (public API)"]
@@ -22,20 +22,20 @@ graph TD
     Baselines --> Models
     Baselines --> Training
     Baselines --> Eval
-    Baselines --> RuleBased
+    Baselines --> ReactiveControl
     Baselines --> Tuning
     Baselines --> Plotting
     Controllers -->|uses| B2B
     Training -->|uses| B2B
     Eval -->|uses| B2B
-    RuleBased -->|uses| B2B
+    ReactiveControl -->|uses| B2B
 ```
 
 ## Directory Structure
 
 ```
 baselines/
-├── controllers/           # Rule-based reactive controllers
+├── controllers/           # Reactive controllers
 │   ├── unitary_hvac.py    # PI + Trim-and-Respond for unitary systems
 │   └── air_loop.py        # VAV air-loop controller
 ├── models/
@@ -47,7 +47,7 @@ baselines/
 │   └── callbacks.py       # W&B training callbacks
 ├── plotting/              # Matplotlib figure scripts
 ├── configs/               # Hydra configuration
-├── run_rule_based.py      # Baseline CSV generation
+├── run_reactive_control.py      # Baseline CSV generation
 ├── train_ppo.py           # Per-building PPO specialist (Section 5)
 ├── train_dynamics_adaptation.py  # Section 6.1
 ├── train_cross_domain.py  # Section 6.2 (Amorpheus)
@@ -66,7 +66,7 @@ pip install -e ".[training]"   # Installs all required dependencies
 
 ```bash
 # 1. Generate baseline returns CSV (needed for scoring)
-python -m baselines.run_rule_based experiment=eval_rule_based \
+python -m baselines.run_reactive_control experiment=eval_reactive_control \
     building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=5
 
 # 2. Train per-building PPO specialists
@@ -94,7 +94,7 @@ reference.
 
 | Page | Description |
 |---|---|
-| [Rule-Based Controllers](controllers.md) | UnitaryHvac and AirLoop controllers |
+| [Reactive Controllers](controllers.md) | UnitaryHvac and AirLoop controllers |
 | [PPO Specialist](ppo-specialist.md) | Per-building PPO training (Section 5) |
 | [Dynamics Adaptation](dynamics-adaptation.md) | Multi-building training (Section 6.1) |
 | [Cross-Domain Transfer](cross-domain.md) | Amorpheus transformer (Section 6.2) |

@@ -1,11 +1,11 @@
 # Controller Tuning
 
-Tune rule-based controller parameters using Optuna.
+Tune reactive controller parameters using Optuna.
 
 ## Overview
 
 `tune_controller.py` uses Optuna's TPE sampler to optimize the hyperparameters
-of the rule-based controllers (`UnitaryHvacConfig` or `AirLoopConfig`). The
+of the reactive controllers (`UnitaryHvacConfig` or `AirLoopConfig`). The
 objective is the episode return on a single building.
 
 ## Usage
@@ -44,7 +44,7 @@ baselines/configs/tuned_controllers/
 └── ...
 ```
 
-These tuned configs are automatically loaded by `run_rule_based.py` when
+These tuned configs are automatically loaded by `run_reactive_control.py` when
 evaluating on the matching building type and climate zone.
 
 ## Tuned Parameters

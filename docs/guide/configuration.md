@@ -20,7 +20,7 @@ All Hydra configs live in `baselines/configs/`:
 baselines/configs/
 ├── config.yaml           # Root config with defaults
 ├── experiment/           # Per-script experiment settings
-│   ├── eval_rule_based.yaml
+│   ├── eval_reactive_control.yaml
 │   ├── train_ppo.yaml
 │   ├── train_dynamics_specialist.yaml
 │   ├── train_dynamics_baseline.yaml
@@ -53,7 +53,7 @@ python -m baselines.<script> experiment=<name> [overrides...]
 Examples:
 
 ```bash
-python -m baselines.run_rule_based experiment=eval_rule_based
+python -m baselines.run_reactive_control experiment=eval_reactive_control
 python -m baselines.train_ppo experiment=train_ppo seed=42
 python -m baselines.train_dynamics_adaptation \
     experiment=train_dynamics_parameterized difficulty=medium
