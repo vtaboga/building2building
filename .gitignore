@@ -32,7 +32,7 @@ data/
 !building2building/data/
 b2b_outputs/
 !building2building/sources/data/
-./cursor/
+.cursor/
 dataset_v2/
 analysis/
 
