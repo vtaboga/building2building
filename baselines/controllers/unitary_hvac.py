@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
+
+FanErrorMode = Literal["nearest_setpoint", "center_of_band"]
+_FAN_ERROR_MODES: tuple[FanErrorMode, ...] = ("nearest_setpoint", "center_of_band")
 
 from baselines.utils.metadata import (
     find_obs_index,
@@ -60,9 +63,24 @@ class UnitaryHvacConfig:
     sat_respond: float = 0.5
     demand_deadband: float = 0.5
     availability_on: float = 1.0
+    # How the fan-airflow PI loop computes its error signal.
+    # - "nearest_setpoint": err = max(0, t_zone - cool_sp) when hot,
+    #                       max(0, heat_sp - t_zone) when cold,
+    #                       0 in between (fan pinned at min inside the band).
+    # - "center_of_band":  err = |t_zone - (heat_sp + cool_sp) / 2|, the PI
+    #                       loop is active for every non-zero deviation from
+    #                       the band center.
+    fan_error_mode: FanErrorMode = "nearest_setpoint"
     target_schedule: TargetScheduleConfig = field(
         default_factory=TargetScheduleConfig
     )
+
+    def __post_init__(self) -> None:
+        if self.fan_error_mode not in _FAN_ERROR_MODES:
+            raise ValueError(
+                f"fan_error_mode must be one of {_FAN_ERROR_MODES}; "
+                f"got {self.fan_error_mode!r}."
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +203,7 @@ class UnitaryHvacPolicy:
         self.sat_respond = cfg.sat_respond
         self.demand_deadband = cfg.demand_deadband
         self.availability_on = cfg.availability_on
+        self.fan_error_mode: FanErrorMode = cfg.fan_error_mode
 
         sched = cfg.target_schedule
         self._sched_enabled = sched.enabled
@@ -351,13 +370,20 @@ class UnitaryHvacPolicy:
         self, z: _ZoneState, t_zone: float, heat_sp: float, cool_sp: float
     ) -> float:
         m_dot_min = self.min_fan_frac * z.fan_max
-        if t_zone > cool_sp:
-            err = t_zone - cool_sp
-        elif t_zone < heat_sp:
-            err = heat_sp - t_zone
+        if self.fan_error_mode == "center_of_band":
+            center = 0.5 * (heat_sp + cool_sp)
+            err = abs(t_zone - center)
+            if err <= 0.0:
+                z.air_pi.integral *= 0.8
+                return m_dot_min
         else:
-            z.air_pi.integral *= 0.8
-            return m_dot_min
+            if t_zone > cool_sp:
+                err = t_zone - cool_sp
+            elif t_zone < heat_sp:
+                err = heat_sp - t_zone
+            else:
+                z.air_pi.integral *= 0.8
+                return m_dot_min
 
         u = _pi_step(err, z.air_pi, self.kp, self.ki, self.integral_max)
         m_dot = m_dot_min + u * (z.fan_max - m_dot_min)

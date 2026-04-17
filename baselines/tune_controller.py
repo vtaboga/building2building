@@ -17,8 +17,16 @@ Usage with Hydra::
 
 from __future__ import annotations
 
+import gc
 import logging
 import random
+import tempfile
+from concurrent.futures import (
+    CancelledError,
+    Executor,
+    ProcessPoolExecutor,
+    as_completed,
+)
 from pathlib import Path
 from typing import Any, Callable, Literal
 
@@ -34,7 +42,10 @@ from baselines.controllers.air_loop import (
     AirLoopPolicy,
 )
 from baselines.controllers.unitary_hvac import UnitaryHvacConfig, UnitaryHvacPolicy
-from baselines.utils.evaluation import run_episode
+from baselines.utils.evaluation import (
+    close_env_aggressively,
+    run_episode_reward_only,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +65,9 @@ def _suggest_unitary_hvac(trial: optuna.Trial) -> UnitaryHvacConfig:
         sat_respond=trial.suggest_float("sat_respond", 0.1, 5.0),
         demand_deadband=trial.suggest_float("demand_deadband", 0.01, 2.0),
         availability_on=trial.suggest_float("availability_on", 0.5, 3.0),
+        fan_error_mode=trial.suggest_categorical(
+            "fan_error_mode", ["nearest_setpoint", "center_of_band"]
+        ),
     )
 
 
@@ -98,48 +112,206 @@ def _config_to_dict(cfg: UnitaryHvacConfig | AirLoopConfig) -> dict[str, Any]:
     return d
 
 
+def _aggregate_rewards(
+    rewards: list[float], method: str, percentile_q: float
+) -> float:
+    """Aggregate per-building rewards into a single objective value.
+
+    ``method="percentile"`` (default) returns a low-quantile (e.g. 25th
+    percentile) — a robust-but-not-brittle target that the tuner can actually
+    improve on, unlike ``min`` which is dominated by whichever building is
+    unlucky on a given trial.
+    """
+    if not rewards:
+        return float("-inf")
+    if method == "min":
+        return float(min(rewards))
+    if method == "mean":
+        return float(np.mean(rewards))
+    if method == "percentile":
+        return float(np.percentile(rewards, percentile_q))
+    raise ValueError(
+        f"Unknown aggregation method '{method}'. "
+        "Expected one of: 'min', 'mean', 'percentile'."
+    )
+
+
+def _run_one_building(
+    building_type: str,
+    building_id: str,
+    task: str,
+    run_period: Literal["full_year", "winter", "summer"],
+    cfg: UnitaryHvacConfig | AirLoopConfig,
+    is_vav: bool,
+) -> float:
+    """Run one full episode for *building_id* and return the total reward.
+
+    This function is defined at module top level (and therefore picklable)
+    so it can be dispatched to a :class:`ProcessPoolExecutor`.  Each worker
+    process creates its own EnergyPlus output directory and tears the
+    simulation down aggressively before returning.
+
+    Heavy imports (``building2building``, ``pyenergyplus``) happen inside the
+    function body so that the workers — which share a ``spawn``'d interpreter
+    — only pay the import cost on the first call and reuse cached modules
+    across subsequent trials.
+    """
+    # Lazy imports inside the worker: safe under ``spawn`` start method.
+    from building2building.env import setup_energyplus_path
+
+    setup_energyplus_path()
+
+    import building2building as worker_b2b  # noqa: N813  (alias for clarity)
+    from baselines.controllers.air_loop import AirLoopPolicy as _AirLoopPolicy
+    from baselines.controllers.unitary_hvac import (
+        UnitaryHvacPolicy as _UnitaryHvacPolicy,
+    )
+    from baselines.utils.evaluation import (
+        close_env_aggressively as _close_env_aggressively,
+    )
+    from baselines.utils.evaluation import (
+        run_episode_reward_only as _run_episode_reward_only,
+    )
+
+    policy = _AirLoopPolicy(cfg) if is_vav else _UnitaryHvacPolicy(cfg)
+    eplus_dir = Path(tempfile.mkdtemp(prefix=f"b2b_tune_{building_id}_"))
+    env = worker_b2b.new_make_env(
+        building_type,
+        building_id=building_id,
+        task=task,
+        run_period=run_period,
+        eplus_output_dir=eplus_dir,
+    )
+    try:
+        policy.bind_env(env)
+        return float(_run_episode_reward_only(env, policy))
+    finally:
+        _close_env_aggressively(env, cleanup_dir=eplus_dir)
+
+
 def _make_objective(
     building_type: str,
     building_ids: list[str],
     task: str,
     run_period: Literal["full_year", "winter", "summer"],
+    aggregation: str,
+    percentile_q: float,
+    executor: Executor | None = None,
 ) -> Callable[[optuna.Trial], float]:
     """Return an Optuna objective that evaluates across *building_ids*.
 
-    The score returned is the **worst** (minimum) episode reward across
-    all buildings, so that the tuner optimises for robustness.
+    The score returned is the aggregated episode reward across all buildings
+    (by default the 25th percentile), so that the tuner optimises for robust
+    but learnable performance.  Using the strict minimum is very noisy: a
+    single unlucky building can dominate the score and mask real progress.
+
+    Each building episode runs in its own scratch directory so EnergyPlus
+    output files (``eplusout.*``) are cleaned up eagerly instead of
+    accumulating in ``$TMPDIR``.  The EnergyPlus thread is also joined and
+    the simulation state explicitly released between episodes; see
+    :func:`baselines.utils.evaluation.close_env_aggressively`.
+
+    If *executor* is provided the per-building simulations are dispatched
+    to it concurrently (one future per building).  Otherwise the loop is
+    sequential and behaves exactly like the pre-parallel version.
     """
     is_vav = building_type in VAV_BUILDING_TYPES
 
     def objective(trial: optuna.Trial) -> float:
         if is_vav:
-            cfg = _suggest_air_loop(trial)
-            policy = AirLoopPolicy(cfg)
+            cfg: UnitaryHvacConfig | AirLoopConfig = _suggest_air_loop(trial)
         else:
             cfg = _suggest_unitary_hvac(trial)
-            policy = UnitaryHvacPolicy(cfg)
 
-        rewards: list[float] = []
-        for bid in building_ids:
-            env = b2b.new_make_env(
-                building_type,
-                building_id=bid,
-                task=task,
-                run_period=run_period,
+        if executor is None:
+            return _evaluate_sequential(
+                trial, cfg, is_vav, building_type, building_ids, task, run_period,
+                aggregation, percentile_q,
             )
-            try:
-                policy.bind_env(env)
-                result = run_episode(env, policy)
-                rewards.append(result.total_reward)
-            except Exception as e:
-                logger.warning("Trial %d failed on %s: %s", trial.number, bid, e)
-                return float("-inf")
-            finally:
-                env.close()
-
-        return min(rewards)
+        return _evaluate_parallel(
+            trial, cfg, is_vav, building_type, building_ids, task, run_period,
+            aggregation, percentile_q, executor,
+        )
 
     return objective
+
+
+def _evaluate_sequential(
+    trial: optuna.Trial,
+    cfg: UnitaryHvacConfig | AirLoopConfig,
+    is_vav: bool,
+    building_type: str,
+    building_ids: list[str],
+    task: str,
+    run_period: Literal["full_year", "winter", "summer"],
+    aggregation: str,
+    percentile_q: float,
+) -> float:
+    policy = AirLoopPolicy(cfg) if is_vav else UnitaryHvacPolicy(cfg)
+    rewards: list[float] = []
+    for bid in building_ids:
+        eplus_dir = Path(tempfile.mkdtemp(prefix=f"b2b_tune_{bid}_"))
+        env = b2b.new_make_env(
+            building_type,
+            building_id=bid,
+            task=task,
+            run_period=run_period,
+            eplus_output_dir=eplus_dir,
+        )
+        try:
+            policy.bind_env(env)
+            rewards.append(run_episode_reward_only(env, policy))
+        except Exception as e:
+            logger.warning("Trial %d failed on %s: %s", trial.number, bid, e)
+            return float("-inf")
+        finally:
+            close_env_aggressively(env, cleanup_dir=eplus_dir)
+            del env
+    return _aggregate_rewards(rewards, aggregation, percentile_q)
+
+
+def _evaluate_parallel(
+    trial: optuna.Trial,
+    cfg: UnitaryHvacConfig | AirLoopConfig,
+    is_vav: bool,
+    building_type: str,
+    building_ids: list[str],
+    task: str,
+    run_period: Literal["full_year", "winter", "summer"],
+    aggregation: str,
+    percentile_q: float,
+    executor: Executor,
+) -> float:
+    futures = {
+        executor.submit(
+            _run_one_building,
+            building_type, bid, task, run_period, cfg, is_vav,
+        ): bid
+        for bid in building_ids
+    }
+    rewards: list[float] = []
+    failed = False
+    try:
+        for fut in as_completed(futures):
+            bid = futures[fut]
+            try:
+                rewards.append(float(fut.result()))
+            except CancelledError:
+                continue
+            except Exception as e:
+                logger.warning("Trial %d failed on %s: %s", trial.number, bid, e)
+                failed = True
+                break
+    finally:
+        # If a worker raised we cancel the siblings so that we don't pay
+        # for their remaining compute — futures already running cannot be
+        # interrupted but pending ones will not start.
+        if failed:
+            for fut in futures:
+                fut.cancel()
+    if failed:
+        return float("-inf")
+    return _aggregate_rewards(rewards, aggregation, percentile_q)
 
 
 @hydra.main(config_path="configs", config_name="config", version_base=None)
@@ -167,27 +339,105 @@ def main(cfg: DictConfig) -> None:
 
     n_eval_buildings: int = int(cfg.get("n_eval_buildings", 5))
 
-    from baselines.run_reactive_control import _get_climate_zone
+    aggregation: str = str(cfg.get("aggregation", "percentile"))
+    allowed_aggregations = {"min", "mean", "percentile"}
+    if aggregation not in allowed_aggregations:
+        raise ValueError(
+            f"Invalid aggregation '{aggregation}'. "
+            f"Expected one of {sorted(allowed_aggregations)}."
+        )
+    percentile_q: float = float(cfg.get("percentile_q", 25.0))
+    if not 0.0 < percentile_q < 100.0:
+        raise ValueError(
+            f"percentile_q must be in (0, 100); got {percentile_q}."
+        )
+    storage_dir_cfg = cfg.get("storage_dir", None)
+    storage_dir = (
+        Path(str(storage_dir_cfg)) if storage_dir_cfg is not None else output_dir
+    )
+    n_building_workers: int = int(cfg.get("n_building_workers", 1))
+    if n_building_workers < 1:
+        raise ValueError(
+            f"n_building_workers must be >= 1; got {n_building_workers}."
+        )
 
-    all_test_ids = b2b.list_buildings(building_type, split="test")
-    if not all_test_ids:
-        logger.error("No test buildings found for %s", building_type)
-        return
+    sampler = optuna.samplers.TPESampler(
+        n_startup_trials=n_startup, seed=42
+    )
+    study_name = f"tune_{building_type.lower()}_cz{climate_zone}_{task}"
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    storage_path = storage_dir / f"{study_name}.db"
+    storage_url = f"sqlite:///{storage_path}"
+    study = optuna.create_study(
+        direction="maximize",
+        sampler=sampler,
+        study_name=study_name,
+        storage=storage_url,
+        load_if_exists=True,
+    )
+    completed = sum(
+        1 for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE
+    )
+    logger.info(
+        "Study storage: %s (%d completed trials already in DB)",
+        storage_url,
+        completed,
+    )
+    remaining_trials = max(0, n_trials - completed)
 
-    matching_ids = [
-        bid
-        for bid in all_test_ids
-        if _get_climate_zone(building_type, bid) == climate_zone
-    ]
-    # SingleFamilyHouse has no CZ mapping — use all test buildings.
-    if not matching_ids:
-        matching_ids = list(all_test_ids)
-
-    rng = random.Random(42)
-    if len(matching_ids) <= n_eval_buildings:
-        eval_ids = matching_ids
+    # ── Fixed eval-building set ──────────────────────────────────────────
+    # The evaluation buildings are drawn ONCE per study (seeded) and then
+    # persisted in the study's user attributes.  Every resumed job – and any
+    # later analysis script that inspects the study – therefore sees the
+    # exact same pool of buildings, regardless of changes to the upstream
+    # building registry or the ``n_eval_buildings`` config value.
+    stored_eval_ids = study.user_attrs.get("eval_building_ids")
+    if stored_eval_ids is not None:
+        eval_ids = [str(b) for b in stored_eval_ids]
+        logger.info(
+            "Re-using %d eval buildings stored in study user_attrs",
+            len(eval_ids),
+        )
     else:
-        eval_ids = rng.sample(matching_ids, n_eval_buildings)
+        from baselines.run_reactive_control import _get_climate_zone
+
+        all_test_ids = b2b.list_buildings(building_type, split="test")
+        if not all_test_ids:
+            logger.error("No test buildings found for %s", building_type)
+            return
+
+        matching_ids = [
+            bid
+            for bid in all_test_ids
+            if _get_climate_zone(building_type, bid) == climate_zone
+        ]
+        # SingleFamilyHouse has no CZ mapping — use all test buildings.
+        if not matching_ids:
+            matching_ids = list(all_test_ids)
+
+        rng = random.Random(42)
+        if len(matching_ids) <= n_eval_buildings:
+            eval_ids = list(matching_ids)
+        else:
+            eval_ids = rng.sample(matching_ids, n_eval_buildings)
+
+        study.set_user_attr("eval_building_ids", eval_ids)
+        study.set_user_attr(
+            "eval_building_selection",
+            {
+                "seed": 42,
+                "n_eval_buildings": n_eval_buildings,
+                "pool_size": len(matching_ids),
+                "building_type": building_type,
+                "climate_zone": climate_zone,
+            },
+        )
+        logger.info(
+            "Drew %d eval buildings (seed=42, pool=%d) and stored them "
+            "in study user_attrs",
+            len(eval_ids),
+            len(matching_ids),
+        )
 
     logger.info(
         "Tuning %s controller for %s (cz=%d, %d eval buildings, task=%s, "
@@ -200,16 +450,6 @@ def main(cfg: DictConfig) -> None:
         run_period,
     )
     logger.info("Eval building IDs: %s", eval_ids)
-
-    sampler = optuna.samplers.TPESampler(
-        n_startup_trials=n_startup, seed=42
-    )
-    study_name = f"tune_{building_type.lower()}_cz{climate_zone}"
-    study = optuna.create_study(
-        direction="maximize",
-        sampler=sampler,
-        study_name=study_name,
-    )
 
     # ── W&B logging ──────────────────────────────────────────────
     wandb_cfg = cfg.get("wandb", {})
@@ -269,14 +509,68 @@ def main(cfg: DictConfig) -> None:
 
     callbacks.append(_track_best)
 
-    objective = _make_objective(building_type, eval_ids, task, run_period)
-    study.optimize(
-        objective,
-        n_trials=n_trials,
-        timeout=timeout,
-        callbacks=callbacks,
-        catch=(ValueError,),
+    def _gc_callback(
+        study: optuna.Study, trial: optuna.trial.FrozenTrial
+    ) -> None:
+        gc.collect()
+
+    callbacks.append(_gc_callback)
+
+    # ── Within-trial parallelism ─────────────────────────────────────────
+    # When ``n_building_workers > 1`` the per-building EnergyPlus runs of
+    # each trial are dispatched to a persistent ``ProcessPoolExecutor``
+    # using the ``spawn`` start method (EnergyPlus is not fork-safe).  The
+    # executor is reused across trials so the b2b / pyenergyplus import
+    # cost is paid only on the first trial.  Each worker uses ~1 CPU core
+    # and several hundred MB of RAM – bump ``--cpus-per-task`` and
+    # ``--mem`` in the SLURM script accordingly.
+    effective_workers = min(n_building_workers, len(eval_ids))
+    executor: ProcessPoolExecutor | None = None
+    if effective_workers > 1:
+        import multiprocessing as _mp
+
+        ctx = _mp.get_context("spawn")
+        executor = ProcessPoolExecutor(
+            max_workers=effective_workers, mp_context=ctx
+        )
+        logger.info(
+            "Within-trial parallelism: %d worker processes (spawn)",
+            effective_workers,
+        )
+    else:
+        logger.info(
+            "Within-trial parallelism: disabled (n_building_workers=%d, "
+            "eval_ids=%d)",
+            n_building_workers,
+            len(eval_ids),
+        )
+
+    objective = _make_objective(
+        building_type,
+        eval_ids,
+        task,
+        run_period,
+        aggregation=aggregation,
+        percentile_q=percentile_q,
+        executor=executor,
     )
+    logger.info(
+        "Objective aggregation: %s%s",
+        aggregation,
+        f" (q={percentile_q:.1f})" if aggregation == "percentile" else "",
+    )
+    try:
+        study.optimize(
+            objective,
+            n_trials=remaining_trials,
+            timeout=timeout,
+            callbacks=callbacks,
+            catch=(ValueError,),
+            gc_after_trial=True,
+        )
+    finally:
+        if executor is not None:
+            executor.shutdown(wait=True)
 
     if use_wandb:
         try:
