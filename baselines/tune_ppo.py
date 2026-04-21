@@ -46,31 +46,6 @@ from baselines.utils.training import build_ppo, make_vec_env
 
 logger = logging.getLogger(__name__)
 
-PLACE_TO_CLIMATE_ZONE: dict[str, int] = {
-    "Miami": 1,
-    "Houston": 2,
-    "Tampa": 2,
-    "Tucson": 2,
-    "Atlanta": 3,
-    "ElPaso": 3,
-    "SanDiego": 3,
-    "SanFrancisco": 3,
-    "Albuquerque": 4,
-    "Baltimore": 4,
-    "NewYork": 4,
-    "PortAngeles": 4,
-    "Seattle": 4,
-    "Buffalo": 5,
-    "Chicago": 5,
-    "Denver": 5,
-    "Vancouver": 5,
-    "GreatFalls": 6,
-    "Rochester": 6,
-    "Duluth": 7,
-    "InternationalFalls": 7,
-    "Fairbanks": 8,
-}
-
 ORION_SPACE: dict[str, str] = {
     "/learning_rate": "loguniform(1e-5, 3e-4)",
     "/n_steps": "choices([256, 512, 1024, 2048])",
@@ -96,18 +71,11 @@ _ARCH_MAP: dict[str, list[int]] = {
 
 
 def _get_climate_zone(building_type: str, building_id: str) -> int | None:
-    """Best-effort climate zone lookup from the building's weather file."""
-    try:
-        from building2building.data.registry import get_registry
-
-        info = get_registry().get_building_by_id(building_type, building_id)
-        weather = info.weather_file
-        if not weather:
-            return None
-        place = Path(weather).stem.split("_")[0]
-        return PLACE_TO_CLIMATE_ZONE.get(place)
-    except Exception:
+    """Return the ASHRAE climate zone of a building, or ``None`` if it has
+    no CZ assignment (e.g. :class:`SingleFamilyHouse`)."""
+    if building_type in b2b.TYPES_WITHOUT_CLIMATE_ZONE:
         return None
+    return b2b.get_climate_zone(building_type, building_id)
 
 
 def _group_by_climate_zone(

@@ -68,6 +68,7 @@ def make_env_from_config(config: EnvBuildConfig, eplus_output_dir: str | Path) -
     )
 
     env = create_simulator(building_config)
+    env.metadata["building_info"] = info
     max_steps = config.env_max_steps
     if max_steps is None:
         max_steps = config.task.expected_steps()

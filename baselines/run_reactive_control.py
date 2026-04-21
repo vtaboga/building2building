@@ -78,49 +78,18 @@ def _load_tuned_air_loop(bt: str, cz: int | None) -> AirLoopConfig:
     return AirLoopConfig()
 
 
-PLACE_TO_CLIMATE_ZONE: dict[str, int] = {
-    "Miami": 1,
-    "Houston": 2,
-    "Tampa": 2,
-    "Tucson": 2,
-    "Atlanta": 3,
-    "ElPaso": 3,
-    "SanDiego": 3,
-    "SanFrancisco": 3,
-    "Albuquerque": 4,
-    "Baltimore": 4,
-    "NewYork": 4,
-    "PortAngeles": 4,
-    "Seattle": 4,
-    "Buffalo": 5,
-    "Chicago": 5,
-    "Denver": 5,
-    "Vancouver": 5,
-    "GreatFalls": 6,
-    "Rochester": 6,
-    "Duluth": 7,
-    "InternationalFalls": 7,
-    "Fairbanks": 8,
-}
-
-
 def _get_climate_zone(bt: str, bid: str) -> int | None:
-    """Best-effort climate zone lookup from the building's weather filename.
+    """Return the ASHRAE climate zone, or ``None`` for types without one.
 
-    Returns ``None`` when no place-to-CZ mapping is available (e.g.
-    for SingleFamilyHouse buildings that use per-building weather).
+    Thin wrapper around :func:`building2building.api.get_climate_zone` that
+    returns ``None`` (rather than raising) for building types in
+    :data:`building2building.api.TYPES_WITHOUT_CLIMATE_ZONE` (e.g. SFH), so
+    the ``cz | None`` contract of :func:`_load_tuned_unitary_hvac` /
+    :func:`_load_tuned_air_loop` is preserved.
     """
-    try:
-        from building2building.data.registry import get_registry
-
-        info = get_registry().get_building_by_id(bt, bid)
-        weather = info.weather_file
-        if not weather:
-            return None
-        place = Path(weather).stem.split("_")[0]
-        return PLACE_TO_CLIMATE_ZONE.get(place)
-    except Exception:
+    if bt in b2b.TYPES_WITHOUT_CLIMATE_ZONE:
         return None
+    return b2b.get_climate_zone(bt, bid)
 
 
 def _select_policy(

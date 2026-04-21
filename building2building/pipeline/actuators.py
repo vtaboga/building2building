@@ -143,7 +143,12 @@ def _set_fan_always_on(
     available so the agent can modulate mass flow at any time.
     """
     target = fan_name.upper()
-    for fan_type in ("Fan:SystemModel", "Fan:OnOff", "Fan:ConstantVolume"):
+    for fan_type in (
+        "Fan:SystemModel",
+        "Fan:OnOff",
+        "Fan:ConstantVolume",
+        "Fan:VariableVolume",
+    ):
         fans = obj.get(fan_type, {})
         fan = fans.get(fan_name)
         if fan is None:
@@ -1074,8 +1079,70 @@ def make_vav_system_controllable(
 
         return htg_actuator, clg_actuator
 
+    # Pin fan / air-loop availability always-on for RL control.  Without
+    # this override, OfficeMedium (and other VAV prototypes) inherit the
+    # DOE ``HVACOperationSchd`` which turns supply fans off nights / Sundays
+    # and re-enables them only during occupied hours -- that schedule
+    # accounts for ~45 % of the year.  Whenever the fan is off, the VAV
+    # damper cannot deliver conditioned air regardless of what the agent
+    # commands on the SAT or flow-fraction actuators, which mechanically
+    # caps cooling control.  ``AvailabilityManager:NightCycle`` on the
+    # air loop is also neutralized for the same reason.
+    vav_onoff_stl = create_onoff_availability_stl(obj, name="vav always on availability")
+    vav_always_on_sched = create_schedule_constant(
+        obj, vav_onoff_stl, 1, name="vav always on availability"
+    )
+
+    def _find_supply_fans_for_loop(loop_name: str) -> list[tuple[str, str]]:
+        """Return ``[(fan_type, fan_name), ...]`` for the supply branches of
+        *loop_name*, by walking ``AirLoopHVAC`` → ``BranchList`` → ``Branch``
+        components.  The ontology query is fan-type-agnostic; we filter in
+        Python by matching ``component_object_type`` against known fan
+        object types.
+        """
+        fan_types = {
+            "Fan:SystemModel",
+            "Fan:OnOff",
+            "Fan:ConstantVolume",
+            "Fan:VariableVolume",
+        }
+        found: list[tuple[str, str]] = []
+        query = """
+            SELECT ?loop ?fanType ?fanName
+            WHERE {
+                ?loop a "AirLoopHVAC" .
+                ?loop idf:branch_list_name ?branchListName .
+                ?branchListName a "BranchList" .
+                ?branchListName idf:branches ?branchListHead .
+                ?branchListHead rdf:rest*/rdf:first ?branchItem .
+                ?branchItem idf:branch_name ?branchName .
+                ?branchName a "Branch" .
+                ?branchName idf:components ?componentsHead .
+                ?componentsHead rdf:rest*/rdf:first ?comp .
+                ?comp idf:component_object_type ?fanType .
+                ?comp idf:component_name ?fanName .
+            }
+        """
+        for row in g.query(query):
+            if str(row.loop) != loop_name:
+                continue
+            if str(row.fanType) not in fan_types:
+                continue
+            found.append((str(row.fanType), str(row.fanName)))
+        return found
+
     loops = []
     for loop_name, (supply_outlet, zone_terminals) in loops_dict.items():
+        for fan_type, fan_name in _find_supply_fans_for_loop(loop_name):
+            _set_fan_always_on(obj, fan_name, vav_always_on_sched)
+            logger.info(
+                "VAV always-on: overrode availability of %s %r on loop %r",
+                fan_type,
+                fan_name,
+                loop_name,
+            )
+        _ensure_always_on_availability(obj, loop_name, vav_always_on_sched)
+
         terminals = []
         for zone, terminal_name in zone_terminals:
             flow_act = install_flow_fraction_actuator(terminal_name)

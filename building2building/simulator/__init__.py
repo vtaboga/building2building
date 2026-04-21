@@ -216,6 +216,12 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         else {},
         "target_temperature_mode": task_config.target_temperature_mode,
         "morphology": morphology,
+        "task_config": task_config,
+        # ``building_info`` is populated by the env factories
+        # (:func:`building2building.api.new_make_env`,
+        # :func:`building2building.envs.factory.make_env_from_config`) after
+        # simulator creation, since only they have the :class:`BuildingInfo`.
+        "building_info": None,
     }
 
     return gymenv
