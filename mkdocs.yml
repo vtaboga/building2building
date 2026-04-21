@@ -91,7 +91,6 @@ nav:
       - Dynamics Adaptation: baselines/dynamics-adaptation.md
       - Cross-Domain Transfer: baselines/cross-domain.md
       - Controller Tuning: baselines/tuning.md
-      - Tuned-Controller Analysis: baselines/analysis.md
       - Plotting: baselines/plotting.md
   - Tutorials:
       - Quick Tour: tutorials/quick-tour.md

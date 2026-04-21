@@ -1,9 +1,9 @@
 # Controller Tuning
 
 Tune reactive controller parameters (`UnitaryHvacConfig` or `AirLoopConfig`)
-per `(building_type, climate_zone)` pair with Optuna. The tuned YAMLs under
-`baselines/configs/tuned_controllers/` are the controllers exercised by the
-full-year rollouts in [Tuned-Controller Analysis](analysis.md).
+per `(building_type, climate_zone)` pair with Optuna. The tuned YAMLs land
+in `baselines/configs/tuned_controllers/` and are the controllers consumed
+by `baselines/run_reactive_control.py` at rollout time.
 
 ## Overview
 
@@ -58,8 +58,7 @@ python -m baselines.tune_controller experiment=tune_controller \
 
 ## Reproducing the 25-config v2 tune
 
-The analysis in [Tuned-Controller Analysis](analysis.md) covers **25
-`(type, cz)` pairs**:
+The reference v2 tune covers **25 `(type, cz)` pairs**:
 
 | Building type | Climate zones | Count |
 |---|---|---:|
@@ -126,9 +125,8 @@ The number of trials actually executed is min(`n_trials`, trials fitting in
    finishes (or hits `timeout_seconds`), the best trial's config is dumped
    to `baselines/configs/tuned_controllers/<controller>_<type>_cz<cz>.yaml`.
 
-Tuned configs emitted by this pipeline are automatically picked up by both
-`baselines/run_reactive_control.py` and
-`baselines/analyze_tuned_controller.py` when the filename matches the
+Tuned configs emitted by this pipeline are automatically picked up by
+`baselines/run_reactive_control.py` when the filename matches the
 `(type, cz)` being evaluated.
 
 ## Output
@@ -170,13 +168,9 @@ Key parameters:
 - `target_schedule` is serialized with a `!!python/tuple` tag for
   `weekend_days`. Downstream loaders use `yaml.unsafe_load` to tolerate
   this — tracked as a minor cleanup (`safe_dump` on the tuner side).
-- Tuned gains can over-fit the training split. See
-  [Tuned-Controller Analysis → Why the tuned gain can misgeneralize](analysis.md#why-the-tuned-gain-can-misgeneralize)
-  for a worked example on `SingleFamilyHouse-0014`.
+- Tuned gains can over-fit the training split.
 
 ## Related pages
 
 - [Reactive Controllers](controllers.md) — algorithm details for
   `UnitaryHvacPolicy` / `AirLoopPolicy` and the parameters the tuner searches.
-- [Tuned-Controller Analysis](analysis.md) — full-year rollouts, artefacts,
-  and aggregation for the 25 configs produced above.

@@ -99,5 +99,4 @@ reference.
 | [Dynamics Adaptation](dynamics-adaptation.md) | Multi-building training (Section 6.1) |
 | [Cross-Domain Transfer](cross-domain.md) | Amorpheus transformer (Section 6.2) |
 | [Controller Tuning](tuning.md) | Optuna hyperparameter optimization |
-| [Tuned-Controller Analysis](analysis.md) | Full-year rollouts, per-building figures, and per-type summaries for the tuned controllers |
 | [Plotting](plotting.md) | Paper figure generation |
