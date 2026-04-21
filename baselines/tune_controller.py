@@ -399,21 +399,21 @@ def main(cfg: DictConfig) -> None:
             len(eval_ids),
         )
     else:
-        from baselines.run_reactive_control import _get_climate_zone
+        if building_type in b2b.TYPES_WITHOUT_CLIMATE_ZONE:
+            # SingleFamilyHouse has no CZ mapping — use all test buildings.
+            matching_ids = b2b.list_buildings(building_type, split="test")
+        else:
+            matching_ids = b2b.list_buildings_by_climate_zone(
+                building_type, climate_zone, split="test"
+            )
 
-        all_test_ids = b2b.list_buildings(building_type, split="test")
-        if not all_test_ids:
-            logger.error("No test buildings found for %s", building_type)
-            return
-
-        matching_ids = [
-            bid
-            for bid in all_test_ids
-            if _get_climate_zone(building_type, bid) == climate_zone
-        ]
-        # SingleFamilyHouse has no CZ mapping — use all test buildings.
         if not matching_ids:
-            matching_ids = list(all_test_ids)
+            logger.error(
+                "No test buildings found for %s / cz=%s",
+                building_type,
+                climate_zone,
+            )
+            return
 
         rng = random.Random(42)
         if len(matching_ids) <= n_eval_buildings:
