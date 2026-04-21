@@ -14,8 +14,18 @@ from typing import Any, Literal
 
 import gymnasium as gym
 
+from building2building.api.rollout import (
+    Controller,
+    Trajectory,
+    callable_controller,
+    rollout,
+)
 from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig, parse_benchmark_config
 from building2building.config.tasks import TASK_PRESETS, TaskPreset, resolve_task_preset
+from building2building.data.climate_zones import (
+    TYPES_WITHOUT_CLIMATE_ZONE,
+    ClimateZoneUnavailableError,
+)
 from building2building.data.download import ALL_BUILDING_TYPES, BuildingType
 from building2building.envs import make_env_from_config
 from building2building.types import RewardConfig, RunPeriodConfig, TaskConfig, reward_config_from_dict
@@ -39,6 +49,52 @@ def list_buildings(
     from building2building.data.registry import get_registry
 
     return get_registry().list_buildings(building_type, split)
+
+
+def list_buildings_by_climate_zone(
+    building_type: BuildingType,
+    climate_zone: int,
+    split: Literal["train", "test"] = "train",
+) -> list[str]:
+    """Return building IDs filtered by ASHRAE climate zone.
+
+    Raises:
+        ClimateZoneUnavailableError: If ``building_type`` has no ASHRAE
+            climate-zone assignment (e.g. ``SingleFamilyHouse``).
+    """
+    from building2building.data.registry import get_registry
+
+    return get_registry().list_buildings_by_climate_zone(
+        building_type, climate_zone, split
+    )
+
+
+def get_climate_zone(
+    building_type: BuildingType,
+    building_id: str,
+) -> int:
+    """Return the ASHRAE climate zone of a building.
+
+    Raises:
+        ClimateZoneUnavailableError: If ``building_type`` has no ASHRAE
+            climate-zone assignment (e.g. ``SingleFamilyHouse``).
+        KeyError: If ``building_id`` is not found in the unified metadata.
+        ValueError: If the matching row has a null ``climate_zone`` despite
+            the type being mappable (indicates a corrupt / stale parquet).
+    """
+    from building2building.data.registry import get_registry
+
+    if building_type in TYPES_WITHOUT_CLIMATE_ZONE:
+        raise ClimateZoneUnavailableError(
+            f"{building_type!r} has no ASHRAE climate-zone assignment"
+        )
+    info = get_registry().get_building_by_id(building_type, building_id)
+    if info.climate_zone is None:
+        raise ValueError(
+            f"climate_zone is null for {building_type}/{building_id}; "
+            "your metadata.parquet may be out of date."
+        )
+    return info.climate_zone
 
 
 def _patch_epjson_run_period(
@@ -207,6 +263,7 @@ def new_make_env(
     )
 
     env = create_simulator(building_config)
+    env.metadata["building_info"] = info
     steps = max_episode_steps or task_cfg.expected_steps()
     return gym.wrappers.TimeLimit(env, max_episode_steps=int(steps))
 
@@ -228,6 +285,14 @@ def make_env(config: EnvBuildConfig, eplus_output_dir: str | Path) -> gym.Env:
 __all__ = [
     "list_building_types",
     "list_buildings",
+    "list_buildings_by_climate_zone",
+    "get_climate_zone",
+    "ClimateZoneUnavailableError",
+    "TYPES_WITHOUT_CLIMATE_ZONE",
+    "Controller",
+    "Trajectory",
+    "callable_controller",
+    "rollout",
     "make_env",
     "new_make_env",
     "parse_benchmark_config",

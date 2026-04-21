@@ -66,34 +66,6 @@ BuildingType = Literal[
 
 SPLIT_DATA_DIR = Path(__file__).resolve().parent / "data"
 
-PLACE_TO_CLIMATE_ZONE: dict[str, int] = {
-    "Miami": 1,
-    "Houston": 2,
-    "Tampa": 2,
-    "Tucson": 2,
-    "Atlanta": 3,
-    "ElPaso": 3,
-    "SanDiego": 3,
-    "SanFrancisco": 3,
-    "Albuquerque": 4,
-    "Baltimore": 4,
-    "NewYork": 4,
-    "PortAngeles": 4,
-    "Seattle": 4,
-    "Buffalo": 5,
-    "Chicago": 5,
-    "Denver": 5,
-    "Vancouver": 5,
-    "GreatFalls": 6,
-    "Rochester": 6,
-    "Duluth": 7,
-    "InternationalFalls": 7,
-    "Fairbanks": 8,
-}
-
-CLIMATE_ZONES: list[int] = sorted(set(PLACE_TO_CLIMATE_ZONE.values()))
-
-
 def load_split_ids(
     building_type: BuildingType,
     split: Literal["train", "test", "test_small"],
@@ -154,55 +126,6 @@ def sample_building_ids(
             f"Cannot sample n={n} without replacement from only {len(ids)} ids"
         )
     return [int(x) for x in rng.sample(ids, k=n)]
-
-
-def climate_zone_for_building(
-    building_type: BuildingType, building_id: int
-) -> int:
-    """Look up the ASHRAE climate zone of a building via its metadata place."""
-    rows = search_buildings(building_type=building_type, building_id=building_id)
-    if rows.empty:
-        raise ValueError(f"No metadata for {building_type} id={building_id}")
-    place = str(rows.iloc[0]["place"])
-    if place not in PLACE_TO_CLIMATE_ZONE:
-        raise ValueError(
-            f"Place {place!r} for {building_type} id={building_id} "
-            f"has no climate-zone mapping"
-        )
-    return PLACE_TO_CLIMATE_ZONE[place]
-
-
-def find_building_id_for_climate_zone(
-    building_type: BuildingType,
-    split: Literal["train", "test", "test_small"],
-    climate_zone: int,
-    index: int = 0,
-) -> int:
-    """Return the building_id of the *index*-th building in *split* belonging
-    to *climate_zone*.
-
-    Raises:
-        ValueError: If no building matches or *index* is out of range.
-    """
-    if climate_zone not in CLIMATE_ZONES:
-        raise ValueError(
-            f"Invalid climate_zone={climate_zone}; valid: {CLIMATE_ZONES}"
-        )
-    ids = load_split_ids(building_type, split)
-    matches: list[int] = []
-    for bid in ids:
-        if climate_zone_for_building(building_type, bid) == climate_zone:
-            matches.append(bid)
-    if not matches:
-        raise ValueError(
-            f"No {building_type} buildings in CZ{climate_zone} for split={split}"
-        )
-    if index < 0 or index >= len(matches):
-        raise ValueError(
-            f"Only {len(matches)} {building_type} building(s) in "
-            f"CZ{climate_zone} for split={split}, but index={index} requested"
-        )
-    return matches[index]
 
 
 def dataset_zip() -> Derivation:

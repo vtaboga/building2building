@@ -8,10 +8,18 @@ except ModuleNotFoundError:
     pass
 
 from building2building.api import (
+    ClimateZoneUnavailableError,
+    Controller,
+    TYPES_WITHOUT_CLIMATE_ZONE,
+    Trajectory,
+    callable_controller,
+    get_climate_zone,
     list_building_types,
     list_buildings,
+    list_buildings_by_climate_zone,
     make_env,
     new_make_env,
+    rollout,
 )
 from building2building.morphology import (
     Morphology,
@@ -64,8 +72,17 @@ __all__ = [
     # Environment creation
     "list_building_types",
     "list_buildings",
+    "list_buildings_by_climate_zone",
+    "get_climate_zone",
+    "ClimateZoneUnavailableError",
+    "TYPES_WITHOUT_CLIMATE_ZONE",
     "make_env",
     "new_make_env",
+    # Rollout / trajectory capture
+    "Controller",
+    "Trajectory",
+    "callable_controller",
+    "rollout",
     # Scoring
     "compute_normalized_score",
     # Benchmarks

@@ -15,6 +15,10 @@ from typing import Literal
 import duckdb
 import pandas as pd
 
+from building2building.data.climate_zones import (
+    TYPES_WITHOUT_CLIMATE_ZONE,
+    ClimateZoneUnavailableError,
+)
 from building2building.data.download import (
     ALL_BUILDING_TYPES,
     BuildingType,
@@ -41,6 +45,7 @@ class BuildingInfo:
     weather_file: str
     hvac_type: str
     building_dir: Path
+    climate_zone: int | None
 
 
 class BuildingRegistry:
@@ -58,6 +63,15 @@ class BuildingRegistry:
         if self._metadata is None:
             meta_path = download_metadata()
             self._metadata = pd.read_parquet(meta_path)
+            if "climate_zone" not in self._metadata.columns:
+                raise RuntimeError(
+                    "metadata.parquet is missing the 'climate_zone' column. "
+                    "Your HuggingFace cache is from the old dataset revision; "
+                    "clear ~/.cache/huggingface/hub/datasets--vtaboga--"
+                    "building2building_dataset/ (or re-download via "
+                    "huggingface_hub.snapshot_download(..., force_download=True)) "
+                    "and retry."
+                )
         if self._splits is None:
             splits_path = download_splits()
             raw = json.loads(splits_path.read_text())
@@ -121,6 +135,8 @@ class BuildingRegistry:
             raise KeyError(f"Building {building_id!r} not found in metadata")
         r = row.iloc[0]
         building_dir = get_building_path(building_type, building_id)
+        cz_raw = r.get("climate_zone")
+        climate_zone: int | None = None if pd.isna(cz_raw) else int(cz_raw)
         return BuildingInfo(
             building_id=str(r["building_id"]),
             building_type=building_type,
@@ -133,7 +149,35 @@ class BuildingRegistry:
             weather_file=str(r.get("weather_file", "")),
             hvac_type=str(r.get("hvac_type", "unknown")),
             building_dir=building_dir,
+            climate_zone=climate_zone,
         )
+
+    def list_buildings_by_climate_zone(
+        self,
+        building_type: BuildingType,
+        climate_zone: int,
+        split: Literal["train", "test"] = "train",
+    ) -> list[str]:
+        """Return building IDs for a given type / split filtered by ASHRAE CZ.
+
+        Raises:
+            ClimateZoneUnavailableError: If ``building_type`` is one of
+                :data:`TYPES_WITHOUT_CLIMATE_ZONE` (e.g. SingleFamilyHouse),
+                which has no single ASHRAE climate zone.
+        """
+        if building_type in TYPES_WITHOUT_CLIMATE_ZONE:
+            raise ClimateZoneUnavailableError(
+                f"{building_type!r} has no ASHRAE climate-zone assignment; "
+                "use list_buildings(...) instead."
+            )
+        split_ids = set(self.list_buildings(building_type, split))
+        df = self.metadata
+        mask = (
+            (df["building_type"] == building_type)
+            & (df["building_id"].isin(split_ids))
+            & (df["climate_zone"] == climate_zone)
+        )
+        return df.loc[mask, "building_id"].astype(str).tolist()
 
     def query_buildings(
         self,
