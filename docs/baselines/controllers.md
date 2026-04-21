@@ -149,6 +149,12 @@ The script auto-selects `AirLoopPolicy` for `OfficeMedium` and
 `UnitaryHvacPolicy` for all other building types. If tuned controller configs
 exist for the building type and climate zone, they are loaded automatically.
 
+For full-year diagnostic rollouts of the tuned controllers (trajectories,
+per-building figures, and aggregated per-type summaries), see
+[Tuned-Controller Analysis](analysis.md). That page documents the
+reproducible pipeline used to produce the `analysis/*_tuned_v2/` artefacts
+shipped with the repo.
+
 ## Output
 
 `run_reactive_control.py` generates `baseline_returns.csv` with columns:

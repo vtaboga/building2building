@@ -339,16 +339,13 @@ def rollout_and_analyze(
     try:
         obs_names: list[str] = env.metadata["observation_names"]
         act_names: list[str] = env.metadata["action_names"]
-        # ``morphology.controlled_zones`` is populated by build_morphology.
-        morphology = env.metadata.get("morphology")
-        controlled_zones: list[str] = []
-        if morphology is not None and hasattr(morphology, "controlled_zones"):
-            controlled_zones = list(morphology.controlled_zones)  # type: ignore[arg-type]
-        elif morphology is not None and hasattr(morphology, "nodes"):
-            for node in morphology.nodes:
-                nid = getattr(node, "id", "")
-                if nid.startswith("zone:"):
-                    controlled_zones.append(nid[len("zone:"):])
+        controlled_zones: list[str] = list(
+            env.metadata.get("controlled_zones", []) or []
+        )
+        # Capture a shallow snapshot of env.metadata so we can reconstruct
+        # per-zone target setpoints after env.close() — the task_config
+        # object is a plain dataclass, cheap to keep.
+        env_metadata = dict(env.metadata)
 
         logger.info(
             "Rollout: %s / %s (cz=%d, task=%s) — zones=%d, run_period=%s",
@@ -381,14 +378,25 @@ def rollout_and_analyze(
         if zone_indices
         else np.zeros((observations.shape[0], 0), np.float32)
     )
-    # Align setpoint columns to zone order by name.
+    # Align setpoint columns to zone order by name.  In ``constant`` target
+    # mode (the default for task1..4) the simulator does not emit a
+    # ``target_temperature <zone>`` observation, so we fall back to the
+    # per-zone constant stored in the env's ``task_config``.
     sp_by_zone = {label: i for i, label in zip(sp_indices, sp_labels)}
+    task_cfg = env_metadata.get("task_config")
     aligned_sp_cols = []
     for zl in zone_labels:
         if zl in sp_by_zone:
             aligned_sp_cols.append(observations[:, sp_by_zone[zl]])
+        elif task_cfg is not None and hasattr(task_cfg, "target_for_zone"):
+            const = float(task_cfg.target_for_zone(zl).occupied_c)
+            aligned_sp_cols.append(
+                np.full(observations.shape[0], const, dtype=np.float32)
+            )
         else:
-            aligned_sp_cols.append(np.full(observations.shape[0], np.nan, np.float32))
+            aligned_sp_cols.append(
+                np.full(observations.shape[0], np.nan, dtype=np.float32)
+            )
     setpoints = np.stack(aligned_sp_cols, axis=1).astype(np.float32)
 
     outdoor = (
