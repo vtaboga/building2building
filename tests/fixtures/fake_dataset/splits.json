@@ -14,5 +14,13 @@
         "RetailStandalone": [],
         "RestaurantFastFood": [],
         "OfficeMedium": []
+    },
+    "test_small": {
+        "OfficeSmall": ["OfficeSmall-0002"],
+        "SingleFamilyHouse": [],
+        "Warehouse": [],
+        "RetailStandalone": [],
+        "RestaurantFastFood": [],
+        "OfficeMedium": []
     }
 }

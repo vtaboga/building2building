@@ -95,3 +95,30 @@ env = b2b.new_make_env("OfficeSmall", building_id=train_ids[5])
 Each building type has a fixed train/test split stored in
 `splits.json` on the HuggingFace repository. The splits are deterministic and
 reproducible across runs.
+
+### Updating the Small Test Split
+
+Use `baselines/scripts/make_test_small_split.py` to create a reviewable
+`splits.json` manifest with an added `test_small` split:
+
+```bash
+python baselines/scripts/make_test_small_split.py \
+    --output outputs/splits_with_test_small.json \
+    --seed 0
+```
+
+The script preserves the existing `train` and `test` entries. It selects one
+commercial test building per climate zone 1 through 8, then samples 8
+`SingleFamilyHouse` test buildings with the provided seed. After reviewing the
+printed summary and generated JSON, manually upload
+`outputs/splits_with_test_small.json` to the
+`vtaboga/building2building_dataset` Hugging Face dataset as `splits.json`.
+
+After upload, refresh the Hugging Face cache if needed and verify:
+
+```python
+import building2building as b2b
+
+ids = b2b.list_buildings("OfficeSmall", split="test_small")
+assert len(ids) == 8
+```

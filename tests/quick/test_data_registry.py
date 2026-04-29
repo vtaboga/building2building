@@ -41,6 +41,10 @@ class TestBuildingRegistryListings:
         ids = registry.list_buildings("OfficeSmall", "test")
         assert ids == ["OfficeSmall-0002"]
 
+    def test_list_buildings_test_small(self, registry: BuildingRegistry) -> None:
+        ids = registry.list_buildings("OfficeSmall", "test_small")
+        assert ids == ["OfficeSmall-0002"]
+
     def test_list_buildings_empty_split(self, registry: BuildingRegistry) -> None:
         ids = registry.list_buildings("RetailStandalone", "train")
         assert ids == []
@@ -102,6 +106,10 @@ class TestBuildingRegistryQuery:
         df = registry.query_buildings(split="train")
         expected_ids = {"OfficeSmall-0001", "SingleFamilyHouse-0001", "Warehouse-0001"}
         assert set(df["building_id"]) == expected_ids
+
+    def test_query_by_test_small_split(self, registry: BuildingRegistry) -> None:
+        df = registry.query_buildings(split="test_small")
+        assert set(df["building_id"]) == {"OfficeSmall-0002"}
 
     def test_query_with_filter(self, registry: BuildingRegistry) -> None:
         df = registry.query_buildings(hvac_type="baseboard")

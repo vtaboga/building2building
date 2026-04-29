@@ -40,7 +40,7 @@ def list_building_types() -> list[str]:
 
 def list_buildings(
     building_type: BuildingType,
-    split: Literal["train", "test"] = "train",
+    split: Literal["train", "test", "test_small"] = "train",
 ) -> list[str]:
     """Return building IDs for a given type and split.
 
@@ -54,7 +54,7 @@ def list_buildings(
 def list_buildings_by_climate_zone(
     building_type: BuildingType,
     climate_zone: int,
-    split: Literal["train", "test"] = "train",
+    split: Literal["train", "test", "test_small"] = "train",
 ) -> list[str]:
     """Return building IDs filtered by ASHRAE climate zone.
 
@@ -164,7 +164,7 @@ def _patch_epjson_run_period(
 def new_make_env(
     building_type: BuildingType,
     *,
-    split: Literal["train", "test"] = "train",
+    split: Literal["train", "test", "test_small"] = "train",
     index: int = 0,
     building_id: str | None = None,
     task: str | TaskPreset = "task1",
@@ -184,7 +184,7 @@ def new_make_env(
 
     Args:
         building_type: Building type (e.g. ``"OfficeSmall"``).
-        split: Dataset split (``"train"`` or ``"test"``).
+        split: Dataset split (``"train"``, ``"test"``, or ``"test_small"``).
         index: Zero-based index into the split.
         building_id: Explicit building ID, overrides *split*/*index*.
         task: Named task preset (``"task1"``–``"task5"``) or a
