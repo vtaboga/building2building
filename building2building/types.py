@@ -10,9 +10,17 @@ from typing import Any, ClassVar, Literal, Protocol, Sequence, Union
 
 
 RunPeriodName = Literal["full_year", "winter", "summer"]
-TargetTemperatureMode = Literal["constant", "occupancy"]
+TargetTemperatureMode = Literal["constant", "occupancy", "random_schedule"]
+SeasonName = Literal["winter", "shoulder", "summer"]
+UnoccupiedPolicy = Literal["fixed", "seasonal"]
 
 DEFAULT_TIMESTEPS_PER_HOUR: int = 12
+
+VALID_TARGET_TEMPERATURE_MODES: frozenset[str] = frozenset(
+    {"constant", "occupancy", "random_schedule"}
+)
+VALID_SEASON_NAMES: frozenset[str] = frozenset({"winter", "shoulder", "summer"})
+VALID_UNOCCUPIED_POLICIES: frozenset[str] = frozenset({"fixed", "seasonal"})
 
 
 @dataclass(frozen=True)
@@ -101,17 +109,64 @@ class RunPeriodConfig:
         return day_counts[self.name] * 24 * timesteps_per_hour
 
 
+DEFAULT_SEASONAL_UNOCCUPIED_C: dict[SeasonName, float] = {
+    "winter": 18.0,
+    "shoulder": 21.0,
+    "summer": 26.0,
+}
+
+
 @dataclass(frozen=True)
 class ZoneTargetTemperatureConfig:
     """Target temperature setpoints for a single thermal zone.
 
     Attributes:
         occupied_c: Target temperature when the zone is occupied (°C).
-        unoccupied_c: Target temperature when the zone is unoccupied (°C).
+        unoccupied_c: Target temperature when the zone is unoccupied
+            (°C).  Used only when ``unoccupied_policy == "fixed"``.
+        unoccupied_policy: ``"fixed"`` always uses :attr:`unoccupied_c`;
+            ``"seasonal"`` dispatches to :attr:`seasonal_unoccupied_c`
+            based on the current simulation month.
+        seasonal_unoccupied_c: Per-season unoccupied setpoints (°C),
+            keyed by ``"winter"`` / ``"shoulder"`` / ``"summer"``.
+            Required when ``unoccupied_policy == "seasonal"``.
     """
 
     occupied_c: float
     unoccupied_c: float
+    unoccupied_policy: UnoccupiedPolicy = "fixed"
+    seasonal_unoccupied_c: dict[SeasonName, float] | None = None
+
+    def __post_init__(self) -> None:
+        if self.unoccupied_policy not in VALID_UNOCCUPIED_POLICIES:
+            raise ValueError(
+                "unoccupied_policy must be one of "
+                f"{sorted(VALID_UNOCCUPIED_POLICIES)}, "
+                f"got {self.unoccupied_policy!r}"
+            )
+        if self.unoccupied_policy == "seasonal":
+            if self.seasonal_unoccupied_c is None:
+                raise ValueError(
+                    "seasonal_unoccupied_c is required when "
+                    "unoccupied_policy == 'seasonal'"
+                )
+            missing = VALID_SEASON_NAMES - set(self.seasonal_unoccupied_c.keys())
+            if missing:
+                raise ValueError(
+                    "seasonal_unoccupied_c must define all seasons "
+                    f"{sorted(VALID_SEASON_NAMES)}; missing {sorted(missing)}"
+                )
+
+    def unoccupied_for_season(self, season: SeasonName) -> float:
+        """Return the unoccupied setpoint for a given season.
+
+        For ``"fixed"`` policies this is just :attr:`unoccupied_c`.
+        For ``"seasonal"`` policies this looks up the per-season map.
+        """
+        if self.unoccupied_policy == "seasonal":
+            assert self.seasonal_unoccupied_c is not None
+            return float(self.seasonal_unoccupied_c[season])
+        return float(self.unoccupied_c)
 
     @classmethod
     def from_dict(
@@ -120,8 +175,9 @@ class ZoneTargetTemperatureConfig:
         """Create from a dictionary, using a fallback for missing values.
 
         Args:
-            data: Mapping with optional keys ``"occupied_c"`` and
-                ``"unoccupied_c"``.
+            data: Mapping with optional keys ``"occupied_c"``,
+                ``"unoccupied_c"``, ``"unoccupied_policy"``, and
+                ``"seasonal_unoccupied_c"``.
             fallback_temperature_c: Value used when ``"occupied_c"`` is
                 absent. ``"unoccupied_c"`` falls back to the occupied
                 value.
@@ -131,7 +187,58 @@ class ZoneTargetTemperatureConfig:
         """
         occupied = data.get("occupied_c", fallback_temperature_c)
         unoccupied = data.get("unoccupied_c", occupied)
-        return cls(occupied_c=float(occupied), unoccupied_c=float(unoccupied))
+        policy_raw = str(data.get("unoccupied_policy", "fixed")).strip().lower()
+        if policy_raw not in VALID_UNOCCUPIED_POLICIES:
+            raise ValueError(
+                "unoccupied_policy must be one of "
+                f"{sorted(VALID_UNOCCUPIED_POLICIES)}, got {policy_raw!r}"
+            )
+        policy: UnoccupiedPolicy = policy_raw  # type: ignore[assignment]
+        seasonal_raw = data.get("seasonal_unoccupied_c")
+        seasonal: dict[SeasonName, float] | None = None
+        if seasonal_raw is not None:
+            if not isinstance(seasonal_raw, dict):
+                raise TypeError(
+                    "seasonal_unoccupied_c must be a mapping of season → °C"
+                )
+            unknown_keys = set(seasonal_raw.keys()) - VALID_SEASON_NAMES
+            if unknown_keys:
+                raise ValueError(
+                    "seasonal_unoccupied_c keys must be subset of "
+                    f"{sorted(VALID_SEASON_NAMES)}, got unknown {sorted(unknown_keys)}"
+                )
+            seasonal = {
+                str(k): float(v) for k, v in seasonal_raw.items()  # type: ignore[misc]
+            }
+        if policy == "seasonal" and seasonal is None:
+            seasonal = dict(DEFAULT_SEASONAL_UNOCCUPIED_C)
+        return cls(
+            occupied_c=float(occupied),
+            unoccupied_c=float(unoccupied),
+            unoccupied_policy=policy,
+            seasonal_unoccupied_c=seasonal,
+        )
+
+
+@dataclass(frozen=True)
+class RandomScheduleConfig:
+    """Configuration for the per-day random occupancy schedule (``task5``).
+
+    This drives ``target_temperature_mode == "random_schedule"``: each
+    simulated day a fresh arrival time, departure time, occupied
+    setpoint, and unoccupied setpoint are drawn from the distribution
+    associated with :attr:`building_type`.
+
+    Attributes:
+        building_type: Building type key (e.g. ``"OfficeSmall"``) used
+            to pick default per-type distributions. ``None`` falls
+            back to a generic office profile.
+        seed: Base RNG seed for reproducibility.  The effective
+            per-day seed is derived from ``(seed, year, day_of_year)``.
+    """
+
+    building_type: str | None = None
+    seed: int = 0
 
 
 @dataclass
@@ -141,7 +248,8 @@ class TaskConfig:
     Attributes:
         run_period: Simulation run period (season or full year).
         target_temperature_mode: How target temperatures are determined
-            (``"constant"`` or ``"occupancy"``-dependent).
+            (``"constant"``, ``"occupancy"``-dependent, or
+            ``"random_schedule"`` with a Python-side daily generator).
         default_zone_target_temperature: Fallback target temperature
             used for zones without a zone-specific override.
         zone_target_temperatures: Per-zone target temperature overrides,
@@ -150,6 +258,10 @@ class TaskConfig:
             per hour.  Determines the control resolution (e.g. 4 → 15 min,
             12 → 5 min).  Must be a divisor of 60 accepted by EnergyPlus
             (1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60).
+        random_schedule_config: Parameters for the random daily
+            schedule generator.  Only used when
+            ``target_temperature_mode == "random_schedule"``; ignored
+            otherwise.
     """
 
     run_period: RunPeriodConfig
@@ -159,6 +271,7 @@ class TaskConfig:
         default_factory=dict
     )
     timesteps_per_hour: int = DEFAULT_TIMESTEPS_PER_HOUR
+    random_schedule_config: RandomScheduleConfig | None = None
 
     VALID_TIMESTEPS_PER_HOUR: ClassVar[frozenset[int]] = frozenset(
         {1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60}
@@ -188,10 +301,10 @@ class TaskConfig:
         run_period = RunPeriodConfig.from_name(task_section.get("run_period", "full_year"))
 
         mode_raw = str(task_section.get("target_temperature_mode", "constant")).strip().lower()
-        if mode_raw not in {"constant", "occupancy"}:
+        if mode_raw not in VALID_TARGET_TEMPERATURE_MODES:
             raise ValueError(
-                "task.target_temperature_mode must be one of {'constant', 'occupancy'}, "
-                f"got {mode_raw!r}"
+                "task.target_temperature_mode must be one of "
+                f"{sorted(VALID_TARGET_TEMPERATURE_MODES)}, got {mode_raw!r}"
             )
         mode: TargetTemperatureMode = mode_raw  # type: ignore[assignment]
 
@@ -227,12 +340,26 @@ class TaskConfig:
                 f"got {timesteps_per_hour}"
             )
 
+        random_schedule_cfg: RandomScheduleConfig | None = None
+        rs_raw = task_section.get("random_schedule")
+        if rs_raw is not None:
+            if not isinstance(rs_raw, dict):
+                raise TypeError("task.random_schedule must be a mapping")
+            bt_raw = rs_raw.get("building_type")
+            random_schedule_cfg = RandomScheduleConfig(
+                building_type=str(bt_raw) if bt_raw is not None else None,
+                seed=int(rs_raw.get("seed", 0)),
+            )
+        elif mode == "random_schedule":
+            random_schedule_cfg = RandomScheduleConfig()
+
         return cls(
             run_period=run_period,
             target_temperature_mode=mode,
             default_zone_target_temperature=default_temp,
             zone_target_temperatures=zone_targets,
             timesteps_per_hour=timesteps_per_hour,
+            random_schedule_config=random_schedule_cfg,
         )
 
     def expected_steps(self) -> int:

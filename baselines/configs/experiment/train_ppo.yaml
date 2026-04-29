@@ -16,7 +16,7 @@ building_types:
 
 split: test
 buildings_per_type: 8
-tasks: [task1, task2, task3, task4]
+tasks: [task1, task2, task3, task4, task5]
 
 training:
   total_timesteps: 5_000_000

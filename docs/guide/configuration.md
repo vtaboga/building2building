@@ -33,7 +33,7 @@ baselines/configs/
 │   ├── unitary_hvac.yaml
 │   └── air_loop.yaml
 ├── reward/               # Task reward definitions
-│   ├── task1.yaml ... task4.yaml
+│   ├── task1.yaml ... task5.yaml
 ├── training/
 │   └── default.yaml      # Training loop parameters
 ├── tuned_controllers/    # Optuna-optimized controller configs

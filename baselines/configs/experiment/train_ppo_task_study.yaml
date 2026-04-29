@@ -1,0 +1,30 @@
+# @package _global_
+# Paper-parity PPO sweep across all 5 tasks.
+#
+# Trains per-building PPO specialists on the same pool as Section 5 of
+# the paper (8 buildings per type / one per climate zone) for all five
+# paper tasks across 3 seeds and the full-year run period.  Uses the
+# existing PPO hyperparameters from Appendix D.3.  Results feed the
+# task-study analysis alongside the reactive baseline returns.
+name: train_ppo_task_study
+
+defaults:
+  - override /policy: ppo
+  - override /training: default
+
+building_types:
+  - OfficeSmall
+  - OfficeMedium
+  - RetailStandalone
+  - RestaurantFastFood
+  - Warehouse
+  - SingleFamilyHouse
+
+split: test
+buildings_per_type: 8
+tasks: [task1, task2, task3, task4, task5]
+seeds: [0, 1, 2]
+
+training:
+  total_timesteps: 5_000_000
+  n_envs: 14

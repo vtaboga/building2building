@@ -33,7 +33,7 @@ Key parameters:
 | Parameter | Description | Default |
 |---|---|---|
 | `building_types` | List of building types to train on | All 6 types |
-| `tasks` | List of task presets | `[task1, task2, task3, task4]` |
+| `tasks` | List of task presets | `[task1, task2, task3, task4, task5]` |
 | `buildings_per_type` | Number of buildings per type | `0` (all) |
 | `training.total_timesteps` | PPO training steps per building | `1000000` |
 | `training.n_envs` | Parallel training environments | `4` |

@@ -81,13 +81,42 @@ reward = BaseRewardConfig(energy_weight=0.01)
 
 **Constant:** the target is always `occupied_c` regardless of occupancy.
 
-**Occupancy-based:** the target switches to `unoccupied_c` when zone occupancy
-is zero.
+**Occupancy-based:** the target switches to an unoccupied setpoint when zone
+occupancy is zero.  The unoccupied setpoint may be:
+
+* `fixed` (a single year-round value via `unoccupied_c`), or
+* `seasonal` — dispatched by the current simulation month via
+  `seasonal_unoccupied_c = {"winter": ..., "shoulder": ..., "summer": ...}`.
+  This avoids the pathology of a fixed 18 °C target driving unnecessary
+  summer cooling.  The paper's `task3` uses the seasonal policy by default
+  (18 / 21 / 26 °C).
+
+!!! warning "Buildings without `People` objects"
+    Occupancy-based tasks read EnergyPlus's `Zone People Occupant Count`
+    variable.  If a building's epJSON does not define any `People`
+    objects, that variable is always zero and `task3` degenerates to a
+    constant "unoccupied" setpoint — i.e. it behaves like a
+    `constant`-mode task whose target is the seasonal unoccupied value
+    (18 / 21 / 26 °C) instead of 21 °C.  In the bundled dataset,
+    **`SingleFamilyHouse` has no occupancy schedule**, so `task3` on
+    that building type is not informative.  Prefer `task5`
+    (random schedule), which drives its own occupancy signal from the
+    Python side and works uniformly across every building type.
+
+**Random schedule:** each simulated day, a fresh arrival time, departure time,
+occupied setpoint, and unoccupied setpoint are sampled from a per-building-type
+distribution.  This is what `task5` uses.
 
 ```python
 env = b2b.new_make_env(
     "OfficeSmall",
-    task="task3",  # uses occupancy mode
+    task="task3",  # seasonal occupancy-based targets
+)
+
+env = b2b.new_make_env(
+    "OfficeSmall",
+    task="task5",  # per-day random arrival/departure + setpoints
+    random_schedule_seed=42,
 )
 ```
 
@@ -117,11 +146,16 @@ env = b2b.new_make_env(
 
 ## Task Presets
 
-The four named task presets define specific reward configurations:
+The five named task presets define specific reward configurations:
 
-| Task | Reward | Energy Weight | dT | Mode |
-|---|---|---|---|---|
-| `task1` | Deadband | 0.01 | 1.0 | Constant |
-| `task2` | Deadband | 0.10 | 1.0 | Constant |
-| `task3` | Deadband | 0.01 | 1.0 | Occupancy |
-| `task4` | Barrier | 0.01 | 1.0 | Constant |
+| Task | Reward | Energy Weight | dT | Mode | Notes |
+|---|---|---|---|---|---|
+| `task1` | Deadband | 0.01 | 1.0 | Constant | Comfort-leaning baseline |
+| `task2` | Deadband | 0.10 | 1.0 | Constant | Energy-leaning baseline |
+| `task3` | Deadband | 0.01 | 1.0 | Occupancy | Seasonal unoccupied setpoint (18 / 21 / 26 °C) |
+| `task4` | Barrier | 0.01 | 1.0 | Constant | Hard-band penalty |
+| `task5` | Deadband | 0.01 | 1.0 | Random schedule | Per-day random arrival / departure / setpoints |
+
+An additional preset `task3_legacy` reproduces the paper's original
+fixed 18 °C unoccupied setpoint and is intended only for the
+seasonal-ablation study in `analysis/task_study/`.

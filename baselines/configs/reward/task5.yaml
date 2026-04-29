@@ -1,0 +1,14 @@
+# Task 5: Deadband reward, random daily arrival/departure + setpoints
+#
+# Per-building-type distributions are defined in
+# building2building/simulator/schedules.py.  Each simulated day draws a
+# fresh (arrival_h, departure_h, occupied_c, unoccupied_c) tuple from the
+# distribution matching the active building type.
+task_name: task5
+reward_type: deadband
+energy_weight: 0.01
+dT: 1.0
+target_temperature_mode: random_schedule
+target_temperature_occupied: 21.0
+target_temperature_unoccupied: 18.0
+random_schedule_seed: 0

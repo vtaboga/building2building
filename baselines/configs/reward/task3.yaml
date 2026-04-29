@@ -1,4 +1,10 @@
-# Task 3: Deadband reward, low energy weight, occupancy-based target
+# Task 3: Deadband reward, occupancy-based target with SEASONAL unoccupied setpoint
+#
+# The unoccupied setpoint drifts with the season to avoid fighting the
+# outdoor climate: in winter we let the zone cool to 18 C, in summer we
+# let it warm to 26 C, and in the shoulder we stay neutral at 21 C.  This
+# replaces the paper's original fixed 18 C which was counter-productive
+# in summer.
 task_name: task3
 reward_type: deadband
 energy_weight: 0.01
@@ -6,3 +12,8 @@ dT: 1.0
 target_temperature_mode: occupancy
 target_temperature_occupied: 21.0
 target_temperature_unoccupied: 18.0
+unoccupied_policy: seasonal
+seasonal_unoccupied_c:
+  winter: 18.0
+  shoulder: 21.0
+  summer: 26.0

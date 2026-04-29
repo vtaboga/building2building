@@ -58,7 +58,7 @@ print(f"Test action dim:  {test_env.action_space.shape[0]}")
 |---|---|---|---|
 | `system_type` | `"unitary"` / `"central"` | `"unitary"` | HVAC system type. Determines which actuators are toggled and the default building type. |
 | `direction` | `"expand"` / `"reduce"` | `"expand"` | Whether **test** has more or fewer actuators than training. |
-| `task` | `str` | `"task1"` | Named task preset (`"task1"`–`"task4"`). |
+| `task` | `str` | `"task1"` | Named task preset (`"task1"`–`"task5"`). |
 | `building_type` | `str` or `None` | `None` | Override the default building type. When `None`, defaults to `"OfficeSmall"` for unitary and `"OfficeMedium"` for central. |
 | `split` | `"train"` / `"test"` | `"train"` | Dataset split from which to select the building. |
 | `split_index` | `int` | `0` | Index within the split to select the building. |

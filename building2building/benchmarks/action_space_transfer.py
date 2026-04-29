@@ -145,6 +145,7 @@ class ActionSpaceTransfer(BenchmarkProblem):
         from building2building.simulator import create_simulator
         from building2building.types import (
             BuildingConfig,
+            RandomScheduleConfig,
             RunPeriodConfig,
             TaskConfig,
             ZoneTargetTemperatureConfig,
@@ -167,13 +168,27 @@ class ActionSpaceTransfer(BenchmarkProblem):
         weather_path = info.building_dir / info.weather_file
 
         run_period_cfg = RunPeriodConfig.from_name("full_year")
+        default_zone_target = ZoneTargetTemperatureConfig(
+            occupied_c=preset.target_temperature_occupied,
+            unoccupied_c=preset.target_temperature_unoccupied,
+            unoccupied_policy=preset.unoccupied_policy,
+            seasonal_unoccupied_c=(
+                dict(preset.seasonal_unoccupied_c)
+                if preset.seasonal_unoccupied_c is not None
+                else None
+            ),
+        )
+        random_schedule_cfg: RandomScheduleConfig | None = None
+        if preset.target_temperature_mode == "random_schedule":
+            random_schedule_cfg = RandomScheduleConfig(
+                building_type=self.building_type,
+                seed=0,
+            )
         task_cfg = TaskConfig(
             run_period=run_period_cfg,
             target_temperature_mode=preset.target_temperature_mode,
-            default_zone_target_temperature=ZoneTargetTemperatureConfig(
-                occupied_c=preset.target_temperature_occupied,
-                unoccupied_c=preset.target_temperature_unoccupied,
-            ),
+            default_zone_target_temperature=default_zone_target,
+            random_schedule_config=random_schedule_cfg,
         )
 
         equipment_data: list[AnyEquipment] = structure(

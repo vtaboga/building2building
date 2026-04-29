@@ -8,6 +8,7 @@ from building2building.types import (
     BarrierRewardConfig,
     BaseRewardConfig,
     DeadbandRewardConfig,
+    RandomScheduleConfig,
     RunPeriodConfig,
     TaskConfig,
     ZoneTargetTemperatureConfig,
@@ -120,6 +121,82 @@ class TestTaskConfig:
     def test_expected_steps_delegates(self) -> None:
         tc = TaskConfig.from_dict({"run_period": "summer", "timesteps_per_hour": 6})
         assert tc.expected_steps() == 92 * 24 * 6
+
+    def test_random_schedule_mode_accepted(self) -> None:
+        tc = TaskConfig.from_dict({"target_temperature_mode": "random_schedule"})
+        assert tc.target_temperature_mode == "random_schedule"
+        assert tc.random_schedule_config is not None
+
+    def test_random_schedule_config_from_dict(self) -> None:
+        tc = TaskConfig.from_dict(
+            {
+                "target_temperature_mode": "random_schedule",
+                "random_schedule": {"building_type": "OfficeSmall", "seed": 42},
+            }
+        )
+        assert tc.random_schedule_config is not None
+        assert tc.random_schedule_config.building_type == "OfficeSmall"
+        assert tc.random_schedule_config.seed == 42
+
+    def test_random_schedule_requires_mapping(self) -> None:
+        with pytest.raises(TypeError, match="random_schedule"):
+            TaskConfig.from_dict(
+                {
+                    "target_temperature_mode": "random_schedule",
+                    "random_schedule": "not a mapping",
+                }
+            )
+
+    def test_random_schedule_config_defaults(self) -> None:
+        rs = RandomScheduleConfig()
+        assert rs.building_type is None
+        assert rs.seed == 0
+
+
+@pytest.mark.quick
+class TestZoneTargetTemperatureConfigExtended:
+    def test_from_dict_seasonal_roundtrip(self) -> None:
+        cfg = ZoneTargetTemperatureConfig.from_dict(
+            {
+                "occupied_c": 21.0,
+                "unoccupied_c": 18.0,
+                "unoccupied_policy": "seasonal",
+                "seasonal_unoccupied_c": {
+                    "winter": 17.0,
+                    "shoulder": 21.0,
+                    "summer": 26.0,
+                },
+            },
+            fallback_temperature_c=21.0,
+        )
+        assert cfg.unoccupied_policy == "seasonal"
+        assert cfg.unoccupied_for_season("summer") == 26.0
+
+    def test_from_dict_unknown_policy_raises(self) -> None:
+        with pytest.raises(ValueError, match="unoccupied_policy"):
+            ZoneTargetTemperatureConfig.from_dict(
+                {
+                    "occupied_c": 21.0,
+                    "unoccupied_policy": "spring_only",
+                },
+                fallback_temperature_c=21.0,
+            )
+
+    def test_from_dict_seasonal_unknown_season_key_raises(self) -> None:
+        with pytest.raises(ValueError, match="seasonal_unoccupied_c"):
+            ZoneTargetTemperatureConfig.from_dict(
+                {
+                    "occupied_c": 21.0,
+                    "unoccupied_policy": "seasonal",
+                    "seasonal_unoccupied_c": {
+                        "winter": 18.0,
+                        "shoulder": 21.0,
+                        "summer": 26.0,
+                        "monsoon": 24.0,
+                    },
+                },
+                fallback_temperature_c=21.0,
+            )
 
 
 @pytest.mark.quick
