@@ -16,13 +16,16 @@ def main() -> None:
     task = "task1"
     run_period = "winter"
     total_timesteps = 50_000
+    train_building_id = b2b.list_buildings(building_type, split="train")[0]
+    eval_building_id = b2b.list_buildings(building_type, split="test")[0]
 
     # -- Train --
-    print(f"Training PPO on {building_type}/{task} ({run_period})...")
+    print(
+        f"Training PPO on {building_type}/{train_building_id}/{task} ({run_period})..."
+    )
     train_env = b2b.new_make_env(
         building_type,
-        split="train",
-        index=0,
+        building_id=train_building_id,
         task=task,
         run_period=run_period,
     )
@@ -45,8 +48,7 @@ def main() -> None:
     print("\nEvaluating on test building...")
     eval_env = b2b.new_make_env(
         building_type,
-        split="test",
-        index=0,
+        building_id=eval_building_id,
         task=task,
         run_period=run_period,
     )
@@ -72,6 +74,8 @@ def main() -> None:
             cumulative_return=total_reward,
             building_type=building_type,
             task=task,
+            run_period=run_period,
+            building_id=eval_building_id,
         )
         print(f"Normalized score: {score:.3f} (>1.0 = better than baseline)")
     except FileNotFoundError:

@@ -59,6 +59,9 @@ where = ["."]
 include = ["building2building*"]
 exclude = ["tests*"]
 
+[tool.setuptools.package-data]
+building2building = ["scores/*.csv"]
+
 [tool.black]
 line-length = 88
 target-version = ["py310"]

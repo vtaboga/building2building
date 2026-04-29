@@ -2,19 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import patch
-
 import pytest
 
 from building2building import scoring
 
 
 @pytest.fixture(autouse=True)
-def _clear_baseline_cache() -> None:
+def _clear_cache() -> None:
     """Ensure each test starts with a clean cache."""
-    scoring._baseline_cache = None
-    scoring._baseline_cache_no_task = None
+    scoring._cache = None
 
 
 @pytest.mark.quick
@@ -22,17 +18,13 @@ class TestComputeNormalizedScore:
     @pytest.fixture(autouse=True)
     def _inject_baselines(self) -> None:
         """Inject a controlled baseline cache for deterministic tests."""
-        scoring._baseline_cache = {
-            ("OfficeSmall", "task1", "OfficeSmall-0001"): -30000.0,
-            ("OfficeSmall", "task1", "OfficeSmall-0002"): -25000.0,
-            ("Warehouse", "task1", "Warehouse-0001"): -40000.0,
-            ("SingleFamilyHouse", "task1", "SingleFamilyHouse-0001"): -10000.0,
-        }
-        scoring._baseline_cache_no_task = {
-            ("OfficeSmall", "OfficeSmall-0001"): -30000.0,
-            ("OfficeSmall", "OfficeSmall-0002"): -25000.0,
-            ("Warehouse", "Warehouse-0001"): -40000.0,
-            ("SingleFamilyHouse", "SingleFamilyHouse-0001"): -10000.0,
+        scoring._cache = {
+            ("OfficeSmall", "task1", "full_year", "OfficeSmall-0001"): -30000.0,
+            ("OfficeSmall", "task1", "full_year", "OfficeSmall-0002"): -25000.0,
+            ("OfficeSmall", "task1", "winter", "OfficeSmall-0001"): -12000.0,
+            ("OfficeSmall", "task1", "summer", "OfficeSmall-0001"): -18000.0,
+            ("Warehouse", "task1", "full_year", "Warehouse-0001"): -40000.0,
+            ("SingleFamilyHouse", "task1", "full_year", "SingleFamilyHouse-0001"): -10000.0,
         }
 
     def test_by_building_id(self) -> None:
@@ -40,27 +32,58 @@ class TestComputeNormalizedScore:
             cumulative_return=-30000.0,
             building_type="OfficeSmall",
             task="task1",
+            run_period="full_year",
             building_id="OfficeSmall-0001",
         )
         assert score == pytest.approx(1.0)
 
-    def test_by_building_type_average(self) -> None:
-        avg = (-30000.0 + -25000.0) / 2
-        score = scoring.compute_normalized_score(
-            cumulative_return=avg,
-            building_type="OfficeSmall",
-            task="task1",
-        )
-        assert score == pytest.approx(1.0)
+    def test_missing_building_id_argument_raises(self) -> None:
+        with pytest.raises(TypeError, match="building_id"):
+            scoring.compute_normalized_score(
+                cumulative_return=-30000.0,
+                building_type="OfficeSmall",
+                task="task1",
+                run_period="full_year",
+            )  # type: ignore[call-arg]
+
+    def test_none_building_id_raises(self) -> None:
+        with pytest.raises(ValueError, match="building_id must be specified"):
+            scoring.compute_normalized_score(
+                cumulative_return=-30000.0,
+                building_type="OfficeSmall",
+                task="task1",
+                run_period="full_year",
+                building_id=None,  # type: ignore[arg-type]
+            )
 
     def test_better_than_baseline(self) -> None:
         score = scoring.compute_normalized_score(
             cumulative_return=-15000.0,
             building_type="OfficeSmall",
             task="task1",
+            run_period="full_year",
             building_id="OfficeSmall-0001",
         )
         assert score == pytest.approx(-15000.0 / -30000.0)
+
+    def test_winter_vs_summer_differ(self) -> None:
+        winter = scoring.compute_normalized_score(
+            cumulative_return=-12000.0,
+            building_type="OfficeSmall",
+            task="task1",
+            run_period="winter",
+            building_id="OfficeSmall-0001",
+        )
+        summer = scoring.compute_normalized_score(
+            cumulative_return=-12000.0,
+            building_type="OfficeSmall",
+            task="task1",
+            run_period="summer",
+            building_id="OfficeSmall-0001",
+        )
+        assert winter == pytest.approx(1.0)
+        assert summer == pytest.approx(-12000.0 / -18000.0)
+        assert winter != summer
 
     def test_missing_building_id_raises(self) -> None:
         with pytest.raises(KeyError, match="No baseline return found"):
@@ -68,24 +91,27 @@ class TestComputeNormalizedScore:
                 cumulative_return=-1.0,
                 building_type="OfficeSmall",
                 task="task1",
+                run_period="full_year",
                 building_id="OfficeSmall-9999",
             )
 
-    def test_missing_building_type_raises(self) -> None:
-        with pytest.raises(KeyError, match="No baseline returns found"):
+    def test_missing_run_period_raises(self) -> None:
+        with pytest.raises(KeyError, match="No baseline return found"):
             scoring.compute_normalized_score(
                 cumulative_return=-1.0,
-                building_type="NonExistent",  # type: ignore[arg-type]
+                building_type="Warehouse",
                 task="task1",
+                run_period="winter",
+                building_id="Warehouse-0001",
             )
 
     def test_zero_baseline_returns_raw(self) -> None:
-        scoring._baseline_cache = {("ZeroType", "task1", "ZT-001"): 0.0}
-        scoring._baseline_cache_no_task = {("ZeroType", "ZT-001"): 0.0}
+        scoring._cache = {("ZeroType", "task1", "full_year", "ZT-001"): 0.0}
         score = scoring.compute_normalized_score(
             cumulative_return=-500.0,
             building_type="ZeroType",  # type: ignore[arg-type]
             task="task1",
+            run_period="full_year",
             building_id="ZT-001",
         )
         assert score == -500.0

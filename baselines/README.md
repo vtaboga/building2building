@@ -195,6 +195,8 @@ score = b2b.compute_normalized_score(
     cumulative_return=-5000.0,
     building_type="OfficeSmall",
     task="task1",
+    run_period="full_year",
+    building_id="OfficeSmall-0001",
 )
 
 # Benchmarks
