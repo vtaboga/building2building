@@ -44,9 +44,9 @@ test_envs = bench.make_test_envs(n=4)
 
 1. **Reproducible splits** -- building selections are deterministic and
    seeded.
-2. **Named task presets** -- `"task1"` through `"task4"` reproduce exact
+2. **Named task presets** -- `"task1"` through `"task5"` reproduce exact
    paper conditions.
 3. **Normalized scoring** -- `b2b.compute_normalized_score()` compares agent
-   returns to the reactive-controller baseline.
+   returns to the reactive-controller baseline for the same building.
 4. **Season-aware tasks** -- each side can specify a `run_period` (`winter`,
    `summer`, or `full_year`).

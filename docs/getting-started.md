@@ -71,7 +71,7 @@ Key parameters of `new_make_env`:
 | `split` | `"train"` or `"test"` | `"train"` |
 | `index` | Position in the split list | `0` |
 | `building_id` | Explicit building ID (alternative to split+index) | `None` |
-| `task` | `"task1"` through `"task4"` or a `TaskPreset` | `"task1"` |
+| `task` | `"task1"` through `"task5"` or a `TaskPreset` | `"task1"` |
 | `run_period` | `"full_year"`, `"winter"`, or `"summer"` | `"full_year"` |
 | `timesteps_per_hour` | Simulation resolution | `12` (5-min steps) |
 
@@ -209,8 +209,7 @@ for env in train_envs + test_envs:
 
 ## 8. Normalized Scoring
 
-After generating `baseline_returns.csv` (see step 5), compute normalized
-scores:
+Use the packaged baseline returns to compute normalized scores:
 
 ```python
 import building2building as b2b
@@ -219,6 +218,8 @@ score = b2b.compute_normalized_score(
     cumulative_return=-5000.0,
     building_type="OfficeSmall",
     task="task1",
+    run_period="full_year",
+    building_id="OfficeSmall-0001",
 )
 print(f"Normalized score: {score:.3f}")
 # > 1.0 means the agent outperforms the reactive baseline

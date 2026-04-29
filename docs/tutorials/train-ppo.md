@@ -92,6 +92,8 @@ score = b2b.compute_normalized_score(
     cumulative_return=total_reward,
     building_type="OfficeSmall",
     task="task1",
+    run_period="full_year",
+    building_id="OfficeSmall-0001",
 )
 print(f"Normalized score: {score:.3f}")
 ```
