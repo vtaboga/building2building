@@ -11,9 +11,9 @@ building_types:
   - SingleFamilyHouse
 
 split: test
-run_period: full_year
+run_periods: [full_year]
 max_buildings_per_type: null
-tasks: [task1, task2, task3, task4]
+tasks: [task1, task2, task3, task4, task5]
 n_runs: 1
 output_csv: baseline_returns.csv
 

@@ -125,6 +125,19 @@ def close_env_aggressively(
     output directory.  When many envs are created sequentially inside a
     long-running process (e.g. Optuna tuning), the following all leak:
 
+    .. TODO::
+        ``minergym.environment.EnergyPlusEnvironment`` should override
+        ``close()`` to call ``self.ep.try_stop(); self.ep = None``, mirroring
+        what ``reset()`` already does for the *previous* episode.  That would
+        fix the thread and native-state leak upstream.  However, it cannot fix
+        the output-directory leak because ``eplus_output_dir`` is passed to
+        ``MakeEnergyPlus`` at construction time and is not stored as an
+        attribute on ``EnergyPlusEnvironment``.  For that reason, and because
+        editing an installed package is fragile (overwritten on ``pip
+        install`` / ``uv sync``), this helper should be kept even after a
+        minergym fix lands: it handles both the resource leak *and* the
+        directory cleanup in one call.
+
     * the daemon ``threading.Thread`` running ``api.runtime.run_energyplus``,
     * cyclic references between the ``EnergyPlusSimulation`` object, its
       ``StateStarted``/``StateDone`` state, and the thread's closure,

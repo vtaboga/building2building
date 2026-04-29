@@ -1,21 +1,24 @@
 # @package _global_
 # CHS-based PPO hyperparameter tuning (Patterson et al., RLC 2024).
 #
-# One run per (building_type, task) pair.  Orion TPE explores PPO
-# hyperparameters while evaluating across 8 buildings (one per climate
-# zone).  SLURM job array workers call suggest/observe in a loop.
+# A single Orion experiment evaluates each HP config across buildings sampled
+# from all building types and ASHRAE climate zones simultaneously.  Each
+# building is one CHS environment: training and evaluation happen on the same
+# building, matching the paper's procedure.
 #
-# Sweep (run as SLURM job array):
-#   python -m baselines.tune_ppo experiment=tune_ppo \
-#       building_type=OfficeSmall task=task1
+# Trial cost (default config):
+#   n_tune_buildings=2 × 5 types × ntune_seeds=3 × ~75 min ≈ 37.5 h/trial
+#   → 1 trial per worker in 48 h; 75 workers → ~75 trials per submission
+#   → n_startup_trials=30 leaves ~45 TPE-guided trials per submission
+#
+# Sweep (75 workers sharing one Orion DB):
+#   python -m baselines.tune_ppo experiment=tune_ppo task=task1
 #
 # CHS analysis (after all sweep jobs complete):
-#   python -m baselines.tune_ppo experiment=tune_ppo \
-#       building_type=OfficeSmall task=task1 analyze=true
+#   python -m baselines.tune_ppo experiment=tune_ppo task=task1 analyze=true
 #
 # Re-evaluation:
-#   python -m baselines.tune_ppo experiment=tune_ppo \
-#       building_type=OfficeSmall task=task1 reeval=true
+#   python -m baselines.tune_ppo experiment=tune_ppo task=task1 reeval=true
 
 name: tune_ppo
 
@@ -23,18 +26,31 @@ defaults:
   - override /policy: ppo
   - override /training: default
 
-building_type: ???            # e.g. OfficeSmall, OfficeMedium, ...
 task: ???                     # e.g. task1, task2, task3, task4
 
+# Building types included in the unified sweep
+building_types:
+  - OfficeSmall
+  - OfficeMedium
+  - RestaurantFastFood
+  - RetailStandalone
+  - Warehouse
+
 # Orion / CHS parameters
-n_trials: 100
-n_startup_trials: 20
-ntune_seeds: 3                # seeds per (building, trial) in the sweep
+n_trials: 500
+n_startup_trials: 30          # random exploration before TPE kicks in (≥ 5× n_dims = 30)
+ntune_seeds: 3                # seeds per (building, trial) — 3 × 10 buildings ≈ 37.5 h/trial
+n_tune_buildings: 2           # buildings per type from the test split (2 × 5 types = 10 total)
 algorithm: tpe
 
 # Paths (use SCRATCH for shared DB on Mila cluster)
 orion_db_dir: ${oc.env:SCRATCH,outputs}/orion_dbs
-results_dir: ${oc.env:SCRATCH,outputs}/chs_results/${building_type}_${task}
+results_dir: ${oc.env:SCRATCH,outputs}/chs_results/all_${task}
+
+# Must match --time in launch_chs_sweep.sh.  Workers check remaining wall time
+# before each suggest() call and exit cleanly if a full trial would not fit,
+# preventing stale "reserved" entries in the Orion DB.
+wall_time_hours: 48
 
 # Modes
 reeval: false

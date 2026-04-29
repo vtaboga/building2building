@@ -108,7 +108,16 @@ def _patch_epjson_run_period(
     user requests a different run period (``winter``, ``summer``), we must
     patch the dates so that EnergyPlus actually simulates the right season
     instead of relying only on the ``TimeLimit`` wrapper.
+
+    ``Schedule:File`` objects in residential buildings (e.g. SingleFamilyHouse)
+    reference external CSV files via relative paths.  When the patched epJSON
+    is written to a different directory (``dst_epjson.parent != src_epjson.parent``),
+    EnergyPlus cannot find those files and segfaults.  We therefore rewrite
+    any relative ``file_name`` entries to absolute paths rooted at
+    ``src_epjson.parent`` before writing the patched file.
     """
+    src_dir = src_epjson.parent
+
     with src_epjson.open() as f:
         epjson: dict[str, Any] = json.load(f)
 
@@ -143,6 +152,11 @@ def _patch_epjson_run_period(
     rp1["end_day_of_month"] = run_period_cfg.end_day_of_month
     rp1["end_month"] = run_period_cfg.end_month
 
+    for sched_obj in epjson.get("Schedule:File", {}).values():
+        file_name = sched_obj.get("file_name", "")
+        if file_name and not Path(file_name).is_absolute():
+            sched_obj["file_name"] = str((src_dir / file_name).resolve())
+
     with dst_epjson.open("w") as f:
         json.dump(epjson, f, indent=4)
 
@@ -157,7 +171,8 @@ def new_make_env(
     reward: str | RewardConfig | None = None,
     run_period: str = "full_year",
     timesteps_per_hour: int = 12,
-    target_temperature_mode: str = "constant",
+    target_temperature_mode: str | None = None,
+    random_schedule_seed: int | None = None,
     eplus_output_dir: str | Path | None = None,
     max_episode_steps: int | None = None,
 ) -> gym.Env:
@@ -172,13 +187,20 @@ def new_make_env(
         split: Dataset split (``"train"`` or ``"test"``).
         index: Zero-based index into the split.
         building_id: Explicit building ID, overrides *split*/*index*.
-        task: Named task preset (``"task1"``–``"task4"``) or a
+        task: Named task preset (``"task1"``–``"task5"``) or a
             :class:`~building2building.config.tasks.TaskPreset` instance.
         reward: Override reward.  If ``None``, uses the task default.
         run_period: Simulation run period name (``"full_year"``,
             ``"winter"``, ``"summer"``).
         timesteps_per_hour: Number of simulation steps per hour.
-        target_temperature_mode: ``"constant"`` or ``"occupancy"``.
+        target_temperature_mode: Override the preset's target mode
+            (``"constant"``, ``"occupancy"``, or ``"random_schedule"``).
+            When ``None`` (default), the mode is taken from the task
+            preset, so that e.g. ``task="task3"`` automatically uses
+            occupancy-based targets.
+        random_schedule_seed: Base seed for the per-day schedule
+            generator used by ``task5``.  ``None`` falls back to the
+            value on the preset's task config (default ``0``).
         eplus_output_dir: Directory for EnergyPlus output.  If ``None``,
             a temporary directory is used.
         max_episode_steps: Maximum episode length.
@@ -191,6 +213,7 @@ def new_make_env(
     from building2building.data.registry import get_registry
     from building2building.types import (
         BuildingConfig,
+        RandomScheduleConfig,
         ZoneTargetTemperatureConfig,
     )
 
@@ -235,14 +258,36 @@ def new_make_env(
             patched_epjson_path,
         )
 
+    effective_mode: str = (
+        target_temperature_mode
+        if target_temperature_mode is not None
+        else preset.target_temperature_mode
+    )
+
+    default_zone_target = ZoneTargetTemperatureConfig(
+        occupied_c=preset.target_temperature_occupied,
+        unoccupied_c=preset.target_temperature_unoccupied,
+        unoccupied_policy=preset.unoccupied_policy,
+        seasonal_unoccupied_c=(
+            dict(preset.seasonal_unoccupied_c)
+            if preset.seasonal_unoccupied_c is not None
+            else None
+        ),
+    )
+
+    random_schedule_cfg: RandomScheduleConfig | None = None
+    if effective_mode == "random_schedule":
+        random_schedule_cfg = RandomScheduleConfig(
+            building_type=building_type,
+            seed=int(random_schedule_seed) if random_schedule_seed is not None else 0,
+        )
+
     task_cfg = TaskConfig(
         run_period=run_period_cfg,
-        target_temperature_mode=target_temperature_mode,  # type: ignore[arg-type]
-        default_zone_target_temperature=ZoneTargetTemperatureConfig(
-            occupied_c=preset.target_temperature_occupied,
-            unoccupied_c=preset.target_temperature_unoccupied,
-        ),
+        target_temperature_mode=effective_mode,  # type: ignore[arg-type]
+        default_zone_target_temperature=default_zone_target,
         timesteps_per_hour=timesteps_per_hour,
+        random_schedule_config=random_schedule_cfg,
     )
 
     from cattrs import structure

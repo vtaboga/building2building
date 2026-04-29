@@ -10,10 +10,16 @@ from building2building.types import BarrierRewardConfig, DeadbandRewardConfig
 
 @pytest.mark.quick
 class TestTaskPresets:
-    def test_all_four_presets_exist(self) -> None:
-        assert set(TASK_PRESETS.keys()) == {"task1", "task2", "task3", "task4"}
+    def test_paper_presets_exist(self) -> None:
+        paper_tasks = {"task1", "task2", "task3", "task4", "task5"}
+        assert paper_tasks.issubset(TASK_PRESETS.keys())
 
-    @pytest.mark.parametrize("name", ["task1", "task2", "task3", "task4"])
+    def test_task3_legacy_preset_exists_for_ablation(self) -> None:
+        assert "task3_legacy" in TASK_PRESETS
+
+    @pytest.mark.parametrize(
+        "name", ["task1", "task2", "task3", "task4", "task5", "task3_legacy"]
+    )
     def test_preset_is_task_preset(self, name: str) -> None:
         assert isinstance(TASK_PRESETS[name], TaskPreset)
 
@@ -24,15 +30,26 @@ class TestTaskPresets:
         assert p.target_temperature_mode == "constant"
         assert p.target_temperature_occupied == 21.0
         assert p.target_temperature_unoccupied == 21.0
+        assert p.unoccupied_policy == "fixed"
 
     def test_task2_deadband_high_energy_weight(self) -> None:
         p = TASK_PRESETS["task2"]
         assert isinstance(p.reward, DeadbandRewardConfig)
         assert p.reward.energy_weight == 0.10
 
-    def test_task3_occupancy_mode(self) -> None:
+    def test_task3_occupancy_mode_seasonal(self) -> None:
         p = TASK_PRESETS["task3"]
         assert p.target_temperature_mode == "occupancy"
+        assert p.unoccupied_policy == "seasonal"
+        assert p.seasonal_unoccupied_c is not None
+        assert p.seasonal_unoccupied_c["winter"] == 18.0
+        assert p.seasonal_unoccupied_c["shoulder"] == 21.0
+        assert p.seasonal_unoccupied_c["summer"] == 26.0
+
+    def test_task3_legacy_is_fixed(self) -> None:
+        p = TASK_PRESETS["task3_legacy"]
+        assert p.target_temperature_mode == "occupancy"
+        assert p.unoccupied_policy == "fixed"
         assert p.target_temperature_unoccupied == 18.0
 
     def test_task4_barrier_reward(self) -> None:
@@ -40,10 +57,17 @@ class TestTaskPresets:
         assert isinstance(p.reward, BarrierRewardConfig)
         assert p.reward.violation_penalty == 10.0
 
+    def test_task5_random_schedule(self) -> None:
+        p = TASK_PRESETS["task5"]
+        assert isinstance(p.reward, DeadbandRewardConfig)
+        assert p.target_temperature_mode == "random_schedule"
+
 
 @pytest.mark.quick
 class TestResolveTaskPreset:
-    @pytest.mark.parametrize("name", ["task1", "task2", "task3", "task4"])
+    @pytest.mark.parametrize(
+        "name", ["task1", "task2", "task3", "task4", "task5", "task3_legacy"]
+    )
     def test_known_presets_resolve(self, name: str) -> None:
         preset = resolve_task_preset(name)
         assert preset is TASK_PRESETS[name]

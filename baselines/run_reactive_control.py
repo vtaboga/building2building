@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Evaluate reactive controllers and generate baseline_returns.csv.
 
+Each run produces one row per ``(building_type, task, run_period, building_id)``.
+
 Usage with Hydra::
 
     python -m baselines.run_reactive_control experiment=eval_reactive_control
@@ -18,6 +20,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -37,7 +40,7 @@ from baselines.plotting.plot_trajectory import (
     extract_trajectory_data,
     plot_trajectory,
 )
-from baselines.utils.evaluation import EpisodeResult, run_episode
+from baselines.utils.evaluation import EpisodeResult, close_env_aggressively, run_episode
 
 logger = logging.getLogger(__name__)
 
@@ -50,15 +53,29 @@ class RunResult:
     building_type: str
     building_id: str
     task: str
+    run_period: str
     rewards: list[float]
     reward_mean: float
+
+
+def _load_tuned_yaml(path: Path) -> dict[str, Any]:
+    """Load a tuned-controller YAML, tolerating python/tuple tags.
+
+    Several files under ``baselines/configs/tuned_controllers`` were
+    dumped with plain ``yaml.dump`` and therefore contain
+    ``!!python/tuple`` (e.g. ``target_schedule.weekend_days``), which
+    ``yaml.safe_load`` refuses to construct. We use ``yaml.unsafe_load``
+    here because these files are produced by our own tuning pipeline.
+    Downstream callers drop the ``target_schedule`` entry anyway.
+    """
+    return yaml.unsafe_load(path.read_text())
 
 
 def _load_tuned_unitary_hvac(bt: str, cz: int | None) -> UnitaryHvacConfig:
     if cz is not None:
         p = TUNED_CONFIGS_DIR / f"unitary_hvac_{bt.lower()}_cz{cz}.yaml"
         if p.exists():
-            raw = yaml.safe_load(p.read_text())
+            raw = _load_tuned_yaml(p)
             raw.pop("type", None)
             return UnitaryHvacConfig(**{
                 k: float(v) if isinstance(v, (int, float)) else v
@@ -72,7 +89,7 @@ def _load_tuned_air_loop(bt: str, cz: int | None) -> AirLoopConfig:
     if cz is not None:
         p = TUNED_CONFIGS_DIR / f"air_loop_{bt.lower()}_cz{cz}.yaml"
         if p.exists():
-            raw = yaml.safe_load(p.read_text())
+            raw = _load_tuned_yaml(p)
             raw.pop("type", None)
             return AirLoopConfig(**raw)
     return AirLoopConfig()
@@ -126,11 +143,13 @@ def evaluate_building(
     rewards: list[float] = []
 
     for run_idx in range(n_runs):
+        eplus_dir = Path(tempfile.mkdtemp(prefix="b2b_eplus_"))
         env = b2b.new_make_env(
             building_type,
             building_id=building_id,
             task=task,
             run_period=run_period,
+            eplus_output_dir=eplus_dir,
         )
         try:
             policy = _select_policy(building_type, building_id, env)
@@ -167,31 +186,41 @@ def evaluate_building(
                     plot_trajectory(traj, output_path=fig_path)
                     logger.info("    Saved plot → %s.*", fig_path)
         finally:
-            env.close()
+            close_env_aggressively(env, cleanup_dir=eplus_dir)
 
     return RunResult(
         building_type=building_type,
         building_id=building_id,
         task=task,
+        run_period=run_period,
         rewards=rewards,
         reward_mean=float(np.mean(rewards)),
     )
 
 
 def write_csv(results: list[RunResult], path: Path, *, n_runs: int) -> None:
-    """Write results to CSV with per-task rows."""
+    """Write results to CSV with one row per (building, task, run_period)."""
     run_cols = [f"reward_run{i + 1}" for i in range(n_runs)]
-    fieldnames = ["building_type", "task", "building_id"] + run_cols + [
-        "reward_mean"
+    fieldnames = [
+        "building_type",
+        "task",
+        "run_period",
+        "building_id",
+        *run_cols,
+        "reward_mean",
     ]
 
     with path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        for r in sorted(results, key=lambda x: (x.building_type, x.task, x.building_id)):
+        for r in sorted(
+            results,
+            key=lambda x: (x.building_type, x.task, x.run_period, x.building_id),
+        ):
             row: dict[str, Any] = {
                 "building_type": r.building_type,
                 "task": r.task,
+                "run_period": r.run_period,
                 "building_id": r.building_id,
                 "reward_mean": f"{r.reward_mean:.1f}",
             }
@@ -212,14 +241,17 @@ def main(cfg: DictConfig) -> None:
     building_types: list[str] = list(cfg.building_types)
     tasks: list[str] = list(cfg.tasks)
     split: str = cfg.get("split", "test")
-    run_period_raw = str(cfg.get("run_period", "full_year"))
+    run_periods_raw = list(cfg.run_periods)
     allowed_run_periods = {"full_year", "winter", "summer"}
-    if run_period_raw not in allowed_run_periods:
+    bad = [p for p in run_periods_raw if p not in allowed_run_periods]
+    if bad:
         raise ValueError(
-            f"Invalid run_period '{run_period_raw}'. "
-            f"Expected one of {sorted(allowed_run_periods)}."
+            f"Invalid run_periods {bad}. "
+            f"Expected subset of {sorted(allowed_run_periods)}."
         )
-    run_period: Literal["full_year", "winter", "summer"] = run_period_raw  # type: ignore[assignment]
+    run_periods: list[Literal["full_year", "winter", "summer"]] = list(
+        run_periods_raw
+    )  # type: ignore[assignment]
     max_bldgs = cfg.get("max_buildings_per_type")
     n_runs: int = int(cfg.get("n_runs", 1))
     output_csv = Path(str(cfg.get("output_csv", "baseline_returns.csv")))
@@ -244,30 +276,38 @@ def main(cfg: DictConfig) -> None:
             building_ids = building_ids[: int(max_bldgs)]
 
         logger.info(
-            "Evaluating %s: %d buildings x %d tasks (run_period=%s)",
+            "Evaluating %s: %d buildings x %d tasks x %d run_periods=%s",
             bt,
             len(building_ids),
             len(tasks),
-            run_period,
+            len(run_periods),
+            run_periods,
         )
 
         for bid in building_ids:
             for task in tasks:
-                try:
-                    result = evaluate_building(
-                        bt,
-                        bid,
-                        task,
-                        run_period=run_period,
-                        n_runs=n_runs,
-                        save_trajectories=save_trajectories,
-                        plot_trajectories=plot_trajectories,
-                        trajectory_dir=trajectory_dir,
-                        plot_dir=plot_dir,
-                    )
-                    results.append(result)
-                except Exception:
-                    logger.exception("Failed: %s/%s task=%s", bt, bid, task)
+                for period in run_periods:
+                    try:
+                        result = evaluate_building(
+                            bt,
+                            bid,
+                            task,
+                            run_period=period,
+                            n_runs=n_runs,
+                            save_trajectories=save_trajectories,
+                            plot_trajectories=plot_trajectories,
+                            trajectory_dir=trajectory_dir,
+                            plot_dir=plot_dir,
+                        )
+                        results.append(result)
+                    except Exception:
+                        logger.exception(
+                            "Failed: %s/%s task=%s run_period=%s",
+                            bt,
+                            bid,
+                            task,
+                            period,
+                        )
 
     if results:
         write_csv(results, output_csv, n_runs=n_runs)

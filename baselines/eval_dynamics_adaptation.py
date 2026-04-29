@@ -66,7 +66,11 @@ def evaluate_specialist(
                 ep: EpisodeResult = run_episode(env, model)
                 try:
                     ns = b2b.compute_normalized_score(
-                        bench.building_type, ep.total_reward, task=bench.task
+                        ep.total_reward,
+                        bench.building_type,
+                        bench.task,
+                        run_period="full_year",
+                        building_id=bid,
                     )
                 except Exception:
                     ns = None
@@ -116,7 +120,11 @@ def evaluate_multi_building(
                 ep: EpisodeResult = run_episode(env, model)
                 try:
                     ns = b2b.compute_normalized_score(
-                        bench.building_type, ep.total_reward, task=bench.task
+                        ep.total_reward,
+                        bench.building_type,
+                        bench.task,
+                        run_period="full_year",
+                        building_id=bid,
                     )
                 except Exception:
                     ns = None

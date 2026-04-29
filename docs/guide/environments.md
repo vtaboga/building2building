@@ -42,7 +42,7 @@ env = b2b.new_make_env(
 | `split` | `"train"` / `"test"` | Dataset split |
 | `index` | `int` | Zero-based index into the split |
 | `building_id` | `str` | Explicit building ID (overrides split+index) |
-| `task` | `str` / `TaskPreset` | `"task1"`--`"task4"` or a `TaskPreset` |
+| `task` | `str` / `TaskPreset` | `"task1"`--`"task5"` or a `TaskPreset` |
 | `reward` | `RewardConfig` | Override reward (default: from task preset) |
 | `run_period` | `str` | `"full_year"`, `"winter"`, or `"summer"` |
 | `timesteps_per_hour` | `int` | Simulation resolution (default: 12 = 5 min) |

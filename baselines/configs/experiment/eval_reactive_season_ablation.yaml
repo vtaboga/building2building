@@ -1,0 +1,36 @@
+# @package _global_
+# Season-ablation study for the occupancy-based tasks.
+#
+# Compares three presets on a reduced building sample across winter /
+# summer / full_year run periods:
+#
+#   * task3_legacy  — paper-original fixed 18 C unoccupied setpoint
+#   * task3         — new seasonal unoccupied policy (18 / 21 / 26)
+#   * task5         — per-day random arrival/departure + setpoints
+#
+# This is the evidence base for the paper supplement's discussion of
+# why the fixed 18 C unoccupied setpoint is counter-productive in
+# summer and how the seasonal / random-schedule alternatives behave.
+name: eval_reactive_season_ablation
+
+building_types:
+  - OfficeSmall
+  - OfficeMedium
+  - RetailStandalone
+  - RestaurantFastFood
+  - Warehouse
+  - SingleFamilyHouse
+
+split: test
+# Override `run_periods` at invocation to run a single-period sweep; the
+# analysis driver runs this config three times with {winter, summer, full_year}.
+run_periods: [full_year]
+max_buildings_per_type: 2
+tasks: [task3_legacy, task3, task5]
+n_runs: 1
+output_csv: baseline_returns_season_ablation.csv
+
+save_trajectories: true
+plot_trajectories: false
+trajectory_dir: trajectories/season_ablation
+plot_dir: plots/season_ablation

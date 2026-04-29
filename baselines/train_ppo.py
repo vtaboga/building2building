@@ -60,6 +60,7 @@ def train_and_eval(
     n_envs: int,
     output_dir: Path,
     seed: int,
+    run_period: str = "full_year",
 ) -> TrainResult:
     """Train a PPO specialist on one building and run one eval episode."""
     tag = f"{building_type}/{building_id}/{task}"
@@ -67,7 +68,10 @@ def train_and_eval(
 
     def make_env() -> Monitor:
         env = b2b.new_make_env(
-            building_type, building_id=building_id, task=task
+            building_type,
+            building_id=building_id,
+            task=task,
+            run_period=run_period,
         )
         return Monitor(env)
 
@@ -94,7 +98,10 @@ def train_and_eval(
     vec_env.close()
 
     eval_env = b2b.new_make_env(
-        building_type, building_id=building_id, task=task
+        building_type,
+        building_id=building_id,
+        task=task,
+        run_period=run_period,
     )
     try:
         result = run_episode(eval_env, model)
@@ -105,6 +112,7 @@ def train_and_eval(
             total_reward,
             building_type,
             task,
+            run_period=run_period,
             building_id=building_id,
         )
         logger.info("Normalized score for %s: %.4f", tag, normalized_score)
@@ -172,6 +180,7 @@ def main(cfg: DictConfig) -> None:
     total_timesteps: int = int(cfg.training.total_timesteps)
     n_envs: int = int(cfg.training.n_envs)
     seed: int = int(cfg.get("seed", 0))
+    run_period: str = str(cfg.get("run_period", "full_year"))
 
     output_dir = Path(cfg.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -223,6 +232,7 @@ def main(cfg: DictConfig) -> None:
                         n_envs=n_envs,
                         output_dir=output_dir,
                         seed=seed,
+                        run_period=run_period,
                     )
                     results.append(result)
                     _wandb_log({

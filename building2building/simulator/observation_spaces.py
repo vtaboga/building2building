@@ -20,6 +20,11 @@ from minergym.simulation import (
     api,
 )
 
+from building2building.simulator.schedules import (
+    RandomDailyScheduleGenerator,
+    distribution_for_building_type,
+    month_to_season,
+)
 from building2building.simulator.transform_utils import (
     Transform,
     TransformDictSpace,
@@ -42,6 +47,14 @@ def lifted_day_of_year(state):
 def lifted_day_of_week(state):
     # EnergyPlus convention: 1=Sunday, 2=Monday, ..., 7=Saturday
     return api.exchange.day_of_week(state)
+
+
+def lifted_month(state):
+    return api.exchange.month(state)
+
+
+def lifted_year(state):
+    return api.exchange.year(state)
 
 
 @dataclass
@@ -160,8 +173,11 @@ class DynamicTargetTemperature:
     """Return the target temperature for a zone, optionally occupancy-aware.
 
     In ``"occupancy"`` mode, returns the occupied setpoint when
-    occupancy > 0 and the unoccupied setpoint otherwise.  In any other
-    mode, always returns the occupied setpoint.
+    occupancy > 0 and the unoccupied setpoint otherwise.  When
+    :attr:`zone_target` uses the ``"seasonal"`` unoccupied policy, the
+    unoccupied setpoint is dispatched by the current simulation month
+    (DEC/JAN/FEB → winter, JUN/JUL/AUG → summer, else shoulder).  In
+    any other mode, always returns the occupied setpoint.
 
     Attributes:
         occupancy_reader: Reader that queries zone occupancy from the
@@ -169,19 +185,108 @@ class DynamicTargetTemperature:
         mode: ``"occupancy"`` for occupancy-dependent behaviour,
             anything else for a constant setpoint.
         zone_target: Target temperature configuration for this zone.
+        month_reader: Callable that returns the current simulation
+            month (1–12).  Only consulted when ``zone_target`` uses the
+            ``"seasonal"`` policy; may be left ``None`` when all
+            callers use ``"fixed"`` (kept for test convenience).
     """
 
     occupancy_reader: DynamicZoneVariable
     mode: str
     zone_target: ZoneTargetTemperatureConfig
+    month_reader: Callable[[c_void_p], int] | None = None
 
     def __call__(self, state: c_void_p) -> float:
         if self.mode == "occupancy":
             occupancy = float(self.occupancy_reader(state))
             if occupancy > 0.0:
                 return self.zone_target.occupied_c
+            if self.zone_target.unoccupied_policy == "seasonal":
+                if self.month_reader is None:
+                    raise RuntimeError(
+                        "Seasonal unoccupied policy requires a month_reader; "
+                        "none was configured for this DynamicTargetTemperature."
+                    )
+                season = month_to_season(int(self.month_reader(state)))
+                return self.zone_target.unoccupied_for_season(season)
             return self.zone_target.unoccupied_c
         return self.zone_target.occupied_c
+
+
+@dataclass
+class _RandomScheduleCache:
+    """Per-zone cache of the active :class:`DailySchedule`.
+
+    Stateful by design: sampling is idempotent within a simulated day
+    (keyed on ``(year, day_of_year)``) so that both the target and
+    occupancy observations agree.
+    """
+
+    generator: RandomDailyScheduleGenerator
+    last_key: tuple[int, int] | None = None
+    schedule: Any = None
+
+    def refresh(self, state: c_void_p, month_reader, year_reader, day_of_year_reader):
+        year = int(year_reader(state))
+        day_of_year = int(day_of_year_reader(state))
+        key = (year, day_of_year)
+        if self.last_key == key and self.schedule is not None:
+            return self.schedule
+        season = month_to_season(int(month_reader(state)))
+        self.schedule = self.generator.schedule_for(
+            year=year, day_of_year=day_of_year, season=season
+        )
+        self.last_key = key
+        return self.schedule
+
+
+@dataclass
+class DynamicRandomScheduleTarget:
+    """Return the target temperature for a zone from a random daily schedule.
+
+    The schedule is re-sampled once per simulated day; within a day
+    the occupied setpoint is returned when the current time falls in
+    the ``[arrival_h, departure_h)`` window, otherwise the unoccupied
+    setpoint.
+    """
+
+    cache: _RandomScheduleCache
+    month_reader: Callable[[c_void_p], int]
+    year_reader: Callable[[c_void_p], int]
+    day_of_year_reader: Callable[[c_void_p], int]
+    hour_reader: Callable[[c_void_p], float]
+
+    def __call__(self, state: c_void_p) -> float:
+        schedule = self.cache.refresh(
+            state, self.month_reader, self.year_reader, self.day_of_year_reader
+        )
+        hour = float(self.hour_reader(state))
+        if schedule.is_occupied(hour):
+            return float(schedule.occupied_c)
+        return float(schedule.unoccupied_c)
+
+
+@dataclass
+class DynamicRandomScheduleOccupancy:
+    """Return a 0/1 occupancy signal derived from the random schedule.
+
+    Shares the same per-zone :class:`_RandomScheduleCache` as the
+    matching :class:`DynamicRandomScheduleTarget` so that both
+    observations are always consistent within a timestep.
+    """
+
+    cache: _RandomScheduleCache
+    month_reader: Callable[[c_void_p], int]
+    year_reader: Callable[[c_void_p], int]
+    day_of_year_reader: Callable[[c_void_p], int]
+    hour_reader: Callable[[c_void_p], float]
+
+    def __call__(self, state: c_void_p) -> float:
+        schedule = self.cache.refresh(
+            state, self.month_reader, self.year_reader, self.day_of_year_reader
+        )
+        hour = float(self.hour_reader(state))
+        return 1.0 if schedule.is_occupied(hour) else 0.0
 
 
 _PEAK_HVAC_POWER_W_M2 = 200.0
@@ -235,6 +340,45 @@ def flat_observation_info(
                         occupancy_reader=occupancy_reader,
                         mode=task_config.target_temperature_mode,
                         zone_target=zone_target,
+                        month_reader=lifted_month,
+                    )
+                ),
+                (10.0, 35.0),
+            )
+    elif task_config.target_temperature_mode == "random_schedule":
+        rs_cfg = task_config.random_schedule_config
+        building_type = rs_cfg.building_type if rs_cfg is not None else None
+        base_seed = rs_cfg.seed if rs_cfg is not None else 0
+        distribution = distribution_for_building_type(building_type)
+        for zone_idx, zone_name in enumerate(controlled_zones):
+            # Decorrelate schedules across zones by offsetting the seed.
+            generator = RandomDailyScheduleGenerator(
+                distribution=distribution,
+                base_seed=int(base_seed) + zone_idx * 997,
+            )
+            cache = _RandomScheduleCache(generator=generator)
+            occupancy_template[zone_name] = (
+                f"zone_occupancy {zone_name}",
+                FunctionHole(
+                    DynamicRandomScheduleOccupancy(
+                        cache=cache,
+                        month_reader=lifted_month,
+                        year_reader=lifted_year,
+                        day_of_year_reader=lifted_day_of_year,
+                        hour_reader=lifted_current_time,
+                    )
+                ),
+                (0.0, 1.0),
+            )
+            target_template[zone_name] = (
+                f"target_temperature {zone_name}",
+                FunctionHole(
+                    DynamicRandomScheduleTarget(
+                        cache=cache,
+                        month_reader=lifted_month,
+                        year_reader=lifted_year,
+                        day_of_year_reader=lifted_day_of_year,
+                        hour_reader=lifted_current_time,
                     )
                 ),
                 (10.0, 35.0),
