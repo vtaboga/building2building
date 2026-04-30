@@ -30,8 +30,10 @@ class TestGoalAdaptation:
     def test_defaults(self) -> None:
         bm = GoalAdaptation()
         assert bm.building_type == "OfficeSmall"
-        assert bm.train_task == "task1"
-        assert bm.test_task == "task2"
+        # Defaults moved to the trade-off-transfer axis on the
+        # normalized 3x3 task family (see goal_adaptation.py docstring).
+        assert bm.train_task == "task_occ_wmed"
+        assert bm.test_task == "task_occ_whigh"
         assert bm.run_period == "full_year"
 
     def test_custom_params(self) -> None:

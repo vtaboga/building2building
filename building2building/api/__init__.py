@@ -28,7 +28,13 @@ from building2building.data.climate_zones import (
 )
 from building2building.data.download import ALL_BUILDING_TYPES, BuildingType
 from building2building.envs import make_env_from_config
-from building2building.types import RewardConfig, RunPeriodConfig, TaskConfig, reward_config_from_dict
+from building2building.types import (
+    NormalizedDeadbandRewardConfig,
+    RewardConfig,
+    RunPeriodConfig,
+    TaskConfig,
+    reward_config_from_dict,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -187,8 +193,17 @@ def new_make_env(
         split: Dataset split (``"train"`` or ``"test"``).
         index: Zero-based index into the split.
         building_id: Explicit building ID, overrides *split*/*index*.
-        task: Named task preset (``"task1"``–``"task5"``) or a
+        task: Named task preset or a
             :class:`~building2building.config.tasks.TaskPreset` instance.
+            Recognised names are the legacy paper presets
+            (``"task1"`` … ``"task5"``) and the 9 normalized presets
+            ``"task_<mode>_<level>"`` with
+            ``mode ∈ {const, occ, rand}`` and ``level ∈ {w0, wmed, whigh}``.
+            For the normalized family, ``(tau_T, tau_E)`` are
+            auto-resolved from
+            :file:`building2building/data/reward_normalizers.yaml`
+            using the building's
+            ``(building_type, climate_zone)`` bucket.
         reward: Override reward.  If ``None``, uses the task default.
         run_period: Simulation run period name (``"full_year"``,
             ``"winter"``, ``"summer"``).
@@ -229,6 +244,24 @@ def new_make_env(
         info = registry.get_building_by_id(building_type, building_id)
     else:
         info = registry.get_building_by_index(building_type, split, index)
+
+    # Auto-fill unfilled NormalizedDeadbandRewardConfig sentinels using
+    # the per-(building_type, climate_zone) constants in
+    # reward_normalizers.yaml.  This is what makes
+    # ``new_make_env(task="task_occ_wmed", building_id=...)``
+    # "just work" — the preset stores ``tau_T = tau_E = None``, and
+    # we resolve them once we know which building we're building.
+    if (
+        isinstance(effective_reward, NormalizedDeadbandRewardConfig)
+        and not effective_reward.is_filled
+    ):
+        from building2building.data.reward_normalizers import resolve_reward_normalizer
+
+        info_bid = getattr(info, "building_id", None) or building_id or ""
+        normalizer = resolve_reward_normalizer(building_type, info_bid)
+        effective_reward = effective_reward.filled(
+            normalizer.tau_T, normalizer.tau_E
+        )
 
     if eplus_output_dir is None:
         eplus_output_dir = Path(tempfile.mkdtemp(prefix="b2b_eplus_"))
@@ -304,6 +337,12 @@ def new_make_env(
         warmup_phases=info.warmup_phases,
         area=info.net_conditioned_area_m2,
         hvac_equipment=equipment_data,
+        # Stash building identity so the simulator dispatch site can
+        # cite the building in calibration-mismatch warnings.
+        source_metadata={
+            "building_type": building_type,
+            "building_id": getattr(info, "building_id", None),
+        },
         task_config=task_cfg,
     )
 

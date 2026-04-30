@@ -426,11 +426,100 @@ class DeadbandRewardConfig:
     dT: float
 
 
-RewardConfig = Union[DeadbandRewardConfig, BaseRewardConfig, BarrierRewardConfig]
+@dataclass(frozen=True)
+class NormalizedDeadbandRewardConfig:
+    """Deadband reward with per-bucket comfort/energy normalizers.
+
+    The reward is
+
+    .. math::
+
+        r = -\\Big(\\tfrac{\\text{temp\\_penalty}}{\\tau_T}
+                  + w_E \\cdot \\tfrac{\\text{power\\_penalty}}{\\tau_E}\\Big)
+
+    where ``(tau_T, tau_E)`` come from a tuned-RBC calibration rollout
+    on the train split (see
+    :file:`building2building/data/reward_normalizers.yaml`).  After
+    normalization, ``mean(temp_penalty / tau_T) ≈ 1`` and
+    ``mean(power_penalty / tau_E) ≈ 1`` at the median train building of
+    each ``(building_type, climate_zone)`` bucket under the calibration
+    RBC, so ``energy_weight`` becomes a *dimensionless* trade-off knob:
+
+    * ``energy_weight < 1`` → temperature priority,
+    * ``energy_weight ≈ 1`` → balanced trade-off,
+    * ``energy_weight > 1`` → energy priority.
+
+    Sentinel state
+    --------------
+    Task presets store this config with ``tau_T = tau_E = None`` (the
+    *unfilled* sentinel state) because the constants depend on the
+    chosen building.  At env-construction time
+    :func:`building2building.api.new_make_env` resolves the bucket via
+    :func:`building2building.data.reward_normalizers.resolve_reward_normalizer`
+    and replaces the unfilled config with a filled one.  The simulator
+    dispatch site rejects unfilled configs with a clear error.
+
+    Attributes:
+        energy_weight: Dimensionless trade-off weight ``w_E``.  See
+            class docstring.
+        dT: Half-width of the temperature deadband (°C).  Calibration
+            assumes ``dT = 1.0``; other values are accepted but emit a
+            calibration-mismatch :class:`RuntimeWarning` at dispatch.
+        tau_T: Comfort normalizer.  ``None`` means "preset-time
+            sentinel; resolve me at env build time".
+        tau_E: Energy normalizer.  Same convention.
+    """
+
+    energy_weight: float
+    dT: float
+    tau_T: float | None = None
+    tau_E: float | None = None
+
+    def __post_init__(self) -> None:
+        # Both-None (unfilled preset) and both-set (filled, ready for
+        # the simulator) are valid; the mixed case is always a bug.
+        if (self.tau_T is None) != (self.tau_E is None):
+            raise ValueError(
+                "NormalizedDeadbandRewardConfig: tau_T and tau_E must be set "
+                "together (both None for an unfilled preset, both float for "
+                f"a filled config). Got tau_T={self.tau_T!r}, tau_E={self.tau_E!r}."
+            )
+        if self.is_filled:
+            assert self.tau_T is not None and self.tau_E is not None
+            if self.tau_T <= 0 or self.tau_E <= 0:
+                raise ValueError(
+                    "NormalizedDeadbandRewardConfig: tau_T and tau_E must be "
+                    f"strictly positive when filled, got tau_T={self.tau_T!r}, "
+                    f"tau_E={self.tau_E!r}."
+                )
+
+    @property
+    def is_filled(self) -> bool:
+        """``True`` iff both ``tau_T`` and ``tau_E`` are set."""
+        return self.tau_T is not None and self.tau_E is not None
+
+    def filled(self, tau_T: float, tau_E: float) -> "NormalizedDeadbandRewardConfig":
+        """Return a copy of this config with concrete ``(tau_T, tau_E)``."""
+        from dataclasses import replace
+
+        return replace(self, tau_T=float(tau_T), tau_E=float(tau_E))
+
+
+RewardConfig = Union[
+    DeadbandRewardConfig,
+    BaseRewardConfig,
+    BarrierRewardConfig,
+    NormalizedDeadbandRewardConfig,
+]
 
 
 VALID_REWARD_TYPES = frozenset(
-    {"DeadbandRewardConfig", "BarrierRewardConfig", "BaseRewardConfig"}
+    {
+        "DeadbandRewardConfig",
+        "BarrierRewardConfig",
+        "BaseRewardConfig",
+        "NormalizedDeadbandRewardConfig",
+    }
 )
 
 
@@ -476,6 +565,20 @@ def reward_config_from_dict(
     if reward_type == "BaseRewardConfig":
         return BaseRewardConfig(
             energy_weight=float(reward_section.get("energy_weight", 0.0))
+        )
+    if reward_type == "NormalizedDeadbandRewardConfig":
+        # Both tau_T and tau_E are optional in the dict form: missing
+        # values produce an *unfilled* sentinel config (consistent with
+        # the preset construction path), so YAML reward configs can
+        # opt into auto-resolution at env-build time without naming
+        # specific (bt, cz) constants.
+        raw_tau_T = reward_section.get("tau_T")
+        raw_tau_E = reward_section.get("tau_E")
+        return NormalizedDeadbandRewardConfig(
+            energy_weight=float(reward_section.get("energy_weight", 1.0)),
+            dT=float(reward_section.get("dT", 1.0)),
+            tau_T=float(raw_tau_T) if raw_tau_T is not None else None,
+            tau_E=float(raw_tau_E) if raw_tau_E is not None else None,
         )
 
     raise ValueError(
