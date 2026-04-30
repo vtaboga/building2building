@@ -16,6 +16,7 @@ building_types:
 
 split: test
 buildings_per_type: 8
+building_ids: null
 tasks: [task1, task2, task3, task4, task5]
 
 training:

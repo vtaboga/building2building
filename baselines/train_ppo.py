@@ -10,6 +10,9 @@ Usage with Hydra::
     python -m baselines.train_ppo experiment=train_ppo
     python -m baselines.train_ppo experiment=train_ppo \
         building_types=[OfficeSmall] tasks=[task1] buildings_per_type=4
+    python -m baselines.train_ppo experiment=train_ppo \
+        building_types=[OfficeSmall] tasks=[task1] \
+        building_ids=[OfficeSmall-0001]
 """
 
 from __future__ import annotations
@@ -48,6 +51,44 @@ def _policy_overrides(policy_cfg: DictConfig) -> dict[str, Any]:
     for key in ("algorithm", "policy_type", "device"):
         raw.pop(key, None)
     return raw
+
+
+def _selected_building_ids(
+    cfg: DictConfig,
+    *,
+    building_type: str,
+    split: str,
+    buildings_per_type: int,
+) -> list[str]:
+    """Resolve explicit building overrides or split-based defaults."""
+    explicit_ids_raw = cfg.get("building_ids")
+    available_ids = list(b2b.list_buildings(building_type, split=split))
+    available_set = set(available_ids)
+    if explicit_ids_raw is None:
+        if buildings_per_type <= 0:
+            return available_ids
+        return available_ids[:buildings_per_type]
+
+    explicit_ids = [
+        str(building_id)
+        for building_id in OmegaConf.to_container(explicit_ids_raw, resolve=True)
+    ]
+    selected_ids = [
+        building_id
+        for building_id in explicit_ids
+        if building_id.startswith(f"{building_type}-")
+    ]
+    invalid_ids = [
+        building_id
+        for building_id in selected_ids
+        if building_id not in available_set
+    ]
+    if invalid_ids:
+        raise ValueError(
+            f"Invalid building_ids for {building_type}/{split}: {invalid_ids}. "
+            "Ensure IDs belong to the selected split."
+        )
+    return selected_ids
 
 
 def train_and_eval(
@@ -210,9 +251,12 @@ def main(cfg: DictConfig) -> None:
     results: list[TrainResult] = []
 
     for bt in building_types:
-        building_ids = b2b.list_buildings(bt, split=split)[
-            :buildings_per_type
-        ]
+        building_ids = _selected_building_ids(
+            cfg,
+            building_type=bt,
+            split=split,
+            buildings_per_type=buildings_per_type,
+        )
         logger.info(
             "Building type %s: %d buildings x %d tasks",
             bt,

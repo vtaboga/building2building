@@ -25,6 +25,8 @@ import gymnasium as gym
 from building2building.benchmarks.base import BenchmarkProblem
 from building2building.pipeline.actuators import AnyEquipment, UnitarySystem, VAVSystem
 
+SplitName = Literal["train", "test", "test_small"]
+
 _DEFAULT_BUILDING_TYPE: dict[str, str] = {
     "unitary": "OfficeSmall",
     "central": "OfficeMedium",
@@ -105,7 +107,7 @@ class ActionSpaceTransfer(BenchmarkProblem):
         direction: Literal["expand", "reduce"] = "expand",
         task: str = "task1",
         building_type: str | None = None,
-        split: Literal["train", "test"] = "train",
+        split: SplitName = "train",
         split_index: int = 0,
     ) -> None:
         self.system_type = system_type

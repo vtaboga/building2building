@@ -29,6 +29,8 @@ from building2building.data.download import (
 
 logger = logging.getLogger(__name__)
 
+SplitName = Literal["train", "test", "test_small"]
+
 
 @dataclass(frozen=True)
 class BuildingInfo:
@@ -98,7 +100,7 @@ class BuildingRegistry:
     def list_buildings(
         self,
         building_type: BuildingType,
-        split: Literal["train", "test"] = "train",
+        split: SplitName = "train",
     ) -> list[str]:
         """Return building IDs for a given type and split."""
         split_data = self.splits.get(split, {})
@@ -107,7 +109,7 @@ class BuildingRegistry:
     def get_building_by_index(
         self,
         building_type: BuildingType,
-        split: Literal["train", "test"],
+        split: SplitName,
         index: int,
     ) -> BuildingInfo:
         """Select a building by split and index, return its info and path."""
@@ -156,7 +158,7 @@ class BuildingRegistry:
         self,
         building_type: BuildingType,
         climate_zone: int,
-        split: Literal["train", "test"] = "train",
+        split: SplitName = "train",
     ) -> list[str]:
         """Return building IDs for a given type / split filtered by ASHRAE CZ.
 
@@ -182,7 +184,7 @@ class BuildingRegistry:
     def query_buildings(
         self,
         building_type: BuildingType | None = None,
-        split: Literal["train", "test"] | None = None,
+        split: SplitName | None = None,
         **filters: object,
     ) -> pd.DataFrame:
         """Query the metadata with optional filters using DuckDB."""
