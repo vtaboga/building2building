@@ -35,3 +35,18 @@ class TestListBuildings:
             mock_registry.list_buildings.assert_called_once_with(
                 "OfficeSmall", "train"
             )
+
+    def test_delegates_test_small_to_registry(self) -> None:
+        mock_registry = MagicMock()
+        mock_registry.list_buildings.return_value = ["OfficeSmall-0002"]
+        with patch(
+            "building2building.data.registry.get_registry",
+            return_value=mock_registry,
+        ):
+            from building2building.api import list_buildings
+
+            result = list_buildings("OfficeSmall", "test_small")
+            assert result == ["OfficeSmall-0002"]
+            mock_registry.list_buildings.assert_called_once_with(
+                "OfficeSmall", "test_small"
+            )

@@ -19,7 +19,7 @@ from building2building.types import (
     reward_config_from_dict,
 )
 
-SplitName = Literal["train", "test"]
+SplitName = Literal["train", "test", "test_small"]
 SelectionMode = Literal[
     "split_index",
     "building_id",
@@ -83,9 +83,10 @@ class DatasetSelectionConfig:
             split = None
         else:
             split_norm = str(split_raw).strip().lower()
-            if split_norm not in {"train", "test"}:
+            if split_norm not in {"train", "test", "test_small"}:
                 raise ValueError(
-                    "dataset_selection.split must be one of {'train', 'test'} or null"
+                    "dataset_selection.split must be one of "
+                    "{'train', 'test', 'test_small'} or null"
                 )
             split = split_norm  # type: ignore[assignment]
 

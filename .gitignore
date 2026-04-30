@@ -44,6 +44,7 @@ refactoring/
 /configs/
 baselines/scripts/
 staging/
+plans/
 
 # temporary
 simulator/patched_minergym_simulation.py
