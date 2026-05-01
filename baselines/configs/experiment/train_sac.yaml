@@ -1,0 +1,24 @@
+# @package _global_
+# Train per-building SAC specialists (companion to train_ppo.yaml).
+name: train_sac
+
+defaults:
+  - override /policy: sac
+  - override /training: default
+
+building_types:
+  - OfficeSmall
+  - OfficeMedium
+  - RetailStandalone
+  - RestaurantFastFood
+  - Warehouse
+  - SingleFamilyHouse
+
+split: test
+buildings_per_type: 8
+building_ids: null
+tasks: [task1, task2, task3, task4, task5]
+
+training:
+  total_timesteps: 1_000_000
+  n_envs: 4

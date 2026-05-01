@@ -1,0 +1,24 @@
+# @package _global_
+# Paper-parity SAC sweep across the same 5 tasks as train_ppo_task_study.
+name: train_sac_task_study
+
+defaults:
+  - override /policy: sac
+  - override /training: default
+
+building_types:
+  - OfficeSmall
+  - OfficeMedium
+  - RetailStandalone
+  - RestaurantFastFood
+  - Warehouse
+  - SingleFamilyHouse
+
+split: test
+buildings_per_type: 8
+tasks: [task1, task2, task3, task4, task5]
+seeds: [0, 1, 2]
+
+training:
+  total_timesteps: 1_000_000
+  n_envs: 4
