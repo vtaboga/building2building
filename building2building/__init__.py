@@ -21,6 +21,7 @@ from building2building.api import (
     new_make_env,
     rollout,
 )
+from building2building.api.rl_wrappers import wrap_env_for_rl
 from building2building.morphology import (
     Morphology,
     MorphologyEdge,
@@ -126,4 +127,5 @@ __all__ = [
     "NormalizeObservation",
     "PadObservation",
     "ResampleBuildingOnResetWrapper",
+    "wrap_env_for_rl",
 ]

@@ -36,14 +36,13 @@ import yaml
 from omegaconf import DictConfig, OmegaConf
 from orion.client import create_experiment
 from orion.core.utils.exceptions import ReservationRaceCondition
-from stable_baselines3.common.monitor import Monitor
-
 import building2building as b2b
 from baselines.chs import load_trial_rewards_from_dir
 from baselines.utils.evaluation import run_episode
-from baselines.utils.training import build_ppo, make_vec_env
+from baselines.utils.training import build_ppo, make_rl_env_fn, make_vec_env
 
 logger = logging.getLogger(__name__)
+
 
 # batch_size upper bound (8192) exceeds the smallest rollout buffer
 # (n_steps=512 × n_envs=8 = 4096), so the clamp in _params_to_ppo_hparams
@@ -201,13 +200,14 @@ def _train_and_eval_single(
     Returns the total episode reward on the eval building.
     """
 
-    def make_train_env() -> Monitor:
-        env = b2b.new_make_env(
-            building_type, building_id=train_building_id, task=task
-        )
-        return Monitor(env)
-
-    env_fns = [make_train_env for _ in range(n_envs)]
+    env_fn = make_rl_env_fn(
+        building_type=building_type,
+        building_id=train_building_id,
+        task=task,
+        normalize_obs=True,
+        rescale_action=True,
+    )
+    env_fns = [env_fn for _ in range(n_envs)]
     vec_env = make_vec_env(env_fns, use_subproc=n_envs > 1)
 
     try:
@@ -222,9 +222,14 @@ def _train_and_eval_single(
     finally:
         vec_env.close()
 
-    eval_env = b2b.new_make_env(
-        building_type, building_id=eval_building_id, task=task
-    )
+    eval_env = make_rl_env_fn(
+        building_type=building_type,
+        building_id=eval_building_id,
+        task=task,
+        normalize_obs=True,
+        rescale_action=True,
+        monitor=False,
+    )()
     try:
         result = run_episode(eval_env, model)
         return result.total_reward

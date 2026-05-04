@@ -25,6 +25,7 @@ from stable_baselines3 import PPO
 
 import building2building as b2b
 from baselines.utils.evaluation import EpisodeResult, run_episode
+from baselines.utils.training import make_rl_env_fn
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +53,15 @@ def evaluate_model(
     results: list[EvalResult] = []
 
     for _ in range(n_episodes):
-        env = b2b.new_make_env(
-            building_type,
+        env = make_rl_env_fn(
+            building_type=building_type,
             building_id=building_id,
             task=task,
             run_period=run_period,
-        )
+            normalize_obs=True,
+            rescale_action=True,
+            monitor=False,
+        )()
         try:
             ep: EpisodeResult = run_episode(env, model)
             try:

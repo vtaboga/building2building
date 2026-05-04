@@ -112,7 +112,7 @@ def evaluate_multi_building(
                 bench.building_type, building_id=bid, task=bench.task
             )
             env = b2b.PadObservation(env, target_size=20)
-            env = b2b.NormalizeObservation(env)
+            env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
             if augment_params:
                 env = b2b.AugmentObservationWithBuildingParams(env)
             env = Monitor(env)

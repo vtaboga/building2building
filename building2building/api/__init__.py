@@ -181,6 +181,7 @@ def new_make_env(
     random_schedule_seed: int | None = None,
     eplus_output_dir: str | Path | None = None,
     max_episode_steps: int | None = None,
+    rescale_action: bool = False,
 ) -> gym.Env:
     """Create a Gymnasium environment using the unified dataset.
 
@@ -219,6 +220,16 @@ def new_make_env(
         eplus_output_dir: Directory for EnergyPlus output.  If ``None``,
             a temporary directory is used.
         max_episode_steps: Maximum episode length.
+        rescale_action: If ``True``, wrap the simulator with
+            :class:`gym.wrappers.RescaleAction` so the agent-facing
+            action space is ``[-1, 1]`` per actuator.  The wrapper
+            maps actions back to engineering units internally.
+            Defaults to ``False`` so that non-RL consumers (reactive
+            controllers, benchmark harnesses, manual rollouts) are
+            unaffected.  RL training code should use
+            :func:`building2building.api.rl_wrappers.wrap_env_for_rl`
+            or the ``make_rl_env_fn`` helper instead, which set this
+            flag and also apply observation normalisation.
 
     Returns:
         A Gymnasium environment backed by EnergyPlus.
@@ -348,6 +359,8 @@ def new_make_env(
 
     env = create_simulator(building_config)
     env.metadata["building_info"] = info
+    if rescale_action:
+        env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
     steps = max_episode_steps or task_cfg.expected_steps()
     return gym.wrappers.TimeLimit(env, max_episode_steps=int(steps))
 

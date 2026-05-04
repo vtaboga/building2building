@@ -21,12 +21,12 @@ class TestBuildSac:
         """build_sac must return a SAC instance on a minimal Box env."""
         import gymnasium as gym
         from stable_baselines3 import SAC
-        from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+        from stable_baselines3.common.vec_env import DummyVecEnv
 
         from baselines.utils.training import build_sac
 
         env = gym.make("Pendulum-v1")
-        vec_env = VecNormalize(DummyVecEnv([lambda: env]), norm_obs=True, norm_reward=False)
+        vec_env = DummyVecEnv([lambda: env])
         try:
             model = build_sac(vec_env, seed=0, verbose=0)
             assert isinstance(model, SAC)
@@ -37,12 +37,12 @@ class TestBuildSac:
         """build_sac must accept hyperparameter overrides."""
         import gymnasium as gym
         from stable_baselines3 import SAC
-        from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+        from stable_baselines3.common.vec_env import DummyVecEnv
 
         from baselines.utils.training import build_sac
 
         env = gym.make("Pendulum-v1")
-        vec_env = VecNormalize(DummyVecEnv([lambda: env]), norm_obs=True, norm_reward=False)
+        vec_env = DummyVecEnv([lambda: env])
         try:
             model = build_sac(vec_env, seed=42, verbose=0, batch_size=64, gamma=0.95)
             assert isinstance(model, SAC)
@@ -56,12 +56,12 @@ class TestBuildSac:
         import torch
         import gymnasium as gym
         from stable_baselines3 import SAC
-        from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+        from stable_baselines3.common.vec_env import DummyVecEnv
 
         from baselines.utils.training import build_sac
 
         env = gym.make("Pendulum-v1")
-        vec_env = VecNormalize(DummyVecEnv([lambda: env]), norm_obs=True, norm_reward=False)
+        vec_env = DummyVecEnv([lambda: env])
         try:
             model = build_sac(
                 vec_env,

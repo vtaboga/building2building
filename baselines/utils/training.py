@@ -10,6 +10,7 @@ import gymnasium as gym
 import torch
 from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnv
+from stable_baselines3.common.monitor import Monitor
 
 logger = logging.getLogger(__name__)
 
@@ -116,8 +117,10 @@ def build_sac(
     keyword arguments.
 
     Args:
-        env: Vectorized environment (must be wrapped with VecNormalize for
-            observation normalisation before calling this function).
+        env: Vectorized environment.  Observation normalisation is handled
+            by the per-env :class:`~building2building.simulator.wrappers.NormalizeObservation`
+            wrapper applied via :func:`make_rl_env_fn`; no ``VecNormalize`` is
+            required.
         tensorboard_log: TensorBoard log directory.
         seed: Random seed.
         verbose: SB3 verbosity level (0=silent, 1=info, 2=debug).
@@ -167,3 +170,71 @@ def make_vec_env(
     if use_subproc and len(env_fns) > 1:
         return SubprocVecEnv(list(env_fns))
     return DummyVecEnv(list(env_fns))
+
+
+def make_rl_env_fn(
+    *,
+    building_type: str,
+    building_id: str | None,
+    task: Any,
+    run_period: str = "full_year",
+    normalize_obs: bool = True,
+    rescale_action: bool = True,
+    monitor: bool = True,
+) -> Callable[[], gym.Env]:
+    """Return a thunk that builds a single wrapped env for an RL run.
+
+    The thunk is what :class:`~stable_baselines3.common.vec_env.SubprocVecEnv`
+    and :class:`~stable_baselines3.common.vec_env.DummyVecEnv` consume.
+
+    The returned env is constructed via
+    :func:`building2building.api.new_make_env` (with the
+    ``rescale_action`` keyword), then passed through
+    :func:`building2building.wrap_env_for_rl` (with ``normalize_obs``).
+    Optionally wrapped in :class:`~stable_baselines3.common.monitor.Monitor`.
+
+    All four of ``train_ppo``, ``train_sac``, ``tune_ppo``, ``eval_ppo``
+    use this; the analysis modules use it too, ensuring the wrapper stack
+    is identical across all RL code paths::
+
+        Monitor(NormalizeObservation(RescaleAction(TimeLimit(simulator))))
+
+    Args:
+        building_type: Building type string (e.g. ``"OfficeSmall"``).
+        building_id: Explicit building identifier.
+        task: Task name or preset passed to :func:`building2building.api.new_make_env`.
+        run_period: Simulation run period (``"full_year"``, ``"winter"``,
+            ``"summer"``).
+        normalize_obs: Apply deterministic ``[0, 1]`` observation scaling
+            via :class:`~building2building.simulator.wrappers.NormalizeObservation`.
+        rescale_action: Rescale the action space to ``[-1, 1]``.
+            Applied via ``new_make_env(rescale_action=True)`` so that
+            ``wrap_env_for_rl`` is always called with
+            ``rescale_action=False`` to avoid double-rescaling.
+        monitor: Wrap the env in
+            :class:`~stable_baselines3.common.monitor.Monitor`.
+
+    Returns:
+        A zero-argument callable that, when called, returns a fully
+        wrapped :class:`gymnasium.Env`.
+    """
+    import building2building as b2b
+
+    def _factory() -> gym.Env:
+        env = b2b.new_make_env(
+            building_type,
+            building_id=building_id,
+            task=task,
+            run_period=run_period,
+            rescale_action=rescale_action,
+        )
+        env = b2b.wrap_env_for_rl(
+            env,
+            normalize_obs=normalize_obs,
+            rescale_action=False,
+        )
+        if monitor:
+            env = Monitor(env)
+        return env
+
+    return _factory

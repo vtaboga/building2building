@@ -69,7 +69,7 @@ def _apply_wrappers(
     if pad_obs_to is not None:
         env = b2b.PadObservation(env, target_size=pad_obs_to)
     if normalize_obs:
-        env = b2b.NormalizeObservation(env)
+        env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
     if augment_params:
         env = b2b.AugmentObservationWithBuildingParams(env)
     env = Monitor(env)

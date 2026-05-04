@@ -6,9 +6,9 @@ trained from scratch, then evaluated for one episode.  Results are
 collected into a CSV summary.
 
 SAC-specific notes:
-- Observations are normalised via SB3 VecNormalize (norm_obs=True,
-  norm_reward=False).  The VecNormalize state is saved alongside the model
-  so deterministic evaluation uses the same normalisation statistics.
+- Observations are normalised via deterministic per-feature ``[0, 1]``
+  scaling (``b2b.wrap_env_for_rl``).  No ``VecNormalize`` statistics file
+  is written; evaluation is reproducible by construction.
 - n_envs=4 (vs PPO's 14) because SAC does one gradient step per env step;
   more envs would reduce update density without proportional benefit.
 - total_timesteps=1M (vs PPO's 5M) because SAC is off-policy and
@@ -34,12 +34,10 @@ from typing import Any
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 import building2building as b2b
 from baselines.utils.evaluation import run_episode
-from baselines.utils.training import build_sac, make_vec_env
+from baselines.utils.training import build_sac, make_rl_env_fn, make_vec_env
 
 logger = logging.getLogger(__name__)
 
@@ -117,18 +115,16 @@ def train_and_eval(
     tag = f"{building_type}/{building_id}/{task}"
     logger.info("Training SAC on %s for %d timesteps", tag, total_timesteps)
 
-    def make_env() -> Monitor:
-        env = b2b.new_make_env(
-            building_type,
-            building_id=building_id,
-            task=task,
-            run_period=run_period,
-        )
-        return Monitor(env)
-
-    env_fns = [make_env for _ in range(n_envs)]
-    raw_vec_env = make_vec_env(env_fns, use_subproc=n_envs > 1)
-    vec_env = VecNormalize(raw_vec_env, norm_obs=True, norm_reward=False)
+    env_fn = make_rl_env_fn(
+        building_type=building_type,
+        building_id=building_id,
+        task=task,
+        run_period=run_period,
+        normalize_obs=True,
+        rescale_action=True,
+    )
+    env_fns = [env_fn for _ in range(n_envs)]
+    vec_env = make_vec_env(env_fns, use_subproc=n_envs > 1)
 
     model_dir = output_dir / "models" / building_type / task
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -146,34 +142,21 @@ def train_and_eval(
 
     model_path = model_dir / f"sac_{building_id}"
     model.save(str(model_path))
-    vec_normalize_path = model_dir / f"sac_vecnormalize_{building_id}.pkl"
-    vec_env.save(str(vec_normalize_path))
     logger.info("Saved model to %s", model_path)
-    logger.info("Saved VecNormalize state to %s", vec_normalize_path)
     vec_env.close()
 
-    # Eval: wrap a fresh single env in DummyVecEnv, then load saved VecNormalize.
-    eval_inner = b2b.new_make_env(
-        building_type,
+    eval_env = make_rl_env_fn(
+        building_type=building_type,
         building_id=building_id,
         task=task,
         run_period=run_period,
-    )
-    eval_vec = DummyVecEnv([lambda: eval_inner])  # type: ignore[return-value]
-    eval_vec_norm = VecNormalize.load(str(vec_normalize_path), eval_vec)
-    eval_vec_norm.training = False
-    eval_vec_norm.norm_reward = False
-
+        normalize_obs=True,
+        rescale_action=True,
+        monitor=False,
+    )()
     try:
-        from stable_baselines3.common.evaluation import evaluate_policy
-
-        mean_reward, _ = evaluate_policy(
-            model,
-            eval_vec_norm,
-            n_eval_episodes=1,
-            deterministic=True,
-        )
-        total_reward = float(mean_reward)
+        result = run_episode(eval_env, model)
+        total_reward = result.total_reward
         logger.info("Eval reward for %s: %.1f", tag, total_reward)
 
         normalized_score = b2b.compute_normalized_score(
@@ -185,7 +168,7 @@ def train_and_eval(
         )
         logger.info("Normalized score for %s: %.4f", tag, normalized_score)
     finally:
-        eval_vec_norm.close()
+        eval_env.close()
 
     return TrainResult(
         building_type=building_type,

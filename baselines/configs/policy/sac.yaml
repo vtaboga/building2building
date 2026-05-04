@@ -82,14 +82,14 @@ learning_rate: 7.3e-4
 #
 # If we ever switch to multi-year training to handle inter-annual
 # weather variation, raise this to 1e6.
-buffer_size: 300_000
+buffer_size: 1_000_000
 
 # Warmup before any gradient update.  10k = ~1.4 days at 5-min cadence.
 # The buffer needs enough diverse transitions before the policy starts
 # learning, otherwise the first gradient lock the policy into a bad
 # local minimum (the PPO failure mode we are deliberately avoiding).
 # rl-zoo Bullet uses 10k.
-learning_starts: 10_000
+learning_starts: 15_000
 
 # Batch size.  At gradient_steps=4 and train_freq=4, each "training
 # block" sees ~2k samples — enough diversity to average out the per-step

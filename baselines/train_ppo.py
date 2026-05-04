@@ -25,11 +25,10 @@ from typing import Any
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from stable_baselines3.common.monitor import Monitor
 
 import building2building as b2b
 from baselines.utils.evaluation import run_episode
-from baselines.utils.training import build_ppo, make_vec_env
+from baselines.utils.training import build_ppo, make_rl_env_fn, make_vec_env
 
 logger = logging.getLogger(__name__)
 
@@ -107,16 +106,15 @@ def train_and_eval(
     tag = f"{building_type}/{building_id}/{task}"
     logger.info("Training PPO on %s for %d timesteps", tag, total_timesteps)
 
-    def make_env() -> Monitor:
-        env = b2b.new_make_env(
-            building_type,
-            building_id=building_id,
-            task=task,
-            run_period=run_period,
-        )
-        return Monitor(env)
-
-    env_fns = [make_env for _ in range(n_envs)]
+    env_fn = make_rl_env_fn(
+        building_type=building_type,
+        building_id=building_id,
+        task=task,
+        run_period=run_period,
+        normalize_obs=True,
+        rescale_action=True,
+    )
+    env_fns = [env_fn for _ in range(n_envs)]
     vec_env = make_vec_env(env_fns, use_subproc=n_envs > 1)
 
     model_dir = output_dir / "models" / building_type / task
@@ -138,12 +136,15 @@ def train_and_eval(
     logger.info("Saved model to %s", model_path)
     vec_env.close()
 
-    eval_env = b2b.new_make_env(
-        building_type,
+    eval_env = make_rl_env_fn(
+        building_type=building_type,
         building_id=building_id,
         task=task,
         run_period=run_period,
-    )
+        normalize_obs=True,
+        rescale_action=True,
+        monitor=False,
+    )()
     try:
         result = run_episode(eval_env, model)
         total_reward = result.total_reward
