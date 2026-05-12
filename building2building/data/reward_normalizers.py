@@ -65,8 +65,10 @@ logger = logging.getLogger(__name__)
 SUPPORTED_SCHEMA_VERSION: int = 1
 
 DEFAULT_REWARD_NORMALIZERS_PATH: Path = (
-    Path(__file__).resolve().parent / "reward_normalizers.yaml"
+    Path(__file__).resolve().parent / "reward_normalizers_random_linear.yaml"
 )
+
+_SEASON_KEYS: frozenset[str] = frozenset({"winter", "summer", "full_year"})
 
 
 class RewardNormalizersUnavailableError(FileNotFoundError):
@@ -178,16 +180,31 @@ def _coerce_int(value: Any, *, key: str) -> int:
 def _parse_source(raw: Any) -> RewardNormalizerSource:
     if not isinstance(raw, dict):
         raise TypeError("reward_normalizers.yaml: 'source' must be a mapping")
-    required = {"controller", "calibration_task", "run_period", "split", "aggregation"}
-    missing = required - set(raw.keys())
+    required_without_period = {"controller", "calibration_task", "split", "aggregation"}
+    has_run_period = "run_period" in raw
+    has_run_periods = "run_periods" in raw
+    if not has_run_period and not has_run_periods:
+        required_without_period.add("run_period")
+    missing = required_without_period - set(raw.keys())
     if missing:
         raise ValueError(
             f"reward_normalizers.yaml: 'source' is missing keys {sorted(missing)}"
         )
+    if has_run_period:
+        run_period_str = str(raw["run_period"])
+    elif has_run_periods:
+        rp_val = raw["run_periods"]
+        run_period_str = (
+            ",".join(str(v) for v in rp_val)
+            if isinstance(rp_val, list)
+            else str(rp_val)
+        )
+    else:
+        run_period_str = ""
     return RewardNormalizerSource(
         controller=str(raw["controller"]),
         calibration_task=str(raw["calibration_task"]),
-        run_period=str(raw["run_period"]),
+        run_period=run_period_str,
         split=str(raw["split"]),
         aggregation=str(raw["aggregation"]),
         b2b_version=str(raw["b2b_version"]) if raw.get("b2b_version") is not None else None,
@@ -275,11 +292,27 @@ def _apply_floor_one(
     )
 
 
-def parse_reward_normalizers(raw: dict[str, Any]) -> RewardNormalizerTable:
+def _is_seasonal(constants_raw: dict) -> bool:
+    """Return True if the constants dict uses a season → bt → cz schema."""
+    return bool(constants_raw) and set(constants_raw).issubset(_SEASON_KEYS)
+
+
+def parse_reward_normalizers(
+    raw: dict[str, Any],
+    *,
+    run_period: str | None = None,
+) -> RewardNormalizerTable:
     """Parse a deserialized YAML mapping into a typed table.
 
     Centralizing the parsing here lets unit tests build synthetic
     inputs (good and bad) without writing temporary files.
+
+    Args:
+        raw: Deserialized YAML top-level mapping.
+        run_period: Season to select from seasonal YAMLs (``"winter"``,
+            ``"summer"``, ``"full_year"``).  When ``None`` and the YAML
+            is seasonal, ``"full_year"`` is used.  Ignored for flat
+            (non-seasonal) YAMLs.
     """
     if not isinstance(raw, dict):
         raise TypeError("reward_normalizers.yaml: top-level must be a mapping")
@@ -297,6 +330,19 @@ def parse_reward_normalizers(raw: dict[str, Any]) -> RewardNormalizerTable:
     constants_raw = raw.get("constants")
     if not isinstance(constants_raw, dict):
         raise TypeError("reward_normalizers.yaml: 'constants' must be a mapping")
+
+    if _is_seasonal(constants_raw):
+        season = run_period if run_period is not None else "full_year"
+        if season not in constants_raw:
+            raise KeyError(
+                f"reward_normalizers.yaml: seasonal YAML has no section for "
+                f"run_period={season!r}; available: {sorted(constants_raw)}"
+            )
+        constants_raw = constants_raw[season]
+        if not isinstance(constants_raw, dict):
+            raise TypeError(
+                f"reward_normalizers.yaml: constants[{season!r}] must be a mapping"
+            )
 
     flat: list[tuple[str, str, dict[str, float | int]]] = []
     for bt, by_cz in constants_raw.items():
@@ -334,6 +380,8 @@ def parse_reward_normalizers(raw: dict[str, Any]) -> RewardNormalizerTable:
 
 def load_reward_normalizers(
     path: Path | None = None,
+    *,
+    run_period: str | None = None,
 ) -> RewardNormalizerTable:
     """Load and validate ``reward_normalizers.yaml``.
 
@@ -341,6 +389,8 @@ def load_reward_normalizers(
         path: Override the default YAML location.  When ``None``
             (default), reads
             :data:`DEFAULT_REWARD_NORMALIZERS_PATH`.
+        run_period: Season slice for seasonal YAMLs (``"winter"``,
+            ``"summer"``, ``"full_year"``).  Ignored for flat YAMLs.
 
     Raises:
         RewardNormalizersUnavailableError: If the YAML file does not
@@ -360,26 +410,31 @@ def load_reward_normalizers(
             "and commit the resulting YAML to the repo."
         )
     raw = yaml.safe_load(target.read_text())
-    return parse_reward_normalizers(raw)
+    return parse_reward_normalizers(raw, run_period=run_period)
 
 
-@lru_cache(maxsize=4)
-def _cached_load(path_str: str | None) -> RewardNormalizerTable:
-    """Cached loader keyed by string path so the LRU cache hashes cleanly."""
-    return load_reward_normalizers(Path(path_str) if path_str else None)
+@lru_cache(maxsize=12)
+def _cached_load(path_str: str | None, run_period: str | None) -> RewardNormalizerTable:
+    """Cached loader keyed by (path, run_period) so the LRU cache hashes cleanly."""
+    return load_reward_normalizers(
+        Path(path_str) if path_str else None,
+        run_period=run_period,
+    )
 
 
 def get_reward_normalizers_cached(
     path: Path | None = None,
+    *,
+    run_period: str | None = None,
 ) -> RewardNormalizerTable:
     """Same as :func:`load_reward_normalizers` but cached.
 
     Reading ~6 building-types' worth of YAML on every env reset would
     be wasteful in long PPO runs.  This helper memoizes the parsed
-    table per resolved path.
+    table per (resolved path, run_period).
     """
     path_str = str(path.resolve()) if path is not None else None
-    return _cached_load(path_str)
+    return _cached_load(path_str, run_period)
 
 
 def clear_reward_normalizers_cache() -> None:
@@ -411,6 +466,7 @@ def resolve_reward_normalizer(
     building_type: str,
     building_id: str,
     *,
+    run_period: str | None = None,
     path: Path | None = None,
 ) -> RewardNormalizer:
     """Look up the ``(tau_T, tau_E)`` for a given building.
@@ -424,6 +480,9 @@ def resolve_reward_normalizer(
         building_type: e.g. ``"OfficeMedium"``.
         building_id: Dataset building identifier (used only for types
             with a climate zone).
+        run_period: Season slice for seasonal YAMLs (``"winter"``,
+            ``"summer"``, ``"full_year"``).  Passed through to
+            :func:`get_reward_normalizers_cached`.
         path: Optional override for the YAML location (testing).
 
     Raises:
@@ -431,7 +490,7 @@ def resolve_reward_normalizer(
         KeyError: If the building type or climate zone is not present
             in the YAML.
     """
-    table = get_reward_normalizers_cached(path)
+    table = get_reward_normalizers_cached(path, run_period=run_period)
     by_cz = table.constants.get(building_type)
     if by_cz is None:
         raise KeyError(

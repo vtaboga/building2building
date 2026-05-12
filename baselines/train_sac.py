@@ -9,25 +9,46 @@ SAC-specific notes:
 - Observations are normalised via deterministic per-feature ``[0, 1]``
   scaling (``b2b.wrap_env_for_rl``).  No ``VecNormalize`` statistics file
   is written; evaluation is reproducible by construction.
-- n_envs=4 (vs PPO's 14) because SAC does one gradient step per env step;
-  more envs would reduce update density without proportional benefit.
+- Actions are rescaled to ``[-1, 1]`` via ``gym.wrappers.RescaleAction``
+  inside the env (applied before ``TimeLimit``); ``wrap_env_for_rl`` is
+  called with ``rescale_action=False`` to avoid a second rescale layer.
+- ``train_freq=1, gradient_steps=-1`` → SB3 performs ``n_envs`` gradient
+  steps per environment step, keeping the update-to-data ratio at 1.0.
+- Tasks use ``NormalizedDeadbandReward`` (``task_*_w0`` family by default)
+  with per-bucket ``(τ_T, τ_E)`` constants from
+  ``reward_normalizers_random_linear.yaml``.  ``energy_weight=0`` (``w0``)
+  means the reward measures pure thermal comfort; switch to ``wmed``/
+  ``whigh`` to add an energy penalty.
 - total_timesteps=1M (vs PPO's 5M) because SAC is off-policy and
   sample-efficient.
+- Multi-seed runs: use Hydra multirun, e.g.
+      python -m baselines.train_sac experiment=train_sac_task_study \\
+          --multirun seed=0,1,2
 
 Usage with Hydra::
 
     python -m baselines.train_sac experiment=train_sac
-    python -m baselines.train_sac experiment=train_sac \
-        building_types=[OfficeSmall] tasks=[task1] buildings_per_type=4
-    python -m baselines.train_sac experiment=train_sac \
-        building_types=[OfficeSmall] tasks=[task1] \
+    python -m baselines.train_sac experiment=train_sac \\
+        building_types=[OfficeSmall] tasks=[task_const_w0] buildings_per_type=1
+    python -m baselines.train_sac experiment=train_sac \\
+        building_types=[OfficeSmall] tasks=[task_const_w0] \\
         building_ids=[OfficeSmall-0001]
+
+Quick smoke-test (single small-office building, 50 k steps, 1 env)::
+
+    python -m baselines.train_sac experiment=train_sac \\
+        building_types=[OfficeSmall] \\
+        tasks=[task_const_w0] \\
+        buildings_per_type=1 \\
+        training.n_envs=1 \\
+        training.total_timesteps=50000
 """
 
 from __future__ import annotations
 
 import csv
 import logging
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -36,7 +57,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 import building2building as b2b
-from baselines.utils.evaluation import run_episode
+from baselines.utils.evaluation import close_env_aggressively, run_episode
 from baselines.utils.training import build_sac, make_rl_env_fn, make_vec_env
 
 logger = logging.getLogger(__name__)
@@ -135,6 +156,11 @@ def train_and_eval(
         seed=seed,
         **policy_overrides,
     )
+    # SB3 seeds the policy, replay buffer RNG, and each VecEnv worker
+    # (worker i gets seed+i) via set_random_seed, called internally by
+    # the SAC constructor.  Calling it again here is a no-op but makes
+    # the intent explicit and guards against future constructor changes.
+    model.set_random_seed(seed)
     model.learn(
         total_timesteps=total_timesteps,
         progress_bar=True,
@@ -159,16 +185,29 @@ def train_and_eval(
         total_reward = result.total_reward
         logger.info("Eval reward for %s: %.1f", tag, total_reward)
 
-        normalized_score = b2b.compute_normalized_score(
-            total_reward,
-            building_type,
-            task,
-            run_period=run_period,
-            building_id=building_id,
-        )
-        logger.info("Normalized score for %s: %.4f", tag, normalized_score)
+        try:
+            normalized_score = b2b.compute_normalized_score(
+                total_reward,
+                building_type,
+                task,
+                run_period=run_period,
+                building_id=building_id,
+            )
+            logger.info("Normalized score for %s: %.4f", tag, normalized_score)
+        except KeyError:
+            logger.warning(
+                "No baseline return found for %s — normalized_score set to nan. "
+                "Run baselines/scripts/run_baseline_returns.sh for task=%s then "
+                "merge_baseline_returns.py to populate baseline_returns.csv.",
+                tag,
+                task,
+            )
+            normalized_score = float("nan")
     finally:
-        eval_env.close()
+        # close_env_aggressively stops the EnergyPlus thread, releases the
+        # native simulation state, and removes the tmpfs output directory —
+        # plain env.close() is a gymnasium no-op and leaks all three.
+        close_env_aggressively(eval_env)
 
     return TrainResult(
         building_type=building_type,
@@ -194,13 +233,18 @@ def write_results_csv(results: list[TrainResult], path: Path) -> None:
         for r in sorted(
             results, key=lambda x: (x.building_type, x.task, x.building_id)
         ):
+            norm_str = (
+                "nan"
+                if math.isnan(r.normalized_score)
+                else f"{r.normalized_score:.4f}"
+            )
             writer.writerow(
                 {
                     "building_type": r.building_type,
                     "building_id": r.building_id,
                     "task": r.task,
                     "total_reward": f"{r.total_reward:.1f}",
-                    "normalized_score": f"{r.normalized_score:.4f}",
+                    "normalized_score": norm_str,
                 }
             )
     logger.info("Wrote %d results to %s", len(results), path)
@@ -242,6 +286,21 @@ def main(cfg: DictConfig) -> None:
         try:
             import wandb
 
+            # Build a unique run name encoding the full training context so
+            # that array jobs (one building per job) are distinguishable in
+            # the W&B UI.  Format: sac_<BT>_<task>_<building_id>_s<seed>
+            # When multiple BTs or tasks are in one job, join with "+".
+            bt_str = "+".join(building_types)
+            task_str = "+".join(tasks)
+            # building_ids is not resolved yet here; use cfg value if present.
+            explicit_ids = cfg.get("building_ids")
+            if explicit_ids is not None:
+                ids_list = list(OmegaConf.to_container(explicit_ids, resolve=True))
+                id_str = "+".join(str(i) for i in ids_list)
+            else:
+                id_str = f"{buildings_per_type}bldgs"
+            run_name = f"sac_{bt_str}_{task_str}_{id_str}_s{seed}"
+
             wandb.init(
                 project=OmegaConf.select(
                     wandb_cfg, "project", default="b2b-baselines"
@@ -249,7 +308,7 @@ def main(cfg: DictConfig) -> None:
                 entity=OmegaConf.select(wandb_cfg, "entity", default=None),
                 tags=list(OmegaConf.select(wandb_cfg, "tags", default=[])),
                 config=OmegaConf.to_container(cfg, resolve=True),
-                name=f"sac_{'_'.join(building_types)}_{'_'.join(tasks)}",
+                name=run_name,
                 group="train_sac",
                 sync_tensorboard=True,
             )

@@ -176,6 +176,7 @@ def new_make_env(
     task: str | TaskPreset = "task1",
     reward: str | RewardConfig | None = None,
     run_period: str = "full_year",
+    normalizer_path: Path | None = None,
     timesteps_per_hour: int = 12,
     target_temperature_mode: str | None = None,
     random_schedule_seed: int | None = None,
@@ -208,6 +209,10 @@ def new_make_env(
         reward: Override reward.  If ``None``, uses the task default.
         run_period: Simulation run period name (``"full_year"``,
             ``"winter"``, ``"summer"``).
+        normalizer_path: Override the default
+            :data:`~building2building.data.reward_normalizers.DEFAULT_REWARD_NORMALIZERS_PATH`
+            used to resolve ``(tau_T, tau_E)`` for normalized-reward presets.
+            When ``None`` (default), the built-in random-policy YAML is used.
         timesteps_per_hour: Number of simulation steps per hour.
         target_temperature_mode: Override the preset's target mode
             (``"constant"``, ``"occupancy"``, or ``"random_schedule"``).
@@ -269,7 +274,11 @@ def new_make_env(
         from building2building.data.reward_normalizers import resolve_reward_normalizer
 
         info_bid = getattr(info, "building_id", None) or building_id or ""
-        normalizer = resolve_reward_normalizer(building_type, info_bid)
+        normalizer = resolve_reward_normalizer(
+            building_type, info_bid,
+            run_period=run_period,
+            path=normalizer_path,
+        )
         effective_reward = effective_reward.filled(
             normalizer.tau_T, normalizer.tau_E
         )

@@ -4,7 +4,7 @@ name: train_sac
 
 defaults:
   - override /policy: sac
-  - override /training: default
+  - override /training: sac
 
 building_types:
   - OfficeSmall
@@ -17,8 +17,13 @@ building_types:
 split: test
 buildings_per_type: 8
 building_ids: null
-tasks: [task1, task2, task3, task4, task5]
+# Normalized-reward presets (NormalizedDeadbandReward with per-bucket τ_T/τ_E
+# from reward_normalizers_random_linear.yaml).  energy_weight=0 (w0 suffix)
+# focuses the policy purely on thermal comfort; switch to wmed/whigh to add an
+# energy penalty.  The three modes cover constant, occupancy, and random-schedule
+# temperature targets — equivalent coverage to the legacy task1/task3/task5.
+tasks: [task_const_w0, task_occ_w0, task_rand_w0]
 
 training:
-  total_timesteps: 1_000_000
+  total_timesteps: 2_000_000
   n_envs: 4

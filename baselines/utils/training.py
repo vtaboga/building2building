@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+from pathlib import Path
 from typing import Any, Callable, Sequence
 
 import gymnasium as gym
@@ -181,6 +182,7 @@ def make_rl_env_fn(
     normalize_obs: bool = True,
     rescale_action: bool = True,
     monitor: bool = True,
+    normalizer_path: Path | None = None,
 ) -> Callable[[], gym.Env]:
     """Return a thunk that builds a single wrapped env for an RL run.
 
@@ -197,7 +199,11 @@ def make_rl_env_fn(
     use this; the analysis modules use it too, ensuring the wrapper stack
     is identical across all RL code paths::
 
-        Monitor(NormalizeObservation(RescaleAction(TimeLimit(simulator))))
+        Monitor(NormalizeObservation(TimeLimit(RescaleAction(simulator))))
+
+    Note: ``RescaleAction`` is applied inside ``TimeLimit`` because
+    ``new_make_env`` wraps with ``RescaleAction`` before returning the
+    ``TimeLimit``-wrapped env.
 
     Args:
         building_type: Building type string (e.g. ``"OfficeSmall"``).
@@ -213,6 +219,8 @@ def make_rl_env_fn(
             ``rescale_action=False`` to avoid double-rescaling.
         monitor: Wrap the env in
             :class:`~stable_baselines3.common.monitor.Monitor`.
+        normalizer_path: Override the default reward-normalizer YAML
+            passed to :func:`building2building.api.new_make_env`.
 
     Returns:
         A zero-argument callable that, when called, returns a fully
@@ -227,6 +235,7 @@ def make_rl_env_fn(
             task=task,
             run_period=run_period,
             rescale_action=rescale_action,
+            normalizer_path=normalizer_path,
         )
         env = b2b.wrap_env_for_rl(
             env,

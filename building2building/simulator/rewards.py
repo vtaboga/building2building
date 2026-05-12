@@ -160,11 +160,7 @@ def _deadband_components(
     for zone in controlled_zones:
         current_temp = float(obs["temperature"][zone])
         target_temp = _zone_target(obs, zone, task_config)
-        dev = abs(current_temp - target_temp)
-        if dev <= dT:
-            temp_error += (current_temp - target_temp) ** 2
-        else:
-            temp_error += dev
+        temp_error += (current_temp - target_temp) ** 2
 
     temp_error = temp_error / len(controlled_zones)
 
