@@ -36,7 +36,7 @@ analysis/task_study/reward_design/plots/fig_random_policy_normalizer_calibration
 It was produced by the `--mode aggregate` step of
 `compute_random_policy_reward_normalizers.py` at git sha
 `00e7c24aa12e3b27c19b78e813bca64bef390c43` (the same run that wrote
-`reward_normalizers_random_linear.yaml`).  Per-bucket median of
+`reward_normalizers.yaml`).  Per-bucket median of
 `temp_penalty/τ_T` and `power_penalty/τ_E` is exactly 1.0 by
 construction (tau values store the median), and bucket IQRs match the
 `tau_T_iqr` / `tau_E_iqr` fields in the committed YAML.
@@ -77,8 +77,7 @@ Implementation map:
 | Reward config dataclass (sentinel pattern) | `building2building/types.py::NormalizedDeadbandRewardConfig` |
 | Reward function | `building2building/simulator/rewards.py::NormalizedDeadbandReward` |
 | Calibration constants loader | `building2building/data/reward_normalizers.py` |
-| Calibration YAML (default) | `building2building/data/reward_normalizers_random_linear.yaml` |
-| Calibration YAML (archived) | `building2building/data/archive/reward_normalizers_linear.yaml` (tuned-RBC, not used) |
+| Calibration YAML | `building2building/data/reward_normalizers.yaml` |
 | Task presets + factory | `building2building/config/tasks.py` |
 | Env-factory auto-fill of `(τ_T, τ_E)` | `building2building/api/__init__.py::new_make_env` |
 | Calibration scripts | `analysis/task_study/compute_reward_normalizers.py`, `compute_random_policy_reward_normalizers.py` |
@@ -261,7 +260,7 @@ Research deliverables:
 | Area | Status |
 | --- | --- |
 | New reward formula and types | Landed |
-| Calibration YAMLs | Random-policy YAML committed as default; tuned-RBC YAML archived under `building2building/data/archive/` |
+| Calibration YAML | `building2building/data/reward_normalizers.yaml` (random-policy) |
 | 9-task preset grid | Landed |
 | RL obs/action normalization wiring | Landed; PPO/SAC/dyn-adapt all use `make_rl_env_fn` |
 | PPO under new reward | Trained on winter only; freezes at `w_E ≥ 10`, `target_kl=0.02` too tight; **full-year sweep + retune pending** (B3, B4) |

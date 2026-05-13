@@ -16,7 +16,7 @@ SAC-specific notes:
   steps per environment step, keeping the update-to-data ratio at 1.0.
 - Tasks use ``NormalizedDeadbandReward`` (``task_*_w0`` family by default)
   with per-bucket ``(τ_T, τ_E)`` constants from
-  ``reward_normalizers_random_linear.yaml``.  ``energy_weight=0`` (``w0``)
+  ``reward_normalizers.yaml``.  ``energy_weight=0`` (``w0``)
   means the reward measures pure thermal comfort; switch to ``wmed``/
   ``whigh`` to add an energy penalty.
 - total_timesteps=1M (vs PPO's 5M) because SAC is off-policy and

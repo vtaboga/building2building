@@ -1,12 +1,12 @@
 """Per-(building_type, climate_zone) reward normalization constants.
 
-This module wraps :file:`reward_normalizers_random_linear.yaml`, which
-stores ``(tau_T, tau_E)`` constants computed from SAC-warmup
-uniform-random policy rollouts on the train split (calibration regime:
-occupancy-based deadband, ``dT=1.0``, seasonal unoccupied policy, using
-``task3``).  The random controller was chosen because it is
-policy-independent — it bakes in no RBC-specific bias into the
-normalizers.  The constants are consumed at training time by
+This module wraps :file:`reward_normalizers.yaml`, which stores
+``(tau_T, tau_E)`` constants computed from SAC-warmup uniform-random
+policy rollouts on the train split (calibration regime: occupancy-based
+deadband, ``dT=1.0``, seasonal unoccupied policy, using ``task3``).
+The random controller was chosen because it is policy-independent —
+it bakes in no RBC-specific bias into the normalizers.  The constants
+are consumed at training time by
 :class:`building2building.simulator.rewards.NormalizedDeadbandReward`
 so that
 
@@ -20,7 +20,8 @@ of each ``(building_type, climate_zone)`` bucket under the calibration
 random policy.
 
 The YAML file is *committed to git* (small) and produced by
-:mod:`analysis.task_study.compute_random_policy_reward_normalizers`.
+:mod:`analysis.task_study.compute_random_policy_reward_normalizers`
+(``--mode aggregate``).
 
 Numerical floor
 ---------------
@@ -68,7 +69,7 @@ logger = logging.getLogger(__name__)
 SUPPORTED_SCHEMA_VERSION: int = 1
 
 DEFAULT_REWARD_NORMALIZERS_PATH: Path = (
-    Path(__file__).resolve().parent / "reward_normalizers_random_linear.yaml"
+    Path(__file__).resolve().parent / "reward_normalizers.yaml"
 )
 
 _SEASON_KEYS: frozenset[str] = frozenset({"winter", "summer", "full_year"})

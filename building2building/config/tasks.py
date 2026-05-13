@@ -31,7 +31,7 @@ Naming convention for the normalized family:
 * weight component:
     * ``w0``    — ``energy_weight = 0.0`` (comfort-only upper bound).
     * ``wmed``  — ``energy_weight = 1.0`` (balanced under the
-      calibration RBC by construction).
+      calibration random policy by construction).
     * ``whigh`` — ``energy_weight = 5.0`` (energy emphasis).
 """
 
@@ -57,9 +57,9 @@ WeightLevel = Literal["w0", "wmed", "whigh"]
 ModeShort = Literal["const", "occ", "rand"]
 
 #: Energy-weight values for the 3-level grid.  ``wmed = 1.0`` is the
-#: "balanced under the calibration RBC" anchor; the two endpoints are
-#: chosen to span comfort-only and energy-emphasis regimes without
-#: making the comparison degenerate.
+#: "balanced under the calibration random policy" anchor; the two
+#: endpoints are chosen to span comfort-only and energy-emphasis regimes
+#: without making the comparison degenerate.
 NORMALIZED_WEIGHT_LEVELS: dict[WeightLevel, float] = {
     "w0": 0.0,
     "wmed": 1.0,

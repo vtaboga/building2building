@@ -437,13 +437,14 @@ class NormalizedDeadbandRewardConfig:
         r = -\\Big(\\tfrac{\\text{temp\\_penalty}}{\\tau_T}
                   + w_E \\cdot \\tfrac{\\text{power\\_penalty}}{\\tau_E}\\Big)
 
-    where ``(tau_T, tau_E)`` come from a tuned-RBC calibration rollout
-    on the train split (see
+    where ``(tau_T, tau_E)`` come from a random-policy calibration
+    rollout on the train split (see
     :file:`building2building/data/reward_normalizers.yaml`).  After
     normalization, ``mean(temp_penalty / tau_T) ≈ 1`` and
     ``mean(power_penalty / tau_E) ≈ 1`` at the median train building of
     each ``(building_type, climate_zone)`` bucket under the calibration
-    RBC, so ``energy_weight`` becomes a *dimensionless* trade-off knob:
+    random policy, so ``energy_weight`` becomes a *dimensionless*
+    trade-off knob:
 
     * ``energy_weight < 1`` → temperature priority,
     * ``energy_weight ≈ 1`` → balanced trade-off,

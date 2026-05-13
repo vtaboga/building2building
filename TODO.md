@@ -18,9 +18,9 @@ references.
 
 ### ~~A1. Decide the calibration controller and document it~~ ✓
 
-Choice: `reward_normalizers_random_linear.yaml` (SAC-warmup uniform
-random). Rationale: policy-independent; bakes in no RBC-specific bias.
-Tuned-RBC YAML archived to `building2building/data/archive/`.
+Choice: `reward_normalizers.yaml` (SAC-warmup uniform random; formerly
+`reward_normalizers_random_linear.yaml`). Rationale: policy-independent;
+bakes in no RBC-specific bias. Tuned-RBC YAML deleted.
 
 ### ~~A2. Re-run calibration if A1 invalidates the current YAML~~ N/A
 

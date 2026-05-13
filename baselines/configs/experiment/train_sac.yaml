@@ -18,7 +18,7 @@ split: test
 buildings_per_type: 8
 building_ids: null
 # Normalized-reward presets (NormalizedDeadbandReward with per-bucket τ_T/τ_E
-# from reward_normalizers_random_linear.yaml).  energy_weight=0 (w0 suffix)
+# from reward_normalizers.yaml).  energy_weight=0 (w0 suffix)
 # focuses the policy purely on thermal comfort; switch to wmed/whigh to add an
 # energy penalty.  The three modes cover constant, occupancy, and random-schedule
 # temperature targets — equivalent coverage to the legacy task1/task3/task5.
