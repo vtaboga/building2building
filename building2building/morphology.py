@@ -133,6 +133,13 @@ class NodeType:
 # actuator bounds (e.g. a new equipment type or different setpoint ranges),
 # these must be updated manually to match.  A future refactor should unify
 # these so the morphological universe is derived from the pipeline definitions.
+# Zone NodeTypes share the same 9-d attribute schema (ZONE_ATTRIBUTE_NAMES
+# in building2building.geometry). All values are dimensionless and in [0,1]
+# by construction of extract_zone_geometry(), so bounds = (0,)*9 / (1,)*9.
+_ZONE_ATTR_LOW: tuple[float, ...] = (0.0,) * 9
+_ZONE_ATTR_HIGH: tuple[float, ...] = (1.0,) * 9
+
+
 WEATHER = NodeType("weather",
     _obs_low=(-30.0, 0.0),   _obs_high=(50.0, 100.0))      # outdoor_temp (°C), outdoor_humidity (%)
 CALENDAR = NodeType("calendar",
@@ -141,20 +148,25 @@ ENERGY = NodeType("energy",
     _obs_low=(0.0, 0.0),      _obs_high=(200.0, 200.0))      # electricity, gas (Wh/m²/timestep)
 UNITARY_ZONE = NodeType("unitary_zone",
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
-    _act_low=(0.0, 5.0), _act_high=(15.0, 60.0))              # fan_flow (kg/s), supply_air_temp (°C)
+    _act_low=(0.0, 5.0), _act_high=(15.0, 60.0),              # fan_flow (kg/s), supply_air_temp (°C)
+    _attr_low=_ZONE_ATTR_LOW, _attr_high=_ZONE_ATTR_HIGH)     # zone geometry (see building2building.geometry)
 VAV_ZONE = NodeType("vav_zone",
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
-    _act_low=(0.0, 10.0, 18.0), _act_high=(1.0, 35.0, 40.0)) # flow_frac, htg_sp (°C), clg_sp (°C)
+    _act_low=(0.0, 10.0, 18.0), _act_high=(1.0, 35.0, 40.0), # flow_frac, htg_sp (°C), clg_sp (°C)
+    _attr_low=_ZONE_ATTR_LOW, _attr_high=_ZONE_ATTR_HIGH)
 VAV_ZONE_NO_COOLING = NodeType("vav_zone_no_cooling",
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
-    _act_low=(0.0, 10.0), _act_high=(1.0, 35.0))              # flow_frac, htg_sp (°C) — clg_sp fixed
+    _act_low=(0.0, 10.0), _act_high=(1.0, 35.0),              # flow_frac, htg_sp (°C) — clg_sp fixed
+    _attr_low=_ZONE_ATTR_LOW, _attr_high=_ZONE_ATTR_HIGH)
 VAV_SUPPLY = NodeType("vav_supply",
     _act_low=(10.0,),  _act_high=(55.0,))                     # supply_air_temp (°C)
 HEATING_ZONE = NodeType("heating_zone",
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
-    _act_low=(10.0,),  _act_high=(35.0,))                     # htg_sp (°C)
+    _act_low=(10.0,),  _act_high=(35.0,),                     # htg_sp (°C)
+    _attr_low=_ZONE_ATTR_LOW, _attr_high=_ZONE_ATTR_HIGH)
 UNCONTROLLED_ZONE = NodeType("uncontrolled_zone",
-    _obs_low=(10.0,),  _obs_high=(45.0,))                     # zone_temp (°C)
+    _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
+    _attr_low=_ZONE_ATTR_LOW, _attr_high=_ZONE_ATTR_HIGH)
 # fmt: on
 
 ALL_NODE_TYPES: tuple[NodeType, ...] = (
