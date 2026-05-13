@@ -31,11 +31,22 @@ Usage::
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Sequence
 
 import numpy as np
 from gymnasium.spaces import Box
+
+
+def _empty_array() -> np.ndarray:
+    """Default factory for the per-node `attributes` and per-morphology
+    `common_attributes` arrays. ndarrays aren't hashable, so the
+    corresponding fields are also marked `field(compare=False)` to keep
+    the frozen dataclass's auto-generated `__eq__`/`__hash__` working —
+    node identity stays determined by the discrete fields (node_id,
+    node_type, indices) rather than attribute values.
+    """
+    return np.empty(0, dtype=np.float32)
 
 if TYPE_CHECKING:
     from building2building.types import Equipment
@@ -57,10 +68,16 @@ class NodeType:
     input sizes and policies can rescale outputs without depending on
     per-environment metadata.
 
+    Types may also declare a local *attribute* space — static per-node
+    metadata that doesn't change within an episode (e.g. zone geometry
+    for zone-typed nodes). Per-node attribute values live on
+    :class:`MorphologyNode`; per-morphology common attributes live on
+    :class:`Morphology`.
+
     The bounds are stored as tuples of floats to keep the dataclass
-    frozen and hashable.  Use the :attr:`local_observation_space` and
-    :attr:`local_action_space` properties to obtain ``gymnasium.spaces.Box``
-    objects.
+    frozen and hashable.  Use the :attr:`local_observation_space`,
+    :attr:`local_action_space`, and :attr:`local_attribute_space`
+    properties to obtain ``gymnasium.spaces.Box`` objects.
     """
 
     name: str
@@ -68,6 +85,8 @@ class NodeType:
     _obs_high: tuple[float, ...] = ()
     _act_low: tuple[float, ...] = ()
     _act_high: tuple[float, ...] = ()
+    _attr_low: tuple[float, ...] = ()
+    _attr_high: tuple[float, ...] = ()
 
     @property
     def observation_dim(self) -> int:
@@ -76,6 +95,10 @@ class NodeType:
     @property
     def action_dim(self) -> int:
         return len(self._act_low)
+
+    @property
+    def attribute_dim(self) -> int:
+        return len(self._attr_low)
 
     @property
     def local_observation_space(self) -> Box:
@@ -91,6 +114,14 @@ class NodeType:
         return Box(
             low=np.array(self._act_low, dtype=np.float32),
             high=np.array(self._act_high, dtype=np.float32),
+        )
+
+    @property
+    def local_attribute_space(self) -> Box:
+        """Gymnasium Box for the local attribute space."""
+        return Box(
+            low=np.array(self._attr_low, dtype=np.float32),
+            high=np.array(self._attr_high, dtype=np.float32),
         )
 
 
@@ -142,6 +173,29 @@ NODE_TYPE_BY_NAME: dict[str, NodeType] = {nt.name: nt for nt in ALL_NODE_TYPES}
 
 
 # ---------------------------------------------------------------------------
+# Common (morphology-wide) attribute schema.
+#
+# Per-node attributes live on :class:`MorphologyNode` and are typed by the
+# node's :class:`NodeType`. Morphology-wide common attributes — things
+# like total floor area, climate-zone index, or other building-level
+# static features — share a single schema declared here. Currently empty;
+# expand the two tuples (and update :attr:`Morphology.common_attributes`
+# producers) when adding building-level attributes.
+# ---------------------------------------------------------------------------
+
+COMMON_ATTRIBUTE_LOW: tuple[float, ...] = ()
+COMMON_ATTRIBUTE_HIGH: tuple[float, ...] = ()
+
+
+def common_attribute_space() -> Box:
+    """Gymnasium Box for the morphology-wide common attribute schema."""
+    return Box(
+        low=np.array(COMMON_ATTRIBUTE_LOW, dtype=np.float32),
+        high=np.array(COMMON_ATTRIBUTE_HIGH, dtype=np.float32),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Morphology graph
 # ---------------------------------------------------------------------------
 
@@ -159,12 +213,17 @@ class MorphologyNode:
             belong to this node's local observation.
         action_indices: Indices into the flat global action vector that
             belong to this node's local action.
+        attributes: Static per-node attribute values, conforming to the
+            node type's :attr:`local_attribute_space`. Defaults to an
+            empty array for types that declare no attributes. Excluded
+            from ``__eq__``/``__hash__`` (see :func:`_empty_array`).
     """
 
     node_id: str
     node_type: NodeType
     obs_indices: tuple[int, ...]
     action_indices: tuple[int, ...]
+    attributes: np.ndarray = field(default_factory=_empty_array, compare=False)
 
 
 @dataclass(frozen=True)
@@ -185,11 +244,19 @@ class Morphology:
         edges: All edges in the graph.
         unassigned_obs_indices: Observation indices not mapped to any node
             (e.g. task-specific occupancy or target temperature signals).
+        common_attributes: Static morphology-wide attribute values
+            (e.g. building-level metadata shared across all nodes).
+            Defaults to an empty array; the bounds schema is module-level
+            (see :data:`COMMON_ATTRIBUTE_LOW` / :data:`COMMON_ATTRIBUTE_HIGH`).
+            Excluded from ``__eq__``/``__hash__``.
     """
 
     nodes: tuple[MorphologyNode, ...]
     edges: tuple[MorphologyEdge, ...]
     unassigned_obs_indices: tuple[int, ...] = ()
+    common_attributes: np.ndarray = field(
+        default_factory=_empty_array, compare=False,
+    )
 
     def node_ids(self) -> list[str]:
         """Return all node IDs in graph order."""
