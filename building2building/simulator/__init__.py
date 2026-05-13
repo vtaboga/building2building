@@ -1,6 +1,9 @@
+import gc
 import itertools
 import json
 import logging
+import shutil
+import threading
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,6 +40,65 @@ from building2building.types import (
 
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_THREAD_JOIN_TIMEOUT: float = 10.0
+
+
+class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
+    """EnergyPlusEnvironment subclass with a leak-free ``close()``.
+
+    Overrides ``gymnasium.Env.close`` (which is a no-op in both
+    ``gymnasium.Env`` and the upstream ``EnergyPlusEnvironment``) to:
+
+    1. Stop the running EnergyPlus simulation via ``ep.try_stop()``.
+    2. Join the EnergyPlus daemon thread so its closure (and the
+       captured ``ManagedState``) become collectable.
+    3. Drop the ``ep`` reference and call ``gc.collect()`` so that
+       ``ManagedState.__del__`` fires and the native EnergyPlus state
+       is released.
+    4. Remove the EnergyPlus output directory tracked in
+       ``_b2b_eplus_output_dir``.
+
+    Two class-level attributes configure behaviour and are expected to
+    be set as instance attributes by :func:`create_simulator`:
+
+    * ``_b2b_eplus_output_dir``: the output directory to remove on close.
+    * ``_b2b_thread_join_timeout``: seconds to wait for the thread before
+      logging a warning (default :data:`_DEFAULT_THREAD_JOIN_TIMEOUT`).
+    """
+
+    _b2b_eplus_output_dir: Path | None = None
+    _b2b_thread_join_timeout: float = _DEFAULT_THREAD_JOIN_TIMEOUT
+
+    def close(self) -> None:
+        if self.ep is not None:
+            # Capture the thread reference before try_stop() transitions the
+            # simulation state from StateStarted to StateDone (which drops
+            # the ep_thread attribute from the state object).
+            ep_sim_state = getattr(self.ep, "state", None)
+            ep_thread = getattr(ep_sim_state, "ep_thread", None)
+
+            try:
+                self.ep.try_stop()
+            except Exception as exc:
+                logger.debug("ep.try_stop() raised during close: %s", exc)
+
+            if isinstance(ep_thread, threading.Thread) and ep_thread.is_alive():
+                ep_thread.join(timeout=self._b2b_thread_join_timeout)
+                if ep_thread.is_alive():
+                    logger.warning(
+                        "EnergyPlus thread did not exit within %.1fs; "
+                        "resources may leak.",
+                        self._b2b_thread_join_timeout,
+                    )
+
+            self.ep = None
+
+        gc.collect()
+
+        if self._b2b_eplus_output_dir is not None:
+            shutil.rmtree(self._b2b_eplus_output_dir, ignore_errors=True)
+            self._b2b_eplus_output_dir = None
 
 
 # Calibration regime baked into reward_normalizers.yaml.
@@ -147,7 +209,7 @@ class MakeEnergyPlus:
         return sim
 
 
-def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
+def create_simulator(building_config: BuildingConfig) -> B2BEnergyPlusEnvironment:
     """Create an EnergyPlus Gymnasium environment from a building config.
 
     Reads the epJSON building file, constructs observation and action spaces
@@ -310,7 +372,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         all_zone_names=sorted(all_zones),
     )
 
-    gymenv = EnergyPlusEnvironment[np.ndarray, np.ndarray](
+    gymenv = B2BEnergyPlusEnvironment(
         make_energyplus,
         reward_function,
         obs_info.space,
@@ -318,6 +380,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         action_space_info.agent_transform.codomain(),
         action_space_info.assemble_full_action,
     )
+    gymenv._b2b_eplus_output_dir = eplus_output_dir
 
     gymenv.metadata = {
         "controlled_zones": controlled_zones,

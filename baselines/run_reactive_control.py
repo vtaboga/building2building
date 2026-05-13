@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import csv
 import logging
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -40,7 +39,7 @@ from baselines.plotting.plot_trajectory import (
     extract_trajectory_data,
     plot_trajectory,
 )
-from baselines.utils.evaluation import EpisodeResult, close_env_aggressively, run_episode
+from baselines.utils.evaluation import EpisodeResult, run_episode
 
 logger = logging.getLogger(__name__)
 
@@ -143,13 +142,11 @@ def evaluate_building(
     rewards: list[float] = []
 
     for run_idx in range(n_runs):
-        eplus_dir = Path(tempfile.mkdtemp(prefix="b2b_eplus_"))
         env = b2b.new_make_env(
             building_type,
             building_id=building_id,
             task=task,
             run_period=run_period,
-            eplus_output_dir=eplus_dir,
         )
         try:
             policy = _select_policy(building_type, building_id, env)
@@ -186,7 +183,7 @@ def evaluate_building(
                     plot_trajectory(traj, output_path=fig_path)
                     logger.info("    Saved plot → %s.*", fig_path)
         finally:
-            close_env_aggressively(env, cleanup_dir=eplus_dir)
+            env.close()
 
     return RunResult(
         building_type=building_type,

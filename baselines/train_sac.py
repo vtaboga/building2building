@@ -57,7 +57,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 import building2building as b2b
-from baselines.utils.evaluation import close_env_aggressively, run_episode
+from baselines.utils.evaluation import run_episode
 from baselines.utils.training import build_sac, make_rl_env_fn, make_vec_env
 
 logger = logging.getLogger(__name__)
@@ -204,10 +204,7 @@ def train_and_eval(
             )
             normalized_score = float("nan")
     finally:
-        # close_env_aggressively stops the EnergyPlus thread, releases the
-        # native simulation state, and removes the tmpfs output directory —
-        # plain env.close() is a gymnasium no-op and leaks all three.
-        close_env_aggressively(eval_env)
+        eval_env.close()
 
     return TrainResult(
         building_type=building_type,

@@ -20,7 +20,6 @@ from __future__ import annotations
 import gc
 import logging
 import random
-import tempfile
 from concurrent.futures import (
     CancelledError,
     Executor,
@@ -42,10 +41,7 @@ from baselines.controllers.air_loop import (
     AirLoopPolicy,
 )
 from baselines.controllers.unitary_hvac import UnitaryHvacConfig, UnitaryHvacPolicy
-from baselines.utils.evaluation import (
-    close_env_aggressively,
-    run_episode_reward_only,
-)
+from baselines.utils.evaluation import run_episode_reward_only
 
 logger = logging.getLogger(__name__)
 
@@ -167,26 +163,21 @@ def _run_one_building(
         UnitaryHvacPolicy as _UnitaryHvacPolicy,
     )
     from baselines.utils.evaluation import (
-        close_env_aggressively as _close_env_aggressively,
-    )
-    from baselines.utils.evaluation import (
         run_episode_reward_only as _run_episode_reward_only,
     )
 
     policy = _AirLoopPolicy(cfg) if is_vav else _UnitaryHvacPolicy(cfg)
-    eplus_dir = Path(tempfile.mkdtemp(prefix=f"b2b_tune_{building_id}_"))
     env = worker_b2b.new_make_env(
         building_type,
         building_id=building_id,
         task=task,
         run_period=run_period,
-        eplus_output_dir=eplus_dir,
     )
     try:
         policy.bind_env(env)
         return float(_run_episode_reward_only(env, policy))
     finally:
-        _close_env_aggressively(env, cleanup_dir=eplus_dir)
+        env.close()
 
 
 def _make_objective(
@@ -205,11 +196,10 @@ def _make_objective(
     but learnable performance.  Using the strict minimum is very noisy: a
     single unlucky building can dominate the score and mask real progress.
 
-    Each building episode runs in its own scratch directory so EnergyPlus
-    output files (``eplusout.*``) are cleaned up eagerly instead of
-    accumulating in ``$TMPDIR``.  The EnergyPlus thread is also joined and
-    the simulation state explicitly released between episodes; see
-    :func:`baselines.utils.evaluation.close_env_aggressively`.
+    Each building episode is cleaned up eagerly via ``env.close()``:
+    the EnergyPlus thread is joined, the native state is released, and
+    the output directory is removed so EnergyPlus artefacts do not
+    accumulate in ``$TMPDIR``.
 
     If *executor* is provided the per-building simulations are dispatched
     to it concurrently (one future per building).  Otherwise the loop is
@@ -250,13 +240,11 @@ def _evaluate_sequential(
     policy = AirLoopPolicy(cfg) if is_vav else UnitaryHvacPolicy(cfg)
     rewards: list[float] = []
     for bid in building_ids:
-        eplus_dir = Path(tempfile.mkdtemp(prefix=f"b2b_tune_{bid}_"))
         env = b2b.new_make_env(
             building_type,
             building_id=bid,
             task=task,
             run_period=run_period,
-            eplus_output_dir=eplus_dir,
         )
         try:
             policy.bind_env(env)
@@ -265,7 +253,7 @@ def _evaluate_sequential(
             logger.warning("Trial %d failed on %s: %s", trial.number, bid, e)
             return float("-inf")
         finally:
-            close_env_aggressively(env, cleanup_dir=eplus_dir)
+            env.close()
             del env
     return _aggregate_rewards(rewards, aggregation, percentile_q)
 
