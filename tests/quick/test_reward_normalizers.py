@@ -169,7 +169,8 @@ class TestResolveRewardNormalizer:
 @pytest.mark.quick
 class TestDefaultPathSentinel:
     def test_default_path_constant_points_inside_package(self) -> None:
-        # We don't require the file to exist (this PR doesn't ship it
-        # yet), only that the constant resolves to the expected place.
-        assert DEFAULT_REWARD_NORMALIZERS_PATH.name == "reward_normalizers.yaml"
+        assert DEFAULT_REWARD_NORMALIZERS_PATH.name == "reward_normalizers_random_linear.yaml"
         assert DEFAULT_REWARD_NORMALIZERS_PATH.parent.name == "data"
+        assert DEFAULT_REWARD_NORMALIZERS_PATH.exists(), (
+            "Committed YAML not found; was it accidentally removed?"
+        )

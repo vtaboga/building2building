@@ -1,10 +1,12 @@
 """Per-(building_type, climate_zone) reward normalization constants.
 
-This module wraps :file:`reward_normalizers.yaml`, which stores
-``(tau_T, tau_E)`` constants computed from tuned-RBC full-year rollouts
-on the train split (calibration regime: occupancy-based deadband,
-``dT=1.0``, seasonal unoccupied policy).  The constants are consumed at
-training time by
+This module wraps :file:`reward_normalizers_random_linear.yaml`, which
+stores ``(tau_T, tau_E)`` constants computed from SAC-warmup
+uniform-random policy rollouts on the train split (calibration regime:
+occupancy-based deadband, ``dT=1.0``, seasonal unoccupied policy, using
+``task3``).  The random controller was chosen because it is
+policy-independent — it bakes in no RBC-specific bias into the
+normalizers.  The constants are consumed at training time by
 :class:`building2building.simulator.rewards.NormalizedDeadbandReward`
 so that
 
@@ -15,16 +17,17 @@ so that
 
 is approximately balanced (mean-1 on each axis) at the median building
 of each ``(building_type, climate_zone)`` bucket under the calibration
-RBC.
+random policy.
 
 The YAML file is *committed to git* (small) and produced by
-:mod:`analysis.task_study.compute_reward_normalizers`.
+:mod:`analysis.task_study.compute_random_policy_reward_normalizers`.
 
 Numerical floor
 ---------------
-HVAC penalties under the tuned RBC are non-trivial in practice, so
-neither ``tau_T`` nor ``tau_E`` should be near zero on the actual
-calibration data.  As a defensive guardrail we clip up to
+HVAC penalties under the random policy are non-trivial in practice
+(random actions still exercise the HVAC), so neither ``tau_T`` nor
+``tau_E`` should be near zero on the actual calibration data.  As a
+defensive guardrail we clip up to
 ``max(epsilon_abs, epsilon_rel * median(tau over buckets))`` and set a
 ``floor_applied_*`` flag on the resulting :class:`RewardNormalizer`.
 Tests assert that the floor is dormant on the committed YAML.
@@ -89,10 +92,10 @@ class RewardNormalizer:
 
     Attributes:
         tau_T: Comfort-penalty normalizer (mean ``temp_penalty`` of the
-            tuned RBC under the calibration task at the median train
+            random policy under the calibration task at the median train
             building of this bucket).
         tau_E: Energy-penalty normalizer (mean ``power_penalty`` of the
-            tuned RBC under the calibration task at the median train
+            random policy under the calibration task at the median train
             building of this bucket).
         tau_T_iqr: Inter-quartile range of ``tau_T`` across the bucket
             (a tightness measure).
