@@ -49,6 +49,7 @@ def _empty_array() -> np.ndarray:
     return np.empty(0, dtype=np.float32)
 
 if TYPE_CHECKING:
+    from building2building.geometry import ZoneGeometry
     from building2building.types import Equipment
 
 logger = logging.getLogger(__name__)
@@ -406,6 +407,7 @@ def build_morphology(
     *,
     controlled_zones: list[str] | None = None,
     all_zone_names: list[str] | None = None,
+    zone_geometry: dict[str, "ZoneGeometry"] | None = None,
 ) -> Morphology:
     """Build a morphology graph from equipment metadata and obs/action names.
 
@@ -424,6 +426,10 @@ def build_morphology(
         all_zone_names: All thermal zone names in the building model.
             When provided, zones not in *controlled_zones* are added as
             ``uncontrolled_zone`` nodes.
+        zone_geometry: Optional mapping ``zone_name -> ZoneGeometry`` from
+            :func:`building2building.geometry.extract_zone_geometry`. When
+            present, zone-typed nodes carry their geometric attributes;
+            otherwise their ``attributes`` array stays empty.
 
     Returns:
         A fully-constructed :class:`Morphology`.
@@ -431,6 +437,16 @@ def build_morphology(
     nodes: list[MorphologyNode] = []
     edges: list[MorphologyEdge] = []
     assigned_obs: set[int] = set()
+
+    def _attrs_for(zone_name: str) -> np.ndarray:
+        """Per-zone attribute array, looked up from `zone_geometry` if
+        supplied; empty otherwise."""
+        if zone_geometry is None:
+            return np.empty(0, dtype=np.float32)
+        zg = zone_geometry.get(zone_name)
+        if zg is None:
+            return np.empty(0, dtype=np.float32)
+        return zg.to_array()
 
     # -- Global singleton nodes --------------------------------------------
 
@@ -493,7 +509,8 @@ def build_morphology(
             node_id = f"zone:{zone}"
             nodes.append(
                 MorphologyNode(
-                    node_id, UNITARY_ZONE, tuple(o_idx), tuple(a_idx)
+                    node_id, UNITARY_ZONE, tuple(o_idx), tuple(a_idx),
+                    attributes=_attrs_for(zone),
                 )
             )
             assigned_obs.update(o_idx)
@@ -538,7 +555,8 @@ def build_morphology(
                 node_id = f"zone:{zone}"
                 nodes.append(
                     MorphologyNode(
-                        node_id, nt, tuple(o_idx), tuple(a_idx)
+                        node_id, nt, tuple(o_idx), tuple(a_idx),
+                        attributes=_attrs_for(zone),
                     )
                 )
                 assigned_obs.update(o_idx)
@@ -570,7 +588,8 @@ def build_morphology(
             node_id = f"zone:{zone}"
             nodes.append(
                 MorphologyNode(
-                    node_id, HEATING_ZONE, tuple(o_idx), tuple(a_idx)
+                    node_id, HEATING_ZONE, tuple(o_idx), tuple(a_idx),
+                    attributes=_attrs_for(zone),
                 )
             )
             assigned_obs.update(o_idx)
@@ -588,7 +607,8 @@ def build_morphology(
             node_id = f"zone:{zone}"
             nodes.append(
                 MorphologyNode(
-                    node_id, UNCONTROLLED_ZONE, (temp_idx,), ()
+                    node_id, UNCONTROLLED_ZONE, (temp_idx,), (),
+                    attributes=_attrs_for(zone),
                 )
             )
             assigned_obs.add(temp_idx)

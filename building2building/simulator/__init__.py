@@ -23,6 +23,7 @@ from building2building.simulator.rewards import (
     BaseReward,
     DeadbandReward,
 )
+from building2building.geometry import extract_zone_geometry
 from building2building.morphology import build_morphology
 from building2building.types import (
     BarrierRewardConfig,
@@ -191,6 +192,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         action_names=action_names,
         controlled_zones=controlled_zones,
         all_zone_names=sorted(all_zones),
+        zone_geometry=extract_zone_geometry(epjson),
     )
 
     gymenv = EnergyPlusEnvironment[np.ndarray, np.ndarray](
