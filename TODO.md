@@ -26,14 +26,12 @@ Tuned-RBC YAML archived to `building2building/data/archive/`.
 
 A1's choice matches the pre-existing default; no re-run needed.
 
-### A3. Validate and commit the calibration sanity plot
+### ~~A3. Validate and commit the calibration sanity plot~~ ✓
 
-- Files: regenerate `analysis/task_study/reward_design/plots/fig_normalizer_calibration.png`
-  from the chosen YAML; commit it (or document its location if it
-  lives outside the release tree).
-- Acceptance: per-bucket median of `temp_penalty/τ_T` and
-  `power_penalty/τ_E` is exactly 1.0 by construction; bucket IQRs
-  match the values in the committed YAML.
+Plot lives in the git-ignored `/analysis/` tree; location documented in
+`notes.md` § "Calibration sanity plot". Median/τ = 1.0 by construction;
+IQRs match committed YAML. Regenerate with
+`python -m analysis.task_study.compute_random_policy_reward_normalizers --mode aggregate`.
 
 ---
 

@@ -24,6 +24,34 @@ question: `comfort_only` / `balanced` / `energy_priority` ×
 
 ---
 
+## Calibration sanity plot
+
+The calibration sanity figure lives **outside the git-tracked tree**
+(inside the git-ignored `/analysis/` directory):
+
+```
+analysis/task_study/reward_design/plots/fig_random_policy_normalizer_calibration.png
+```
+
+It was produced by the `--mode aggregate` step of
+`compute_random_policy_reward_normalizers.py` at git sha
+`00e7c24aa12e3b27c19b78e813bca64bef390c43` (the same run that wrote
+`reward_normalizers_random_linear.yaml`).  Per-bucket median of
+`temp_penalty/τ_T` and `power_penalty/τ_E` is exactly 1.0 by
+construction (tau values store the median), and bucket IQRs match the
+`tau_T_iqr` / `tau_E_iqr` fields in the committed YAML.
+
+To regenerate:
+
+```bash
+python -m analysis.task_study.compute_random_policy_reward_normalizers --mode aggregate
+```
+
+(Requires the per-building rollout cache under
+`$SCRATCH/b2b_reward_normalizers_random/data/`.)
+
+---
+
 ## Reward — calibration regime and impl map
 
 Calibration regime (load-bearing for Phase A/B/C):
