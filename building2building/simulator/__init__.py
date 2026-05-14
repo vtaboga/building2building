@@ -98,7 +98,15 @@ class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
         return super().reset(seed=seed, options=options)
 
     def close(self) -> None:
-        if self.ep is not None:
+        # Gate output-dir cleanup on whether a simulation was actually running.
+        # The upstream EnergyPlusEnvironment.reset() calls self.close()
+        # polymorphically (after we've already nulled self.ep and rmtree'd the
+        # dir in our own reset() preamble).  Without this guard, that second
+        # close() call would delete the directory we just recreated with
+        # mkdir, leaving EnergyPlus nothing to write into.
+        had_simulation = self.ep is not None
+
+        if had_simulation:
             # Capture the thread reference before try_stop() transitions the
             # simulation state from StateStarted to StateDone (which drops
             # the ep_thread attribute from the state object).
@@ -120,7 +128,7 @@ class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
 
         gc.collect()
 
-        if self._b2b_eplus_output_dir is not None:
+        if had_simulation and self._b2b_eplus_output_dir is not None:
             shutil.rmtree(self._b2b_eplus_output_dir, ignore_errors=True)
 
 
