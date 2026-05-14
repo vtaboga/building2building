@@ -237,6 +237,17 @@ Monitor ( NormalizeObservation ( RescaleAction ( TimeLimit ( EnergyPlusSimulator
   Tests: `tests/long/test_env_leak.py` (filesystem cleanup, thread join,
   regression RSS guard, plain-close regression).
 
+  **Upstream fix landed on vtaboga/minergym (B0.1.upstream, sha `6d03b9a`).**
+  `EnergyPlusEnvironment` now has a proper `close()` (thread join + gc +
+  optional `rmtree`), `reset()` delegates to `close()`, and three new
+  constructor parameters `eplus_output_dir`, `cleanup_output_dir_on_close`,
+  `thread_join_timeout` expose the behaviour without subclassing.
+  `try_stop()` also gains an explicit `StateDone` branch and a proper
+  `NotImplementedError` for `StateStarting`.  Once `pyproject.toml` is
+  pinned to `6d03b9a`, `B2BEnergyPlusEnvironment` can collapse to passing
+  `eplus_output_dir=…, cleanup_output_dir_on_close=True` to the upstream
+  constructor (TODO B0.1.upstream acceptance criteria).
+
   **Residual EnergyPlus-native RSS growth (~14 MB/cycle, irreducible).**
   Even with `delete_state` and `reset_state`, EnergyPlus accumulates
   ~14 MB/cycle in C++ global/static objects inside the DLL (output variable

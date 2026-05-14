@@ -65,6 +65,14 @@ class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
     * ``_b2b_eplus_output_dir``: the output directory to remove on close.
     * ``_b2b_thread_join_timeout``: seconds to wait for the thread before
       logging a warning (default :data:`_DEFAULT_THREAD_JOIN_TIMEOUT`).
+
+    .. note::
+        The upstream ``EnergyPlusEnvironment`` (vtaboga/minergym sha ``6d03b9a``)
+        now ships equivalent ``close()`` logic plus the ``eplus_output_dir``
+        and ``cleanup_output_dir_on_close`` constructor parameters (TODO
+        B0.1.upstream).  Once ``pyproject.toml`` is pinned to that commit, this
+        subclass can be collapsed to passing those two parameters to the upstream
+        constructor directly.
     """
 
     _b2b_eplus_output_dir: Path | None = None
