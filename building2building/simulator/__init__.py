@@ -38,7 +38,6 @@ from building2building.types import (
     TaskConfig,
 )
 
-
 logger = logging.getLogger(__name__)
 
 _DEFAULT_THREAD_JOIN_TIMEOUT: float = 10.0
@@ -98,10 +97,7 @@ class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
             ep_sim_state = getattr(self.ep, "state", None)
             ep_thread = getattr(ep_sim_state, "ep_thread", None)
 
-            try:
-                self.ep.try_stop()
-            except Exception as exc:
-                logger.debug("ep.try_stop() raised during close: %s", exc)
+            self.ep.try_stop()
 
             if isinstance(ep_thread, threading.Thread) and ep_thread.is_alive():
                 ep_thread.join(timeout=self._b2b_thread_join_timeout)
@@ -260,12 +256,14 @@ def create_simulator(building_config: BuildingConfig) -> B2BEnergyPlusEnvironmen
         set(itertools.chain(*(item.zones() for item in building_config.hvac_equipment)))
     )
 
-    heating_only_zones = sorted(set(
-        z
-        for eq in building_config.hvac_equipment
-        if hasattr(eq, "equipment_type") and eq.equipment_type == "heating_only"
-        for z in eq.zones()
-    ))
+    heating_only_zones = sorted(
+        set(
+            z
+            for eq in building_config.hvac_equipment
+            if hasattr(eq, "equipment_type") and eq.equipment_type == "heating_only"
+            for z in eq.zones()
+        )
+    )
 
     task_config = building_config.task_config
 
@@ -410,9 +408,11 @@ def create_simulator(building_config: BuildingConfig) -> B2BEnergyPlusEnvironmen
         "hvac_equipment": building_config.hvac_equipment,
         "area": building_config.area,
         "warmup_phases": building_config.warmup_phases,
-        "building_source_metadata": dict(building_config.source_metadata)
-        if isinstance(building_config.source_metadata, dict)
-        else {},
+        "building_source_metadata": (
+            dict(building_config.source_metadata)
+            if isinstance(building_config.source_metadata, dict)
+            else {}
+        ),
         "target_temperature_mode": task_config.target_temperature_mode,
         "morphology": morphology,
         "task_config": task_config,
