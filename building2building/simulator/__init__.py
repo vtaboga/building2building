@@ -89,6 +89,14 @@ class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
         self._b2b_eplus_output_dir: Path | None = eplus_output_dir
         self._b2b_thread_join_timeout: float = thread_join_timeout
 
+    def reset(
+        self, *, seed: int | None = None, options: dict | None = None
+    ) -> tuple[Any, dict]:
+        self.close()
+        if self._b2b_eplus_output_dir is not None:
+            self._b2b_eplus_output_dir.mkdir(parents=True, exist_ok=True)
+        return super().reset(seed=seed, options=options)
+
     def close(self) -> None:
         if self.ep is not None:
             # Capture the thread reference before try_stop() transitions the

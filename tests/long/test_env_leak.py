@@ -80,9 +80,9 @@ class TestEnvLeakClose:
                 env.close()
 
                 leftover = [d for d in parent.iterdir() if d.is_dir()]
-                assert not leftover, (
-                    f"After close() #{i}, leftover output dirs: {leftover}"
-                )
+                assert (
+                    not leftover
+                ), f"After close() #{i}, leftover output dirs: {leftover}"
 
     def test_close_joins_thread(self) -> None:
         """(ii) Thread count returns to baseline after env.close()."""
@@ -147,3 +147,103 @@ class TestEnvLeakClose:
                 "Output dir still exists after plain env.close(); "
                 "B2BEnergyPlusEnvironment.close() did not clean it up."
             )
+
+
+class TestEnvLeakReset:
+    """env.reset() must be leak-free on a single persistent env instance."""
+
+    def test_reset_joins_thread(self) -> None:
+        """(i) Thread count returns to baseline after every env.reset()."""
+        from building2building.api import new_make_env
+
+        gc.collect()
+        baseline = threading.active_count()
+
+        env = new_make_env(**_ENV_KWARGS)
+        try:
+            for i in range(_N):
+                env.reset()
+
+                gc.collect()
+                count = threading.active_count()
+                assert count == baseline, (
+                    f"After reset() #{i}: thread count {count} != baseline "
+                    f"{baseline}; EnergyPlus thread was not joined."
+                )
+        finally:
+            env.close()
+
+    def test_reset_does_not_accumulate_output_dirs(self) -> None:
+        """(ii) Parent eplus_output_dir contains exactly one run-dir at any time."""
+        from building2building.api import new_make_env
+
+        with tempfile.TemporaryDirectory(prefix="b2b_reset_leak_") as tmpdir:
+            parent = Path(tmpdir)
+            out_dir = parent / "run"
+            out_dir.mkdir()
+            env = new_make_env(**_ENV_KWARGS, eplus_output_dir=out_dir)
+            try:
+                for i in range(_N):
+                    env.reset()
+
+                    subdirs = [d for d in parent.iterdir() if d.is_dir()]
+                    assert len(subdirs) == 1, (
+                        f"After reset() #{i}, expected exactly 1 subdir in "
+                        f"{parent}, found {len(subdirs)}: {subdirs}"
+                    )
+            finally:
+                env.close()
+
+    @pytest.mark.skipif(not _PSUTIL_AVAILABLE, reason="psutil not installed")
+    def test_reset_bounds_rss_growth(self) -> None:
+        """(iii) RSS growth across N cycles is bounded by _RSS_MAX_GROWTH_BYTES."""
+        import psutil
+
+        from building2building.api import new_make_env
+
+        proc = psutil.Process()
+        gc.collect()
+        rss_before = proc.memory_info().rss
+
+        env = new_make_env(**_ENV_KWARGS)
+        try:
+            for _ in range(_N):
+                env.reset()
+        finally:
+            env.close()
+
+        gc.collect()
+        rss_after = proc.memory_info().rss
+        growth = rss_after - rss_before
+        assert growth < _RSS_MAX_GROWTH_BYTES, (
+            f"RSS grew by {growth / 1e6:.1f} MB across {_N} reset cycles "
+            f"(limit: {_RSS_MAX_GROWTH_BYTES / 1e6:.0f} MB, "
+            f"= {_RSS_PER_CYCLE_BYTES // (1024 * 1024)} MB/cycle × {_N}); "
+            "EnergyPlus-native growth of ~14 MB/cycle is expected and "
+            "accounted for; this failure means extra leakage beyond that."
+        )
+
+    def test_double_reset_same_env(self) -> None:
+        """Two consecutive reset() calls without close() must not crash."""
+        from building2building.api import new_make_env
+
+        with tempfile.TemporaryDirectory(prefix="b2b_double_reset_") as tmpdir:
+            parent = Path(tmpdir)
+            out_dir = parent / "run"
+            out_dir.mkdir()
+            env = new_make_env(**_ENV_KWARGS, eplus_output_dir=out_dir)
+            try:
+                env.reset()
+                env.reset()
+
+                subdirs = [d for d in parent.iterdir() if d.is_dir()]
+                assert len(subdirs) == 1, (
+                    f"After double reset(), expected exactly 1 subdir in "
+                    f"{parent}, found {len(subdirs)}: {subdirs}"
+                )
+                assert out_dir.exists(), (
+                    "Output dir does not exist after double reset(); "
+                    "reset() should recreate it."
+                )
+            finally:
+                env.close()
