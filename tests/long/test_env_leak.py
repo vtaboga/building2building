@@ -107,7 +107,7 @@ class TestEnvLeakClose:
 
     @pytest.mark.skipif(not _PSUTIL_AVAILABLE, reason="psutil not installed")
     def test_close_bounds_rss_growth(self) -> None:
-        """(iii) RSS growth across N cycles is bounded (<50 MB)."""
+        """(iii) RSS growth across N cycles is bounded by _RSS_MAX_GROWTH_BYTES."""
         import psutil
 
         from building2building.api import new_make_env
