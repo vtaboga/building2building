@@ -237,16 +237,22 @@ Monitor ( NormalizeObservation ( RescaleAction ( TimeLimit ( EnergyPlusSimulator
   Tests: `tests/long/test_env_leak.py` (filesystem cleanup, thread join,
   regression RSS guard, plain-close regression).
 
-  **Upstream fix landed on vtaboga/minergym (B0.1.upstream, sha `6d03b9a`).**
-  `EnergyPlusEnvironment` now has a proper `close()` (thread join + gc +
-  optional `rmtree`), `reset()` delegates to `close()`, and three new
-  constructor parameters `eplus_output_dir`, `cleanup_output_dir_on_close`,
-  `thread_join_timeout` expose the behaviour without subclassing.
-  `try_stop()` also gains an explicit `StateDone` branch and a proper
-  `NotImplementedError` for `StateStarting`.  Once `pyproject.toml` is
-  pinned to `6d03b9a`, `B2BEnergyPlusEnvironment` can collapse to passing
-  `eplus_output_dir=…, cleanup_output_dir_on_close=True` to the upstream
-  constructor (TODO B0.1.upstream acceptance criteria).
+  **Upstream fix landed on vtaboga/minergym.** Two commits:
+  - `6d03b9a` — initial ``close()`` with thread join + gc + optional
+    ``rmtree``; ``reset()`` delegates to ``close()``; new constructor
+    parameters ``eplus_output_dir``, ``cleanup_output_dir_on_close``,
+    ``thread_join_timeout``.
+  - `956c3e1` — gate rmtree on ``had_ep`` (idempotency fix) and add
+    ``eplus_output_dir.mkdir()`` in ``reset()`` so the directory exists
+    for every ``make_energyplus()`` call regardless of
+    ``cleanup_output_dir_on_close``.
+
+  ``pyproject.toml`` is pinned to ``956c3e1``.  **``B2BEnergyPlusEnvironment``
+  is now a thin shim** (constructor only) that sets
+  ``cleanup_output_dir_on_close=True`` when an ``eplus_output_dir`` is
+  given, and delegates all behaviour to the upstream class.  The
+  ``had_simulation``/``had_ep`` guard lives in the upstream ``close()``;
+  the in-tree ``reset()`` and ``close()`` overrides have been removed.
 
   **Residual EnergyPlus-native RSS growth (~14 MB/cycle, irreducible).**
   Even with `delete_state` and `reset_state`, EnergyPlus accumulates
@@ -266,11 +272,13 @@ Monitor ( NormalizeObservation ( RescaleAction ( TimeLimit ( EnergyPlusSimulator
   and is unrelated to B0.  The dependency is correct and the behaviour is
   unaffected; this note preserves the audit trail.
 
-  **B0/B0.1 complete as of commits `5118af5`–`7dd389f`.** Both `close()` and
-  `reset()` are now leak-free by default.  The `had_simulation` guard in
-  `close()` is load-bearing: do not remove it without understanding the
-  double-close pattern (upstream's `reset()` calls `self.close()`
-  polymorphically after our `reset()` already called it).
+  **B0/B0.1 complete as of commits `5118af5`–`7dd389f` (in-tree) and
+  `956c3e1` (upstream).** Both `close()` and `reset()` are now leak-free
+  by default.  The `had_ep` guard in the upstream `close()` is
+  load-bearing: it makes `close()` idempotent so the polymorphic call
+  from `reset()` (which calls `self.close()` after the prior episode has
+  already been stopped) does not re-rmtree the freshly recreated output
+  directory.
 
   **What to watch for in future experiments** (issues that could appear but
   are not covered by the automated tests):
@@ -306,19 +314,20 @@ Monitor ( NormalizeObservation ( RescaleAction ( TimeLimit ( EnergyPlusSimulator
      or add a `gc.collect()` + assertion after each trial.
 
   5. **`reset()` returning stale observations after a long-running episode.**
-     The `reset()` override calls `self.close()` before `super().reset()`.
+     The upstream `reset()` calls `self.close()` before `make_energyplus()`.
      If `try_stop()` raises (e.g. because EnergyPlus crashed during the
-     episode), the exception will now propagate (B0.1.h removed the
-     `try/except`).  This is the correct "fail loudly" behaviour, but watch
-     for unexpected `reset()` failures in W&B run logs — they indicate an
-     EnergyPlus crash that was previously silently swallowed.
+     episode), the exception will propagate.  This is the correct "fail
+     loudly" behaviour, but watch for unexpected `reset()` failures in
+     W&B run logs — they indicate an EnergyPlus crash that was previously
+     silently swallowed.
 
   6. **Output-dir accumulation with `ResampleBuildingOnResetWrapper`.**  The
      wrapper calls `self.env.close()` only when the building index changes.
      When the same building is resampled, the inner `env.reset()` is called
-     (our leak-free override), which cleans up the old dir and recreates it.
-     If the wrapper is ever bypassed or subclassed differently, verify that
-     the inner env's `reset()` is still the B2B override.
+     (the upstream leak-free reset), which cleans up the old dir and recreates
+     it.  If the wrapper is ever bypassed or subclassed differently, verify
+     that the inner env's `reset()` is the upstream
+     `EnergyPlusEnvironment.reset()`.
 
 - Parallel-seed CHS tuning idea (from a pre-cleanup planning doc):
   the 30 seeds inside one Optuna trial (10 buildings × 3 seeds) are

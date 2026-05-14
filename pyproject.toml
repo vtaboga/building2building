@@ -11,7 +11,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 
 dependencies = [
-    "minergym @ git+https://github.com/vtaboga/minergym.git@6d03b9a",
+    "minergym @ git+https://github.com/vtaboga/minergym.git@956c3e1",
     "gitpython>=3.1.0",
     "numpy>=1.24.0",
     "gymnasium>=1.2.0",

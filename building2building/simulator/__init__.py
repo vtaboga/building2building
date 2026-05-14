@@ -1,9 +1,6 @@
-import gc
 import itertools
 import json
 import logging
-import shutil
-import threading
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,38 +41,17 @@ _DEFAULT_THREAD_JOIN_TIMEOUT: float = 10.0
 
 
 class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
-    """EnergyPlusEnvironment subclass with a leak-free ``close()``.
+    """Thin shim over :class:`~minergym.environment.EnergyPlusEnvironment`.
 
-    Overrides ``gymnasium.Env.close`` (which is a no-op in the base
-    ``gymnasium.Env``) to:
+    The upstream ``EnergyPlusEnvironment`` (vtaboga/minergym sha ``956c3e1``)
+    now ships leak-free ``close()`` / ``reset()`` logic and the
+    ``eplus_output_dir``, ``cleanup_output_dir_on_close``, and
+    ``thread_join_timeout`` constructor parameters.  This subclass exists only
+    for backward-compatible naming; it forwards all arguments to the upstream
+    constructor with ``cleanup_output_dir_on_close`` set to ``True`` whenever
+    an ``eplus_output_dir`` is provided.
 
-    1. Stop the running EnergyPlus simulation via ``ep.try_stop()``.
-    2. Join the EnergyPlus daemon thread so its closure (and the
-       captured ``ManagedState``) become collectable.
-    3. Drop the ``ep`` reference and call ``gc.collect()`` so that
-       ``ManagedState``'s ``weakref.finalize`` callback fires and the
-       native EnergyPlus state is released via ``delete_state()``.
-    4. Remove the EnergyPlus output directory passed as
-       ``eplus_output_dir`` to the constructor.
-
-    Args:
-        *args: Forwarded to :class:`~minergym.environment.EnergyPlusEnvironment`.
-        eplus_output_dir: Output directory to remove on ``close()``.
-            Pass ``None`` (default) to skip cleanup.
-        thread_join_timeout: Seconds to wait for the EnergyPlus thread
-            before logging a warning (default
-            :data:`_DEFAULT_THREAD_JOIN_TIMEOUT`).
-        **kwargs: Forwarded to
-            :class:`~minergym.environment.EnergyPlusEnvironment`.
-
-    .. note::
-        The upstream ``EnergyPlusEnvironment`` (vtaboga/minergym sha
-        ``6d03b9a``) now ships equivalent ``close()`` logic plus the
-        ``eplus_output_dir`` and ``cleanup_output_dir_on_close``
-        constructor parameters (TODO B0.1.upstream).  Once
-        ``pyproject.toml`` is pinned to that commit, this subclass can
-        be collapsed to passing those two parameters to the upstream
-        constructor directly.
+    See upstream commit vtaboga/minergym@956c3e1 and TODO B0.1.upstream.
     """
 
     def __init__(
@@ -85,51 +61,13 @@ class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
         thread_join_timeout: float = _DEFAULT_THREAD_JOIN_TIMEOUT,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, **kwargs)
-        self._b2b_eplus_output_dir: Path | None = eplus_output_dir
-        self._b2b_thread_join_timeout: float = thread_join_timeout
-
-    def reset(
-        self, *, seed: int | None = None, options: dict | None = None
-    ) -> tuple[Any, dict]:
-        self.close()
-        if self._b2b_eplus_output_dir is not None:
-            self._b2b_eplus_output_dir.mkdir(parents=True, exist_ok=True)
-        return super().reset(seed=seed, options=options)
-
-    def close(self) -> None:
-        # Gate output-dir cleanup on whether a simulation was actually running.
-        # The upstream EnergyPlusEnvironment.reset() calls self.close()
-        # polymorphically (after we've already nulled self.ep and rmtree'd the
-        # dir in our own reset() preamble).  Without this guard, that second
-        # close() call would delete the directory we just recreated with
-        # mkdir, leaving EnergyPlus nothing to write into.
-        had_simulation = self.ep is not None
-
-        if had_simulation:
-            # Capture the thread reference before try_stop() transitions the
-            # simulation state from StateStarted to StateDone (which drops
-            # the ep_thread attribute from the state object).
-            ep_sim_state = getattr(self.ep, "state", None)
-            ep_thread = getattr(ep_sim_state, "ep_thread", None)
-
-            self.ep.try_stop()
-
-            if isinstance(ep_thread, threading.Thread) and ep_thread.is_alive():
-                ep_thread.join(timeout=self._b2b_thread_join_timeout)
-                if ep_thread.is_alive():
-                    logger.warning(
-                        "EnergyPlus thread did not exit within %.1fs; "
-                        "resources may leak.",
-                        self._b2b_thread_join_timeout,
-                    )
-
-            self.ep = None
-
-        gc.collect()
-
-        if had_simulation and self._b2b_eplus_output_dir is not None:
-            shutil.rmtree(self._b2b_eplus_output_dir, ignore_errors=True)
+        super().__init__(
+            *args,
+            eplus_output_dir=eplus_output_dir,
+            cleanup_output_dir_on_close=eplus_output_dir is not None,
+            thread_join_timeout=thread_join_timeout,
+            **kwargs,
+        )
 
 
 # Calibration regime baked into reward_normalizers.yaml.
