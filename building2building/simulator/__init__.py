@@ -47,36 +47,48 @@ _DEFAULT_THREAD_JOIN_TIMEOUT: float = 10.0
 class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
     """EnergyPlusEnvironment subclass with a leak-free ``close()``.
 
-    Overrides ``gymnasium.Env.close`` (which is a no-op in both
-    ``gymnasium.Env`` and the upstream ``EnergyPlusEnvironment``) to:
+    Overrides ``gymnasium.Env.close`` (which is a no-op in the base
+    ``gymnasium.Env``) to:
 
     1. Stop the running EnergyPlus simulation via ``ep.try_stop()``.
     2. Join the EnergyPlus daemon thread so its closure (and the
        captured ``ManagedState``) become collectable.
     3. Drop the ``ep`` reference and call ``gc.collect()`` so that
-       ``ManagedState.__del__`` fires and the native EnergyPlus state
-       is released.
-    4. Remove the EnergyPlus output directory tracked in
-       ``_b2b_eplus_output_dir``.
+       ``ManagedState``'s ``weakref.finalize`` callback fires and the
+       native EnergyPlus state is released via ``delete_state()``.
+    4. Remove the EnergyPlus output directory passed as
+       ``eplus_output_dir`` to the constructor.
 
-    Two class-level attributes configure behaviour and are expected to
-    be set as instance attributes by :func:`create_simulator`:
-
-    * ``_b2b_eplus_output_dir``: the output directory to remove on close.
-    * ``_b2b_thread_join_timeout``: seconds to wait for the thread before
-      logging a warning (default :data:`_DEFAULT_THREAD_JOIN_TIMEOUT`).
+    Args:
+        *args: Forwarded to :class:`~minergym.environment.EnergyPlusEnvironment`.
+        eplus_output_dir: Output directory to remove on ``close()``.
+            Pass ``None`` (default) to skip cleanup.
+        thread_join_timeout: Seconds to wait for the EnergyPlus thread
+            before logging a warning (default
+            :data:`_DEFAULT_THREAD_JOIN_TIMEOUT`).
+        **kwargs: Forwarded to
+            :class:`~minergym.environment.EnergyPlusEnvironment`.
 
     .. note::
-        The upstream ``EnergyPlusEnvironment`` (vtaboga/minergym sha ``6d03b9a``)
-        now ships equivalent ``close()`` logic plus the ``eplus_output_dir``
-        and ``cleanup_output_dir_on_close`` constructor parameters (TODO
-        B0.1.upstream).  Once ``pyproject.toml`` is pinned to that commit, this
-        subclass can be collapsed to passing those two parameters to the upstream
+        The upstream ``EnergyPlusEnvironment`` (vtaboga/minergym sha
+        ``6d03b9a``) now ships equivalent ``close()`` logic plus the
+        ``eplus_output_dir`` and ``cleanup_output_dir_on_close``
+        constructor parameters (TODO B0.1.upstream).  Once
+        ``pyproject.toml`` is pinned to that commit, this subclass can
+        be collapsed to passing those two parameters to the upstream
         constructor directly.
     """
 
-    _b2b_eplus_output_dir: Path | None = None
-    _b2b_thread_join_timeout: float = _DEFAULT_THREAD_JOIN_TIMEOUT
+    def __init__(
+        self,
+        *args: Any,
+        eplus_output_dir: Path | None = None,
+        thread_join_timeout: float = _DEFAULT_THREAD_JOIN_TIMEOUT,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._b2b_eplus_output_dir: Path | None = eplus_output_dir
+        self._b2b_thread_join_timeout: float = thread_join_timeout
 
     def close(self) -> None:
         if self.ep is not None:
@@ -387,8 +399,8 @@ def create_simulator(building_config: BuildingConfig) -> B2BEnergyPlusEnvironmen
         obs_info.flatten,
         action_space_info.agent_transform.codomain(),
         action_space_info.assemble_full_action,
+        eplus_output_dir=eplus_output_dir,
     )
-    gymenv._b2b_eplus_output_dir = eplus_output_dir
 
     gymenv.metadata = {
         "controlled_zones": controlled_zones,
