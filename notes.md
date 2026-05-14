@@ -260,6 +260,12 @@ Monitor ( NormalizeObservation ( RescaleAction ( TimeLimit ( EnergyPlusSimulator
   simulation in a subprocess so the OS reclaims everything on exit).
   At ~14 MB/cycle, a 500-episode SLURM job accumulates ~7 GB; stay within
   node memory budget when planning long training runs.
+
+  **B0.1.f (housekeeping):** `gitpython>=3.1.0` was bundled into commit `be7463c`
+  alongside the B0 resource-leak fix; it belongs to `building2building/store.py`
+  and is unrelated to B0.  The dependency is correct and the behaviour is
+  unaffected; this note preserves the audit trail.
+
 - Parallel-seed CHS tuning idea (from a pre-cleanup planning doc):
   the 30 seeds inside one Optuna trial (10 buildings × 3 seeds) are
   currently evaluated sequentially in `baselines/tune_ppo.py::_run_sweep`,
