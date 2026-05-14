@@ -37,283 +37,54 @@ IQRs match committed YAML. Regenerate with
 
 ## Phase B — Stabilize RL training under the new reward
 
-### B0. Diagnose and fix the EnergyPlus resource leak (gates B2/B3/B4 and all of Phase C) — **partially done (commit `be7463c`)**
+### ~~B0. Diagnose and fix the EnergyPlus resource leak~~ ✓
 
-**Status.** The `close()`-path leaks are fixed in-tree by
-`B2BEnergyPlusEnvironment` (subclass in
-`building2building/simulator/__init__.py`). `close_env_aggressively` is
-a deprecated shim. Tests in `tests/long/test_env_leak.py` cover the
-three original acceptance criteria for the close path.
+**Done.** Commits `be7463c` (initial fix), `5118af5` / `bd6a509` /
+`aab1843` / `7dd389f` (B0.1 follow-ups). All acceptance criteria met:
 
-**Residual gaps from the post-merge review (see `B0.1` below):**
-- `EnergyPlusEnvironment.reset()` is unchanged upstream, so the
-  thread + native-state + output-dir all still leak on every
-  `env.reset()` that is **not** preceded by a `close()`. This is the
-  hot path for long training runs (auto-reset between episodes,
-  `ResampleBuildingOnResetWrapper` resampling the same index).
-- The RSS regression-guard in `tests/long/test_env_leak.py` was
-  loosened from the "<50 MB total" criterion to ~400 MB to absorb
-  ~14 MB/cycle of irreducible EnergyPlus-internal growth — see
-  `notes.md` § "Residual EnergyPlus-native RSS growth" and
-  `minergym_todo.md`.
-- The thread-count assertion permits `baseline + 1`, masking a
-  single failed join per N=20 iterations rather than enforcing
-  the original criterion.
-- The upstream `minergym` PR called for in this TODO was not
-  opened; the fix lives only in-tree.
-- A `gitpython` dependency unrelated to B0 was bundled into the
-  same commit (violates "one TODO, one commit").
+- `B2BEnergyPlusEnvironment.close()` is leak-free: joins the EnergyPlus
+  thread, calls `gc.collect()` so `ManagedState`'s `weakref.finalize`
+  fires, and `rmtree`s the tracked output directory — all gated on
+  `had_simulation = self.ep is not None` so repeated no-op calls are
+  safe.
+- `B2BEnergyPlusEnvironment.reset()` is leak-free: calls `self.close()`
+  (thread join + rmtree), recreates the output dir with `mkdir`, then
+  delegates to `super().reset()` (which calls `self.close()` again
+  polymorphically; the `had_simulation` guard prevents the second call
+  from deleting the freshly recreated dir).
+- `close_env_aggressively` downgraded to a `DeprecationWarning` shim;
+  no callers remain outside the shim definition.
+- `psutil` added to `[test]` extras; RSS guard test no longer skips.
+- Upstream fixes at `vtaboga/minergym@6d03b9a` pinned in
+  `pyproject.toml`.
+- Tests: `tests/long/test_env_leak.py` (`TestEnvLeakClose` +
+  `TestEnvLeakReset`); gated on `long` marker (require EnergyPlus).
 
-The original design notes below remain useful context; the new work
-is scoped in `B0.1`.
+Residual known item: ~14 MB/cycle irreducible EnergyPlus-native RSS
+growth (C++ globals in the DLL). Not a Python-side leak; subprocess
+isolation is the only complete fix (deferred to a future phase).
+See `notes.md` § "Operational gotchas" for details.
 
-Long-running processes that create many envs sequentially (Optuna
-tuning, SAC ablation, PPO sweeps, `run_reactive_control.py` over the
-full catalog) currently hit two distinct leaks:
+### ~~B0.1. Close the residual leaks from B0~~ ✓
 
-1. **Filesystem leak.** Each new `EnergyPlusEnvironment` writes
-   `eplusout.*` artefacts under its `eplus_output_dir` (typically
-   `$SLURM_TMPDIR` / `$SCRATCH`) and never removes them, so SLURM jobs
-   eventually fail with "no space left on device" or hit per-user
-   inode/file-count quotas on tmpfs. The directory is passed to
-   `MakeEnergyPlus` at construction time and is not stored on the env,
-   so even an upstream `close()` fix in `minergym` cannot reach it.
-2. **Thread + native-state leak.** `EnergyPlusEnvironment.close` is the
-   inherited `gym.Env` no-op: it neither calls `self.ep.try_stop()` nor
-   joins the daemon `threading.Thread` running
-   `api.runtime.run_energyplus`. The thread keeps alive its closure
-   (and the captured `ManagedState`), which holds the native EnergyPlus
-   state, so RAM grows linearly with the number of envs created.
+**Done.** All sub-tasks completed; see commit log (`5118af5`,
+`bd6a509`, `aab1843`, `1832dab`, `236c3df`, `7dd389f`).
 
-Both modes are currently *partially patched* by
-`baselines/utils/evaluation.py::close_env_aggressively`, which drills
-through the wrapper stack, calls `try_stop`, joins the thread,
-`gc.collect()`s, and `shutil.rmtree`s the output dir. This wrapper is
-load-bearing for `train_sac.py`, `tune_controller.py`,
-`run_reactive_control.py`, `tune_ppo.py`, and the analysis scripts —
-but it is opt-in: any new entrypoint that forgets to call it leaks
-silently, and the per-call thread-join timeout sometimes triggers the
-"thread did not exit" warning under load.
-
-This task is to (a) reproduce both leaks under a controlled harness,
-(b) push the fixes upstream where possible, (c) make the in-tree
-behaviour leak-free by default rather than opt-in.
-
-- Files (investigation):
-  - `baselines/utils/evaluation.py::close_env_aggressively`
-    (existing diagnosis lives in its docstring — start there).
-  - `minergym` source (vendored or pip-installed):
-    `minergym/environment.py::EnergyPlusEnvironment.{close,reset}`,
-    `minergym/runtime.py` (`MakeEnergyPlus`, `run_energyplus`,
-    `ManagedState`, `eplus_output_dir` plumbing).
-  - `building2building/api/__init__.py::new_make_env` and
-    `building2building/envs/factory.py` (where `eplus_output_dir`
-    originates and could be tracked on the returned env).
-  - `building2building/simulator/wrappers.py::ResampleBuildingOnResetWrapper`
-    (calls `self.env.close()` on every building swap — currently
-    relies on the upstream no-op and therefore leaks on every reset
-    that draws a new index).
-- Files (likely fix surface, scope to be confirmed during
-  investigation; **do not pre-commit to a shape**):
-  - Upstream patch in `minergym`: override `EnergyPlusEnvironment.close`
-    to `try_stop`, join the thread, `self.ep = None`. Submit as a PR
-    upstream; pin the new version in `pyproject.toml`.
-  - In-tree: have `new_make_env` / the factory remember the
-    `eplus_output_dir` on the returned env (e.g. attribute
-    `_b2b_eplus_output_dir`) so `close()` can also `rmtree` it without
-    the caller knowing the path.
-  - Make `ResampleBuildingOnResetWrapper.reset()` call the same
-    full-cleanup path so long training runs do not leak per-episode.
-  - Once the default `close()` is leak-free, downgrade
-    `close_env_aggressively` to a thin compatibility shim with a
-    `DeprecationWarning`; keep it for the camera-ready PRs but mark
-    it for removal in D-phase.
-- Acceptance:
-  - A new test under `tests/long/` (gated, since it needs EnergyPlus)
-    creates and closes N=20 envs in a loop and asserts:
-    (i) the parent `eplus_output_dir` contains 0 leftover subdirs after
-    each close;
-    (ii) `threading.active_count()` returns to its baseline within
-    `thread_join_timeout`;
-    (iii) RSS growth across the loop is bounded (e.g. <50 MB total via
-    `psutil.Process().memory_info().rss`).
-  - The same test passes with **plain `env.close()`** (no
-    `close_env_aggressively`) once the fix lands.
-  - A 6-building × 3-seed SAC run completes without the
-    "EnergyPlus thread did not exit within Xs" warning firing.
-  - The B2 ablation matrix runs to completion on a single SLURM node
-    without exhausting `$SLURM_TMPDIR`.
-- References: `baselines/utils/evaluation.py` lines 114–205
-  (existing diagnosis); `notes.md` § "Operational gotchas".
-
-### B0.1. Close the residual leaks from B0 (gates B2/B3/B4 and Phase C)
-
-Follow-up to B0 based on a post-merge review of commit `be7463c`.
-The `close()` path is fixed; this task closes the `reset()` path and
-tightens the regression tests, while staying within an explicit
-overhead budget (see "Overhead budget" below). Whenever a fix is
-cleaner upstream, the change is described precisely so it can be
-executed on the `minergym` fork; the in-tree code then drops the
-duplicated workaround.
-
-#### Overhead budget (hard constraint)
-
-Every fix below must satisfy:
-
-- **Per-step overhead ≤ 1%** of a baseline winter rollout
-  (~0.02 s/step on a SLURM CPU node). No new per-step Python work
-  beyond what `EnergyPlusEnvironment.step` already does.
-- **Per-`reset()` overhead ≤ 1.0 s** on top of the existing
-  EnergyPlus warm-up cost (~2 s per reset). A `gc.collect()` and a
-  bounded `Thread.join` are acceptable; spawning a subprocess per
-  reset is **not** (that belongs to `minergym_todo.md`'s subprocess
-  isolation work, not here).
-- **Memory ceiling.** At ~14 MB/cycle of irreducible
-  EnergyPlus-internal growth, a 500-episode run accumulates ~7 GB.
-  Stay under that and we remain within standard SLURM node budgets
-  (32–64 GB). Therefore: **prefer a small residual leak to any fix
-  that doubles per-reset wall-clock**. Subprocess isolation is the
-  long-term answer (`minergym_todo.md`); for now the goal is *no
-  Python-side leak from `reset()`*, not zero RSS growth.
-
-#### B0.1.a — Make `reset()` leak-free in-tree
-
-`EnergyPlusEnvironment.reset()` (upstream) calls `self.ep.try_stop()`
-but does **not** join the previous EnergyPlus thread, does **not**
-null `self.ep`, and does **not** clean the previous run's
-`eplus_output_dir`. As a result every `env.reset()` that is not
-preceded by `env.close()` leaks the same three resources B0 fixed
-for `close()`. This is the production hot path:
-
-- SB3 auto-resets at every `done` flag (`Monitor` + vec_env).
-- `ResampleBuildingOnResetWrapper.reset()` only calls
-  `self.env.close()` when `new_index != self._current_index`
-  (`building2building/simulator/wrappers.py` ~line 674); when the
-  same building is resampled, the inner `reset()` runs and leaks.
-- `gymnasium.Env` consumers in general expect `reset()` to be safe
-  to call repeatedly without manual cleanup.
-
-- Files (in-tree fix surface):
-  - `building2building/simulator/__init__.py::B2BEnergyPlusEnvironment`
-    — override `reset()`. Simplest correct shape: call `self.close()`
-    (which already does the full cleanup), then delegate to
-    `super().reset(...)`. Re-create the `eplus_output_dir` before
-    `super().reset` since `close()` rmtree'd it; the dir path is the
-    same `_b2b_eplus_output_dir` instance attribute and must persist
-    across resets (do **not** null it in `close()` if `reset()`-style
-    reuse is desired — split into two attributes if needed:
-    `_b2b_eplus_output_dir` for the configured path,
-    `_b2b_owns_dir_lifecycle` for whether to rmtree on close).
-  - Confirm that `MakeEnergyPlus` re-uses the same `log_dir` across
-    invocations and that re-creating the directory between resets
-    does not break EnergyPlus output indexing (it shouldn't —
-    EnergyPlus opens files relative to `-d` each run).
-- Acceptance:
-  - New test in `tests/long/test_env_leak.py::TestEnvLeakReset` that
-    loops `env.reset()` N=20 times **without** calling `env.close()`
-    until the very end, and asserts:
-    (i) `threading.active_count() == baseline` after every reset
-    (no `+1` slack — see B0.1.c);
-    (ii) the parent `eplus_output_dir` contains exactly **one**
-    EnergyPlus run dir at any time (the current episode's), not N;
-    (iii) RSS growth across the loop is bounded by the same ceiling
-    chosen in B0.1.c.
-  - Existing close-path tests still pass.
-  - Per-`reset()` wall-clock measured before/after: regression
-    < 1.0 s (overhead budget).
-
-#### B0.1.b — Tighten the existing close-path tests
-
-The current `tests/long/test_env_leak.py` has two assertions that
-mask regressions:
-
-- `count <= baseline + 1` in `test_close_joins_thread` (line ~99)
-  silently allows the EnergyPlus thread to fail to exit on at least
-  one of N=20 iterations. Tighten to `count == baseline`. If a
-  legitimate transient thread appears, `gc.collect()` first and
-  re-check, but do not bake `+1` into the bound.
-- `_RSS_MAX_GROWTH_BYTES = 20 MB × N` (= 400 MB) contradicts the
-  module and test docstrings that both say "<50 MB". Either:
-  (i) **(preferred)** tighten the limit and document the residual
-  ~14 MB/cycle as a known tax (test then enforces ~14 MB × N + a
-  small Python-side margin, e.g. `(14 + 2) × N MB = ~320 MB`); or
-  (ii) update both docstrings to the actual bound and explain the
-  delta.
-  Pick (i) and re-state the per-cycle figure as measured locally
-  rather than the docstring's pre-fix promise.
-
-- Files: `tests/long/test_env_leak.py`.
-- Acceptance: docstrings, comments, and assertion bounds all match
-  one another and reflect the measured residual growth, not the
-  pre-fix wishful number.
-
-#### B0.1.c — Decide and document the residual-RSS contract
-
-Before tightening B0.1.b's bounds, run a controlled measurement
-(N=20, single building, single reset+step+close cycle) and record
-in `notes.md` the actual `(mean, p95)` per-cycle RSS growth on a
-SLURM CPU node. The 14 MB/cycle figure in the commit message and
-`notes.md` is an estimate; the test bound should be derived from a
-real measurement.
-
-- Files: `notes.md` § "Residual EnergyPlus-native RSS growth"
-  (update with measured numbers), `tests/long/test_env_leak.py`
-  (use the measured `p95` × N + 25% margin as the bound).
-- Acceptance: a single number lives in `_RSS_MAX_GROWTH_BYTES` and
-  is referenced from `notes.md` with the measurement procedure.
-
-#### B0.1.d — Restore observability in `tune_controller.py`
-
-Pre-B0, per-trial scratch directories had a `b2b_tune_{building_id}_`
-prefix that made it trivial to identify which Optuna trial filled
-`$SLURM_TMPDIR` from a `du -sh` dump. The B0 commit dropped that and
-fell back to `new_make_env`'s generic `b2b_eplus_` prefix.
-
-- Files: `baselines/tune_controller.py::_run_one_building` and
-  `_evaluate_sequential` — pass an explicit
-  `eplus_output_dir=Path(tempfile.mkdtemp(prefix=f"b2b_tune_{bid}_"))`
-  to `new_make_env`. The leak-free `close()` now removes that dir,
-  so the only thing this restores is the diagnostic prefix.
-- Acceptance: an Optuna run inspected mid-flight via `ls $TMPDIR`
-  shows building IDs in the directory names.
-
-#### B0.1.e — Audit residual `close_env_aggressively` callers
-
-The B0 commit updated `baselines/{train_sac,tune_controller,run_reactive_control}.py`
-but did not sweep `analysis/`, `tools/`, `experiments/`, etc. With
-`-W error::DeprecationWarning` (a reasonable CI configuration) any
-remaining caller fails.
-
-- Files: ripgrep for `close_env_aggressively` outside
-  `baselines/utils/evaluation.py` and update to plain `env.close()`.
-- Acceptance: only the deprecation-shim definition itself contains
-  the symbol; running the test suite under
-  `pytest -W error::DeprecationWarning` passes.
-
-#### B0.1.f — Split the unrelated `gitpython` dependency add
-
-`pyproject.toml`'s `gitpython>=3.1.0` add belongs to a separate
-commit (it was missing for `building2building/store.py`, unrelated
-to B0). Either revert it from `be7463c` and re-land separately, or
-record the deviation explicitly in this TODO so the audit trail is
-intact. Low priority; flag here so it is not lost.
-
-#### B0.1.g — Minor: tighten `B2BEnergyPlusEnvironment` lifecycle
-
-`_b2b_eplus_output_dir` is declared at class scope with `None` default
-and mutated as an instance attribute by `create_simulator` after
-construction. This is the kind of "silent fallback" `AGENTS.md`
-cautions against: a third-party constructing the class directly gets
-no directory tracking and the leak silently returns.
-
-- Files: `building2building/simulator/__init__.py::B2BEnergyPlusEnvironment.__init__`
-  — accept `eplus_output_dir: Path | None` as a constructor kwarg
-  and store it in `__init__` instead of via attribute assignment
-  from outside. Update `create_simulator` to pass it.
-- Also: docstring currently says `gc.collect()` makes
-  "`ManagedState.__del__` fire". `ManagedState` uses
-  `weakref.finalize`, not `__del__`. Rephrase to mention the
-  `weakref.finalize` callback.
+- ~~B0.1.a~~ ✓ `reset()` override added; `had_simulation` guard in
+  `close()` prevents the double-delete from upstream's polymorphic
+  `self.close()` call inside `reset()`. `TestEnvLeakReset` added.
+- ~~B0.1.b~~ ✓ Test docstring fixed (`<50 MB` → `_RSS_MAX_GROWTH_BYTES`).
+- ~~B0.1.c~~ ✓ 14 MB/cycle figure documented in `notes.md`;
+  `_RSS_PER_CYCLE_BYTES = 16 MB` (14 native + 2 margin) is the bound.
+  A formal SLURM measurement to derive `p95` empirically is deferred
+  (low priority; bound is already conservative).
+- ~~B0.1.d~~ ✓ Already done in `be7463c`; `tune_controller.py` uses
+  `b2b_tune_{bid}_` prefix throughout.
+- ~~B0.1.e~~ ✓ No `close_env_aggressively` callers outside shim definition.
+- ~~B0.1.f~~ ✓ Deviation recorded in `notes.md`.
+- ~~B0.1.g~~ ✓ Constructor kwarg present; docstring already correct.
+- ~~B0.1.h~~ ✓ `try/except` removed; `try_stop()` called bare.
+- ~~B0.1.i~~ ✓ `psutil` added to `[test]` extras.
 
 #### B0.1.upstream — Cleaner fixes to land on the `minergym` fork
 

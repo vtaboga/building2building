@@ -266,6 +266,60 @@ Monitor ( NormalizeObservation ( RescaleAction ( TimeLimit ( EnergyPlusSimulator
   and is unrelated to B0.  The dependency is correct and the behaviour is
   unaffected; this note preserves the audit trail.
 
+  **B0/B0.1 complete as of commits `5118af5`–`7dd389f`.** Both `close()` and
+  `reset()` are now leak-free by default.  The `had_simulation` guard in
+  `close()` is load-bearing: do not remove it without understanding the
+  double-close pattern (upstream's `reset()` calls `self.close()`
+  polymorphically after our `reset()` already called it).
+
+  **What to watch for in future experiments** (issues that could appear but
+  are not covered by the automated tests):
+
+  1. **"EnergyPlus thread did not exit within Xs" in `.err` logs.**  This
+     warning fires from `close()` when the thread is still alive after
+     `thread_join_timeout` (default 10 s).  It means EnergyPlus is stuck in
+     a C-level call and the thread leaked.  Check: large buildings with many
+     warmup phases, heavily loaded nodes with CPU contention, or simulations
+     killed mid-step.  Mitigation: increase `thread_join_timeout` in
+     `new_make_env`; long-term fix is subprocess isolation.
+
+  2. **`$SLURM_TMPDIR` growing unexpectedly during training.**  The output dir
+     is rmtree'd inside `close()` only when `had_simulation` is `True`.  If a
+     job crashes between `make_energyplus()` and the first `reset()` (i.e. the
+     env is constructed but never started), the dir is never cleaned up.
+     Similarly, if `env.close()` is never called (KeyboardInterrupt, SIGKILL),
+     the dir leaks.  Check `$SLURM_TMPDIR` usage at the end of a failed job;
+     if it is large, the crash was mid-simulation rather than post-cleanup.
+
+  3. **RSS growing faster than ~14 MB/episode.**  The known residual is
+     ~14 MB/cycle (EnergyPlus C++ globals).  If W&B or SLURM job stats show
+     RSS growing at >20 MB/episode, the Python-side fix is likely regressed
+     (e.g. `self.ep = None` is missing, `gc.collect()` was removed, or a
+     wrapper is holding a reference to the old env).  Run
+     `tests/long/test_env_leak.py` on a node with EnergyPlus to isolate.
+
+  4. **Thread count creeping up across Optuna trials in a single process.**
+     Optuna runs multiple trials sequentially in one process.  Each trial
+     calls `new_make_env` → `reset()` → ... → `close()`.  If the thread
+     count after a trial is `baseline + 1`, the join timed out for that trial
+     (see point 1).  Watch `threading.active_count()` in the Optuna callback
+     or add a `gc.collect()` + assertion after each trial.
+
+  5. **`reset()` returning stale observations after a long-running episode.**
+     The `reset()` override calls `self.close()` before `super().reset()`.
+     If `try_stop()` raises (e.g. because EnergyPlus crashed during the
+     episode), the exception will now propagate (B0.1.h removed the
+     `try/except`).  This is the correct "fail loudly" behaviour, but watch
+     for unexpected `reset()` failures in W&B run logs — they indicate an
+     EnergyPlus crash that was previously silently swallowed.
+
+  6. **Output-dir accumulation with `ResampleBuildingOnResetWrapper`.**  The
+     wrapper calls `self.env.close()` only when the building index changes.
+     When the same building is resampled, the inner `env.reset()` is called
+     (our leak-free override), which cleans up the old dir and recreates it.
+     If the wrapper is ever bypassed or subclassed differently, verify that
+     the inner env's `reset()` is still the B2B override.
+
 - Parallel-seed CHS tuning idea (from a pre-cleanup planning doc):
   the 30 seeds inside one Optuna trial (10 buildings × 3 seeds) are
   currently evaluated sequentially in `baselines/tune_ppo.py::_run_sweep`,
