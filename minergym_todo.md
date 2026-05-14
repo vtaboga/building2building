@@ -2,8 +2,9 @@
 
 # Subprocess isolation for EnergyPlus — implementation spec
 
-**Context.** Even after the B0 resource-leak fix (`B2BEnergyPlusEnvironment.close()`
-stops the thread, calls `delete_state`, and rmtrees the output dir), EnergyPlus
+**Context.** Even after the B0 resource-leak fix (upstream
+`EnergyPlusEnvironment.close()` stops the thread, calls `delete_state`,
+and rmtrees the output dir), EnergyPlus
 accumulates ~14 MB/cycle of RSS in C++ global/static objects inside the DLL that
 `delete_state` and `reset_state` cannot reach.  See `notes.md` §
 "Residual EnergyPlus-native RSS growth".  The only complete fix is process
@@ -265,10 +266,10 @@ fully picklable.
 Add a `use_subprocess: bool = False` parameter and thread it through to
 `MakeEnergyPlus`.
 
-#### Updated `B2BEnergyPlusEnvironment.close()`
+#### Upstream `EnergyPlusEnvironment.close()` interaction
 
 When `use_subprocess=True`, `self.ep` is an `EnergyPlusSimulation` **from the
-main process's perspective** but backed by a subprocess.  The existing
+main process's perspective** but backed by a subprocess.  The upstream
 `close()` calls `self.ep.try_stop()`, which — for
 `SubprocessEnergyPlusSimulation` — sends `("stop",)` and kills the worker
 process.  **No other changes needed** in `close()`: thread joining, `gc.collect()`,

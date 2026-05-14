@@ -37,38 +37,6 @@ from building2building.types import (
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_THREAD_JOIN_TIMEOUT: float = 10.0
-
-
-class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
-    """Thin shim over :class:`~minergym.environment.EnergyPlusEnvironment`.
-
-    The upstream ``EnergyPlusEnvironment`` (vtaboga/minergym sha ``956c3e1``)
-    now ships leak-free ``close()`` / ``reset()`` logic and the
-    ``eplus_output_dir``, ``cleanup_output_dir_on_close``, and
-    ``thread_join_timeout`` constructor parameters.  This subclass exists only
-    for backward-compatible naming; it forwards all arguments to the upstream
-    constructor with ``cleanup_output_dir_on_close`` set to ``True`` whenever
-    an ``eplus_output_dir`` is provided.
-
-    See upstream commit vtaboga/minergym@956c3e1 and TODO B0.1.upstream.
-    """
-
-    def __init__(
-        self,
-        *args: Any,
-        eplus_output_dir: Path | None = None,
-        thread_join_timeout: float = _DEFAULT_THREAD_JOIN_TIMEOUT,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(
-            *args,
-            eplus_output_dir=eplus_output_dir,
-            cleanup_output_dir_on_close=eplus_output_dir is not None,
-            thread_join_timeout=thread_join_timeout,
-            **kwargs,
-        )
-
 
 # Calibration regime baked into reward_normalizers.yaml.
 _CALIBRATION_DT: float = 1.0
@@ -178,7 +146,7 @@ class MakeEnergyPlus:
         return sim
 
 
-def create_simulator(building_config: BuildingConfig) -> B2BEnergyPlusEnvironment:
+def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     """Create an EnergyPlus Gymnasium environment from a building config.
 
     Reads the epJSON building file, constructs observation and action spaces
@@ -343,7 +311,7 @@ def create_simulator(building_config: BuildingConfig) -> B2BEnergyPlusEnvironmen
         all_zone_names=sorted(all_zones),
     )
 
-    gymenv = B2BEnergyPlusEnvironment(
+    gymenv = EnergyPlusEnvironment(
         make_energyplus,
         reward_function,
         obs_info.space,
@@ -351,6 +319,7 @@ def create_simulator(building_config: BuildingConfig) -> B2BEnergyPlusEnvironmen
         action_space_info.agent_transform.codomain(),
         action_space_info.assemble_full_action,
         eplus_output_dir=eplus_output_dir,
+        cleanup_output_dir_on_close=eplus_output_dir is not None,
     )
 
     gymenv.metadata = {

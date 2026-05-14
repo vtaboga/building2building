@@ -145,7 +145,7 @@ class TestEnvLeakClose:
 
             assert not out_dir.exists(), (
                 "Output dir still exists after plain env.close(); "
-                "B2BEnergyPlusEnvironment.close() did not clean it up."
+                "EnergyPlusEnvironment.close() did not clean it up."
             )
 
 

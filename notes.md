@@ -228,31 +228,29 @@ Monitor ( NormalizeObservation ( RescaleAction ( TimeLimit ( EnergyPlusSimulator
   cpus - 2` is the sweet spot. Default sweeps use 14 envs on 16 CPUs.
 - `task_occ_w0` has `w_E = 0`, so the dominance-ratio plot is NaN
   by construction — expected, not a bug.
-- **EnergyPlus resource leak (B0) — fixed.** `B2BEnergyPlusEnvironment`
-  subclass (in `building2building/simulator/__init__.py`) overrides
-  `close()` to stop the simulation thread, join it, call `gc.collect()`,
-  and `rmtree` the output dir. `ManagedState.finalize` → `delete_state`
-  fires correctly after every `close()`. `close_env_aggressively` is now a
-  thin `DeprecationWarning` shim; all callers updated to plain `env.close()`.
+- **EnergyPlus resource leak (B0) — fixed upstream.** The leak-free
+  lifecycle (stop the simulation thread, join it, `gc.collect()`, rmtree
+  the output dir) lives on `minergym.environment.EnergyPlusEnvironment`
+  itself. `ManagedState.finalize` → `delete_state` fires correctly after
+  every `close()`. `close_env_aggressively` is now a thin
+  `DeprecationWarning` shim; all callers use plain `env.close()`.
   Tests: `tests/long/test_env_leak.py` (filesystem cleanup, thread join,
   regression RSS guard, plain-close regression).
 
-  **Upstream fix landed on vtaboga/minergym.** Two commits:
-  - `6d03b9a` — initial ``close()`` with thread join + gc + optional
-    ``rmtree``; ``reset()`` delegates to ``close()``; new constructor
-    parameters ``eplus_output_dir``, ``cleanup_output_dir_on_close``,
-    ``thread_join_timeout``.
-  - `956c3e1` — gate rmtree on ``had_ep`` (idempotency fix) and add
-    ``eplus_output_dir.mkdir()`` in ``reset()`` so the directory exists
-    for every ``make_energyplus()`` call regardless of
-    ``cleanup_output_dir_on_close``.
+  **Upstream commits on vtaboga/minergym:**
+  - `6d03b9a` — initial `close()` with thread join + gc + optional
+    `rmtree`; `reset()` delegates to `close()`; new constructor
+    parameters `eplus_output_dir`, `cleanup_output_dir_on_close`,
+    `thread_join_timeout`.
+  - `956c3e1` — gate rmtree on `had_ep` (idempotency fix) and add
+    `eplus_output_dir.mkdir()` in `reset()` so the directory exists for
+    every `make_energyplus()` call regardless of
+    `cleanup_output_dir_on_close`.
 
-  ``pyproject.toml`` is pinned to ``956c3e1``.  **``B2BEnergyPlusEnvironment``
-  is now a thin shim** (constructor only) that sets
-  ``cleanup_output_dir_on_close=True`` when an ``eplus_output_dir`` is
-  given, and delegates all behaviour to the upstream class.  The
-  ``had_simulation``/``had_ep`` guard lives in the upstream ``close()``;
-  the in-tree ``reset()`` and ``close()`` overrides have been removed.
+  `pyproject.toml` is pinned to `956c3e1`. `building2building/simulator`
+  no longer subclasses `EnergyPlusEnvironment`: `create_simulator()`
+  constructs it directly with `cleanup_output_dir_on_close=eplus_output_dir
+  is not None`.
 
   **Residual EnergyPlus-native RSS growth (~14 MB/cycle, irreducible).**
   Even with `delete_state` and `reset_state`, EnergyPlus accumulates
@@ -357,7 +355,7 @@ Research deliverables:
 | RL obs/action normalization wiring | Landed; PPO/SAC/dyn-adapt all use `make_rl_env_fn` |
 | PPO under new reward | Trained on winter only; freezes at `w_E ≥ 10`, `target_kl=0.02` too tight; **full-year sweep + retune pending** (B3, B4) |
 | SAC under new reward | `sac.yaml` updated with critic-stability fixes. **Conflicts with under-exploration narrative in § SAC; reconcile before Phase B closes** (B1, B2) |
-| EnergyPlus resource leak | **Fixed (B0).** `B2BEnergyPlusEnvironment.close()` is leak-free. Residual ~14 MB/cycle EnergyPlus-native growth is irreducible from Python; see Operational gotchas. |
+| EnergyPlus resource leak | **Fixed (B0).** Upstream `EnergyPlusEnvironment.close()` is leak-free (vtaboga/minergym@956c3e1). Residual ~14 MB/cycle EnergyPlus-native growth is irreducible from Python; see Operational gotchas. |
 | Legacy reward family (`task1`–`task5`, `BarrierReward`, un-norm `DeadbandReward`) | Still present; **deletion before paper rerun** (D2) |
 | Paper figures and tables | Old reward; rerun pending (Phase C) |
 | `baseline_returns.csv` | Old reward; regen post-deletion (C1) |

@@ -86,7 +86,14 @@ See `notes.md` § "Operational gotchas" for details.
 - ~~B0.1.h~~ ✓ `try/except` removed; `try_stop()` called bare.
 - ~~B0.1.i~~ ✓ `psutil` added to `[test]` extras.
 
-#### B0.1.upstream — Cleaner fixes to land on the `minergym` fork
+#### ~~B0.1.upstream — Cleaner fixes to land on the `minergym` fork~~ ✓
+
+**Done.** Upstream commits `6d03b9a` and `956c3e1` on
+`vtaboga/minergym`; pinned in `pyproject.toml`. The in-tree
+`B2BEnergyPlusEnvironment` subclass was removed entirely;
+`create_simulator()` constructs `EnergyPlusEnvironment` directly with
+`cleanup_output_dir_on_close=eplus_output_dir is not None`. The
+historical spec below is retained for the audit trail.
 
 The following are *cleaner* if done upstream than worked around
 in-tree. They are listed in priority order. Each is small and

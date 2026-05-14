@@ -119,10 +119,11 @@ def close_env_aggressively(
     """Compatibility shim — use ``env.close()`` directly.
 
     .. deprecated::
-        ``B2BEnergyPlusEnvironment.close()`` is now leak-free: it stops the
-        simulation thread, joins it, releases the native EnergyPlus state, and
-        removes the output directory.  Plain ``env.close()`` therefore handles
-        everything that this helper used to do manually.
+        Upstream ``minergym.environment.EnergyPlusEnvironment.close()`` is
+        now leak-free: it stops the simulation thread, joins it, releases
+        the native EnergyPlus state, and removes the output directory.
+        Plain ``env.close()`` therefore handles everything that this helper
+        used to do manually.
 
         This function will be removed in phase D.  Callers should switch to
         ``env.close()``.  The ``cleanup_dir`` argument is redundant when the
@@ -137,8 +138,8 @@ def close_env_aggressively(
             env does not track its own output directory.  Redundant for envs
             created via :func:`~building2building.api.new_make_env`.
         thread_join_timeout: Ignored; the join timeout is now configured on
-            the env via ``_b2b_thread_join_timeout``.  Kept for API
-            compatibility.
+            the env via the upstream ``thread_join_timeout`` constructor
+            parameter.  Kept for API compatibility.
     """
     warnings.warn(
         "close_env_aggressively() is deprecated; env.close() is now "
