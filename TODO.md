@@ -634,6 +634,55 @@ command (Hydra invocation, expected outputs, plotting command).
 - Acceptance: all new tests run in < 60 s total; `pytest -m quick`
   green.
 
+### D6.5. Audit and triage the test suite (precedes D7)
+
+**Start with a user brainstorm** before touching any files. The agent
+must present the candidate changes (keep / add / remove / fix) and get
+explicit sign-off before making any edits.
+
+**Motivation.** `pytest tests/quick/` currently shows 27 failures, all
+pre-existing and unrelated to recent code changes. Four root causes:
+
+1. **Missing training extras** (16 tests) — `torch`, `stable_baselines3`,
+   `hydra`, `matplotlib` not installed under the base `[test]` extra.
+   Tests in `test_train_sac_smoke.py` and one in `test_rl_wrappers.py`
+   hard-import training-only modules at collection time.
+2. **Dataset not downloaded** (8 tests) — `test_climate_zones.py`,
+   several `test_rl_wrappers.py`, `test_rollout.py` call `new_make_env`
+   or read the HuggingFace parquet registry, which is a 0-byte
+   placeholder until the dataset is fetched.
+3. **Missing fixture directories** (2 tests) — `test_data_registry.py`
+   expects `tests/fixtures/fake_dataset/{OfficeSmall,Warehouse}/` which
+   don't exist in the repo.
+4. **Deleted preset still in tests** (4 tests) — `test_task_presets.py`
+   checks for `task3_legacy` which was removed from `TASK_PRESETS` as
+   part of the legacy reward cleanup (see D2).
+
+**Brainstorm questions to resolve before acting:**
+
+- Root cause 1: should training-only tests be guarded with
+  `pytest.importorskip("torch")` / a `training` mark, or moved to a
+  separate `tests/training/` tier that only runs under `--extra
+  training`?
+- Root cause 2: should those tests be gated on dataset availability
+  (e.g. `pytest.mark.requires_dataset`), mocked out, or kept as-is as
+  long tests that only run in full CI?
+- Root cause 3: should the fake dataset fixtures be created from
+  scratch, or should those tests be reworked to use `tmp_path` +
+  `mock`?
+- Root cause 4: should the `task3_legacy` tests be deleted outright
+  (since D2 removes the preset), or kept as `xfail` until D2 lands?
+- Are there other tests that are passing but testing code that has since
+  been deleted or superseded?
+- After the triage, `pytest -m quick` (no extras, no dataset) must be
+  green.
+
+- Files: `tests/quick/`, `tests/conftest.py`, possibly new
+  `tests/fixtures/`.
+- Acceptance: `pytest -m quick` exits 0 under `uv sync --extra test`
+  (no training extras, no dataset download); the brainstorm document is
+  preserved as a comment in this TODO item or a linked PR description.
+
 ### D7. Add CI
 
 A minimal GitHub Actions workflow.
