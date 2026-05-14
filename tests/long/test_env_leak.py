@@ -6,10 +6,11 @@ These tests are excluded from quick CI runs via the ``long`` marker.
 Acceptance criteria (TODO.md § B0):
   (i)   The parent ``eplus_output_dir`` contains zero leftover subdirs
         after each ``env.close()``.
-  (ii)  ``threading.active_count()`` returns to its baseline within the
-        thread-join timeout after each ``env.close()``.
-  (iii) RSS growth across N=20 create/reset/close cycles is <50 MB
-        (requires ``psutil``).
+  (ii)  ``threading.active_count()`` returns exactly to its baseline
+        after each ``env.close()``.
+  (iii) RSS growth across N=20 create/reset/close cycles is bounded by
+        the known EnergyPlus-native residual (~14 MB/cycle) plus a small
+        Python-side margin (requires ``psutil``).
 
 The key assertion is that *plain* ``env.close()`` — without
 ``close_env_aggressively`` — satisfies all three criteria.
@@ -38,16 +39,18 @@ _N = 20
 # Python objects.  Investigation (see notes.md § "EnergyPlus RSS growth")
 # shows this comes from C++ global/static objects inside the EnergyPlus DLL
 # that grow with each run_energyplus() call regardless of whether
-# delete_state() or reset_state() is used.  ManagedState.finalize() IS
-# called correctly after every env.close() (confirmed by direct weakref
-# tracking), so our Python fix is correct.  The EnergyPlus-level growth
-# requires either an upstream EnergyPlus fix (moving globals into
+# delete_state() or reset_state() is used.  ManagedState's weakref.finalize
+# callback IS fired correctly after every env.close() (confirmed by direct
+# weakref tracking), so our Python fix is correct.  The EnergyPlus-level
+# growth requires either an upstream EnergyPlus fix (moving globals into
 # EnergyPlusData) or subprocess isolation to eliminate fully.
 #
-# The limit below (20 MB/cycle × N) is a regression guard, not a "no leak"
-# assertion: if something catastrophically broke our fix, growth would be
-# far larger.
-_RSS_MAX_GROWTH_BYTES = 20 * 1024 * 1024 * _N  # 400 MB for N=20
+# The limit below is a regression guard: 14 MB/cycle (measured residual) +
+# 2 MB/cycle Python-side margin × N.  If something catastrophically broke
+# our fix, growth would be far larger.  See TODO B0.1.c for the controlled
+# measurement procedure that this constant should be re-derived from.
+_RSS_PER_CYCLE_BYTES = 16 * 1024 * 1024  # 14 MB native + 2 MB margin
+_RSS_MAX_GROWTH_BYTES = _RSS_PER_CYCLE_BYTES * _N  # 320 MB for N=20
 
 _BUILDING_TYPE = "SingleFamilyHouse"
 _ENV_KWARGS: dict = dict(
@@ -93,12 +96,13 @@ class TestEnvLeakClose:
             env.reset()
             env.close()
 
-            # Allow one extra thread for transient Python internals, but no
-            # more — the EnergyPlus daemon thread must be gone.
+            # gc.collect() before counting so short-lived Python-internal
+            # threads have had a chance to finish.
+            gc.collect()
             count = threading.active_count()
-            assert count <= baseline + 1, (
-                f"After close() #{i}: thread count {count} > baseline "
-                f"{baseline} + 1; EnergyPlus thread was not joined."
+            assert count == baseline, (
+                f"After close() #{i}: thread count {count} != baseline "
+                f"{baseline}; EnergyPlus thread was not joined."
             )
 
     @pytest.mark.skipif(not _PSUTIL_AVAILABLE, reason="psutil not installed")
@@ -122,9 +126,10 @@ class TestEnvLeakClose:
         growth = rss_after - rss_before
         assert growth < _RSS_MAX_GROWTH_BYTES, (
             f"RSS grew by {growth / 1e6:.1f} MB across {_N} env cycles "
-            f"(limit: {_RSS_MAX_GROWTH_BYTES / 1e6:.0f} MB); "
-            "EnergyPlus internal growth is expected (~14 MB/cycle); "
-            "this failure means catastrophic additional leakage beyond that."
+            f"(limit: {_RSS_MAX_GROWTH_BYTES / 1e6:.0f} MB, "
+            f"= {_RSS_PER_CYCLE_BYTES // (1024 * 1024)} MB/cycle × {_N}); "
+            "EnergyPlus-native growth of ~14 MB/cycle is expected and "
+            "accounted for; this failure means extra leakage beyond that."
         )
 
     def test_plain_close_without_close_env_aggressively(self) -> None:
