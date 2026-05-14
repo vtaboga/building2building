@@ -20,6 +20,7 @@ from __future__ import annotations
 import gc
 import logging
 import random
+import tempfile
 from concurrent.futures import (
     CancelledError,
     Executor,
@@ -172,6 +173,7 @@ def _run_one_building(
         building_id=building_id,
         task=task,
         run_period=run_period,
+        eplus_output_dir=Path(tempfile.mkdtemp(prefix=f"b2b_tune_{building_id}_")),
     )
     try:
         policy.bind_env(env)
@@ -245,6 +247,7 @@ def _evaluate_sequential(
             building_id=bid,
             task=task,
             run_period=run_period,
+            eplus_output_dir=Path(tempfile.mkdtemp(prefix=f"b2b_tune_{bid}_")),
         )
         try:
             policy.bind_env(env)
