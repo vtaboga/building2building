@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import weakref
 from pathlib import Path
 from typing import Any, Literal
 
@@ -297,8 +298,16 @@ def new_make_env(
 
     # The dataset ships buildings with full_year baked into the epJSON.
     # Patch the RunPeriod dates when the user requests a different period.
+    #
+    # The patched file is written to a *separate* staging directory, NOT
+    # into eplus_output_dir.  eplus_output_dir is the per-episode output
+    # directory that close() removes on every reset; if the patched epjson
+    # lived there it would be deleted before the first episode starts.  The
+    # staging dir is tied to the env's lifetime via weakref.finalize.
+    _epjson_staging_dir: Path | None = None
     if run_period_cfg.name != "full_year":
-        patched_epjson_path = eplus_output_dir / "building.epjson"
+        _epjson_staging_dir = Path(tempfile.mkdtemp(prefix="b2b_epjson_"))
+        patched_epjson_path = _epjson_staging_dir / "building.epjson"
         _patch_epjson_run_period(epjson_path, patched_epjson_path, run_period_cfg)
         epjson_path = patched_epjson_path
         logger.debug(
@@ -368,6 +377,15 @@ def new_make_env(
 
     env = create_simulator(building_config)
     env.metadata["building_info"] = info
+
+    # Register cleanup for the epjson staging dir (only created when
+    # run_period != "full_year").  We attach it to the innermost env
+    # object (before any wrappers) so it is not affected by wrapper
+    # garbage-collection order.
+    if _epjson_staging_dir is not None:
+        import shutil as _shutil
+        weakref.finalize(env, _shutil.rmtree, _epjson_staging_dir, True)
+
     if rescale_action:
         env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
     steps = max_episode_steps or task_cfg.expected_steps()

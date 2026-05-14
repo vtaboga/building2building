@@ -118,7 +118,6 @@ class B2BEnergyPlusEnvironment(EnergyPlusEnvironment):
 
         if self._b2b_eplus_output_dir is not None:
             shutil.rmtree(self._b2b_eplus_output_dir, ignore_errors=True)
-            self._b2b_eplus_output_dir = None
 
 
 # Calibration regime baked into reward_normalizers.yaml.
