@@ -40,6 +40,7 @@ training = [
 ]
 test = [
     "deepdiff",
+    "psutil",
     "pytest==8.3.5",
     "pytest-mock",
 ]
