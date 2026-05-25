@@ -362,40 +362,45 @@ Monitor ( NormalizeObservation ( RescaleAction ( TimeLimit ( EnergyPlusSimulator
 
 ---
 
-## Status snapshot
+## Status snapshot (2026-05-25)
 
-Branch: `feature/reward-normalization`, 5 commits ahead of
-`origin/dev`, not yet pushed.
+Branch: `feature/reward-normalization`, far ahead of
+`origin/dev`, not yet pushed. The 2026-05-25 brainstorm
+reorganized the remaining work as
+**M → D-house → T → F → R → C** (see `TODO.md` § "Execution
+order"); the L-section's old 4-PR-stack plan is superseded.
 
 Research deliverables:
 
 | Area | Status |
 | --- | --- |
-| New reward formula and types | Landed |
-| Calibration YAML | `building2building/data/reward_normalizers.yaml` (random-policy) |
-| 9-task preset grid | Landed |
-| RL obs/action normalization wiring | Landed; PPO/SAC/dyn-adapt all use `make_rl_env_fn` |
-| PPO under new reward | Trained on winter only; freezes at `w_E ≥ 10`, `target_kl=0.02` too tight; **full-year sweep + retune pending** (B3, B4) |
-| SAC under new reward | `sac.yaml` updated with critic-stability fixes. **Conflicts with under-exploration narrative in § SAC; reconcile before Phase B closes** (B1, B2) |
-| EnergyPlus resource leak | **Fixed (B0).** Upstream `EnergyPlusEnvironment.close()` is leak-free (vtaboga/minergym@956c3e1). Residual ~14 MB/cycle EnergyPlus-native growth is irreducible from Python; see Operational gotchas. |
-| Legacy reward family (`task1`–`task5`, `BarrierReward`, un-norm `DeadbandReward`) | **Deleted (D2).** Presets renamed to `task_<mode>_<e0/emed/ehigh>`. |
-| Paper figures and tables | Old reward; rerun pending (Phase C) |
-| `baseline_returns.csv` | Old reward; regen post-deletion (C1) |
+| New reward formula + types + 9-task preset grid | ✓ Landed |
+| Calibration YAML (`reward_normalizers.yaml`) | ✓ Locked (random-policy reference) |
+| RL obs/action normalization wiring (`make_rl_env_fn`) | ✓ Landed; PPO/SAC/dyn-adapt all go through it |
+| EnergyPlus resource leak (B0/B0.1) | ✓ Fixed upstream (`vtaboga/minergym@956c3e1`). Residual ~14 MB/cycle native RSS growth irreducible — see § Operational gotchas |
+| SAC critic-stability fixes (B1) | ✓ Landed (`64a4eb5`). B2/B3/B4 cancelled — final agents use B1 SAC defaults + committed `ppo.yaml` |
+| Legacy reward family (`task1`–`task5`, `BarrierReward`, un-norm `DeadbandReward`) | ✓ Deleted (D2, `574baaa`). Presets renamed to `task_<mode>_<e0/emed/ehigh>` |
+| OfficeMedium OA-mixer in action space | **Pending (Phase M)** — must land before C1; reference fix in `../RL2GNNs`; invalidates HF dataset, tuned RBCs, OfficeMedium normalizers |
+| Empirical `emed`/`ehigh` study | **Pending (Phase R)** — appendix-quality result; SAC reward-distribution sweep on `test_small` subset |
+| `baseline_returns.csv` | Old reward + old action space; regen on full split as **C1** under locked R values |
+| PPO + SAC specialists | Old reward; rerun as **C2** on `test_small`, 1 seed, default params, 9-task grid |
+| Dynamics adaptation + cross-domain (paper §6.1 / §6.2) | Re-run as final batch of Phase C (**C3 + C4**, confirmed in scope 2026-05-25) |
 
 OSS-readiness deliverables:
 
 | Area | Status |
 | --- | --- |
-| Public API surface defined (`design_doc.md` §3.2) | Done; **needs `CHANGELOG.md` stub + deprecation policy** (D13) |
+| `REPRODUCING.md` | ✓ Drafted (D5, `45799f3`); kept in lock-step with code per Cross-phase principle 2; D16 is the final parity sweep |
+| Eval bug fixes (`eval_ppo.py`, `eval_dynamics_adaptation.py`) | ✓ Fixed (D3, `de258ae`) |
+| `baselines/requirements.txt` removed | ✓ Done (D4, `f6ec020`); install path is `pip install -e ".[training]"` |
+| Public API surface defined (`design_doc.md` §3.2) | Done; **needs `CHANGELOG.md` + deprecation policy** (D13) |
 | API-contract tests (Tier 1) | Exist but unlabelled; **needs `@pytest.mark.api_contract`** (D12) |
-| Pure-logic tests (Tier 2) | Exist; well-covered |
-| Integration tests (Tier 3) | Exist; under-documented |
+| Test-suite triage (precedes CI) | Pending (D6.5); current `pytest -m quick` has pre-existing failures |
 | LICENSE | Missing (D1) |
-| Eval bug fixes (`eval_ppo.py`, `eval_dynamics_adaptation.py`) | Partially edited; regression tests pending (D3) |
 | CI | None (D7) |
-| Tutorials | 5 `.py` + 5 `.md`; **drifted; updated to normalized preset names** (D9) |
-| `REPRODUCING.md` | Pending (D5) |
-| Docs site | Builds; uses legacy task names; needs reward + benchmark-problem pages (D9, D14) |
+| Tutorials / docs migration to normalized preset names | Pending (D9) |
+| Docs site (benchmark-problem pages, etc.) | Pending (D14) |
+| `analysis/` → `baselines/` migration | Pending (audit in F2, execution in D15) |
 
 ---
 

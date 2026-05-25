@@ -5,278 +5,573 @@
 Atomic action items toward open-source release and paper rerun under the
 new normalized reward. **One TODO, one commit** (per `AGENTS.md`).
 
-Items are tagged by phase (A/B/C/D, see `design_doc.md` § Roadmap) but
-otherwise unordered — the user reorders / picks priority. The only hard
-cross-phase dependency is **D2 must precede C1**.
+## Execution order (2026-05-25 brainstorm)
+
+The phases are listed in the order they must run end-to-end. Inside a
+phase, items are reorderable except where a dependency is called out.
+
+1. **Phase M — OfficeMedium OA-mixer action-space fix.** *Must land
+   first.* Changes the action space → invalidates every OfficeMedium
+   artefact downstream of it (HF dataset, tuned RBC, reward
+   normalizers, baselines). Reference fix in `../RL2GNNs` (see M1).
+2. **Phase D-house — codebase cleanup.** LICENSE, CI, legacy code
+   purge, formatter passes, README refresh, **promote useful
+   `analysis/` scripts into `baselines/`** (see "Cross-phase
+   principles" below). Closes the OSS-release housekeeping debt.
+3. **Phase T — test suite.** Per the principles already laid out in
+   the Phase T preamble: pipeline coverage, contract tests, wrapper
+   correctness, fixture matrix.
+4. **Phase F — file and documentation audit (read-only).** Walk
+   every file in `building2building/` and `baselines/` plus every
+   docs page; produce a follow-up checklist. Includes the
+   `analysis/` → `baselines/` migration audit. No edits in this
+   phase.
+5. **Phase R — empirical reward-coefficient study.** Determine the
+   final values of `emed` and `ehigh` (and confirm `e0`) by
+   training a SAC agent while monitoring the per-term reward
+   distribution. Demonstrate (a) balance of the two terms at the
+   chosen settings on a random → SAC-optimal policy ladder, and
+   (b) invariance across buildings within `test_small`. The final
+   plotting / data-gathering scripts live under `baselines/` (the
+   prototype under `analysis/` is dev-only); the resulting
+   figures are slated for the **paper appendix**.
+6. **Phase C — paper rerun on the FINAL codebase.** Strict
+   precondition: M, D-house, T, F, R must all be merged first so
+   every Phase-C artefact is produced by the version of the code
+   that will be open-sourced. Order inside C:
+   - **C1.** Regen `baseline_returns.csv` on the **full
+     train + test split** under the locked `emed`/`ehigh` values.
+   - **C2.** PPO + SAC specialists on `test_small`, 1 seed,
+     default params, full 9-task grid.
+   - **C5 (partial).** Paper updates for the specialist figure
+     and the task table.
+   - **C3.** Dynamics adaptation (paper §6.1) — re-run as the
+     final-step batch.
+   - **C4.** Cross-domain Amorpheus (paper §6.2) — re-run as the
+     final-step batch.
+   - **C5 (final).** Paper updates for Fig 5 (dynamics) and
+     Fig 7 (cross-domain).
+7. **Phase D-API — public-surface finalization.** D5
+   (`REPRODUCING.md`) is done; D9 (docs migration), D12 (contract
+   marker), D13 (`CHANGELOG.md`), D14 (benchmark pages) close
+   alongside / after Phase C.
+
+**Hard dependency:** D2 (legacy reward deletion) was a hard
+precondition for C1 in the previous plan. D2 is now ✓ done, so the
+constraint is satisfied; the new hard constraint is **M completes
+before C1** (the OfficeMedium row in `baseline_returns.csv` would
+otherwise reference the old action space).
+
+**Dropped:** B2 (SAC ablation), B3 (PPO `target_kl` re-tune), B4
+(PPO reward-design full-year study). Decision 2026-05-25: no
+further PPO/SAC hyperparameter sweeps before the camera-ready
+rerun. The final agents use the existing defaults from B1
+(`log_std_init=0.0`, `ent_coef=0.2`, `use_sde=false` for SAC;
+`baselines/configs/policy/ppo.yaml` as committed for PPO).
+
+---
+
+## Cross-phase principles (2026-05-25)
+
+These are project-wide rules that apply to every item below. They
+modify or extend the principles in `AGENTS.md` and `design_doc.md`.
+
+1. **`analysis/` is a development scratchpad. `baselines/` is the
+   release surface.** Scripts that are intermediate exploration —
+   one-off sanity plots, ablation harnesses used to make a decision
+   that is then captured in a YAML — stay in `analysis/`. Any
+   script whose **outputs are cited in the paper** (figures,
+   tables, appendix plots) must have its final form — including the
+   plotting code — committed under `baselines/`. The migration is
+   tracked by **F2** (audit) and **D-house** (execution); it must
+   be complete before Phase C runs, because Phase C runs against
+   "the version of the code that will be open-sourced".
+
+2. **`REPRODUCING.md` is kept in lock-step with the code.** Every
+   item below that adds, moves, or removes a user-runnable script
+   has an implicit "update `REPRODUCING.md`" sub-step. Specifically:
+   when an item's acceptance criterion mentions a new entry
+   point under `baselines/` or `building2building/`, the same
+   commit must update the corresponding section of
+   `REPRODUCING.md`. The cheat-sheet table at the bottom of
+   `REPRODUCING.md` is the canonical reference; if a command is
+   not in that table, it is not part of the reproduction path.
+
+3. **The OSS release ships Python entry points, not Slurm
+   scripts.** Slurm wrappers (`baselines/scripts/*.sh`,
+   `analysis/task_study/scripts/*.sh`, `building2building/pipeline/
+   scripts/*.sh`) are internal developer convenience for the
+   compute cluster — they may live in the repo (and may be cited
+   in `REPRODUCING.md` as "if you have Slurm, you can also run
+   …"), but every paper artefact must be **reproducible from a
+   `python -m …` invocation** that runs on a single machine. When
+   a TODO item below proposes a Slurm script, the sibling
+   `python -m …` invocation is the canonical entry point and the
+   Slurm wrapper is a thin loop around it. If a script today only
+   exists as a Slurm template, Phase D-house extracts the Python
+   entry point.
+
+4. **Decisions still owed (none for the current plan).** C3
+   (dynamics adaptation) and C4 (cross-domain Amorpheus) are now
+   confirmed in scope; they run as the final batch of Phase C
+   per the user's 2026-05-25 follow-up. No `?`-marked items
+   remain.
 
 Format per item: short title; affected files; acceptance check;
 references.
 
 ---
 
-## Phase A — Finalize the reward
+## Phase A — Finalize the reward ✓
 
-### ~~A1. Decide the calibration controller and document it~~ ✓
-
-Choice: `reward_normalizers.yaml` (SAC-warmup uniform random; formerly
-`reward_normalizers_random_linear.yaml`). Rationale: policy-independent;
-bakes in no RBC-specific bias. Tuned-RBC YAML deleted.
-
-### ~~A2. Re-run calibration if A1 invalidates the current YAML~~ N/A
-
-A1's choice matches the pre-existing default; no re-run needed.
-
-### ~~A3. Validate and commit the calibration sanity plot~~ ✓
-
-Plot lives in the git-ignored `/analysis/` tree; location documented in
-`notes.md` § "Calibration sanity plot". Median/τ = 1.0 by construction;
-IQRs match committed YAML. Regenerate with
-`python -m analysis.task_study.compute_random_policy_reward_normalizers --mode aggregate`.
+Done. Calibration controller is the SAC-warmup uniform-random
+policy; `reward_normalizers.yaml` is the locked YAML; sanity plot
+regenerable via `python -m analysis.task_study.compute_random_policy_reward_normalizers --mode aggregate`.
+See `notes.md` § "Reward — calibration regime and impl map" and
+§ "Calibration sanity plot".
 
 ---
 
-## Phase B — Stabilize RL training under the new reward
+## Phase M — OfficeMedium OA-mixer action-space fix
 
-### ~~B0. Diagnose and fix the EnergyPlus resource leak~~ ✓
+**This phase blocks every other downstream artefact.** Run first.
 
-**Done.** Commits `be7463c` (initial fix), `5118af5` / `bd6a509` /
-`aab1843` / `7dd389f` (B0.1 follow-ups). All acceptance criteria met:
+### Context
 
-- `B2BEnergyPlusEnvironment.close()` is leak-free: joins the EnergyPlus
-  thread, calls `gc.collect()` so `ManagedState`'s `weakref.finalize`
-  fires, and `rmtree`s the tracked output directory — all gated on
-  `had_simulation = self.ep is not None` so repeated no-op calls are
-  safe.
-- `B2BEnergyPlusEnvironment.reset()` is leak-free: calls `self.close()`
-  (thread join + rmtree), recreates the output dir with `mkdir`, then
-  delegates to `super().reset()` (which calls `self.close()` again
-  polymorphically; the `had_simulation` guard prevents the second call
-  from deleting the freshly recreated dir).
-- `close_env_aggressively` downgraded to a `DeprecationWarning` shim;
-  no callers remain outside the shim definition.
-- `psutil` added to `[test]` extras; RSS guard test no longer skips.
-- Upstream fixes at `vtaboga/minergym@6d03b9a` pinned in
-  `pyproject.toml`.
-- Tests: `tests/long/test_env_leak.py` (`TestEnvLeakClose` +
-  `TestEnvLeakReset`); gated on `long` marker (require EnergyPlus).
+The current OfficeMedium action space, produced by
+`building2building/pipeline/.../make_controllable`, is missing the
+**outdoor-air mixer** actuator (a.k.a. *OA mixer* / *outdoor-air
+controller*). Without it, the agent cannot regulate the
+mixed-air fraction at the air-handling unit, which is the dominant
+energy-versus-IAQ trade-off in any VAV/AHU building. The
+consequence is that no control policy — RBC, PPO, SAC — can
+reach a meaningful optimum on OfficeMedium; the resulting numbers
+in the paper are not representative of the achievable best on the
+real building.
 
-Residual known item: ~14 MB/cycle irreducible EnergyPlus-native RSS
-growth (C++ globals in the DLL). Not a Python-side leak; subprocess
-isolation is the only complete fix (deferred to a future phase).
-See `notes.md` § "Operational gotchas" for details.
+A working fix already exists in the sibling cluster repo
+`../RL2GNNs` and runs on **one** instance of OfficeMedium there
+(see `../RL2GNNs/officerl/action_spaces.py`,
+`../RL2GNNs/officerl/graph.py` line ~500, and
+`../RL2GNNs/officerl/data/building.epjson`). The relevant
+actuator entries are:
 
-### ~~B0.1. Close the residual leaks from B0~~ ✓
+- `(component_type="Outdoor Air Controller", control_type="Air Mass Flow Rate")`
+  — one per air loop. This is the OA-flow command exposed as an
+  agent action in RL2GNNs.
+- `(component_type="AirLoopHVAC", control_type="Availability Status")`
+  — one per air loop. Availability of the air handler.
 
-**Done.** All sub-tasks completed; see commit log (`5118af5`,
-`bd6a509`, `aab1843`, `1832dab`, `236c3df`, `7dd389f`).
+B2B's pipeline currently emits neither for OfficeMedium. The
+RL2GNNs reactive baseline holds the OA mixer at a constant value;
+the user-confirmed plan is to do the same in B2B's reactive
+controller, but **expose the OA mixer command as part of the
+agent's action space** so PPO/SAC can learn to use it.
 
-- ~~B0.1.a~~ ✓ `reset()` override added; `had_simulation` guard in
-  `close()` prevents the double-delete from upstream's polymorphic
-  `self.close()` call inside `reset()`. `TestEnvLeakReset` added.
-- ~~B0.1.b~~ ✓ Test docstring fixed (`<50 MB` → `_RSS_MAX_GROWTH_BYTES`).
-- ~~B0.1.c~~ ✓ 14 MB/cycle figure documented in `notes.md`;
-  `_RSS_PER_CYCLE_BYTES = 16 MB` (14 native + 2 margin) is the bound.
-  A formal SLURM measurement to derive `p95` empirically is deferred
-  (low priority; bound is already conservative).
-- ~~B0.1.d~~ ✓ Already done in `be7463c`; `tune_controller.py` uses
-  `b2b_tune_{bid}_` prefix throughout.
-- ~~B0.1.e~~ ✓ No `close_env_aggressively` callers outside shim definition.
-- ~~B0.1.f~~ ✓ Deviation recorded in `notes.md`.
-- ~~B0.1.g~~ ✓ Constructor kwarg present; docstring already correct.
-- ~~B0.1.h~~ ✓ `try/except` removed; `try_stop()` called bare.
-- ~~B0.1.i~~ ✓ `psutil` added to `[test]` extras.
+### Downstream invalidations once the action space changes
 
-#### ~~B0.1.upstream — Cleaner fixes to land on the `minergym` fork~~ ✓
+The new action set forces a re-roll of every OfficeMedium-touching
+artefact:
 
-**Done.** Upstream commits `6d03b9a` and `956c3e1` on
-`vtaboga/minergym`; pinned in `pyproject.toml`. The in-tree
-`B2BEnergyPlusEnvironment` subclass was removed entirely;
-`create_simulator()` constructs `EnergyPlusEnvironment` directly with
-`cleanup_output_dir_on_close=eplus_output_dir is not None`. The
-historical spec below is retained for the audit trail.
+| Artefact | Where | Re-roll item |
+| --- | --- | --- |
+| HuggingFace dataset (every OfficeMedium epJSON / equipment.json / metadata row) | `vtaboga/building2building_dataset` | **M2** |
+| Tuned reactive controller for every OfficeMedium climate zone | `baselines/configs/tuned_controllers/air_loop_officemedium_cz{1..8}.yaml` | **M3** |
+| Reward normalizers `(τ_T, τ_E)` for every OfficeMedium climate zone | `building2building/data/reward_normalizers.yaml` (OfficeMedium rows) | **M4** |
+| `baseline_returns.csv` rows for OfficeMedium | `building2building/scores/baseline_returns.csv` | Subsumed by **C1** |
 
-The following are *cleaner* if done upstream than worked around
-in-tree. They are listed in priority order. Each is small and
-self-contained; bundle them as one PR if possible. The in-tree
-counterparts (B0 + B0.1.a + B0.1.g) should be downgraded to thin
-shims once the upstream changes ship and a new minergym version is
-pinned in `pyproject.toml`.
+Items M2–M4 are unavoidable once M1 lands; they cannot be skipped
+or partially run.
 
-**Constraints (re-stated for the fork worker):**
-1. Public Gymnasium interface (`reset`, `step`, `close`) and the
-   `EnergyPlusEnvironment` constructor signature must not change.
-2. Per-step overhead must remain at zero (no new work in
-   `EnergyPlusSimulation.step`).
-3. Per-reset overhead must stay below ~1 s (a `Thread.join(timeout)`
-   and a `gc.collect()` are fine; no subprocess work).
-4. No silent `try`/`except` swallowing — match this repo's
-   "fail loudly" policy.
+### M0. Brainstorm — specifics document
 
-**1. `EnergyPlusEnvironment.close()` override.**
-- File: `minergym/environment.py`.
-- Replace the inherited `gym.Env.close()` no-op with:
-  - `if self.ep is not None`: capture `ep_thread` from
-    `self.ep.state` *before* `try_stop()` (see in-tree comment for
-    why — `try_stop` transitions state to `StateDone` which drops
-    `ep_thread`), call `self.ep.try_stop()`, then `ep_thread.join(
-    timeout=10.0)` with a `logger.warning` if still alive, then
-    `self.ep = None`. Finish with `gc.collect()` so the
-    `weakref.finalize` callback for `ManagedState` runs and
-    `delete_state()` is called.
-- This makes the in-tree `B2BEnergyPlusEnvironment.close()` a thin
-  shim that only handles `_b2b_eplus_output_dir` cleanup
-  (which can't move upstream because the directory lives in
-  `MakeEnergyPlus`, not on the env — see #3 below for an upstream
-  fix for that).
+**Before any code change.** Produce a short design note (~1 page,
+committed to `notes.md` § "OfficeMedium OA-mixer fix") that pins
+the design choices below by reading the RL2GNNs reference and
+checking the assumptions hold for **all 1000 OfficeMedium
+buildings** (not just the one RL2GNNs uses).
 
-**2. `EnergyPlusEnvironment.reset()` cleanup of the previous episode.**
-- File: `minergym/environment.py`.
-- Current upstream `reset()` calls `self.ep.try_stop()` but leaves
-  the thread unjoined and `self.ep` referenced through
-  reassignment. Refactor to call `self.close()` (the new method
-  from #1) before `self.ep = self.make_energyplus()`.
-- This automatically gives every `gym.Env` consumer a leak-free
-  reset without any wrapper-level workaround. Removes the need for
-  B0.1.a's in-tree `reset()` override.
+Questions to answer in the brainstorm:
 
-**3. Track `eplus_output_dir` on `EnergyPlusEnvironment`.**
-- Files: `minergym/environment.py`, `minergym/runtime.py`
-  (`MakeEnergyPlus`).
-- Currently `eplus_output_dir` is a constructor argument to
-  `MakeEnergyPlus` and is not stored on the resulting
-  `EnergyPlusEnvironment`. Expose it as a public attribute
-  (`self.eplus_output_dir: Path | None`) populated by `__init__`,
-  and have the new `close()` from #1 optionally `shutil.rmtree(
-  self.eplus_output_dir, ignore_errors=True)` when set.
-  - Behaviour gate: `cleanup_output_dir_on_close: bool = False`
-    constructor flag, defaulting to `False` to preserve current
-    upstream behaviour for users who want the artefacts.
-    `building2building` would set it to `True`.
-- Once shipped, the in-tree `_b2b_eplus_output_dir` plumbing
-  collapses to passing `cleanup_output_dir_on_close=True` plus the
-  output dir to `EnergyPlusEnvironment.__init__`.
+1. **Per-air-loop multiplicity.** OfficeMedium has multiple air
+   loops (3 in the prototype, see `VAV_1`, `VAV_2`, `VAV_3` in
+   the RL2GNNs epJSON). Does every one of the 1000 OfficeMedium
+   instances in our HF dataset have the same 3-air-loop topology,
+   or do some variants exist? Answer impacts how the actuator
+   list is enumerated.
+2. **Actuator scheme: agent or RBC?** RL2GNNs exposes the OA
+   mixer to the agent. User confirmed B2B does the same. Confirm
+   the action range and units against EnergyPlus's
+   `Air Mass Flow Rate` actuator (kg/s). Decide whether to also
+   expose `AirLoopHVAC × Availability Status` as a discrete
+   action or keep it pinned `On` (RL2GNNs exposes it; for the
+   B2B paper a binary availability action complicates the
+   continuous action space — recommended: **pin to `On` for B2B,
+   diverging from RL2GNNs**).
+3. **Reactive controller constant value.** What value does the
+   RL2GNNs RBC pin the OA mixer to? Is it autosize, minimum-OA,
+   a fraction of design flow, or zone-occupancy-modulated? Pin
+   the same scheme in B2B's reactive controller, and document
+   the exact value in the new tuned-RBC YAMLs.
+4. **Pipeline change locus.** Is this a change to
+   `building2building/pipeline/make_controllable.py` (add the OA
+   mixer to the actuator-set output) only, or does
+   `extract_discovery_metadata` also need to learn about the new
+   actuator type? Verify with one local pipeline dry-run before
+   M1 commits.
+5. **Backward compat.** Buildings already downloaded by users
+   from the **old** HF revision must still load (with the old
+   action space) or fail with a clear error. Recommended:
+   bump the dataset's revision tag (e.g. `v0.2.0` →
+   `v0.3.0`) and have `building2building/data/registry.py`
+   pin the new revision in code so a `pip install -U` user
+   gets the new dataset automatically.
 
-**4. Optional: a `thread_join_timeout` constructor param.**
-- File: `minergym/environment.py`.
-- Make the join timeout from #1 a named parameter (default 10 s)
-  so heavy users (large buildings, high `warmup_phases`) can
-  raise it without subclassing.
+- Files: `notes.md` § "OfficeMedium OA-mixer fix" (new section).
+- Acceptance: design note merged; every numbered question above
+  has an answer; M1 cannot start until this commit lands.
 
-**Acceptance for the fork worker:**
-- Upstream PR opened, linked from `notes.md` § "Operational
-  gotchas" and from `B2BEnergyPlusEnvironment`'s docstring.
-- A version pin in `pyproject.toml` (`minergym @ git+...@<sha>` or
-  a tagged release) once the PR is merged or the fork is
-  consumable.
-- In-tree `B2BEnergyPlusEnvironment` collapses to (at most) the
-  three lines that pass `eplus_output_dir` and
-  `cleanup_output_dir_on_close=True` into the upstream constructor.
-- All `tests/long/test_env_leak.py` tests pass with the new
-  upstream `EnergyPlusEnvironment` directly (i.e. without the
-  in-tree subclass), proving the fix is complete upstream.
+### M1. Pipeline change: emit OA-mixer actuator for OfficeMedium
 
-### ~~B1. Apply SAC fixes 1–3 to the policy config~~ ✓ done
+After M0 locks the design. Touch the smallest possible surface
+that produces the right `ActuatorDescription` list for
+OfficeMedium.
 
-- Files: `baselines/configs/policy/sac.yaml` —
-  `log_std_init: 0.0`, `ent_coef: 0.2`, `use_sde: false`. Add an
-  inline comment block citing the diagnostic findings.
-- Acceptance: `pytest -m quick tests/quick/test_train_sac_smoke.py`
-  passes; SAC training launcher still produces valid trajectories
-  on a 50 k-step smoke test.
-- Reference: `notes.md` § "SAC".
-- **Commit**: `64a4eb5` (feature/reward-normalization)
+- Files: `building2building/pipeline/make_controllable.py` (or
+  whichever module emits the actuator list — verify in M0); the
+  per-HVAC actuator template under `building2building/pipeline/`;
+  one local test against a hand-carved OfficeMedium fixture.
+- Acceptance: running `make_controllable` on **one** real
+  OfficeMedium epJSON pulled from the HF dataset produces an
+  actuator list that contains exactly the new
+  `Outdoor Air Controller × Air Mass Flow Rate` entries (one per
+  air loop) in addition to the existing actuators; the rest of
+  the actuator list is unchanged. Diff against RL2GNNs's
+  expected actuator list for the same building is empty (modulo
+  the M0-confirmed divergence on `Availability Status`).
+- Add a `tests/quick/test_officemedium_actuator_set.py` regression
+  test fixed against a committed minimal OfficeMedium fixture
+  (T0a's `minimal_vav/`, which is an OfficeMedium carve-out) so
+  the actuator set is pinned by the test suite.
 
-### B2. SAC ablation on the calibration anchor
+### M2. Regenerate the HuggingFace dataset for OfficeMedium
 
-Run the 5-cell × 3-seed × 6-building ablation matrix on
-`task_occ_wmed`, full-year, to confirm the fixes restore stable
-learning. Commit a result note.
+The 1000 OfficeMedium epJSONs + `equipment.json` files must be
+regenerated through the post-M1 pipeline and pushed.
 
-- Files: `analysis/task_study/sac_diagnostic/` (data + plots),
-  update `notes.md` with the chosen final SAC config.
-- Acceptance: 0/18 (or near-zero) runs show
-  `best - final > 0.1`; action saturation stays below 10% at every
-  checkpoint; plot in `notes.md` quick-reference table.
-- **Script committed** — submit with:
-  `sbatch --array=0-89 analysis/task_study/sac_diagnostic/submit_ablation.sh`
-- **Status**: waiting for Slurm run; fill result table in `notes.md` § "SAC B2 ablation".
+- Files (input): the source IDFs for OfficeMedium under whatever
+  staging directory the dataset was built from originally (the
+  brainstorm M0 needs to locate this). The B2B repo itself
+  doesn't store these.
+- Files (output): the `OfficeMedium` slice of
+  `vtaboga/building2building_dataset` (revision bump per M0).
+- Release entry point (per Cross-phase principle 3): the dataset
+  regeneration is a Python script under
+  `building2building/pipeline/regen_dataset.py` (new — or extend
+  an existing module if one exists; verify in M0). Canonical
+  invocation:
 
-### B3. Re-tune PPO `target_kl` for the normalized regime
+      python -m building2building.pipeline.regen_dataset \
+          --building-type OfficeMedium --output-dir <staging>
 
-Test `target_kl ∈ {None, 0.05, 0.1}` on `task_occ_wmed`, full-year,
-6 buildings, 3 seeds.
+  The single-machine command must work for the full 1000-building
+  loop (slow but reproducible). A thin Slurm wrapper
+  `building2building/pipeline/scripts/regen_officemedium.sh`
+  parallelizes the Python entry point across `--array=0-999` for
+  cluster runs but is **not** the canonical reproduction path.
+- Acceptance: HF dataset revision bump; every OfficeMedium row in
+  the metadata parquet shows the new actuator-count field;
+  `b2b.new_make_env("OfficeMedium", split="train", index=k)` loads
+  successfully for all `k` in the new test_small subset and the
+  env's `action_space.shape[0]` reflects the new actuator count.
 
-- Files: `baselines/configs/policy/ppo.yaml`, result note appended
-  to `notes.md`.
-- Acceptance: 0/6 buildings freeze in the chosen setting at `w_E = 5`;
-  documented winner in `notes.md`.
+### M3. Re-tune the Optuna reactive controller for OfficeMedium
 
-### B4. Re-run PPO reward-design distribution study on `full_year`
+The reactive baseline parameters in
+`baselines/configs/tuned_controllers/air_loop_officemedium_cz{1..8}.yaml`
+were tuned against the **old** action space and are now stale.
 
-The existing study is winter-only. The calibration regime is
-full-year; without this rerun the "balance at 1.0" claim is not
-directly validated.
+- Release entry point (per Cross-phase principle 3): the existing
+  `baselines/tune_controller.py` Hydra script. Canonical
+  invocation (per CZ):
 
-- Files: launcher under `analysis/task_study/scripts/`, plots under
-  `analysis/task_study/reward_design_normalized/plots/`. Delete
-  pre-existing winter `.npz` files from `$SCRATCH/...` first
-  (`notes.md` Gotcha).
-- Acceptance: `fig_balance_vs_steps_full_year.png` shows red and blue
-  curves near 1.0 at the calibration anchor (median building);
-  `fig_dominance_ratio_vs_steps_full_year.png` is near 1.0 for
-  `task_occ_wmed`.
+      python -m baselines.tune_controller experiment=tune_controller \
+          building_type=OfficeMedium climate_zone=<n> reward=task_occ_emed
+
+  The Slurm wrapper `baselines/scripts/tune_controller.sh` loops
+  this across the 8 OfficeMedium climate zones for cluster runs.
+- Files: regenerate all 8 OfficeMedium climate-zone YAMLs in
+  `baselines/configs/tuned_controllers/`. The OA-mixer command
+  in the RBC is held at the constant value pinned by M0 (not
+  Optuna-searched); only the existing knobs (deadband widths,
+  AHU schedule offsets, etc.) are re-searched.
+- Acceptance: 8 new `air_loop_officemedium_cz*.yaml` files
+  committed; previous versions overwritten (no `_v2` files left
+  around — per `AGENTS.md` "track via git, not via script
+  duplication"); `REPRODUCING.md` § "Reactive-controller tuning"
+  unchanged (it already cites the Python entry point).
+
+### M4. Re-run reward-normalizer calibration for OfficeMedium
+
+The `(τ_T, τ_E)` constants for OfficeMedium in
+`building2building/data/reward_normalizers.yaml` were computed
+under the old action space. The temperature term shouldn't shift
+much (zones are the same) but the power term will — the OA mixer
+materially changes the energy use under any non-trivial control
+policy. Recompute to keep the per-bucket calibration honest.
+
+- Release entry point: the calibration is run via the existing
+  `analysis/task_study/compute_random_policy_reward_normalizers`
+  module. Note that this module is one of the **(promote to
+  baselines/)** candidates flagged in F2 — its outputs feed
+  `reward_normalizers.yaml` which ships with the package, so the
+  final version of the script should live under `baselines/`. If
+  D15 has already moved it, use the new path; if not, M4
+  triggers the move (file an FX sub-commit). Canonical
+  invocation post-move:
+
+      python -m baselines.compute_reward_normalizers \
+          --mode aggregate --building-type OfficeMedium
+
+  (the exact CLI is up to the F2/D15 audit; M0 should pin it).
+- Files: merge the new OfficeMedium rows into
+  `building2building/data/reward_normalizers.yaml`; leave the
+  other building types' rows untouched. Update `REPRODUCING.md`
+  § B/A if the entry point has moved.
+- Acceptance: the OfficeMedium rows in `reward_normalizers.yaml`
+  are updated; the rest of the file is bit-identical to the
+  pre-M4 version (`git diff` shows only OfficeMedium changes); the
+  sanity plot regenerated by the Python invocation above shows
+  medians at 1.0 for OfficeMedium under the new normalizer;
+  `REPRODUCING.md` cites the (possibly new) entry-point path.
 
 ---
 
-## Phase C — Re-run paper experiments
+## Phase B — Stabilize RL training under the new reward ✓ / cancelled
 
-**Strict prerequisite**: D2 (legacy reward deletion) lands first so
-the new artifacts are computed against a single reward family.
+- **B0 + B0.1 (EnergyPlus leak fix).** ✓ Done. Upstream commits
+  `6d03b9a` + `956c3e1` on `vtaboga/minergym`, pinned in
+  `pyproject.toml`; in-tree `B2BEnergyPlusEnvironment` subclass
+  removed; `tests/long/test_env_leak.py` is the regression guard.
+  Residual ~14 MB/cycle native RSS growth is irreducible from
+  Python (would need subprocess isolation — see `minergym_todo.md`
+  for the deferred spec). Operational details + future-failure
+  watchlist live in `notes.md` § "Operational gotchas".
+- **B1 (SAC policy config: `log_std_init=0.0`, `ent_coef=0.2`,
+  `use_sde=false`).** ✓ Done. Commit `64a4eb5` on
+  `feature/reward-normalization`. Rationale in `notes.md` § "SAC".
+- **B2, B3, B4.** Cancelled 2026-05-25. No further PPO/SAC
+  hyperparameter sweeps before the camera-ready rerun; the final
+  agents use B1's SAC defaults and the committed
+  `baselines/configs/policy/ppo.yaml`. B4's "balance at 1.0"
+  validation is **superseded by Phase R** (which trains a SAC
+  agent on `full_year` while monitoring per-term reward
+  contributions on `test_small`).
 
-### C1. Regenerate `baseline_returns.csv` under the new reward
+---
 
-Run `baselines/run_reactive_control.py` across all
-`(building_type, task, run_period, building_id)` combinations under
-the new normalized reward.
+## Phase C — Re-run paper experiments (FINAL stage, on the OSS codebase)
 
-- Files: `building2building/scores/baseline_returns.csv` (replaced
-  in full); update its header schema if needed.
-- Acceptance: row count covers all train and test buildings × task
-  presets × `{full_year, winter, summer}`;
-  `pytest -m quick tests/quick/test_scoring.py` passes.
+**Strict prerequisites — all of these must be merged before C1
+starts:**
 
-### C2. Re-run PPO specialists (paper §5)
+1. **Phase M** (OfficeMedium fix + HF re-upload + RBC re-tune +
+   normalizer recompute) — otherwise OfficeMedium rows are
+   produced against the wrong action space.
+2. **Phase D-house** (legacy deletion, LICENSE, formatter,
+   `pyright`, README refresh).
+3. **Phase T** (test suite green on `pytest -m quick`).
+4. **Phase F** (read-only file/doc audit; follow-up edits from F
+   landed in D-house or merged separately before C starts).
+5. **Phase R** (final `emed` / `ehigh` values pinned in
+   `building2building/config/tasks.py` so every Phase-C run uses
+   the locked coefficients).
 
-- Files: `baselines/train_ppo.py` Hydra outputs collected under
-  `results/`; updated CSV + figure (`fig_ppo_specialist`).
-- Acceptance: figure regenerates from a single command; numerical
-  values for the paper table can be cited from the CSV.
+The intent is captured by the user's "the scripts to generate the
+new results must be run on the final version of the codebase"
+rule: every artefact produced in Phase C must be reproducible by
+the public OSS code, not by the in-flight branch.
 
-### C3. Re-run dynamics adaptation (paper §6.1)
+### C1. Regenerate `baseline_returns.csv` on the **full** split
 
-- Files: `baselines/train_dynamics_adaptation.py`, updated
-  `fig_transfer_rew` and `fig_transfer_temp_deviation`.
-- Acceptance: figures regenerate cleanly; the three approaches
-  (specialist, baseline, parameterized) are evaluated on the new
-  reward with seeds documented.
+Run `baselines/run_reactive_control.py` across **every**
+`(building_type, building_id, task, run_period)` tuple in the
+full train + test split, under the locked `emed` / `ehigh`
+values from Phase R. The reactive baseline is the reference
+controller for the normalized score and underlies every figure
+in the paper — both the specialists (C2) and the transfer
+benchmarks (C3 / C4), so train-split rows are not optional.
 
-### C4. Re-run cross-domain Amorpheus (paper §6.2)
+- Files (release artefact): `building2building/scores/
+  baseline_returns.csv` (replaced in full); schema unchanged from
+  the existing header.
+- Files (release entry point): `baselines/run_reactive_control.py`
+  + the existing
+  `baselines/configs/experiment/eval_reactive_control.yaml`. The
+  full reproduction command (in `REPRODUCING.md` § C1) is the
+  single-machine Hydra invocation:
 
-- Files: `baselines/train_cross_domain.py`, updated
-  cross-domain figure.
-- Acceptance: figure regenerates cleanly under the new reward.
+      python -m baselines.run_reactive_control \
+          experiment=eval_reactive_control \
+          output_csv=building2building/scores/baseline_returns.csv
 
-### C5. Update paper tables and figures
+- Files (developer convenience): `baselines/scripts/
+  run_baseline_returns.sh` Slurm wrapper for the cluster (does
+  **not** ship as the canonical reproduction step per
+  Cross-phase principle 3). Update the Slurm script's header to
+  iterate the full 9-cell task grid + 3 run periods + the full
+  building catalogue; user submits.
+- Tasks × run periods: full 9-cell grid
+  (`task_{const,occ,rand}_{e0,emed,ehigh}`) × `run_period ∈
+  {full_year, winter, summer}`. Total row count ≈
+  `len(full_split) × 9 × 3`.
+- Acceptance: every `(building_type, building_id, task,
+  run_period)` tuple the paper figures cite is present;
+  `pytest -m quick tests/quick/test_scoring.py` passes;
+  `tests/release/test_baseline_returns_coverage.py` (T16) passes
+  against the new CSV; `REPRODUCING.md` § C1 is updated to point
+  at the locked-`emed`/`ehigh` values.
 
-Per `AGENTS.md`, the paper is camera-ready; non-trivial changes need
-explicit user approval. This TODO covers the in-scope updates:
+### C2. PPO + SAC specialists on `test_small` (paper §5)
 
-- Files: `paper/main.tex` — Task table (replace `Task 1`–`Task 4`
-  rows with the chosen normalized presets and weight levels);
-  swap experiment figures; update numerical results in §5/§6 prose.
-- Acceptance: PDF compiles; reviewer-flagged confound about
-  cross-building `w_E` comparability is explicitly addressed in the
-  prose; user has reviewed and approved the diff.
+Scope per the 2026-05-25 brainstorm: **1 seed, default params, no
+tuning, full 9-task grid, evaluated on the test_small subset of
+every building type.**
+
+Total cells = `len(building_types) × len(test_small per type) ×
+9 tasks × 2 algorithms × 1 seed`. With 6 building types and ~5
+test_small buildings per type, that is `6 × 5 × 9 × 2 = 540`
+training runs. Each PPO specialist run is ~5M steps × 14 envs;
+each SAC specialist run is ~1M steps × 4 envs. CPU-only.
+
+The reduction from the camera-ready original plan (3 seeds, full
+test split) to (1 seed, test_small) is deliberate compute
+shedding. **Document this reduction in the paper prose
+(`paper/main.tex` §5)** as part of C5a — the figure caption must
+state the seed count and the building subset.
+
+- Files (release artefacts): `baselines/train_ppo.py`,
+  `baselines/train_sac.py` Hydra outputs collected under
+  `outputs/`; merged CSVs `results_ppo_specialist.csv` +
+  `results_sac_specialist.csv`; combined PPO+SAC specialist
+  figure rendered by an extended
+  `baselines/plotting/plot_ppo_specialist.py` (or a new
+  `baselines/plotting/plot_specialists.py` covering both
+  algorithms — pick one in the C2 first commit, per the D5
+  follow-up noted in `REPRODUCING.md`).
+- Files (release entry points, cited from `REPRODUCING.md`):
+
+      python -m baselines.train_ppo experiment=train_ppo_task_study \
+          --multirun seed=0 \
+          "tasks=[task_const_e0,task_const_emed,task_const_ehigh,task_occ_e0,task_occ_emed,task_occ_ehigh,task_rand_e0,task_rand_emed,task_rand_ehigh]" \
+          building_split=test_small
+
+      python -m baselines.train_sac experiment=train_sac_task_study \
+          --multirun seed=0 \
+          "tasks=[...]" \
+          building_split=test_small
+
+  Both Hydra entry points must support the `building_split=`
+  override (today they may hard-code "train"); land that as the
+  first C2 commit if missing.
+- Files (developer convenience): existing
+  `baselines/scripts/train_ppo_small_test_array.sh` and
+  `baselines/scripts/train_sac_array.sh` are updated in-place
+  (no `_v2` forks per `AGENTS.md`) to wrap the Python entry
+  points above for cluster submission. They do **not** ship as
+  the canonical reproduction step.
+- Acceptance: the specialist figure regenerates from a single
+  Python command; the figure shows PPO and SAC on the same axis;
+  numerical values for the paper table can be cited from the
+  merged CSVs; seed count (1) and `test_small` restriction are
+  explicit in the figure caption; `REPRODUCING.md` § C2 + § C2-bis
+  are updated to reflect the locked `emed`/`ehigh` values and the
+  combined-figure command.
+
+### C5a. Specialist paper updates
+
+Land **after C2** so the specialist figure exists. Splits C5 into
+two; C5a covers everything that depends only on C1+C2; C5b
+covers C3/C4.
+
+- Files: `paper/main.tex` —
+  - Task table: replace any remaining legacy `Task 1`–`Task 4`
+    references with the normalized 9-cell
+    `task_{const,occ,rand}_{e0,emed,ehigh}` family. Pin the
+    final `emed` and `ehigh` values from Phase R in the table
+    caption.
+  - Swap Fig 4 (PPO specialist) for the new PPO + SAC side-by-
+    side figure from C2.
+  - Update §5 prose: seed count (1 not 3), building subset
+    (`test_small`), per-term reward decomposition citation
+    forward-referencing the appendix from Phase R.
+  - Address the reviewer-flagged confound about cross-building
+    `w_E` comparability explicitly in §5 prose; cite the Phase R
+    invariance plot in the appendix.
+  - **Add the Phase R appendix.** Per the user's 2026-05-25
+    follow-up, the empirical reward-coefficient study is included
+    in the camera-ready as an appendix. The appendix lays out R0's
+    methodology, the policy ladder, and the invariance result;
+    figures from R3 are embedded.
+- Acceptance: PDF compiles; reviewer-flagged confound is
+  addressed; the Phase R appendix is present and cited from §5;
+  user has reviewed and approved the diff.
+
+### C3. Dynamics adaptation (paper §6.1) — final step
+
+Confirmed in scope (2026-05-25 follow-up). Runs as the
+**final-step batch** after C1, C2, C5a are complete, on exactly
+the same OSS-ready codebase.
+
+Re-run the three approaches (specialist, baseline, parameterized)
+at three difficulty levels (easy = SingleFamilyHouse, medium =
+OfficeSmall, hard = OfficeMedium) under the new reward and the
+new OfficeMedium action space. 1 seed, default params, matching
+the C2 compute-shedding rationale.
+
+- Files (release entry points, cited from `REPRODUCING.md` § C3):
+
+      python -m baselines.train_dynamics_adaptation \
+          experiment=train_dynamics_specialist difficulty=easy
+      python -m baselines.train_dynamics_adaptation \
+          experiment=train_dynamics_baseline difficulty=easy
+      python -m baselines.train_dynamics_adaptation \
+          experiment=train_dynamics_parameterized difficulty=easy
+
+  (Repeat with `difficulty=medium,hard`.) Plotting via
+  `baselines.plotting.plot_dynamics_adaptation` — see
+  `REPRODUCING.md` § C3 for the full invocation.
+- Acceptance: `fig_transfer_rew` and `fig_transfer_temp_deviation`
+  regenerate from a single Python command per
+  `REPRODUCING.md`; seed count and OfficeMedium action-space
+  update are noted in the figure caption.
+
+### C4. Cross-domain Amorpheus (paper §6.2) — final step
+
+Confirmed in scope (2026-05-25 follow-up). Runs alongside C3 as
+part of the final-step batch.
+
+- Files (release entry points, cited from `REPRODUCING.md` § C4):
+
+      python -m baselines.train_cross_domain experiment=train_cross_domain
+
+  followed by the eval and plotting commands documented in
+  `REPRODUCING.md` § C4.
+- Acceptance: the cross-domain figure regenerates from a single
+  Python command per `REPRODUCING.md`; the action-space update is
+  noted in the figure caption.
+
+### C5b. Transfer paper updates
+
+Land **after C3 + C4**. Closes Phase C.
+
+- Files: `paper/main.tex` — re-render Fig 5 (dynamics adaptation,
+  3-panel) and Fig 7 (cross-domain). Update §6 prose for the new
+  reward + the new OfficeMedium action space; add the same
+  seed-count and configuration notes as in C5a.
+- Acceptance: PDF compiles; figures are produced by the
+  `REPRODUCING.md` commands as committed; user has reviewed and
+  approved the diff.
 
 ---
 
@@ -346,85 +641,34 @@ one minimal code example using `new_make_env` + a benchmark class.
 - Acceptance: `LICENSE` file exists; `pyproject.toml` parses; README
   cites it.
 
-### D2. Delete the legacy reward family (PRECEDES C1)
-val_dynamics_adaptation.py` — fix
-    `compute_normalized_score` argument order; replace hardcoded
-    `PadObservation(target_size=20)` with a value read from the
-    training run's metadata.
-  - `baselines/plotting/plot_ppo_specialist.py` — verified column
-    name match.
-- Acceptance: each bug has a regression test under `tests/quick/`;
-  `pytest -m quick` green.
-Remove `task1`–`task5`, `BarrierRewardConfig`, `BaseRewardConfig`,
-the un-normalized `DeadbandRewardConfig`, and corresponding reward
-classes in `simulator/rewards.py` (keep only `NormalizedDeadbandReward`
-and the shared `_deadband_components` helper).
+### ~~D2. Delete the legacy reward family~~ ✓ (commit `574baaa`, 2026-05-25)
 
-- Files: `building2building/types.py`, `building2building/config/tasks.py`,
-  `building2building/simulator/rewards.py`, `building2building/__init__.py`
-  (exports), `building2building/api/__init__.py` (default `task=`
-  argument), `baselines/configs/reward/task[1-5].yaml` (delete),
-  `baselines/configs/experiment/*.yaml` (replace task references),
-  `tests/quick/test_task_presets.py`, `tests/quick/test_*` (drop
-  legacy-only tests), `README.md`, `docs/`, `tutorials/*` (update
-  examples).
-- Acceptance: `rg -F 'task1' building2building/ baselines/ tests/
-  tutorials/ docs/` returns nothing relevant; `rg 'BarrierReward|BaseReward'
-  building2building/ baselines/ tests/` returns nothing;
-  `pytest -m quick` is green.
-- Reference: `notes.md` § "Status snapshot" and § "Active decisions".
+Legacy `task1`–`task5` presets, `BarrierRewardConfig`,
+`BaseRewardConfig`, and the un-normalized `DeadbandRewardConfig`
+removed; only `NormalizedDeadbandReward` and the shared
+`_deadband_components` helper remain. Original "D2 precedes C1"
+hard dependency is replaced by "**M precedes C1**" (Phase C
+preamble).
 
-### ~~D3. Fix the documented eval bugs~~ ✓
+### ~~D3. Fix the documented eval bugs~~ ✓ (commit `de258ae`)
 
-Four small bugs in the README "Known Issues" section.
+`eval_ppo.py` argument order + model path + `reward_mean` column,
+`eval_dynamics_adaptation.py` argument order + metadata-driven
+`PadObservation`. Regression tests under `tests/quick/`.
 
-- Files:
-  - `baselines/eval_ppo.py` — fix `compute_normalized_score`
-    argument order; fix the model path lookup to match
-    `models/<type>/<task>/ppo_<id>.zip`; fix CSV column name
-    (`reward` → `reward_mean`) so `plotting/plot_ppo_specialist.py`
-    works.
-  - `baselines/eval_dynamics_adaptation.py` — fix
-    `compute_normalized_score` argument order; replace hardcoded
-    `PadObservation(target_size=20)` with a value read from the
-    training run's metadata.
-  - `baselines/plotting/plot_ppo_specialist.py` — verified column
-    name match.
-- Acceptance: each bug has a regression test under `tests/quick/`;
-  `pytest -m quick` green.
+### ~~D4. Drop `baselines/requirements.txt`; update install docs~~ ✓ (commit `f6ec020`)
 
-### ~~D4. Drop `baselines/requirements.txt`; update install docs~~ ✓
+Install path is now `pip install -e ".[training]"`.
 
-It is incomplete and shadows `pyproject.toml[training]`.
+### ~~D5. Write `REPRODUCING.md`~~ ✓ (commit `45799f3`)
 
-- Files: delete `baselines/requirements.txt`; update
-  `baselines/README.md` and root `README.md` to point at
-  `pip install -e ".[training]"`.
-- Acceptance: `requirements.txt` is gone; install instructions point
-  exclusively at `pyproject.toml`.
-
-### ~~D5. Write `REPRODUCING.md`~~ ✓
-
-A single document mapping every paper figure / table to the exact
-command (Hydra invocation, expected outputs, plotting command).
-
-- Files: new `REPRODUCING.md` at repo root; cross-linked from
-  `README.md` (Documentation section) and `design_doc.md`
-  (§2 Reproducibility principle).
-- Coverage: Phase-C deliverables (`baseline_returns.csv`, PPO
-  specialist, **SAC specialist** (camera-ready addition),
-  dynamics adaptation, cross-domain Amorpheus); plus extended
-  scope — Phase-B calibration / B2 SAC ablation / B3 PPO `target_kl`,
-  reactive-controller Optuna tuning, PPO CHS hyperparameter sweep,
-  smoke-test tier. Each entry has the exact Hydra one-/two-liner
-  *and* the plotting command, plus expected artefact paths.
-- Camera-ready note: commands target the normalized 3 × 3 task
-  family (`task_{const,occ,rand}_{w0,wmed,whigh}`); `REPRODUCING.md`
-  flags every spot where a config still defaults to a legacy
-  `task1`–`task5` reference and will be updated as part of D2 / C1.
-- Follow-up tracked: `plot_ppo_specialist.py` needs a third
-  bar-group for SAC (or a duplicate `plot_specialists.py`) before
-  the camera-ready figures can render PPO + SAC side-by-side.
+Lives at the repo root; cross-linked from `README.md` and
+`design_doc.md`. Phase-C deliverables, Phase-B (cancelled)
+calibration entries, Optuna RBC tuning, PPO CHS sweep,
+smoke-test tier all documented. Will be incrementally updated by
+each TODO item that adds, moves, or removes a runnable script
+(Cross-phase principle 2). Outstanding follow-up: the side-by-
+side PPO + SAC specialist figure command (tracked under C2).
 
 ### D6. Add `baselines/` smoke tests
 
@@ -561,6 +805,62 @@ nothing in `summaries/` is still referenced.
   `design_doc.md` / `notes.md`.
 - Acceptance: `rg summaries/` returns nothing; user has confirmed
   `notes.md` is sufficient.
+
+### D15. Execute the `analysis/` → `baselines/` migration
+
+**Depends on F2's migration audit table** in
+`notes.md` § "Phase F analysis/ migration audit". Each row of that
+table becomes a one-commit "FX" sub-item here; this D15 entry is
+the umbrella tracker for them.
+
+For each row labelled **(promote to baselines/)**:
+
+1. Move the script (or its useful subset) into `baselines/` at the
+   destination path pinned by F2.
+2. Move the plotting code into `baselines/plotting/`.
+3. Rewrite imports against the public `building2building` API
+   (no `from building2building.simulator.<internal>`).
+4. Add a Hydra config under `baselines/configs/experiment/` if
+   the script wants Hydra-style invocation.
+5. Update `REPRODUCING.md` in the same commit to cite the new
+   Python entry point.
+6. Delete the original `analysis/` file (or leave a one-line
+   pointer comment to the new location if F2's table flagged the
+   audit-trail value).
+
+For each row labelled **(delete)**: `git rm` the file in a single
+sweep commit at the end.
+
+For each row labelled **(stay in analysis/)**: no action — the
+file already has a destination.
+
+- Files: per F2's migration table; this item lists no files
+  itself.
+- Acceptance: `rg "from analysis" baselines/ building2building/`
+  returns nothing; every script cited in `REPRODUCING.md` lives
+  under `baselines/` or `building2building/`; the migration table
+  in `notes.md` has every row marked done.
+
+### D16. `REPRODUCING.md` parity sweep
+
+**Land last in D-house, after D15.** A one-shot read-through of
+every section in `REPRODUCING.md` against the actual `baselines/`
+state. Catches stale Hydra group names, stale flag names, stale
+output paths, and the migration's downstream effects on the
+cheat-sheet table.
+
+Per Cross-phase principle 2 this is also the "audit your
+predecessors' contributions" gate — every D15 commit was
+*supposed* to update `REPRODUCING.md`, but a sweep at the end
+guarantees the file is internally consistent.
+
+- Files: `REPRODUCING.md` only (no code changes here; if a
+  command is broken, that's a separate bug fix).
+- Acceptance: every `python -m baselines.…` command in the file
+  can be at least dry-run-parsed by Hydra
+  (`python -m baselines.<entry> --help` returns 0 for each entry
+  point cited); the cheat-sheet table at the bottom is in 1:1
+  correspondence with the in-body sections.
 
 ---
 
@@ -1877,79 +2177,334 @@ reflects the new inventory.
 
 ---
 
+## Phase F — File and documentation audit (read-only)
+
+**Run between Phase T and Phase R.** Output is a checklist, not
+code changes. The phase exists because once Phase D-house and
+Phase T close, the repo is *almost* OSS-ready; this is the last
+chance to catch dead code, stale comments, half-migrated docs,
+private paths leaking into public files, and inconsistent
+narration across the docs site before paper-figure runs lock the
+state of the codebase.
+
+**Rule:** F items only **read** and **note**. Do not edit. Edits
+land in a follow-up D-house or D9 commit (or in a fresh "FX"
+fix-up phase if the audit surfaces more than the existing items
+can absorb).
+
+### F1. Walk every file in `building2building/`
+
+Read every `.py`, `.yaml`, `.json`, `.md`, `.txt` under
+`building2building/` and capture, per file:
+
+1. Is the file still used? (`rg <filename> baselines/ tests/
+   tutorials/ docs/` — zero hits ⇒ candidate for deletion.)
+2. Is the docstring honest? (Does what it says it does, no
+   stale claims about removed features.)
+3. Are there `TODO` / `XXX` / `WIP` / `FIXME` comments? List them.
+4. Any hardcoded paths, magic numbers, or commented-out code?
+5. Any imports from `analysis/` or `baselines/` (which would
+   break the public/research barrier)?
+6. Is the file in the right module? (Pipeline code shouldn't
+   sit under `api/`; API code shouldn't sit under `pipeline/`,
+   etc.)
+
+- Output: `notes.md` § "Phase F file audit — building2building/"
+  — one bullet per file, with the six checks above as sub-bullets
+  where applicable. ~1 hour read-through; the output is a flat
+  list, not prose.
+- Acceptance: the section is committed; every file under
+  `building2building/` is mentioned at least once (even if the
+  mention is "fine; no notes").
+
+### F2. Walk every file in `baselines/` + `analysis/` migration audit
+
+Same checks as F1, applied to `baselines/`. Extra checks specific
+to `baselines/`:
+
+7. Does the script use only the public `building2building` API?
+   (`rg "from building2building" baselines/` — every import should
+   resolve to a public symbol per `design_doc.md` §3.2.)
+8. Are Hydra configs (`baselines/configs/`) consistent in style?
+   (One naming convention, one set of default values, no
+   `task_const_e0_legacy` leftovers.)
+9. Are the eval scripts (`eval_ppo.py`,
+   `eval_dynamics_adaptation.py`, etc.) consistent with the eval
+   schema described in `REPRODUCING.md`?
+10. **Is there any Slurm-only entry point** with no Python
+    sibling? Per Cross-phase principle 3, every `baselines/scripts/
+    *.sh` must wrap a `python -m baselines.…` invocation that
+    works on a single machine. Flag any `.sh` whose body
+    contains logic beyond a simple shell loop / array dispatch
+    over a Python entry point.
+
+**Plus a separate `analysis/` → `baselines/` migration audit:**
+
+Walk every `.py` under `analysis/` and label each file as one of:
+
+- **(stay in analysis/)** — pure exploration / decision-making
+  scaffolding whose outputs are not cited in the paper. Examples:
+  `analysis/officemedium_tuned/`, `analysis/_sfh_0014_sweep/`,
+  ad-hoc `plot_*.py` files used to make one figure that informed
+  a decision recorded in `notes.md`.
+- **(promote to baselines/)** — script whose outputs **are**
+  cited in the paper (including the appendix), or are part of a
+  paper-figure pipeline. Examples: the SAC reward-distribution
+  script that Phase R productionizes; the per-building reward-
+  decomposition plotters whose figures will land in the Phase R
+  appendix.
+- **(delete)** — dead scripts whose outputs are not in the paper
+  and whose decisions have already been baked into a YAML / a
+  TODO item / a `notes.md` entry. The originating decision should
+  still be reachable; the script itself can go.
+
+For each (promote) file, name the destination file under
+`baselines/` (or `baselines/plotting/` for plotting code), the
+config-group rewiring needed, and any `analysis.*` imports that
+need rewriting against the `building2building` public API.
+
+- Output: `notes.md` § "Phase F file audit — baselines/" (the
+  first 10 checks) and `notes.md` § "Phase F analysis/ migration
+  audit" (the migration audit, as a three-column table:
+  *file → destination → notes*).
+- Acceptance: F1-style file roll-up plus the migration table; the
+  migration table feeds **D-house FX** items that actually
+  perform the moves before Phase C starts.
+
+### F3. Walk every page in `docs/`
+
+Same checks as F1, applied to `docs/`. Extra docs-specific
+checks:
+
+10. Does `mkdocs build --strict` pass before AND after the F3
+    read-through? (Run it once to baseline, then no F3 edits
+    can break it.)
+11. Are there pages that duplicate content already in
+    `README.md`, `REPRODUCING.md`, or `notes.md`? Flag
+    duplication; D9 absorbs the de-dup work.
+12. Cross-link audit: every `building2building.<symbol>`
+    mention in `docs/` should hyperlink to the API page; every
+    paper-figure mention should hyperlink to `REPRODUCING.md`.
+13. Are there pages that still reference legacy `task1`–`task5`
+    presets? (D9 is supposed to migrate these; F3 verifies.)
+
+- Output: `notes.md` § "Phase F file audit — docs/".
+- Acceptance: same shape as F1; `mkdocs build --strict` still
+  passes.
+
+### F4. Tutorials cross-check
+
+Tutorials are 1:1 paired (`tutorials/*.py` ↔
+`docs/tutorials/*.md`, per the D9 description). For each pair,
+confirm they are still in sync after D9 lands (or note that they
+diverged again).
+
+- Output: `notes.md` § "Phase F tutorial sync check".
+- Acceptance: every pair is checked; divergences are listed with
+  a one-line note about which side is the source of truth.
+
+### F5. Roll-up + sign-off
+
+Merge F1–F4 into a single follow-up checklist under
+`notes.md` § "Phase F roll-up". Each entry from F1–F4 that is
+*not* a no-op gets mapped to either:
+
+- (a) an existing TODO item that already covers it (cite by id),
+- (b) a new "FX" follow-up item (file under "Deferred" if
+  out-of-scope for the camera-ready, or under D-house if it must
+  ship), or
+- (c) explicitly **noted-and-accepted** (the imperfection is
+  documented but won't be fixed).
+
+- Acceptance: every non-no-op note from F1–F4 has a destination
+  in (a)/(b)/(c); user signs off on the checklist before Phase R
+  starts.
+
+---
+
+## Phase R — Empirical reward-coefficient study
+
+**Run between Phase F and Phase C.** Output: final values of
+`emed` and `ehigh` (and confirmation that `e0 = 0.0`), backed by
+empirical evidence on a policy ladder and demonstrated invariance
+across the `test_small` building subset.
+
+The user-confirmed methodology (2026-05-25): reuse
+`analysis/task_study/reward_design_comparison_sac.py` to train a
+SAC agent while monitoring the per-term reward distribution over
+training. The SAC trajectory itself provides the random →
+optimal policy ladder (early training is near-random, late
+training is the SAC optimum for that building).
+
+### R0. Pin the empirical question
+
+**Before any rollout.** Write a short methodology note
+(`notes.md` § "Phase R methodology") that answers:
+
+1. **Target invariance criterion.** What quantitative claim
+   does R make? Recommendation:
+   - For `emed`: at the SAC final checkpoint, the ratio
+     `mean(temp_penalty / tau_T) / mean(emed * power_penalty /
+     tau_E)` is in `[0.5, 2.0]` on every `test_small` building,
+     i.e. the two reward terms are within a factor of 2 of each
+     other end-to-end.
+   - For `ehigh`: at the SAC final checkpoint, the same ratio
+     drops below `0.5` (energy term dominates) on every
+     `test_small` building.
+   - For `e0`: trivially satisfied (`power_penalty` term has
+     zero weight by construction); R0 only verifies that the
+     temperature term behaves sensibly.
+2. **Building subset.** `test_small` per building type. For
+   compute reasons, R can restrict to a sub-subset (e.g. 2
+   buildings per type, 12 total) for the *value search* and
+   then validate on the full `test_small` for the chosen
+   values. Pin the split in R0.
+3. **Run period.** `full_year` (matches Phase A calibration).
+   `winter` is faster but the calibration regime is `full_year`,
+   so use `full_year`.
+4. **SAC config.** Default from `baselines/configs/policy/sac.yaml`
+   + `baselines/configs/training/sac.yaml`. No tuning per the
+   2026-05-25 brainstorm.
+5. **Coefficient grid to test.** Start with the current
+   `{emed=1.0, ehigh=5.0}` plus a small grid around each:
+   - `emed ∈ {0.5, 1.0, 2.0}`
+   - `ehigh ∈ {3.0, 5.0, 10.0}`
+   Total cells: `3 × len(building_subset)` for each coefficient
+   (since the SAC trajectory itself spans the policy ladder, only
+   one run per cell is needed).
+
+- Files: `notes.md` § "Phase R methodology".
+- Acceptance: every numbered choice above is pinned with a
+  concrete value before any Slurm submission.
+
+### R1. Productionize the SAC reward-distribution script into `baselines/`
+
+`analysis/task_study/reward_design_comparison_sac.py` already
+trains a SAC agent and decomposes the per-step reward into
+`(temp_penalty, power_penalty)`. Since the **outputs of R3 land
+in the paper appendix**, per Cross-phase principle 1 the final
+script must live under `baselines/`, not `analysis/`. R1 is the
+productionization commit.
+
+Concretely:
+
+1. Promote the script to **`baselines/run_reward_coefficient_study.py`**
+   (or a similar name; pin in R1's first commit). Move only the
+   logic that produces the appendix data; leave any prototype-
+   only branches behind in `analysis/` (they remain there for the
+   audit trail).
+2. Parametrize via Hydra (matching the rest of `baselines/`):
+   the energy-weight grid, the building subset, the run period,
+   and the SAC config. The Hydra entry point becomes the
+   canonical Python invocation cited in `REPRODUCING.md`.
+3. Extend the building loop to iterate the R0-pinned subset (a
+   sub-subset of `test_small`).
+
+- Files: new
+  `baselines/run_reward_coefficient_study.py`; new Hydra config
+  `baselines/configs/experiment/reward_coefficient_study.yaml`;
+  the prototype under
+  `analysis/task_study/reward_design_comparison_sac.py` is
+  preserved as historical artefact (D-house FX may later move it
+  alongside the rest of the migration). Update `REPRODUCING.md`
+  in the same commit (new "Appendix: reward-coefficient study"
+  section under the Phase B/A block, with the Python
+  invocation).
+- Acceptance: a dry-run with one building × one energy weight
+  produces the expected NPZ artefact under
+  `outputs/reward_coefficient_study/`; the file size, schema,
+  and column names match the prototype's output (so R3's
+  plotting code can read it).
+
+### R2. Run the sweep
+
+The user runs the sweep from the Python entry point committed in
+R1. The canonical invocation in `REPRODUCING.md` is the
+single-machine command:
+
+    python -m baselines.run_reward_coefficient_study \
+        experiment=reward_coefficient_study
+
+Expected runtime on the cluster:
+`~12 buildings × 3 emed values × 3 ehigh values × ~1 hour SAC =
+~108 hours of CPU time`; with 12 parallel cluster workers, ~9
+hours wall-clock. A thin Slurm wrapper under
+`baselines/scripts/run_reward_coefficient_study.sh` (developer
+convenience only) loops the Python entry point per cell.
+
+- Acceptance: every `(building, emed, ehigh)` cell produces a
+  valid NPZ under `outputs/reward_coefficient_study/`; total
+  compute documented in `notes.md`.
+
+### R3. Aggregate + plot
+
+The plotting code is part of the OSS release per Cross-phase
+principle 1 — it produces the paper appendix figures. Land it
+under `baselines/plotting/`, not `analysis/`.
+
+Produce:
+
+1. **Ladder plot.** Per building, per energy_weight: `(temp_penalty / tau_T)`
+   and `(w_E * power_penalty / tau_E)` over training, both on
+   the same y-axis. Reader sees both terms move from "random"
+   (early SAC) to "optimal" (late SAC).
+2. **Balance plot.** Per energy_weight (averaged across the
+   building subset): the ratio of the two terms at the final
+   SAC checkpoint, with a band over buildings for invariance.
+3. **Per-building invariance plot.** At the chosen final `emed`
+   and `ehigh`: the ratio per building, error bars over
+   training-final variance, on one axis. Reader sees that the
+   ratio sits in the R0-pinned window on every building.
+
+- Files: new
+  `baselines/plotting/plot_reward_coefficient_study.py`;
+  appendix-quality figures committed under `figures/appendix/`
+  (or whatever the paper's existing appendix figure directory is).
+  Update `REPRODUCING.md` with the plotting command alongside
+  R1's training command.
+- Acceptance: the three figures regenerate from one Python
+  command; the values pinned in R0 are visibly satisfied (or, if
+  not, R3 recommends a different pair); the figures are at
+  paper-appendix quality (font size, axis labels, units).
+
+### R4. Pin final values + update presets
+
+Based on R3, commit the final `emed` and `ehigh` values to
+`building2building/config/tasks.py` (in `TASK_PRESETS`'s
+`NormalizedDeadbandRewardConfig.energy_weight` fields for the
+`task_{const,occ,rand}_{emed,ehigh}` presets). Update the
+README task-preset table, the docstrings, and the paper
+appendix that cites these values.
+
+- Files: `building2building/config/tasks.py`, `README.md` (task
+  table values), `docs/api/types.md` (if it cites the values),
+  `paper/main.tex` appendix (the chosen values + a back-reference
+  to the R3 figure). The main-text task-table caption is captured
+  under C5a.
+- Acceptance: the values in the code match the R3 conclusion;
+  `pytest -m quick tests/quick/test_task_presets.py` passes; the
+  values are cited (with a forward-reference to the R3 figure)
+  in the paper appendix; `REPRODUCING.md` § "Appendix: reward-
+  coefficient study" is updated to lock the values.
+
+---
+
 ## Landing the `feature/reward-normalization` branch
 
-The branch is 5 commits ahead of `origin/dev`, 0 behind, not yet
-pushed. It mixes the reward redesign, an RL wrapper refactor, eval
-bug fixes, and a SAC baseline. Return it to `dev` as a stack of
-small reviewable PRs cut from `dev` (not stacked in git; each is
-logically independent). Use the `split-to-prs` skill when slicing
-the diff. After PR-1..PR-3 land, delete the branch; subsequent
-Phase B/C/D work continues on short-lived branches off `dev`.
+The original "split the 5-commit branch into 4 PRs" plan
+(L0a / L0b / L1 / L2 / L3 / L4) is **superseded** as of
+2026-05-25. Since that plan was written, the branch has absorbed
+D2, D3, D4, D5, B1, the RL-wrapper refactor, the SAC baseline,
+and the Phase-T draft. It is no longer a tidy 4-PR stack.
 
-### L0a. Docs housekeeping commit on `dev`
+**Current intent (revisit before pushing):** land the branch as
+one or two large PRs against `dev` once Phase M / D-house / T / F
+close — not as a multi-PR stack. Phase D16's `REPRODUCING.md`
+parity sweep is the natural last commit before opening the PR.
 
-Lands directly on `dev` to unblock everything else.
-
-- Files: `AGENTS.md`, `design_doc.md`, `TODO.md`, `notes.md`,
-  `paper/reviewer_feedback.md`, the two `.gitignore` fixes
-  (`wandb/` → `/wandb/`, `analysis/` → `/analysis/`), and the
-  pre-existing `.cursorrules` / `.augment/` deletions.
-- Acceptance: pushed to `dev`; no behaviour change.
-
-### L0b. Promoted-ignored commit on `dev`
-
-- Files: `baselines/configs/wandb/default.yaml` (required by Hydra
-  defaults; was silently ignored). Decision needed on
-  `baselines/analysis/`: delete or track.
-- Acceptance: Hydra resolves `defaults: - wandb: default`; decision
-  on `baselines/analysis/` documented in `notes.md`.
-
-### L1. PR-1 — Normalized deadband reward
-
-Content of `799aeb1 reward normalization w.r.t. reactive control`,
-plus the YAML-rename portion of `ad81ad0 wip`
-(`reward_normalizers.yaml` → `reward_normalizers_linear.yaml`,
-add `reward_normalizers_random_linear.yaml`).
-
-- Files: `building2building/{types,config/tasks,simulator/__init__,
-  simulator/rewards,data/reward_normalizers,api/__init__,
-  benchmarks/goal_adaptation}.py` and the four reward tests.
-- Acceptance: branch cut from `dev`; `pytest -m quick` green;
-  lands the new reward family **alongside** (not in place of) the
-  legacy family — D2 happens later in Phase D-house.
-
-### L2. PR-2 — RL wrapper stack + eval bug fixes
-
-`make_rl_env_fn`, `api/rl_wrappers.py`, `wrap_env_for_rl`, the
-bug-fix slice of `eval_ppo.py` / `eval_dynamics_adaptation.py` /
-`tune_ppo.py`, plus `tests/quick/test_rl_wrappers.py`.
-
-- Files: as above.
-- Acceptance: branch cut from `dev`; `pytest -m quick` green; does
-  not depend on Phase A; unblocks Phases B and C.
-
-### L3. PR-3 — SAC baseline (current state)
-
-`baselines/train_sac.py`, `configs/experiment/train_sac*.yaml`,
-`configs/training/sac.yaml`, `configs/policy/sac.yaml` (current
-state, with critic-stability fixes),
-`tests/quick/test_train_sac_smoke.py`.
-
-- Files: as above.
-- Acceptance: branch cut from `dev`; `pytest -m quick` green;
-  README flags SAC as "unstable on occupancy-driven tasks; final
-  tuning in PR-4".
-
-### L4. PR-4 — SAC config under final normalized reward (deferred)
-
-Lands after Phase A (reward locked) and Phase B (SAC ablation B2
-on the calibration anchor completes). The only PR in the stack
-whose contents are not already on the branch.
-
-- Files: `baselines/configs/policy/sac.yaml` (final values),
-  README "Known Issues" cleanup.
-- Acceptance: B2 result documented in `notes.md`; PR cut from `dev`.
+- Acceptance (revised): one or two merge commits on `dev`; the
+  resulting `dev` tip can rebuild every artefact cited in
+  `REPRODUCING.md` via its Python entry points.
 
 ---
 
