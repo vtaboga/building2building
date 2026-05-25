@@ -11,9 +11,7 @@ from typing import Any, Literal
 
 from building2building.data.download import ALL_BUILDING_TYPES, BuildingType
 from building2building.types import (
-    BarrierRewardConfig,
-    BaseRewardConfig,
-    DeadbandRewardConfig,
+    NormalizedDeadbandRewardConfig,
     RewardConfig,
     TaskConfig,
     reward_config_from_dict,
@@ -414,22 +412,15 @@ def reward_to_dict(reward: RewardConfig) -> dict[str, Any]:
     Raises:
         TypeError: If *reward* is not a known ``RewardConfig`` type.
     """
-    if isinstance(reward, DeadbandRewardConfig):
-        return {
-            "reward_type": "DeadbandRewardConfig",
+    if isinstance(reward, NormalizedDeadbandRewardConfig):
+        d: dict[str, Any] = {
+            "reward_type": "NormalizedDeadbandRewardConfig",
             "energy_weight": reward.energy_weight,
             "dT": reward.dT,
         }
-    if isinstance(reward, BarrierRewardConfig):
-        return {
-            "reward_type": "BarrierRewardConfig",
-            "energy_weight": reward.energy_weight,
-            "dT": reward.dT,
-            "violation_penalty": reward.violation_penalty,
-        }
-    if isinstance(reward, BaseRewardConfig):
-        return {
-            "reward_type": "BaseRewardConfig",
-            "energy_weight": reward.energy_weight,
-        }
+        if reward.tau_T is not None:
+            d["tau_T"] = reward.tau_T
+        if reward.tau_E is not None:
+            d["tau_E"] = reward.tau_E
+        return d
     raise TypeError(f"Unsupported reward type: {type(reward).__name__}")

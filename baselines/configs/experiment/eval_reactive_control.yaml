@@ -13,7 +13,7 @@ building_types:
 split: test
 run_periods: [full_year]
 max_buildings_per_type: null
-tasks: [task1, task2, task3, task4, task5]
+tasks: [task_const_e0, task_const_emed, task_const_ehigh, task_occ_e0, task_occ_emed, task_occ_ehigh, task_rand_e0, task_rand_emed, task_rand_ehigh]
 n_runs: 1
 output_csv: baseline_returns.csv
 

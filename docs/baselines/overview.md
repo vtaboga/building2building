@@ -67,11 +67,11 @@ pip install -e ".[training]"   # Installs all required dependencies
 ```bash
 # 1. Generate baseline returns CSV (needed for scoring)
 python -m baselines.run_reactive_control experiment=eval_reactive_control \
-    building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=5
+    building_types=[OfficeSmall] tasks=[task_const_e0] max_buildings_per_type=5
 
 # 2. Train per-building PPO specialists
 python -m baselines.train_ppo experiment=train_ppo \
-    building_types=[OfficeSmall] tasks=[task1] buildings_per_type=1
+    building_types=[OfficeSmall] tasks=[task_const_e0] buildings_per_type=1
 
 # 3. Train dynamics adaptation with building parameters
 python -m baselines.train_dynamics_adaptation \

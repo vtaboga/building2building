@@ -18,13 +18,13 @@ import csv
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 from stable_baselines3 import PPO
 
 import building2building as b2b
 from baselines.utils.evaluation import EpisodeResult, run_episode
+from baselines.utils.training import make_rl_env_fn
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class EvalResult:
     building_type: str
     building_id: str
     task: str
-    reward: float
+    reward_mean: float
     episode_length: int
     normalized_score: float | None
 
@@ -52,12 +52,15 @@ def evaluate_model(
     results: list[EvalResult] = []
 
     for _ in range(n_episodes):
-        env = b2b.new_make_env(
-            building_type,
+        env = make_rl_env_fn(
+            building_type=building_type,
             building_id=building_id,
             task=task,
             run_period=run_period,
-        )
+            normalize_obs=True,
+            rescale_action=True,
+            monitor=False,
+        )()
         try:
             ep: EpisodeResult = run_episode(env, model)
             try:
@@ -75,7 +78,7 @@ def evaluate_model(
                     building_type=building_type,
                     building_id=building_id,
                     task=task,
-                    reward=ep.total_reward,
+                    reward_mean=ep.total_reward,
                     episode_length=ep.episode_length,
                     normalized_score=ns,
                 )
@@ -86,18 +89,20 @@ def evaluate_model(
     return results
 
 
-def _parse_model_filename(name: str) -> tuple[str, str, str] | None:
-    """Extract (building_type, building_id, task) from model filename.
+def _parse_model_path(path: Path) -> tuple[str, str, str] | None:
+    """Extract (building_type, building_id, task) from a nested model path.
 
-    Expected pattern: ``ppo_{building_type}_{building_id}_{task}.zip``
+    Expected directory structure:
+    ``.../<output_dir>/models/<building_type>/<task>/ppo_<building_id>.zip``
     """
-    stem = name.replace(".zip", "")
-    if not stem.startswith("ppo_"):
+    if not path.stem.startswith("ppo_"):
         return None
-    parts = stem[4:].rsplit("_", maxsplit=2)
-    if len(parts) != 3:
+    building_id = path.stem[4:]
+    task = path.parent.name
+    building_type = path.parent.parent.name
+    if not building_id or not task or not building_type:
         return None
-    return parts[0], parts[1], parts[2]
+    return building_type, building_id, task
 
 
 def main() -> None:
@@ -129,18 +134,18 @@ def main() -> None:
     )
 
     model_dir = Path(args.model_dir)
-    model_files = sorted(model_dir.glob("ppo_*.zip"))
+    model_files = sorted(model_dir.rglob("ppo_*.zip"))
     if not model_files:
-        logger.error("No model files found in %s", model_dir)
+        logger.error("No model files found under %s", model_dir)
         return
 
     logger.info("Found %d model files", len(model_files))
     all_results: list[EvalResult] = []
 
     for mf in model_files:
-        parsed = _parse_model_filename(mf.name)
+        parsed = _parse_model_path(mf)
         if parsed is None:
-            logger.warning("Skipping unrecognized file: %s", mf.name)
+            logger.warning("Skipping unrecognized file: %s", mf)
             continue
         bt, bid, task = parsed
         logger.info("Evaluating %s/%s task=%s", bt, bid, task)
@@ -162,7 +167,7 @@ def main() -> None:
         "building_type",
         "building_id",
         "task",
-        "reward",
+        "reward_mean",
         "episode_length",
         "normalized_score",
     ]
@@ -175,7 +180,7 @@ def main() -> None:
                     "building_type": r.building_type,
                     "building_id": r.building_id,
                     "task": r.task,
-                    "reward": f"{r.reward:.1f}",
+                    "reward_mean": f"{r.reward_mean:.1f}",
                     "episode_length": r.episode_length,
                     "normalized_score": (
                         f"{r.normalized_score:.4f}"

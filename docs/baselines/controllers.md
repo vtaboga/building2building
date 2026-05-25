@@ -138,7 +138,7 @@ python -m baselines.run_reactive_control experiment=eval_reactive_control
 
 # Specific building type
 python -m baselines.run_reactive_control experiment=eval_reactive_control \
-    building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=5
+    building_types=[OfficeSmall] tasks=[task_const_e0] max_buildings_per_type=5
 
 # Override controller parameters
 python -m baselines.run_reactive_control experiment=eval_reactive_control \

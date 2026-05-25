@@ -41,7 +41,7 @@ import building2building as b2b
 bench = b2b.benchmarks.ActionSpaceTransfer(
     system_type="unitary",   # "unitary" or "central"
     direction="expand",      # "expand" or "reduce"
-    task="task1",
+    task="task_const_e0",
 )
 
 train_env = bench.make_train_env()
@@ -58,7 +58,7 @@ print(f"Test action dim:  {test_env.action_space.shape[0]}")
 |---|---|---|---|
 | `system_type` | `"unitary"` / `"central"` | `"unitary"` | HVAC system type. Determines which actuators are toggled and the default building type. |
 | `direction` | `"expand"` / `"reduce"` | `"expand"` | Whether **test** has more or fewer actuators than training. |
-| `task` | `str` | `"task1"` | Named task preset (`"task1"`–`"task5"`). |
+| `task` | `str` | `"task_const_e0"` | Named task preset. |
 | `building_type` | `str` or `None` | `None` | Override the default building type. When `None`, defaults to `"OfficeSmall"` for unitary and `"OfficeMedium"` for central. |
 | `split` | `"train"` / `"test"` | `"train"` | Dataset split from which to select the building. |
 | `split_index` | `int` | `0` | Index within the split to select the building. |

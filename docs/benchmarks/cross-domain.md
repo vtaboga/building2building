@@ -22,7 +22,7 @@ import building2building as b2b
 
 bench = b2b.benchmarks.CrossDomainGeneralization(
     difficulty="easy",   # "easy", "medium", or "hard"
-    task="task1",
+    task="task_const_e0",
     n_train=8,
     n_test=8,
 )

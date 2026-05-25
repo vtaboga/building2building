@@ -1,6 +1,0 @@
-# Additional dependencies for running baselines
-# (building2building and its core deps are assumed installed)
-stable-baselines3>=2.0
-torch>=2.0
-wandb
-tqdm

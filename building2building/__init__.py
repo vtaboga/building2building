@@ -21,6 +21,7 @@ from building2building.api import (
     new_make_env,
     rollout,
 )
+from building2building.api.rl_wrappers import wrap_env_for_rl
 from building2building.morphology import (
     Morphology,
     MorphologyEdge,
@@ -54,11 +55,9 @@ from building2building.simulator.wrappers import (
 )
 from building2building.types import (
     ActuatorDescription,
-    BarrierRewardConfig,
-    BaseRewardConfig,
     BuildingConfig,
-    DeadbandRewardConfig,
     Equipment,
+    NormalizedDeadbandRewardConfig,
     RewardConfig,
     TaskConfig,
 )
@@ -112,11 +111,9 @@ __all__ = [
     "VAVTerminal",
     # Type definitions
     "ActuatorDescription",
-    "BarrierRewardConfig",
-    "BaseRewardConfig",
     "BuildingConfig",
-    "DeadbandRewardConfig",
     "Equipment",
+    "NormalizedDeadbandRewardConfig",
     "RewardConfig",
     "TaskConfig",
     # Wrappers
@@ -124,4 +121,5 @@ __all__ = [
     "NormalizeObservation",
     "PadObservation",
     "ResampleBuildingOnResetWrapper",
+    "wrap_env_for_rl",
 ]

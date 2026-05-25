@@ -17,7 +17,7 @@ def make_registered_env(
     building_type: BuildingType,
     split: str = "train",
     index: int = 0,
-    task: str = "task1",
+    task: str = "task_const_e0",
     run_period: str = "full_year",
     timesteps_per_hour: int = 12,
     eplus_output_dir: str | None = None,

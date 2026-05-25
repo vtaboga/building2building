@@ -93,7 +93,7 @@ class ActionSpaceTransfer(BenchmarkProblem):
             temperature actuator.
         direction: ``"expand"`` means training uses the reduced set and
             testing uses the full set.  ``"reduce"`` is the reverse.
-        task: Named task preset (``"task1"``–``"task4"``).
+        task: Named task preset (e.g. ``"task_const_e0"``).
         building_type: Override the default building type for
             *system_type*.  If ``None``, uses ``"OfficeSmall"`` for
             unitary and ``"OfficeMedium"`` for central.
@@ -105,7 +105,7 @@ class ActionSpaceTransfer(BenchmarkProblem):
         self,
         system_type: Literal["unitary", "central"] = "unitary",
         direction: Literal["expand", "reduce"] = "expand",
-        task: str = "task1",
+        task: str = "task_const_e0",
         building_type: str | None = None,
         split: SplitName = "train",
         split_index: int = 0,

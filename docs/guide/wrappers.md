@@ -13,7 +13,7 @@ variance.
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
 env = b2b.NormalizeObservation(env)
 ```
 
@@ -28,7 +28,7 @@ Zero-pads observations to a uniform size. Required for training across buildings
 with different observation dimensions.
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
 env = b2b.PadObservation(env, target_size=40)
 # obs.shape is always (40,) regardless of the building
 ```
@@ -42,7 +42,7 @@ Appends building-level metadata to the observation vector. This enables
 policies to condition on building properties for better generalization.
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
 env = b2b.AugmentObservationWithBuildingParams(env)
 ```
 
@@ -65,7 +65,7 @@ multi-building training where the agent should generalize across instances.
 import building2building as b2b
 
 def factory(idx: int) -> gym.Env:
-    return b2b.new_make_env("OfficeSmall", split="train", index=idx, task="task1")
+    return b2b.new_make_env("OfficeSmall", split="train", index=idx, task="task_const_e0")
 
 env = b2b.ResampleBuildingOnResetWrapper(
     factory,
@@ -79,7 +79,7 @@ env = b2b.ResampleBuildingOnResetWrapper(
 When combining wrappers, apply them in this order:
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
 env = b2b.PadObservation(env, target_size=40)
 env = b2b.AugmentObservationWithBuildingParams(env)
 env = b2b.NormalizeObservation(env)

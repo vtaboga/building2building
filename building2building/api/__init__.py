@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import weakref
 from pathlib import Path
 from typing import Any, Literal
 
@@ -28,7 +29,13 @@ from building2building.data.climate_zones import (
 )
 from building2building.data.download import ALL_BUILDING_TYPES, BuildingType
 from building2building.envs import make_env_from_config
-from building2building.types import RewardConfig, RunPeriodConfig, TaskConfig, reward_config_from_dict
+from building2building.types import (
+    NormalizedDeadbandRewardConfig,
+    RewardConfig,
+    RunPeriodConfig,
+    TaskConfig,
+    reward_config_from_dict,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,14 +174,16 @@ def new_make_env(
     split: Literal["train", "test", "test_small"] = "train",
     index: int = 0,
     building_id: str | None = None,
-    task: str | TaskPreset = "task1",
+    task: str | TaskPreset = "task_const_e0",
     reward: str | RewardConfig | None = None,
     run_period: str = "full_year",
+    normalizer_path: Path | None = None,
     timesteps_per_hour: int = 12,
     target_temperature_mode: str | None = None,
     random_schedule_seed: int | None = None,
     eplus_output_dir: str | Path | None = None,
     max_episode_steps: int | None = None,
+    rescale_action: bool = False,
 ) -> gym.Env:
     """Create a Gymnasium environment using the unified dataset.
 
@@ -187,23 +196,45 @@ def new_make_env(
         split: Dataset split (``"train"``, ``"test"``, or ``"test_small"``).
         index: Zero-based index into the split.
         building_id: Explicit building ID, overrides *split*/*index*.
-        task: Named task preset (``"task1"``–``"task5"``) or a
+        task: Named task preset or a
             :class:`~building2building.config.tasks.TaskPreset` instance.
+            Recognised names are the 9 normalized presets
+            ``"task_<mode>_<level>"`` with
+            ``mode ∈ {const, occ, rand}`` and ``level ∈ {e0, emed, ehigh}``.
+            ``(tau_T, tau_E)`` are auto-resolved from
+            :file:`building2building/data/reward_normalizers.yaml`
+            using the building's ``(building_type, climate_zone)`` bucket.
+            Defaults to ``"task_const_e0"`` (constant setpoint,
+            comfort-only).
         reward: Override reward.  If ``None``, uses the task default.
         run_period: Simulation run period name (``"full_year"``,
             ``"winter"``, ``"summer"``).
+        normalizer_path: Override the default
+            :data:`~building2building.data.reward_normalizers.DEFAULT_REWARD_NORMALIZERS_PATH`
+            used to resolve ``(tau_T, tau_E)`` for normalized-reward presets.
+            When ``None`` (default), the built-in random-policy YAML is used.
         timesteps_per_hour: Number of simulation steps per hour.
         target_temperature_mode: Override the preset's target mode
             (``"constant"``, ``"occupancy"``, or ``"random_schedule"``).
             When ``None`` (default), the mode is taken from the task
-            preset, so that e.g. ``task="task3"`` automatically uses
-            occupancy-based targets.
+            preset, so that e.g. ``task="task_occ_e0"`` automatically
+            uses occupancy-based targets.
         random_schedule_seed: Base seed for the per-day schedule
-            generator used by ``task5``.  ``None`` falls back to the
-            value on the preset's task config (default ``0``).
+            generator used by ``task_rand_*`` presets.  ``None`` falls
+            back to the value on the preset's task config (default ``0``).
         eplus_output_dir: Directory for EnergyPlus output.  If ``None``,
             a temporary directory is used.
         max_episode_steps: Maximum episode length.
+        rescale_action: If ``True``, wrap the simulator with
+            :class:`gym.wrappers.RescaleAction` so the agent-facing
+            action space is ``[-1, 1]`` per actuator.  The wrapper
+            maps actions back to engineering units internally.
+            Defaults to ``False`` so that non-RL consumers (reactive
+            controllers, benchmark harnesses, manual rollouts) are
+            unaffected.  RL training code should use
+            :func:`building2building.api.rl_wrappers.wrap_env_for_rl`
+            or the ``make_rl_env_fn`` helper instead, which set this
+            flag and also apply observation normalisation.
 
     Returns:
         A Gymnasium environment backed by EnergyPlus.
@@ -230,6 +261,28 @@ def new_make_env(
     else:
         info = registry.get_building_by_index(building_type, split, index)
 
+    # Auto-fill unfilled NormalizedDeadbandRewardConfig sentinels using
+    # the per-(building_type, climate_zone) constants in
+    # reward_normalizers.yaml.  This is what makes
+    # ``new_make_env(task="task_occ_emed", building_id=...)``
+    # "just work" — the preset stores ``tau_T = tau_E = None``, and
+    # we resolve them once we know which building we're building.
+    if (
+        isinstance(effective_reward, NormalizedDeadbandRewardConfig)
+        and not effective_reward.is_filled
+    ):
+        from building2building.data.reward_normalizers import resolve_reward_normalizer
+
+        info_bid = getattr(info, "building_id", None) or building_id or ""
+        normalizer = resolve_reward_normalizer(
+            building_type, info_bid,
+            run_period=run_period,
+            path=normalizer_path,
+        )
+        effective_reward = effective_reward.filled(
+            normalizer.tau_T, normalizer.tau_E
+        )
+
     if eplus_output_dir is None:
         eplus_output_dir = Path(tempfile.mkdtemp(prefix="b2b_eplus_"))
     else:
@@ -244,8 +297,16 @@ def new_make_env(
 
     # The dataset ships buildings with full_year baked into the epJSON.
     # Patch the RunPeriod dates when the user requests a different period.
+    #
+    # The patched file is written to a *separate* staging directory, NOT
+    # into eplus_output_dir.  eplus_output_dir is the per-episode output
+    # directory that close() removes on every reset; if the patched epjson
+    # lived there it would be deleted before the first episode starts.  The
+    # staging dir is tied to the env's lifetime via weakref.finalize.
+    _epjson_staging_dir: Path | None = None
     if run_period_cfg.name != "full_year":
-        patched_epjson_path = eplus_output_dir / "building.epjson"
+        _epjson_staging_dir = Path(tempfile.mkdtemp(prefix="b2b_epjson_"))
+        patched_epjson_path = _epjson_staging_dir / "building.epjson"
         _patch_epjson_run_period(epjson_path, patched_epjson_path, run_period_cfg)
         epjson_path = patched_epjson_path
         logger.debug(
@@ -304,11 +365,28 @@ def new_make_env(
         warmup_phases=info.warmup_phases,
         area=info.net_conditioned_area_m2,
         hvac_equipment=equipment_data,
+        # Stash building identity so the simulator dispatch site can
+        # cite the building in calibration-mismatch warnings.
+        source_metadata={
+            "building_type": building_type,
+            "building_id": getattr(info, "building_id", None),
+        },
         task_config=task_cfg,
     )
 
     env = create_simulator(building_config)
     env.metadata["building_info"] = info
+
+    # Register cleanup for the epjson staging dir (only created when
+    # run_period != "full_year").  We attach it to the innermost env
+    # object (before any wrappers) so it is not affected by wrapper
+    # garbage-collection order.
+    if _epjson_staging_dir is not None:
+        import shutil as _shutil
+        weakref.finalize(env, _shutil.rmtree, _epjson_staging_dir, True)
+
+    if rescale_action:
+        env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
     steps = max_episode_steps or task_cfg.expected_steps()
     return gym.wrappers.TimeLimit(env, max_episode_steps=int(steps))
 

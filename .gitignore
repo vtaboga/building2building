@@ -17,7 +17,9 @@ b2b.egg-info/
 building2building.egg-info/
 results/
 !tests/fixtures/results/
-wandb/
+# Only the top-level wandb/ run-output dir; do NOT match
+# baselines/configs/wandb/ (Hydra group with default.yaml).
+/wandb/
 notebooks/
 OfflineRL-Kit/
 jobs/
@@ -32,9 +34,14 @@ data/
 !building2building/data/
 b2b_outputs/
 !building2building/sources/data/
-.cursor/
 dataset_v2/
-analysis/
+# Only the top-level analysis/ research dir; do NOT match
+# baselines/analysis/ (tracked per-building tuned-controller analysis).
+/analysis/
+
+# Cursor: ignore everything except tracked rules
+.cursor/*
+!.cursor/rules/
 
 dataset/
 *.zip
@@ -44,6 +51,7 @@ refactoring/
 /configs/
 baselines/scripts/
 staging/
+summaries/
 plans/
 
 # temporary

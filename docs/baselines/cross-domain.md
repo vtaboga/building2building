@@ -22,7 +22,7 @@ observation and action dimensions:
 ```python
 from baselines.models.amorpheus import AmorpheusPolicy
 
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
 morph = env.metadata["morphology"]
 
 policy = AmorpheusPolicy(morphology=morph, embed_dim=64)

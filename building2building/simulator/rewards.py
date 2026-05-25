@@ -1,17 +1,15 @@
 """Reward functions for HVAC control environments.
 
-Provides three reward variants that trade off thermal comfort against
-energy consumption:
+Provides the normalized deadband reward used across all task presets:
 
-* :class:`BaseReward` -- MSE temperature tracking + weighted energy penalty.
-* :class:`BarrierReward` -- deadband with steep violation penalty.
-* :class:`DeadbandReward` -- quadratic inside deadband, linear outside.
+* :class:`NormalizedDeadbandReward` -- deadband reward with
+  per-(building_type, climate_zone) ``(tau_T, tau_E)`` normalizers so
+  that ``energy_weight`` is dimensionless and comparable across
+  buildings.
 """
 
 from dataclasses import dataclass
 from typing import Any
-
-import numpy as np
 
 from building2building.types import TaskConfig
 
@@ -29,23 +27,22 @@ def _zone_target(obs: dict[str, Any], zone: str, task_config: TaskConfig) -> flo
     return task_config.target_for_zone(zone).occupied_c
 
 
-def base_reward_function(
+def _deadband_components(
     obs: dict[str, Any],
     controlled_zones: list[str],
     task_config: TaskConfig,
-    energy_weight: float = 1.0,
-) -> float:
-    """Calculate a reward combining temperature tracking and energy consumption.
+    dT: float,
+) -> tuple[float, float]:
+    """Compute the deadband ``(temp_penalty, power_penalty)`` decomposition.
 
-    Args:
-        obs: Dictionary containing observations (energy values in Wh/m²)
-        controlled_zones: List of controlled zone names
-        task_config: Task configuration with target temperature info
-        energy_weight: Weight for the energy consumption penalty
-    Returns:
-        float: Combined reward (negative values represent penalties)
+    ``temp_penalty`` is the per-zone-averaged deadband distance:
+    quadratic for ``|T - target| <= dT`` and linear (in ``|T - target|``)
+    beyond.  ``power_penalty`` is electricity + natural-gas energy in
+    Wh/m².  Both are *non-negative*; the reward sign flip happens in
+    the callers.
+
+    Used by :class:`NormalizedDeadbandReward`.
     """
-
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
 
     temp_error = 0.0
@@ -56,125 +53,64 @@ def base_reward_function(
 
     temp_error = temp_error / len(controlled_zones)
 
-    total_reward = -(temp_error + energy_weight * energy_penalty)
-
-    return total_reward
+    return float(temp_error), float(energy_penalty)
 
 
-@dataclass
-class BaseReward:
-    controlled_zones: list[str]
-    energy_weight: float
-    task_config: TaskConfig
-
-    def __call__(self, obs: dict[str, Any]) -> float:
-        return base_reward_function(
-            obs, self.controlled_zones, self.task_config, self.energy_weight
-        )
-
-
-def barrier_reward_function(
+def normalized_deadband_reward_function(
     obs: dict[str, Any],
     controlled_zones: list[str],
     task_config: TaskConfig,
-    energy_weight: float = 1.0,
-    dT: float = 1.0,
-    violation_penalty: float = 10.0,
+    energy_weight: float,
+    dT: float,
+    tau_T: float,
+    tau_E: float,
 ) -> float:
-    """Calculate a reward combining temperature tracking and energy consumption.
+    """Per-bucket-normalized version of :func:`deadband_reward_function`.
 
-    Args:
-        obs: Dictionary containing observations (energy values in Wh/m²)
-        controlled_zones: List of controlled zone names
-        task_config: Task configuration with target temperature info
-        energy_weight: Weight for the energy consumption penalty
-        dT: Comfort deadband in °C
-        violation_penalty: Penalty for comfort violations
+    Computes the ``(temp_penalty, power_penalty)`` decomposition via
+    :func:`_deadband_components`, then returns
 
-    Returns:
-        float: Combined reward (negative values represent penalties)
+    .. math::
+
+        r = -\\Big(\\tfrac{\\text{temp\\_penalty}}{\\tau_T}
+                  + w_E \\cdot \\tfrac{\\text{power\\_penalty}}{\\tau_E}\\Big).
+
+    See
+    :class:`building2building.types.NormalizedDeadbandRewardConfig`
+    for the rationale and calibration regime.
     """
-
-    energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
-
-    temp_error = 0.0
-    for zone in controlled_zones:
-        current_temp = float(obs["temperature"][zone])
-        target_temp = _zone_target(obs, zone, task_config)
-        dev = abs(current_temp - target_temp)
-        if dev >= dT:
-            temp_error += violation_penalty * (dev + 1)
-
-    temp_error = temp_error / len(controlled_zones)
-    total_reward = -(temp_error + energy_weight * energy_penalty)
-
-    return total_reward
+    temp_penalty, power_penalty = _deadband_components(
+        obs, controlled_zones, task_config, dT
+    )
+    return -(temp_penalty / tau_T + energy_weight * power_penalty / tau_E)
 
 
 @dataclass
-class BarrierReward:
-    controlled_zones: list[str]
-    energy_weight: float
-    dT: float
-    violation_penalty: float
-    task_config: TaskConfig
+class NormalizedDeadbandReward:
+    """Deadband reward with per-bucket ``(tau_T, tau_E)`` normalizers.
 
-    def __call__(self, obs: dict[str, Any]) -> float:
-        return barrier_reward_function(
-            obs,
-            self.controlled_zones,
-            self.task_config,
-            self.energy_weight,
-            self.dT,
-            self.violation_penalty,
-        )
-
-
-def deadband_reward_function(
-    obs: dict[str, Any],
-    controlled_zones: list[str],
-    task_config: TaskConfig,
-    energy_weight: float = 1.0,
-    dT: float = 0.5,
-) -> float:
-    """Calculate a reward combining temperature tracking and energy consumption.
-
-    Inside deadband (|T - target| <= dT):  -(T - target)^2
-    Outside deadband (|T - target| > dT):  -|T - target|
-
-    The quadratic term in the deadband avoid bang-bang behavior.
+    The dispatch site in :mod:`building2building.simulator` is
+    responsible for resolving the ``(tau_T, tau_E)`` for the building
+    being simulated and rejecting unfilled
+    :class:`~building2building.types.NormalizedDeadbandRewardConfig`
+    sentinels, so by the time this object is constructed both values
+    are positive floats.
     """
-    energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
 
-    temp_error = 0.0
-    for zone in controlled_zones:
-        current_temp = float(obs["temperature"][zone])
-        target_temp = _zone_target(obs, zone, task_config)
-        dev = abs(current_temp - target_temp)
-        if dev <= dT:
-            temp_error += (current_temp - target_temp) ** 2
-        else:
-            temp_error += dev
-
-    temp_error = temp_error / len(controlled_zones)
-
-    total_reward = -(temp_error + energy_weight * energy_penalty)
-
-    return total_reward
-
-
-@dataclass
-class DeadbandReward:
     controlled_zones: list[str]
     energy_weight: float
     dT: float
+    tau_T: float
+    tau_E: float
     task_config: TaskConfig
 
     def __call__(self, obs: dict[str, Any]) -> float:
-        return deadband_reward_function(
+        return normalized_deadband_reward_function(
             obs=obs,
             controlled_zones=self.controlled_zones,
             task_config=self.task_config,
             energy_weight=self.energy_weight,
             dT=self.dT,
+            tau_T=self.tau_T,
+            tau_E=self.tau_E,
         )

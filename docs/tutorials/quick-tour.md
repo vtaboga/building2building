@@ -26,7 +26,7 @@ Available building types (6): ['SingleFamilyHouse', 'Warehouse', 'RetailStandalo
 ## Step 2: Create an Environment
 
 ```python
-env = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task1")
+env = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task_const_e0")
 
 print(f"Observation space: {env.observation_space}")
 print(f"Action space: {env.action_space}")
@@ -80,7 +80,7 @@ print(f"\nEpisode finished: {steps} steps, return={total_reward:.2f}")
 ```python
 import numpy as np
 
-env2 = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task1")
+env2 = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task_const_e0")
 morph = env2.metadata["morphology"]
 
 print(f"Nodes: {len(morph.nodes)}")
@@ -98,7 +98,7 @@ for node_id, local in local_obs.items():
 
 ```python
 for btype in ["SingleFamilyHouse", "OfficeSmall", "OfficeMedium"]:
-    env_tmp = b2b.new_make_env(btype, split="test", index=0, task="task1")
+    env_tmp = b2b.new_make_env(btype, split="test", index=0, task="task_const_e0")
     morph_tmp = env_tmp.metadata["morphology"]
     print(f"{btype}: obs={env_tmp.observation_space.shape[0]}, "
           f"act={env_tmp.action_space.shape[0]}, "

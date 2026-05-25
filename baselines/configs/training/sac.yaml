@@ -1,0 +1,6 @@
+# SAC-specific training config.
+# eval_freq / eval_episodes / recycle_every from training/default.yaml are
+# PPO-specific keys consumed by train_ppo.py; train_sac.py does a single
+# post-training eval episode and does not use them, so they are omitted here.
+total_timesteps: 1_000_000
+n_envs: 4

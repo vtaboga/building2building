@@ -13,7 +13,7 @@ from stable_baselines3 import PPO
 
 def main() -> None:
     building_type = "OfficeSmall"
-    task = "task1"
+    task = "task_const_e0"
     run_period = "winter"
     total_timesteps = 50_000
     train_building_id = b2b.list_buildings(building_type, split="train")[0]

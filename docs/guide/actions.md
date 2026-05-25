@@ -57,7 +57,7 @@ Each action channel has a human-readable name:
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
 for i, name in enumerate(env.metadata["action_names"]):
     print(f"  [{i}] {name}")
 env.close()
@@ -69,7 +69,7 @@ The action space is a Gymnasium `Box` with per-actuator low/high bounds derived
 from the HVAC equipment specifications:
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
 print(env.action_space)         # Box(low, high, shape=(10,))
 print(env.action_space.low)     # per-actuator lower bounds
 print(env.action_space.high)    # per-actuator upper bounds

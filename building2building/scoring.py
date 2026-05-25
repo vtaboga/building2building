@@ -67,7 +67,7 @@ def compute_normalized_score(
     Args:
         cumulative_return: Total episode return achieved by the agent.
         building_type: The building type used.
-        task: The task preset name (e.g. ``"task1"``).
+        task: The task preset name (e.g. ``"task_const_e0"``).
         run_period: Simulation run period. One of ``"full_year"``,
             ``"winter"``, ``"summer"``.
         building_id: Specific building ID for per-building normalization.

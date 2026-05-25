@@ -3,7 +3,7 @@
 name: cross_domain
 
 defaults:
-  - override /reward: task3
+  - override /reward: task_occ_e0
 
 train_building_types:
   - RetailStandalone

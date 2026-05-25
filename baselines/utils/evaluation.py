@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import gc
 import logging
 import shutil
-import threading
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -117,90 +116,43 @@ def close_env_aggressively(
     cleanup_dir: Path | None = None,
     thread_join_timeout: float = 10.0,
 ) -> None:
-    """Force-release EnergyPlus resources held by *env*.
+    """Compatibility shim — use ``env.close()`` directly.
 
-    ``EnergyPlusEnvironment.close`` is a no-op inherited from
-    ``gymnasium.Env``: calling it does **not** stop the simulation thread,
-    does not free the allocated EnergyPlus state, and does not clean up the
-    output directory.  When many envs are created sequentially inside a
-    long-running process (e.g. Optuna tuning), the following all leak:
+    .. deprecated::
+        Upstream ``minergym.environment.EnergyPlusEnvironment.close()`` is
+        now leak-free: it stops the simulation thread, joins it, releases
+        the native EnergyPlus state, and removes the output directory.
+        Plain ``env.close()`` therefore handles everything that this helper
+        used to do manually.
 
-    .. TODO::
-        ``minergym.environment.EnergyPlusEnvironment`` should override
-        ``close()`` to call ``self.ep.try_stop(); self.ep = None``, mirroring
-        what ``reset()`` already does for the *previous* episode.  That would
-        fix the thread and native-state leak upstream.  However, it cannot fix
-        the output-directory leak because ``eplus_output_dir`` is passed to
-        ``MakeEnergyPlus`` at construction time and is not stored as an
-        attribute on ``EnergyPlusEnvironment``.  For that reason, and because
-        editing an installed package is fragile (overwritten on ``pip
-        install`` / ``uv sync``), this helper should be kept even after a
-        minergym fix lands: it handles both the resource leak *and* the
-        directory cleanup in one call.
-
-    * the daemon ``threading.Thread`` running ``api.runtime.run_energyplus``,
-    * cyclic references between the ``EnergyPlusSimulation`` object, its
-      ``StateStarted``/``StateDone`` state, and the thread's closure,
-    * the EnergyPlus output directory, which under SLURM is usually
-      ``$SLURM_TMPDIR`` (tmpfs, RAM-backed) and fills with ``eplusout.*``
-      artefacts.
-
-    This helper:
-
-    1. Drills through gymnasium wrappers (e.g. ``TimeLimit``) to the
-       underlying ``EnergyPlusEnvironment``.
-    2. Calls ``try_stop`` on the simulation to signal shutdown.
-    3. Joins the EnergyPlus thread so its closure (and the captured
-       ``ManagedState``) become collectable.
-    4. Drops the ``ep`` reference and triggers ``gc.collect()`` so that
-       ``ManagedState.__del__`` fires and the native state is released.
-    5. Removes *cleanup_dir* (the EnergyPlus output directory).
+        This function will be removed in phase D.  Callers should switch to
+        ``env.close()``.  The ``cleanup_dir`` argument is redundant when the
+        environment was created via :func:`~building2building.api.new_make_env`
+        or :func:`~building2building.envs.factory.make_env_from_config`
+        (both track the output directory on the env); it is honoured here only
+        as a fallback for envs constructed through other paths.
 
     Args:
-        env: The environment returned by :func:`new_make_env`, possibly
-            wrapped.
-        cleanup_dir: Directory to ``shutil.rmtree`` after the thread has
-            exited.  Should be the ``eplus_output_dir`` passed to the env.
-        thread_join_timeout: Seconds to wait for the EnergyPlus thread
-            before giving up and logging a warning.
+        env: The environment to close, possibly wrapped.
+        cleanup_dir: Directory to ``shutil.rmtree`` as a fallback when the
+            env does not track its own output directory.  Redundant for envs
+            created via :func:`~building2building.api.new_make_env`.
+        thread_join_timeout: Ignored; the join timeout is now configured on
+            the env via the upstream ``thread_join_timeout`` constructor
+            parameter.  Kept for API compatibility.
     """
-    try:
-        env.close()
-    except Exception as e:
-        logger.debug("env.close() raised: %s", e)
-
-    inner = env
-    for _ in range(8):
-        next_inner = getattr(inner, "env", None)
-        if next_inner is None or next_inner is inner:
-            break
-        inner = next_inner
-
-    sim = getattr(inner, "ep", None)
-    if sim is not None:
-        try:
-            sim.try_stop()
-        except Exception as e:
-            logger.debug("sim.try_stop() raised: %s", e)
-
-        state = getattr(sim, "state", None)
-        ep_thread = getattr(state, "ep_thread", None)
-        if isinstance(ep_thread, threading.Thread) and ep_thread.is_alive():
-            ep_thread.join(timeout=thread_join_timeout)
-            if ep_thread.is_alive():
-                logger.warning(
-                    "EnergyPlus thread did not exit within %.1fs; "
-                    "resources may leak.",
-                    thread_join_timeout,
-                )
-
-        try:
-            inner.ep = None
-        except Exception:
-            pass
-
-    gc.collect()
-
+    warnings.warn(
+        "close_env_aggressively() is deprecated; env.close() is now "
+        "leak-free (thread join + native-state release + output-dir cleanup). "
+        "This function will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    env.close()
+    # Fallback: honour an explicit cleanup_dir in case the env was built
+    # through a path that does not set _b2b_eplus_output_dir (e.g. a direct
+    # create_simulator call predating this fix).  shutil.rmtree with
+    # ignore_errors=True is safe if env.close() already removed the dir.
     if cleanup_dir is not None:
         shutil.rmtree(cleanup_dir, ignore_errors=True)
 

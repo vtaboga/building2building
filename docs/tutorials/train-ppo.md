@@ -23,7 +23,7 @@ env = b2b.new_make_env(
     "OfficeSmall",
     split="train",
     index=0,
-    task="task1",
+    task="task_const_e0",
     run_period="winter",  # shorter episodes for faster training
 )
 env = b2b.NormalizeObservation(env)
@@ -56,7 +56,7 @@ eval_env = b2b.new_make_env(
     "OfficeSmall",
     split="test",
     index=0,
-    task="task1",
+    task="task_const_e0",
     run_period="winter",
 )
 eval_env = b2b.NormalizeObservation(eval_env)
@@ -82,7 +82,7 @@ Run the reactive controller on the same building to generate a reference:
 
 ```bash
 python -m baselines.run_reactive_control experiment=eval_reactive_control \
-    building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=1
+    building_types=[OfficeSmall] tasks=[task_const_e0] max_buildings_per_type=1
 ```
 
 Then compute the normalized score:
@@ -91,7 +91,7 @@ Then compute the normalized score:
 score = b2b.compute_normalized_score(
     cumulative_return=total_reward,
     building_type="OfficeSmall",
-    task="task1",
+    task="task_const_e0",
     run_period="full_year",
     building_id="OfficeSmall-0001",
 )
@@ -106,7 +106,7 @@ The same experiment can be run via the baselines CLI:
 
 ```bash
 python -m baselines.train_ppo experiment=train_ppo \
-    building_types=[OfficeSmall] tasks=[task1] \
+    building_types=[OfficeSmall] tasks=[task_const_e0] \
     buildings_per_type=1 training.total_timesteps=50000
 ```
 

@@ -14,13 +14,13 @@ from baselines.models.amorpheus import AmorpheusPolicy
 
 
 def main() -> None:
-    bench = b2b.benchmarks.CrossDomainGeneralization(difficulty="easy", task="task1")
+    bench = b2b.benchmarks.CrossDomainGeneralization(difficulty="easy", task="task_const_e0")
     print(f"Train type: {bench.train_type}")
     print(f"Test type:  {bench.test_type}")
 
     # -- Compare building types --
     for btype in [bench.train_type, bench.test_type]:
-        env = b2b.new_make_env(btype, split="train", index=0, task="task1")
+        env = b2b.new_make_env(btype, split="train", index=0, task="task_const_e0")
         morph = env.metadata["morphology"]
         print(
             f"\n{btype}: obs={env.observation_space.shape[0]}, "
@@ -37,7 +37,7 @@ def main() -> None:
 
     # -- Instantiate Amorpheus --
     train_env = b2b.new_make_env(
-        bench.train_type, split="train", index=0, task="task1"
+        bench.train_type, split="train", index=0, task="task_const_e0"
     )
     train_morph = train_env.metadata["morphology"]
 
@@ -58,7 +58,7 @@ def main() -> None:
 
     # -- Transfer to test type --
     test_env = b2b.new_make_env(
-        bench.test_type, split="test", index=0, task="task1"
+        bench.test_type, split="test", index=0, task="task_const_e0"
     )
     test_morph = test_env.metadata["morphology"]
     policy.morphology = test_morph

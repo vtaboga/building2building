@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -98,6 +99,7 @@ def evaluate_multi_building(
     model_path: Path,
     bench: b2b.benchmarks.DynamicsAdaptation,
     *,
+    pad_obs_size: int,
     augment_params: bool = False,
     n_episodes: int = 1,
 ) -> list[TestResult]:
@@ -111,8 +113,8 @@ def evaluate_multi_building(
             env: Any = b2b.new_make_env(
                 bench.building_type, building_id=bid, task=bench.task
             )
-            env = b2b.PadObservation(env, target_size=20)
-            env = b2b.NormalizeObservation(env)
+            env = b2b.PadObservation(env, target_size=pad_obs_size)
+            env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
             if augment_params:
                 env = b2b.AugmentObservationWithBuildingParams(env)
             env = Monitor(env)
@@ -194,6 +196,15 @@ def main() -> None:
     parser.add_argument("--task", type=str, default="task1")
     parser.add_argument("--n-episodes", type=int, default=1)
     parser.add_argument("--output", type=str, default="results_dynamics.csv")
+    parser.add_argument(
+        "--pad-obs-size",
+        type=int,
+        default=None,
+        help=(
+            "Observation padding size used during training. "
+            "If not given, loaded from metadata.json in the model directory."
+        ),
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -217,18 +228,25 @@ def main() -> None:
         results = evaluate_specialist(
             model_dir, bench, n_episodes=args.n_episodes
         )
-    elif args.approach == "baseline":
+    elif args.approach in ("baseline", "parameterized"):
+        pad_obs_size: int | None = args.pad_obs_size
+        if pad_obs_size is None:
+            metadata_path = Path(args.model_path).parent / "metadata.json"
+            if not metadata_path.exists():
+                raise FileNotFoundError(
+                    f"metadata.json not found at {metadata_path}. "
+                    "Pass --pad-obs-size explicitly or re-run training to "
+                    "generate the metadata file."
+                )
+            pad_obs_size = int(
+                json.loads(metadata_path.read_text())["pad_obs_size"]
+            )
+        logger.info("Using pad_obs_size=%d", pad_obs_size)
         results = evaluate_multi_building(
             Path(args.model_path),
             bench,
-            augment_params=False,
-            n_episodes=args.n_episodes,
-        )
-    elif args.approach == "parameterized":
-        results = evaluate_multi_building(
-            Path(args.model_path),
-            bench,
-            augment_params=True,
+            pad_obs_size=pad_obs_size,
+            augment_params=(args.approach == "parameterized"),
             n_episodes=args.n_episodes,
         )
     else:

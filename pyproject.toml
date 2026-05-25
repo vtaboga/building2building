@@ -11,7 +11,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 
 dependencies = [
-    "minergym @ git+https://github.com/Terramorpha/minergym.git",
+    "minergym @ git+https://github.com/vtaboga/minergym.git@956c3e1",
+    "gitpython>=3.1.0",
     "numpy>=1.24.0",
     "gymnasium>=1.2.0",
     "cattrs>=25.3.0",
@@ -39,6 +40,7 @@ training = [
 ]
 test = [
     "deepdiff",
+    "psutil",
     "pytest==8.3.5",
     "pytest-mock",
 ]

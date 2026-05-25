@@ -4,7 +4,7 @@ name: dynamics_parameterized
 
 defaults:
   - override /policy: ppo_parameterized
-  - override /reward: task1
+  - override /reward: task_const_e0
   - override /training: default
 
 difficulty: easy

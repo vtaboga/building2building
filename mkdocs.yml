@@ -111,5 +111,6 @@ nav:
       - baselines: api/baselines.md
   - About:
       - Known Issues: about/known-issues.md
+      - Testing: about/testing.md
       - Citing: about/citing.md
       - License: about/license.md
