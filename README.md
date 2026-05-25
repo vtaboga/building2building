@@ -185,17 +185,6 @@ B2B_RUN_LONG_TESTS=1 pytest              # Full suite
 
 ## Known Issues and Limitations
 
-### Confirmed Bugs
-
-- **`compute_normalized_score` argument order swapped** in
-  `baselines/eval_ppo.py` and `baselines/eval_dynamics_adaptation.py`: the first
-  two positional arguments (cumulative return and building type) are reversed.
-- **`eval_ppo.py` model path mismatch**: `train_ppo.py` saves models in
-  nested directories (`models/<type>/<task>/ppo_<id>.zip`) but `eval_ppo.py`
-  expects flat filenames (`ppo_<type>_<id>_<task>.zip`).
-- **`plot_ppo_specialist.py` CSV schema mismatch**: expects a `reward_mean`
-  column but `eval_ppo.py` outputs `reward`.
-
 ### Other Limitations
 
 - `eval_dynamics_adaptation.py` hard-codes `PadObservation(env, target_size=20)`

@@ -21,6 +21,7 @@ Usage with Hydra::
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Callable
@@ -174,6 +175,9 @@ def train_multi_building(
     """Train a single PPO across many buildings."""
     pad_obs_to = _detect_max_obs_dim(building_type, train_ids, task)
     logger.info("Padding observations to %d", pad_obs_to)
+    (output_dir / "metadata.json").write_text(
+        json.dumps({"pad_obs_size": pad_obs_to})
+    )
 
     def make_train_fn(idx: int) -> Callable[[], gym.Env]:
         def fn() -> gym.Env:

@@ -347,7 +347,14 @@ one minimal code example using `new_make_env` + a benchmark class.
   cites it.
 
 ### D2. Delete the legacy reward family (PRECEDES C1)
-
+val_dynamics_adaptation.py` — fix
+    `compute_normalized_score` argument order; replace hardcoded
+    `PadObservation(target_size=20)` with a value read from the
+    training run's metadata.
+  - `baselines/plotting/plot_ppo_specialist.py` — verified column
+    name match.
+- Acceptance: each bug has a regression test under `tests/quick/`;
+  `pytest -m quick` green.
 Remove `task1`–`task5`, `BarrierRewardConfig`, `BaseRewardConfig`,
 the un-normalized `DeadbandRewardConfig`, and corresponding reward
 classes in `simulator/rewards.py` (keep only `NormalizedDeadbandReward`
@@ -367,7 +374,7 @@ and the shared `_deadband_components` helper).
   `pytest -m quick` is green.
 - Reference: `notes.md` § "Status snapshot" and § "Active decisions".
 
-### D3. Fix the documented eval bugs
+### ~~D3. Fix the documented eval bugs~~ ✓
 
 Four small bugs in the README "Known Issues" section.
 
