@@ -386,7 +386,7 @@ Four small bugs in the README "Known Issues" section.
 - Acceptance: each bug has a regression test under `tests/quick/`;
   `pytest -m quick` green.
 
-### D4. Drop `baselines/requirements.txt`; update install docs
+### ~~D4. Drop `baselines/requirements.txt`; update install docs~~ ✓
 
 It is incomplete and shadows `pyproject.toml[training]`.
 

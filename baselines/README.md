@@ -39,7 +39,6 @@ baselines/
 ├── eval_dynamics_adaptation.py   # Evaluate dynamics adaptation models
 ├── eval_cross_domain.py   # Evaluate cross-domain transfer
 ├── tune_controller.py     # Optuna-based controller tuning
-├── requirements.txt
 └── README.md
 ```
 
@@ -48,9 +47,11 @@ baselines/
 ### Install
 
 ```bash
-pip install -e ../  # Install building2building in editable mode
-pip install -r requirements.txt
+pip install -e "../[training]"
 ```
+
+This installs `building2building` in editable mode together with all
+training dependencies (PyTorch, Stable-Baselines3, Hydra, Optuna, W&B).
 
 ### 1. Reactive Controllers
 

@@ -196,12 +196,6 @@ B2B_RUN_LONG_TESTS=1 pytest              # Full suite
 - **`plot_ppo_specialist.py` CSV schema mismatch**: expects a `reward_mean`
   column but `eval_ppo.py` outputs `reward`.
 
-### Missing Dependencies
-
-`baselines/requirements.txt` is incomplete. It does not list `hydra-core`,
-`omegaconf`, `optuna`, `matplotlib`, or `pyyaml`. These are covered by
-`pip install -e ".[training]"` from the main package.
-
 ### Other Limitations
 
 - `eval_dynamics_adaptation.py` hard-codes `PadObservation(env, target_size=20)`
