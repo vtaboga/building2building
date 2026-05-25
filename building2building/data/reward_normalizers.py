@@ -3,7 +3,7 @@
 This module wraps :file:`reward_normalizers.yaml`, which stores
 ``(tau_T, tau_E)`` constants computed from SAC-warmup uniform-random
 policy rollouts on the train split (calibration regime: occupancy-based
-deadband, ``dT=1.0``, seasonal unoccupied policy, using ``task3``).
+deadband, ``dT=1.0``, seasonal unoccupied policy — i.e. the ``task_occ_*`` regime).
 The random controller was chosen because it is policy-independent —
 it bakes in no RBC-specific bias into the normalizers.  The constants
 are consumed at training time by
@@ -80,10 +80,7 @@ class RewardNormalizersUnavailableError(FileNotFoundError):
 
     This is distinct from a generic ``FileNotFoundError`` so callers
     can distinguish "the calibration constants have not been produced
-    yet" from arbitrary I/O errors.  In particular, code paths that
-    only need the legacy ``task1`` (un-normalized
-    :class:`~building2building.types.DeadbandRewardConfig`) preset must
-    not reach this exception.
+    yet" from arbitrary I/O errors.
     """
 
 
@@ -398,11 +395,9 @@ def load_reward_normalizers(
 
     Raises:
         RewardNormalizersUnavailableError: If the YAML file does not
-            exist.  Code that only consumes the legacy ``task1``
-            preset (un-normalized :class:`~building2building.types.DeadbandRewardConfig`)
-            should never trigger this; it only fires when the new
+            exist.  This fires when
             :class:`~building2building.types.NormalizedDeadbandRewardConfig`
-            tries to resolve constants.
+            tries to resolve ``(tau_T, tau_E)`` constants.
         ValueError, TypeError: On schema-validation failures.
     """
     target = path if path is not None else DEFAULT_REWARD_NORMALIZERS_PATH

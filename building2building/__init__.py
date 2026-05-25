@@ -55,10 +55,7 @@ from building2building.simulator.wrappers import (
 )
 from building2building.types import (
     ActuatorDescription,
-    BarrierRewardConfig,
-    BaseRewardConfig,
     BuildingConfig,
-    DeadbandRewardConfig,
     Equipment,
     NormalizedDeadbandRewardConfig,
     RewardConfig,
@@ -114,10 +111,7 @@ __all__ = [
     "VAVTerminal",
     # Type definitions
     "ActuatorDescription",
-    "BarrierRewardConfig",
-    "BaseRewardConfig",
     "BuildingConfig",
-    "DeadbandRewardConfig",
     "Equipment",
     "NormalizedDeadbandRewardConfig",
     "RewardConfig",

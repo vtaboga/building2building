@@ -8,8 +8,8 @@ regenerates it. Every entry has the same shape: *artefact → training /
 eval command → plotting command → expected output path*.
 
 > **Status (Phase B / C in flight).** The camera-ready paper replaces
-> the legacy `task1`–`task5` family with the normalized 3 × 3 family
-> (`task_{const,occ,rand}_{w0,wmed,whigh}` — see
+> the legacy `task_const_e0`–`task_rand_e0` family with the normalized 3 × 3 family
+> (`task_{const,occ,rand}_{e0,emed,ehigh}` — see
 > `building2building/config/tasks.py`). Phase-C re-runs (PPO and SAC
 > specialists, dynamics adaptation, cross-domain) are pending the
 > Phase-B Slurm sweeps in `TODO.md`. Until those land, the commands
@@ -95,9 +95,9 @@ of its own.
 `building_type, building_id, task, run_period, reward_mean, ...`).
 
 > **Camera-ready note.** The Slurm script currently iterates the
-> legacy `task1`–`task5`. Replace `TASKS=(task1 task2 task3 task4
-> task5)` with the camera-ready normalized presets — at minimum
-> `task_const_w0`, `task_occ_w0`, `task_occ_wmed`, `task_rand_w0`
+> legacy tasks. Replace them
+> with the normalized presets — e.g.
+> `task_const_e0`, `task_occ_e0`, `task_occ_emed`, `task_rand_e0`
 > (or the full 9-cell grid if the paper switches to the full
 > family) — and resubmit. This is the work-in-progress part of
 > Phase D2 + C1 in `TODO.md`.
@@ -127,7 +127,7 @@ done
 ```
 
 (`train_ppo_small_test_array.sh` currently hard-codes
-`tasks=[task1]`; for the camera-ready run, swap to the normalized
+`tasks=[task_const_e0]`; for the camera-ready run, swap to the normalized
 preset(s) and rerun once per `(building_type, task)` pair.)
 
 **Standalone evaluation (if re-evaluating saved checkpoints):**
@@ -145,7 +145,7 @@ python -m baselines.eval_ppo \
 python -m baselines.plotting.plot_ppo_specialist \
     --ppo-csv results_ppo_specialist.csv \
     --baseline-csv building2building/scores/baseline_returns.csv \
-    --task task_occ_wmed \
+    --task task_occ_emed \
     --output figures/fig_ppo_specialist
 ```
 
@@ -268,8 +268,8 @@ python -m baselines.plotting.plot_dynamics_adaptation \
 - `figures/transfer/temp_deviation_violin.png` (Fig 5b).
 
 > **Camera-ready note.** `train_dynamics_*.yaml` currently uses
-> `reward: task1`. Update to the chosen normalized preset (likely
-> `task_occ_wmed`) when D2 lands.
+> `reward: task_const_e0`. Update to the chosen normalized preset (likely
+> `task_occ_emed`) when D2 lands.
 
 ---
 
@@ -290,7 +290,7 @@ python -m baselines.train_cross_domain experiment=train_cross_domain
 python -m baselines.eval_cross_domain \
     --model-path outputs/cross_domain/amorpheus_policy.pt \
     --test-building-types Warehouse SingleFamilyHouse \
-    --task task_occ_wmed \
+    --task task_occ_emed \
     --n-test 20 \
     --output results_cross_domain.csv
 ```
@@ -309,7 +309,7 @@ python -m baselines.plotting.plot_cross_domain \
 - Figure: `figures/transfer/comparison_figure.png`.
 
 > **Camera-ready note.** `train_cross_domain.yaml` currently
-> defaults to `reward: task3`; replace with the normalized
+> defaults to `reward: task_occ_e0`; replace with the normalized
 > equivalent when D2 lands.
 
 ---
@@ -338,7 +338,7 @@ location documented in `notes.md` § "Calibration sanity plot").
 
 ### B2. SAC diagnostic ablation
 
-5-cell × 3-seed × 6-building ablation on `task_occ_wmed` /
+5-cell × 3-seed × 6-building ablation on `task_occ_emed` /
 `full_year` confirming that the three SAC fixes (`log_std_init=0`,
 `ent_coef=0.2`, `use_sde=False`) restore stable learning.
 
@@ -351,7 +351,7 @@ result table appended to `notes.md` § "SAC B2 ablation".
 
 ### B3. PPO `target_kl` re-tuning
 
-Sweep `target_kl ∈ {None, 0.05, 0.1}` on `task_occ_wmed` / full_year.
+Sweep `target_kl ∈ {None, 0.05, 0.1}` on `task_occ_emed` / full_year.
 A small Hydra multirun is sufficient (no dedicated script):
 
 ```bash
@@ -359,7 +359,7 @@ python -m baselines.train_ppo experiment=train_ppo_task_study \
     --multirun \
     policy.target_kl=null,0.05,0.1 \
     seed=0,1,2 \
-    "tasks=[task_occ_wmed]"
+    "tasks=[task_occ_emed]"
 ```
 
 **Artefact:** chosen winner committed to `baselines/configs/policy/ppo.yaml`;
@@ -387,7 +387,7 @@ For a single building / climate zone:
 
 ```bash
 python -m baselines.tune_controller experiment=tune_controller \
-    building_type=OfficeSmall climate_zone=1 reward=task_occ_wmed
+    building_type=OfficeSmall climate_zone=1 reward=task_occ_emed
 ```
 
 ---
@@ -400,13 +400,13 @@ included here for completeness.
 
 ```bash
 # 75-worker sweep sharing one Orion DB
-python -m baselines.tune_ppo experiment=tune_ppo task=task_occ_wmed
+python -m baselines.tune_ppo experiment=tune_ppo task=task_occ_emed
 
 # CHS analysis after the sweep finishes
-python -m baselines.tune_ppo experiment=tune_ppo task=task_occ_wmed analyze=true
+python -m baselines.tune_ppo experiment=tune_ppo task=task_occ_emed analyze=true
 
 # Final re-evaluation of the top configurations across many seeds
-python -m baselines.tune_ppo experiment=tune_ppo task=task_occ_wmed reeval=true
+python -m baselines.tune_ppo experiment=tune_ppo task=task_occ_emed reeval=true
 ```
 
 ---

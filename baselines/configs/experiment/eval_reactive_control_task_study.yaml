@@ -1,5 +1,5 @@
 # @package _global_
-# Paper-parity sweep of the tuned reactive controller across all 5 tasks.
+# Sweep of the tuned reactive controller across all 9 normalized tasks.
 #
 # One run per (building_type, building, task) using the tuned reactive
 # controllers already in baselines/configs/tuned_controllers/.  Targets
@@ -19,7 +19,7 @@ building_types:
 split: test
 run_periods: [full_year]
 max_buildings_per_type: 8
-tasks: [task1, task2, task3, task4, task5]
+tasks: [task_const_e0, task_const_emed, task_const_ehigh, task_occ_e0, task_occ_emed, task_occ_ehigh, task_rand_e0, task_rand_emed, task_rand_ehigh]
 n_runs: 1
 output_csv: baseline_returns_task_study.csv
 

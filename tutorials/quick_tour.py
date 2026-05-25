@@ -18,7 +18,7 @@ def main() -> None:
     print(f"Available building types ({len(types)}): {types}")
 
     # -- Create an environment --
-    env = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task1")
+    env = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task_const_e0")
     print(f"\nObservation space: {env.observation_space}")
     print(f"Action space:      {env.action_space}")
 
@@ -59,7 +59,7 @@ def main() -> None:
     env.close()
 
     # -- Explore the morphology graph --
-    env2 = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task1")
+    env2 = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task_const_e0")
     morph = env2.metadata["morphology"]
 
     print(f"\n--- Morphology Graph ---")
@@ -78,7 +78,7 @@ def main() -> None:
     # -- Compare building types --
     print("\n--- Building Type Comparison ---")
     for btype in ["SingleFamilyHouse", "OfficeSmall", "OfficeMedium"]:
-        env_tmp = b2b.new_make_env(btype, split="test", index=0, task="task1")
+        env_tmp = b2b.new_make_env(btype, split="test", index=0, task="task_const_e0")
         morph_tmp = env_tmp.metadata["morphology"]
         print(
             f"{btype}: obs={env_tmp.observation_space.shape[0]}, "

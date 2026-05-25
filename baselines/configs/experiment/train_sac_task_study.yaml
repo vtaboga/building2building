@@ -19,8 +19,8 @@ building_types:
 split: test
 buildings_per_type: 8
 # Normalized-reward presets with energy_weight=0 (pure comfort).
-# Use wmed/whigh variants to trade off energy vs comfort.
-tasks: [task_const_w0, task_occ_w0, task_rand_w0]
+# Use emed/ehigh variants to trade off energy vs comfort.
+tasks: [task_const_e0, task_occ_e0, task_rand_e0]
 
 training:
   total_timesteps: 1_000_000

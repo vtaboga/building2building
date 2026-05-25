@@ -55,7 +55,7 @@ env = b2b.new_make_env(
     "OfficeSmall",
     split="train",
     index=0,
-    task="task1",
+    task="task_const_e0",
 )
 
 obs, info = env.reset()
@@ -71,7 +71,7 @@ Key parameters of `new_make_env`:
 | `split` | `"train"` or `"test"` | `"train"` |
 | `index` | Position in the split list | `0` |
 | `building_id` | Explicit building ID (alternative to split+index) | `None` |
-| `task` | `"task1"` through `"task5"` or a `TaskPreset` | `"task1"` |
+| `task` | preset name (e.g. `"task_const_e0"`) or a `TaskPreset` | `"task_const_e0"` |
 | `run_period` | `"full_year"`, `"winter"`, or `"summer"` | `"full_year"` |
 | `timesteps_per_hour` | Simulation resolution | `12` (5-min steps) |
 
@@ -82,7 +82,7 @@ Key parameters of `new_make_env`:
 Each environment exposes rich metadata:
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
 
 obs_names = env.metadata["observation_names"]  # list[str]
 act_names = env.metadata["action_names"]       # list[str]
@@ -103,7 +103,7 @@ env.close()
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task1")
+env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task_const_e0")
 
 obs, info = env.reset()
 total_reward = 0.0
@@ -130,7 +130,7 @@ B2B ships reactive controllers in the `baselines/` directory. Run them via Hydra
 ```bash
 # Evaluate the reactive controller on one building
 python -m baselines.run_reactive_control experiment=eval_reactive_control \
-    building_types=[OfficeSmall] tasks=[task1] max_buildings_per_type=1
+    building_types=[OfficeSmall] tasks=[task_const_e0] max_buildings_per_type=1
 ```
 
 You can also use the controllers programmatically:
@@ -140,7 +140,7 @@ import building2building as b2b
 from baselines.controllers import UnitaryHvacConfig, UnitaryHvacPolicy
 from baselines.utils.evaluation import run_episode
 
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
 policy = UnitaryHvacPolicy(UnitaryHvacConfig())
 policy.bind_env(env)
 
@@ -157,7 +157,7 @@ env.close()
 
     ```bash
     python -m baselines.train_ppo experiment=train_ppo \
-        building_types=[OfficeSmall] tasks=[task1] \
+        building_types=[OfficeSmall] tasks=[task_const_e0] \
         buildings_per_type=1 training.total_timesteps=100000
     ```
 
@@ -171,7 +171,7 @@ env.close()
         "OfficeSmall",
         split="train",
         index=0,
-        task="task1",
+        task="task_const_e0",
         run_period="winter",
     )
     env = b2b.NormalizeObservation(env)
@@ -191,7 +191,7 @@ The benchmarks API provides structured train/test splits:
 ```python
 import building2building as b2b
 
-bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task1")
+bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task_const_e0")
 print(f"Train buildings: {len(bench.train_building_ids())}")
 print(f"Test buildings: {len(bench.test_building_ids())}")
 
@@ -217,7 +217,7 @@ import building2building as b2b
 score = b2b.compute_normalized_score(
     cumulative_return=-5000.0,
     building_type="OfficeSmall",
-    task="task1",
+    task="task_const_e0",
     run_period="full_year",
     building_id="OfficeSmall-0001",
 )

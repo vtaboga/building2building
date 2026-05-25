@@ -19,7 +19,7 @@ First, generate the reactive-controller baseline for scoring:
 
 ```bash
 python -m baselines.run_reactive_control experiment=eval_reactive_control \
-    building_types=[SingleFamilyHouse] tasks=[task1] max_buildings_per_type=5
+    building_types=[SingleFamilyHouse] tasks=[task_const_e0] max_buildings_per_type=5
 ```
 
 ## Step 2: Inspect the Benchmark
@@ -27,7 +27,7 @@ python -m baselines.run_reactive_control experiment=eval_reactive_control \
 ```python
 import building2building as b2b
 
-bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task1")
+bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task_const_e0")
 print(f"Building type: {bench.building_type}")
 print(f"Train buildings: {len(bench.train_building_ids())}")
 print(f"Test buildings: {len(bench.test_building_ids())}")
@@ -59,7 +59,7 @@ For more control, here is the Python equivalent:
 import building2building as b2b
 from stable_baselines3 import PPO
 
-bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task1")
+bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task_const_e0")
 train_ids = bench.train_building_ids()[:5]  # use 5 buildings for speed
 
 # Create a multi-building training environment
@@ -67,7 +67,7 @@ def make_env(idx):
     env = b2b.new_make_env(
         bench.building_type,
         building_id=train_ids[idx % len(train_ids)],
-        task="task1",
+        task="task_const_e0",
         run_period="winter",
     )
     env = b2b.PadObservation(env, target_size=20)
@@ -96,7 +96,7 @@ for bid in test_ids:
     eval_env = b2b.new_make_env(
         bench.building_type,
         building_id=bid,
-        task="task1",
+        task="task_const_e0",
         run_period="winter",
     )
     eval_env = b2b.PadObservation(eval_env, target_size=20)

@@ -1,0 +1,918 @@
+% RLJ main.tex Version 2025.1
+
+\documentclass[10pt]{article} % For LaTeX2e
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% AUTHOR: Select ONE option:
+%      [accepted]{rlj} --> for camera ready (after peer review, if accepted)
+%      {rlj}           --> for submission
+%      [preprint]{rlj} --> to de-anonymize and remove references to RLJ/RLC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{rlj}           % Should be uncommented for submission
+%\usepackage[accepted]{rlj} % Should be uncommented for the camera-ready
+%\usepackage[preprint]{rlj} % Should be uncommented for preprint versions
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% WARNING: The following packages are already included in the
+%          rlj.sty style file:
+%
+%  1. fancyhdr  - For controlling header/footers
+%  2. natbib    - For formatting the bibliography
+%  3. enumitem  - To customize the appearance of lists
+%  4. fontenc (with option [T1]) - Allows for proper hyphenation and accents
+%  5. times     - Times new roman font
+%  6. ragged2e  - Used to justify text
+%  7. tcolorbox - Used to create boxes on cover page
+%  8. hyperref  - Configures hyperlinks throughout (e.g., links to references)
+%  9. xcolor    - Used to define custom colors for links and boxes
+%  10. amsmath  - Not used, but conflicts with lineno, so we include (and patch) it for authors
+%  11. etoolbox - Included in the amsmath + lineno patch
+%  12. lineno   - For adding line numbers when in submission
+%
+% You do not need to include them again in your main.tex.
+% Including them again may lead to conflicts or compilation errors.
+% Additionally, avoid loading packages that might conflict with these.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Recommended (but not required) packages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{amssymb}            % Defines common symbols like \mathbb R
+\usepackage{mathtools}          % Extends amsmath, providing common math tools
+\usepackage{mathrsfs}           % Enables \mathscr, which can work in cases that \mathcal does not
+%\mathtoolsset{showonlyrefs}     % Only number equations that are referenced (optional)
+\usepackage{graphicx}           % For including images
+\usepackage{subcaption}         % Allows for the use of subfigures and subcaptions
+\usepackage[space]{grffile}     % For spaces in image names
+\usepackage{url}                % For displaying URLs
+\usepackage{cleveref}           % For \cref and \Cref cross-referencing
+\usepackage{lipsum}             % For placeholder text
+\usepackage{booktabs}
+\usepackage{pdflscape}
+\usepackage{rotating}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{algpseudocode}
+\newcommand{\btob}{{\textit{B2B}}}
+\newcommand{\buildingtobuilding}{{Building2Building}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% AUTHOR: Fill in the following meta-data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Enter the title of your paper:
+\title{Building2Building: A Large Scale Benchmark for Generalizable Real-World Reinforcement Learning}
+
+% The "running title" will be displayed in the header on every-other page.
+% It is typically either the same as the title or a shorter version of the title.
+% Enter your running title here:
+\setrunningtitle{Building2Building: A Benchmark for Generalizable Reinforcement Learning at Scale}
+
+% WARNING: Authors must not appear in the submitted version. They should be hidden
+% as long as the rlj package is used without the [accepted] or [preprint] options.
+% Non-anonymous submissions will be rejected without review.
+
+% Enter the author names below. 
+% NOTE: Denote affiliations using superscripts as in the provided example.
+% NOTE: Use \textscript{1,2,3} instead of $^{1,2,3}$.
+%       - Failure to do so will cause affiliation superscripts to appear on the cover page for camera-ready and preprint versions.
+\author{Vincent Taboga\textsuperscript{1,2}, Justin Veilleux \textsuperscript{1,2}, Doseok Jang\textsuperscript{1,2}, Anushree Rankawat\textsuperscript{2}, Pierre-Luc Bacon\textsuperscript{1,2}}
+
+% NOTE: For camera-ready and preprint versions, the cover page includes author names but not affiliations.
+% It automatically removes the superscripts for affiliations.
+% If the automatic process breaks (e.g., if an author name should include a superscript), you can manually define the author string to appear on the cover page by uncommenting the following line.
+%\coverPageAuthor{Marlos C. Machado, Philip S. Thomas, Lorem Ipsum}
+
+% Author emails, which can be clustered if they have shared endings as in this example
+\emails{vincent.taboga@mila.quebec}
+
+% Author affiliations, in the order the occur
+% The inclusion of state/province, etc. is optional.
+% The inclusion of multiple affiliations is optional.
+%   - List multiple affiliations with comma-separated numbers as in the example.
+\affiliations{
+$^{1}$\textbf{Mila - Quebec AI Institute}\\
+$^{2}$\textbf{Université de Montréal - Département d'Informatique et de Recherche Opérationnelle}\\
+% The following two lines are optional and can be commented out
+%\par % If including additional comments like below, use \par to add some whitespace. 
+%$^\dagger$ Additional comments can be added like this, e.g., indicating equal contribution
+}
+
+\contribution{A large-scale suite of control environments based on a high-fidelity HVAC simulator for building climate control. The environments exhibit diverse dynamics and heterogeneous observation and action spaces, providing a testbed for studying generalization in RL.}
+{
+Widely used RL benchmarks are dominated by robotics and video-game domains, typically featuring homogeneous observation and action spaces, which limits the study of generalization across diverse dynamics and control settings.
+}
+
+\contribution{A well-defined benchmarking framework with reproducible tasks designed to evaluate key aspects of generalization in RL including dynamics adaptation, goal adaptation, action-space shift, and cross-domain transfer.}
+{
+None
+}
+
+
+\keywords{Reinforcement Learning; Generalization; Multi-Task; Transfer Learning; Benchmark; Energy; HVAC} 
+
+% Define the summary that appears on the cover page.
+\summary{Reinforcement learning (RL) has achieved strong results in control, yet learned policies remain brittle to changes in dynamics, action spaces, observation spaces, or goals, a critical limitation for real-world deployment. Existing benchmarks offer limited diversity and complexity, making it difficult to rigorously study transfer, multi-task learning, and meta-learning in RL. We introduce \buildingtobuilding{} (\btob{}), a large-scale suite of realistic Heating, Ventilation, and Air Conditioning (HVAC) control environments built on EnergyPlus, a state-of-the-art building simulator. \btob{} is fully compatible with the Gymnasium interface and features a parametric building generator, enabling the systematic generation of diverse building configurations with heterogeneous observation and action spaces. Based on this suite, we define benchmark tasks targeting key open challenges in RL, including goal adaptation, dynamics adaptation, action-space shifts, and cross-domain transfer. By providing a large-scale, diverse, and physically grounded testbed with standardized evaluation protocols, \btob{} enables systematic investigation of generalization and transfer in continuous control. Beyond advancing research on generalization in RL, this new benchmark also carries significant societal implications by enabling improved HVAC control at scale, one of the most energy-intensive systems in buildings.
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Begin document, create title and abstract
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+
+\makeCover  % Create the cover page
+\maketitle
+
+\begin{abstract}
+Reinforcement learning (RL) has achieved strong results in control, yet learned policies remain brittle to changes in dynamics, action spaces, observation spaces, or goals, a critical limitation for real-world deployment. Existing benchmarks offer limited diversity and complexity, making it difficult to rigorously study transfer, multi-task learning, and meta-learning in RL. We introduce \buildingtobuilding{} (\btob{}), a large-scale suite of realistic Heating, Ventilation, and Air Conditioning (HVAC) control environments built on EnergyPlus, a state-of-the-art building simulator. \btob{} is fully compatible with the Gymnasium interface and features a parametric building generator, enabling the systematic generation of diverse building configurations with heterogeneous observation and action spaces. Based on this suite, we define benchmark tasks targeting key open challenges in RL, including goal adaptation, dynamics adaptation, action-space shifts, and cross-domain transfer. By providing a large-scale, diverse, and physically grounded testbed with standardized evaluation protocols, \btob{} enables systematic investigation of generalization and transfer in continuous control. Beyond advancing research on generalization in RL, this new benchmark also carries significant societal implications by enabling improved HVAC control at scale, one of the most energy-intensive systems in buildings.
+\end{abstract}
+
+\section{Introduction}
+
+Reinforcement Learning (RL) has achieved strong performance across a wide range of control problems. In most cases, however, these results are obtained by training a policy on a single target task. While effective in controlled settings, this paradigm limits the ability of RL systems to operate in new environments or adapt to related tasks. Adaptation is a key feature for real-world deployments, and enabling RL agents to generalize and adapt across various environments remains a major open challenge.
+
+Studying generalization in RL requires simulated environments that expose agents to many tasks with varying dynamics, observation spaces, action spaces, and objectives. Existing benchmarks such as Meta-World+ \cite{mclean2025} and RLBench \cite{stephen2020} provide useful testbeds, but remain largely confined to the robotics domain. Moreover, the variations they introduce are often limited to changes in dynamics parameters (e.g., friction) or task goals such as target positions for navigation or object placement. As a result, these benchmarks offer limited diversity in environment structure and rarely include heterogeneous observation and action spaces. Because of this limitation, many works studying cross-domain adaptation or transfer in RL rely on custom experimental setups. These environments are often designed for a specific method and are difficult to reproduce, which makes comparisons across approaches challenging. Consequently, progress toward generalizable RL agents remains fragmented.
+
+In this work, we propose a new domain for studying generalization in RL: heating, ventilation, and air-conditioning (HVAC) control in buildings. Buildings exhibit large diversity in layouts, materials, climate exposure, HVAC configurations and objectives balancing energy savings and comfort. At the same time, they share common physical principles based on thermodynamics and energy conservation. This combination of diverse dynamics, heterogeneous control interfaces, and shared physical principles makes HVAC control an ideal domain for studying generalization.
+
+We introduce \buildingtobuilding{} (\btob{}), a large-scale suite of RL environments built on EnergyPlus, a state-of-the-art building energy simulator \cite{energyplus}. EnergyPlus provides high-fidelity physical modeling of building thermal behavior. The simulator's accuracy is highlighted by works such as \cite{zhang2019}, which showed that RL policies trained in calibrated EnergyPlus simulations can be deployed directly in real buildings. 
+
+Our environment suite includes a building generator that produces a virtually infinite number of environments derived from base archetypes across several geographic locations in North America. These environments expose low-level HVAC actuators such as fans and dampers, creating a wide variety of challenging control problems with heterogeneous observation and action spaces, and objectives reflecting different comfort-energy trade-offs. These models are automatically converted into Gymnasium-compatible RL environments through a dedicated processing pipeline. 
+
+Using this generator, we construct a dataset of over 6000 environments spanning multiple building types, climates, and HVAC system configurations. We further propose well-defined and reproducible benchmark problems that isolate different sources of variation in RL: goal adaptation, dynamics variation, action-space shifts, and cross-domain generalization.
+
+By providing a large and diverse collection of realistic control environments, \btob{} enables systematic and large-scale evaluation of generalization methods in RL. At the same time, it supports research on intelligent HVAC control and helps bridge the gap between fundamental RL research and real-world deployment on energy management systems. HVAC control represents an important societal challenge. Buildings account for roughly one third of global energy consumption, and HVAC systems alone are responsible for nearly half of this usage. Improving HVAC control can therefore reduce energy consumption, lower operational costs, and contribute directly to climate mitigation \cite{iea_outlook2022}.
+
+\section{Related Work}
+
+\subsection{Environments and Benchmarks for Generalization in RL}
+Existing benchmarks for studying generalization in RL are summarized in Table~\ref{tab:rl_benchmarks}, and the different approaches to the generalization problem in RL are further discussed in Appendix~\ref{apdx:prior_work_generalization_rl}. Most of the benchmarks focus on either video games or robotics tasks such as locomotion and manipulation. As a result, they cover only a limited set of application domains. These problems have been extensively studied over the past decade. While they have led to significant algorithmic progress, it remains unclear whether these improvements generalize beyond the specific domains on which they are evaluated. As highlighted by \citep{liao2021}, repeatedly evaluating algorithms on the same benchmarks may lead to overfitting to the benchmark itself rather than genuine progress in general RL capabilities. This motivates the need for new environments covering different applications and offering large diversity of tasks.
+
+\subsection{HVAC control}
+Much of the existing literature on RL for HVAC follows a familiar pattern: select a single building, connect it to a simulator, and demonstrate that an agent can reduce energy consumption while maintaining thermal comfort. Surveys show that this type of study has become common practice \cite{sierla2022,slsayed2024}. However, scaling these approaches beyond individual case studies remains difficult. Each new building requires its own digital twin, with sensors, actuators, and dynamics configured for simulation, and policies trained in one building rarely transfer to others.
+
+Existing environments, summarized in Table \ref{tab:hvac_envs}, Appendix~\ref{apdx:environments_details} reflect this limitation. Platforms such as Sinergym \cite{campoy2025}, Energym \cite{scharnhorst2021}, BOPTEST \cite{blum2021}, and CityLearn \cite{nweye2024} have accelerated research but collectively provide only a few dozen building models. Even within this limited set, policies trained in one environment often fail to generalize to others \cite{manjavacas2024}. Transfer-learning approaches, such as fine-tuning across buildings \citep{kadamala2024,xu2020,coraci2024} or continual learning with hypernetworks \citep{bekal2025}, provide incremental improvements but remain constrained by the lack of large-scale benchmarks. Field studies report similar challenges: a review of more than one hundred deployments finds inconsistent savings and limited reporting on integration costs \citep{habbazi2025}.
+
+In contrast, \btob{} enables large-scale studies of RL for HVAC control. This capability enables a new training paradigm for HVAC control. Rather than designing a highly detailed digital twin for each individual building, policies can be trained across a distribution of buildings that includes the target building. Training across many environments reduces the need for highly accurate per-building models and allows policies to reuse experience across environments, reducing the need to train a new controller from scratch for every building.
+
+
+\begin{table}
+\centering
+\caption{Main benchmarks used to study generalization in reinforcement learning.}
+\begin{tabular}{l l l}
+\hline
+\textbf{Benchmark} & \textbf{Tasks} & \textbf{Domain} \\
+\hline
+MineRL \citep{guss2019} & open / task generators & Video game (Minecraft) \\
+Procgen \citep{cobbe2020} & 16 task families & Procedural video games \\
+RLBench \citep{stephen2020} & 100 tasks & Robotics manipulation \\
+Meta-World \citep{mclean2025} & 50 tasks & Robotics manipulation \\
+DM Control \citep{tunyasuvunakool2022} & $\sim$20 tasks & Robotics locomotion / control \\
+ManiSkill2 \citep{gu2023} & 20 task families & Robotics manipulation \\
+Robosuite \citep{yuke2020} & 9 tasks & Robotics manipulation \\
+MMBench \citep{hansen2026} & 200 tasks & Games and robotics \\
+Habitat \citep{szot2022} & open / configurable & Embodied navigation \\
+\hline
+\end{tabular}
+\label{tab:rl_benchmarks}
+\end{table}
+
+\section{The Building2Building Suite}
+\label{sec:B2B_suite}
+
+\subsection{Environment Generation}
+
+To access a diverse set of environments representative of real buildings, we rely on two complementary sources of building models that produce a large set of heterogeneous environments, summarized in Table~\ref{tab:base_environments}. 
+
+\begin{itemize}
+    \item A dataset generated by a residential building generator \citep{larochelle_martin2026}. This generator produces single-zone houses representing the statistical characteristics of the Québec residential building stock. 
+    \item A parametric building model generator based on the reference commercial buildings from the ASHRAE 90.1 across 16 different locations in North America. The generator follows the methodology used by the Building Technology Assessment Platform \citep{btap2022}, and samples the building size, window-to-wall ratio, insulation levels, and air infiltration. To ensure physical consistency, the generator enforces climate-dependent parameter bounds consistent with ASHRAE standards.
+\end{itemize}
+
+
+\begin{table}
+\centering
+\caption{Base environments included in the benchmark suite.}
+\label{tab:base_environments}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Building type & HVAC type & Zones & Action dim. & Observation dim. \\
+\midrule
+House  & Unitary system & 1  & 2 & 7 \\
+Restaurant & Unitary systems & 3 & 6 & 9 \\
+Warehouse & Unitary systems \& baseboard & 3 & 5 & 9 \\
+Retail Store & Unitary systems & 4 & 8 & 10 \\
+Small Office & Unitary systems & 5 & 5--10 & 11 \\
+Medium Office & Central systems & 15 & 15--33 & 21 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Control Interface}
+
+\btob{} exposes low-level HVAC actuators, and handles the following systems:
+
+\begin{enumerate}
+
+\item \textbf{Unitary HVAC systems.}  
+These systems condition a single thermal zone using a dedicated unit such as a heat pump or packaged rooftop unit. For these systems, the agent controls the supply air temperature (SAT) and the supply air flow rate.
+
+\item \textbf{Central air loop systems for multi-zone conditioning.}  
+These systems use centralized heating and cooling equipment that distributes conditioned air through an air loop serving multiple zones. The agent controls the central SAT, the damper opening of each zone, and the zone-level reheat coils through thermostat setpoints.
+
+\item \textbf{Baseboard and heat-only systems.}  
+These systems provide heating only and are controlled through the zone thermostat.
+
+\end{enumerate}
+
+At each timestep, the agent has access to the following observation: 
+weather data (outdoor air temperature ($^\circ C$) and humidity (\%), calendar information (time of day, day of week, day of year), indoor zones air temperature ($^\circ C$), and HVAC energy consumption per simulation time step ($Wh/m^2/timestep$). Note that the energy consumption is normalized by the floor area of the building to be invariant to building size variations
+
+\subsection{Control Tasks and Reward Functions}
+\label{sec:control_tasks_and_reward_functions}
+
+To study different trade-offs between thermal comfort and energy efficiency, we propose the following reward functions defining a family of control tasks parametrized by energy savings and comfort: 
+
+\begin{enumerate}
+    \item \begin{equation}
+\label{eq:deadband_reward}
+r_t = - \frac{1}{Z \, \tau_T} \sum_{z=1}^Z 
+ (T_z(t) - T^{target}_z(t))^2
+- \frac{w_e}{\tau_e} \, \mathcal{E}_{\text{HVAC}}(t),
+\end{equation}
+
+where $\mathbf{1}_{T_z \in \Delta T}$ is the indicator function of $T_z$ lying within the deadband interval around the target temperature $T_z^{target}$, $Z$ denotes the number of zones, and $w_e$ controls the penalty on HVAC energy consumption $\mathcal{E}_{\text{HVAC}}$. Note that the target temperature $T_z^{target}$ may vary over time depending on occupancy schedules.
+
+\end{enumerate}
+
+\subsection{Structured environment representation}
+\label{sec:structured-env}
+
+A major obstacle in developing transfer and multi-task RL algorithms is the lack of a standard way to represent heterogeneous environments. While the standard Gymnasium interface (observation space, action space, and \texttt{step} function) is sufficient for single environments, it does not provide a structured representation that can describe multiple environments with different control interfaces. Without such a representation, comparing multi-environment algorithms becomes difficult as each algorithm must implement custom logic to handle each environment separately. In an effort to facilitate cross-domain transfer research, \btob{} introduces a structured representation that provides a common abstraction across heterogeneous environments.
+
+We model the control structure of an environment as a \textit{morphology graph}. A morphology is defined as a graph $(V, E)$ where each vertex $v \in V$ has a type $t(v) \in T$ and where each node type $t \in T$ is associated with a local observation space $S(t)$ and a local action space $A(t)$. The global observation and action spaces of the environment are obtained by concatenating the local spaces of all nodes in a pre-defined order. Formally, we define a morphological universe  as $(T, S(t), A(t))$, which is shared and fixed across a collection of environments. A structured environment consists of
+
+\begin{enumerate}
+    \item A standard environment $(S, A, \text{step})$
+    \item A morphology graph $(V, E)$
+    \item A node type assignment $t : V \rightarrow T$
+    \item A global-to-local observation mapping : $ \mathsf{split} : S \rightarrow \prod_{v \in V} S(t(v))  $ 
+    \item A local-to-global action mapping : $ \mathsf{join} : \prod_{v \in V} A(t(v)) \rightarrow A $
+\end{enumerate}
+
+This representation allows policies to operate on the graph structure of the environment and naturally supports architectures such as graph neural networks, heterogeneous graph Transformers \cite{hao2024}, and type-heterogeneous encoder–decoder models \cite{ma2020}. Each environment of \btob{} provides an instance of this structured environment representation. This representation encodes thermal zone adjacency information, groups together actuators within the same HVAC system (e.g., actuators belonging to the same air loop), and establishes the mapping between actuators and the zones they control.
+
+\btob{} also provides procedures to map between the global and local spaces as described previously. Any algorithm that uses environments through the morphology graph and the \textsf{split}/\textsf{join} interface can therefore operate on any \btob{} environment without modification. This enables transfer and multi-task algorithms to be evaluated consistently across buildings with different structures, observation spaces, and control interfaces.
+
+\section{Benchmark Problems}
+\label{sec:benchmark}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.7\linewidth]{figures/b2b-benchmark.png}
+    \caption{Overview of the benchmark design. A large building pool is created using our building generator. Different benchmark tasks evaluate transfer across goals, dynamics, and domains}
+    \label{fig:b2b_benchmark}
+\end{figure}
+
+To defined a reproducible experimental framework, we construct a diverse collection of environments by sampling buildings from the two generators described in Section~\ref{sec:B2B_suite}. For each building type, we generate 1000 environments, resulting in a total dataset of 6000 environments, split in a training and a test set. The resulting environments suite spans a wide range of building dynamics, HVAC configurations, and control interfaces. Additional details on the environments generation is given in Appendix~\ref{apx:building_dataset_generation}.
+
+Using these environments, we define four benchmark settings that isolate different sources of variation in control systems: goal adaptation, dynamics variation, action-space shifts, and cross-domain generalization. These benchmarks are easily accessible through the API interface of \btob{}.
+
+\begin{itemize}
+
+\item \textbf{Goal adaptation.}  
+The training and test environments correspond to the same building and control interface, but the reward function changes. We define the following pre-defined rewards:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Task} & \textbf{Reward} & $w_e$ & $\Delta T$ & \textbf{Temperature targets} \\
+\midrule
+Task 1 & Eq.~\ref{eq:deadband_reward} & 0.01 & $1.0^\circ$C & Constant $21^\circ$C \\
+Task 2 & Eq.~\ref{eq:deadband_reward} & 0.10 & $1.0^\circ$C & Constant $21^\circ$C \\
+Task 3 & Eq.~\ref{eq:deadband_reward} & 0.01 & $1.0^\circ$C & $21^\circ$C (occupied), $18^\circ$C (unoccupied) \\
+Task 4 & Eq.~\ref{eq:barrier_reward} & $w_T=10$ & $1.0^\circ$C & Constant $21^\circ$C \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\item \textbf{Dynamics adaptation.}  The reward function and action space remain fixed, while the building dynamics vary. Buildings differ in climate zone, size, and envelope but share the same archetype.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Difficulty} & \textbf{Building archetype} & \textbf{Variation} & \textbf{Action dim.} \\
+\midrule
+Easy   & Single-zone house & Climate, building envelope parameters & 2 \\
+Medium & Small office      & Climate, building envelope parameters & 10 \\
+Hard   & Medium office     & Climate, building envelope parameters & 33 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\item \textbf{Action-space transfer.}  The building dynamics and reward function remain fixed, but the set of controllable actuators changes between training and testing.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{System type} & \textbf{Training control} & \textbf{Test control} & \textbf{Action dim.} \\
+\midrule
+Unitary system & Air flow rate & Air flow + SAT & $5 \rightarrow 10$ \\
+Central system & VAV boxes only & VAV boxes + central SAT & $30 \rightarrow 33$  \\
+Unitary system &  Air flow + SAT & Air flow rate & $10 \rightarrow 5$  \\
+Central system & VAV boxes + central SAT & VAV boxes only & $33 \rightarrow 30$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\item \textbf{Cross-domain generalization.} Agents are trained and tested on different environments:
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Difficulty} & \textbf{Train building type} & \textbf{Test building type} & \textbf{Key difference} \\
+\midrule
+Easy   & Retail store & Small office  & Similar HVAC types \\
+Medium & Retail store & Warehouse     & Slightly different HVAC types \\
+Hard   & Small office & Medium office & Different HVAC types \\
+Hard   & n types      & m different types & Different domains \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Baselines}
+\label{sec:baselines}
+
+To establish a baseline, we implement supervisory control logic inspired by the ASHRAE Guideline 36 high-performance sequences of operation. Two controllers are implemented: one for unitary systems and one for central air-loop systems. The control structures include zone-level PI loops that regulate airflow and Trim-and-Respond mechanisms that adjust the SAT. Additional implementation details are provided in Appendix~\ref{apdx:baseline_controllers}, and detailed control results are reported in Appendix~\ref{apdx:additional_experiments-reactive_control_logic}. Reactive control strategies are widely used in real buildings, and we therefore use them as the primary baseline. To facilitate evaluation, the benchmark includes a function \textit{compute\_normalized\_score} that divides the cumulative return over one year of simulation by the return obtained by the reactive controller.
+
+In addition, we train PPO agents on a subset of the test set for each building type. The subset contains 8 buildings, one per climate zone. For single-zone houses, which all belong to the same climate zone, 8 buildings are randomly sampled from the test set. Agents are trained on the four goal adaptation tasks defined in Section~\ref{sec:benchmark}. Detailed results and normalized scores are reported in Appendix~\ref{apdx:PPO_results}. 
+
+
+\section{Generalization Experiments}
+\label{sec:limitation_of_current_algorithms}
+
+
+\subsection{Dynamics Adaptation}
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/transfer/model_comparison.png}
+        \caption{}
+        \label{fig:transfer_rew}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/transfer/temp_deviation_violin.png}
+        \caption{}
+        \label{fig:transfer_temp_deviation}
+    \end{subfigure}
+    \caption{(a) Average reward across 71 test buildings (negative log scale). Lower is better. We show standard error across 9 seeds for baseline and parameterized, and across the 71 test buildings for the per-building specialists. (b) Violin plot of the RMS of temperature deviation from target temperature by model across 71 test buildings. Diamonds represent the overall mean of the distribution.}
+    \label{fig:transfer_side_by_side}
+\end{figure}
+
+In order to assess the performance of current methods on dynamics adaptation, we first sample 900 single-zone house buildings for our training set and 71 single-zone buildings for our test set. We then train three different classes of models with PPO: (1) 71 per-building specialists that are trained solely on each building in the test set to establish an upper bound, (2) a centralized agent that resamples new buildings from the training set after every episode, and (3) a centralized agent that resamples new buildings and has its observation space augmented with the building's floor area, year built, and region. Implementation details are given in Appendix~\ref{apdx:dynamics_adaptation}.
+
+\Cref{fig:transfer_rew} shows the average reward across the test buildings for each class of model (with per-building results only on the building that model was trained on). As expected, the per-building specialist has the highest reward, with a substantial gap of $\sim45,000$ return from the parameterized model and $\sim105,000$ from the baseline model. The gap between the baseline and parameterized models shows that multi-task learning is essential for solving this cross domain transfer task as there is a large benefit from conditioning on building parameters. The gap between the parameterized and per-building specialist models shows that there is still much room to improve; current multi-task transfer methods are not yet fully capable of achieving the optimal policy when transferred to new test buildings. \Cref{fig:transfer_temp_deviation} shows a violin plot of the temperature deviation from the target, showing that the per-building specialists and parameterized models successfully learn to control the buildings. The baseline model performs well for some buildings (likely those that are more similar to ones it encountered in its training set) but performs very poorly for others, demonstrating the necessity of task conditioning.
+
+
+\subsection{Cross domain transfer}
+
+%While reusing a policy among buildings with different dynamics is useful, the north star of cross-domain reinforcement learning remains the creation of a foundation model which can work on tasks with various available sensors and actuators. In the context of HVAC control, such a foundation model should adapt to any realistic dynamics, any standard HVAC equipment and any building shape and size. 
+
+To demonstrate how \btob{} can be used to study cross-domain control algorithm, we train a single policy simultaneously on four building types: retail store, fast food restaurant, small office and mediun office. These types of buildings have heterogeneous action and observation spaces, making the environment incompatible use the naive used of customary multi-layer perceptron with fixed input and output sizes. We thus implement a variant of the Amorpheus~\cite{kurin2021} architecture that we train on top of the structured environment representation described in Section~\ref{sec:structured-env}.
+
+The policy architecture consists of standard acausal transformer layers together with type-specific linear encoder and decoder blocks. At inference time, the observation is first split into node-level observations, which are encoded into a shared embedding space. The resulting embeddings are processed by the transformer, decoded into node-level actions, and finally concatenated to produce the global actuator command. Algorithm details are given in Appendix~\ref{apdx:cross_domain}.
+
+The model is trained to solve the Task 3. Training data are collected in parallel on four buildings (one of each type). Buildings are resampled every 10 PPO epochs ensuring that the policy is exposed to the full diversity of buildings in the training set. The model is trained on 1M environment steps and tested on new buildings sampled from the test set. As shown in Figure \Cref{fig:multi-morphology} the policy is able to adapt to new domains, and even outperform the baseline reactive controller on some buildings.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/transfer/comparison_figure.png}
+    \caption{Generalized policy test performance on 20 unseen buildings sampled from the test set.}
+    \label{fig:multi-morphology}
+\end{figure}
+
+\section{Conclusion}
+
+We introduce \btob{}, a large-scale suite of environments and benchmark problems designed to advance research on generalization in RL. \btob{} provides a diverse set of environments with varying dynamics and heterogeneous observation and action spaces, making it well suited for studying multi-task learning and cross-domain transfer. The benchmark tasks cover several forms of adaptation, including goal adaptation and action-space shifts, and provide a reproducible framework for comparing algorithms.
+
+Grounded in real-world applications, the control tasks focus on HVAC systems in buildings. Improving control in this domain has the potential to reduce energy consumption and contribute significantly to climate change mitigation.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Appendices
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\appendix
+
+
+
+% \subsubsection*{Acknowledgments}
+% \label{sec:ack}
+% Use unnumbered third level headings for the acknowledgments. All acknowledgments, including those to funding agencies, go at the end of the paper. Only add this information once your submission is accepted and deanonymized. The acknowledgments do not count towards the 8--12 page limit.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% NOTE: THIS MARKS THE END OF THE "MAIN TEXT"
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Bibliography
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\bibliography{main}
+\bibliographystyle{rlj}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% AUTHOR: If your paper has no supplementary materials, you may 
+%         comment out the line below, which creates the title for
+%         the supplementary materials.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\beginSupplementaryMaterials
+
+\section{Prior work on generalization in RL}
+\label{apdx:prior_work_generalization_rl}
+
+Generalization in RL has been widely studied. A common approach is Meta RL, where an agent is trained on a distribution of tasks so it can quickly adapt to new ones. Early methods include Model-Agnostic Meta-Learning (MAML) \citep{btap2022}, which adapts policies with a few gradient steps, and RL$^2$ \citep{duan2016}, which embeds the learning algorithm inside a recurrent network to share information across tasks via the RNN's hidden state. Later work introduced adaptation mechanisms such as attention-based meta-learners \citep{mishra2018}, and probabilistic context inference methods such as PEARL \citep{rakelly2019}, and Bayes-Adaptive RL (VariBAD) \citep{zintgraf2020}. 
+
+A related line of work studies generalization through a multi-task formulation, where a single model is trained on multiple tasks simultaneously. Such an approach is challenging because gradients from different tasks interfere during learning. Methods such as PCGrad \citep{yu2020} mitigate gradient conflicts between tasks during training, while other approaches rely on multiple learner, such as policy distillation (Distral) \citep{teh2017} and mixture of orthogonal experts \citep{hendawy2024}. Large-scale systems such as IMPALA \citep{espeholt2018} and BRC \citep{nauman2025} demonstrated positive transfer across many tasks, while normalization techniques such as PopArt help address reward-scale imbalance across tasks\citep{hessel2018}.
+
+Recent works also studies adaptation using sequence modeling and in-context reinforcement learning. In these approaches, models are trained on large datasets of trajectories and adapt to new tasks through conditioning on past experience in context. Seminal works in this direction include Decision Transformer,  \citep{chen2021}, Decision Pretrained Transformer \cite{lee2023} and Algorithm Distillation \citep{laskin2022}.
+
+Most multi-task RL methods assume shared observation and action spaces across tasks. However, real-world problems often involve changes in morphology or environments. Methods such as DERL \citep{gupta2021}, MetaMorph \citep{gupta2022}, and AnyMorph \citep{trabucco2022} study control across agents with different morphologies. Several works study theoretically grounded transfer across domains. For instance successor representations and successor features enable reuse of value structure across related tasks \citep{Barreto2017,dayan1993}. Other approaches provide principled alignment across domains, for example through optimal-transport-based imitation learning \citep{fickinger2022}. 
+
+\section{Building dataset generation}
+\label{apx:building_dataset_generation}
+
+We generate a climate-consistent building dataset using climate-dependent parameter ranges derived from ASHRAE 90.1-2022 Tables 5.5-1 through 5.5-8. Instead of sampling all seven envelope and geometry parameters independently over uniform global bounds, each building’s location is first mapped to its ASHRAE climate zone, and LHS unit samples are then remapped to zone-specific ranges defined relative to the prescriptive maxima for fenestration and framed walls. Window U-factors are sampled within $[0.8,\,1.3]\times$ the ASHRAE maximum for the given zone; SHGC is sampled between 0.15 and $(\text{SHGC}_{\max} + 0.10)$, clamped to $[0.10,\,0.80]$; and envelope conductivity and infiltration multipliers are upper-bounded as a function of climate stringency, ensuring tighter constructions in colder zones (ASHRAE 90.1-2022, \S5.4.3.1; Tables 5.5-1--5.5-8). Geometry scaling is narrowed to $[0.7,\,1.5]$ to avoid extreme HVAC autosizing artifacts, while orientation remains uniformly sampled in $[0^\circ,\,360^\circ]$. LHS sampling is preserved within each climate zone by first generating unit hypercube samples and then mapping them through zone-specific bounds. Finally, balanced train/test splits are produced with a dedicated script that performs stratified sampling by location (90/10), ensuring proportional climate representation across splits.
+
+\section{Environments details}
+\label{apdx:environments_details}
+
+\begin{table}
+\centering
+\caption{Comparison of building control environments}
+\label{tab:hvac_envs}
+%\small % or \footnotesize for even smaller
+\setlength{\tabcolsep}{4pt} % default is 6pt
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Environment} & \textbf{Buildings} \\
+\midrule
+RL Testbed \cite{moriyama2018} & 1   \\
+BOPTEST(-Gym) \cite{blum2021} & $\sim$12  \\
+Energym \cite{scharnhorst2021} & 14   \\
+Sinergym \cite{campoy2025} & $\sim$30  \\
+Smart bldg. Control \cite{goldfeder2025}  & 11  \\
+CityLearn \cite{nweye2024} & Variable  \\
+\textbf{Building2Building (Ours)} & \textbf{Thousands}   \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\buildingtobuilding{} converts building simulation models into standardized RL environments. Starting from building descriptions encoded as EnergyPlus input files, \btob{} automatically constructs a controllable simulation environment compatible with the Gymnasium API \citep{towers2024}. The pipeline parses the building model, identifies thermal zones and HVAC systems, exposes relevant control actuators, and generates standardized observation variables. This process abstracts away simulator-specific details and produces environments with consistent interfaces for observations, actions, and rewards. As a result, RL agents can be evaluated across a diverse set of buildings without requiring any simulator-specific implementations.
+
+The resulting Gymnasium environment interacts with the EnergyPlus simulation using callbacks at every step to fetch observations and pass actions. An EnergyPlus timestep takes about $0.1$ms, and multiple EnergyPlus simulations can be launched in parallel. Timestep durations for the different building types are given in Table~\ref{tab:step_time}.
+
+Other HVAC control environments based on high-fidelity open-source models, such as Synergym \cite{campoy2025}, provide only a limited number of buildings. This limitation arises from two main challenges. First, EnergyPlus simulations require detailed input building descriptions, which are rarely available at large scale. Second, interacting with a complex simulator such as EnergyPlus in a consistent way is difficult, especially when exposing low-level HVAC actuators for control. \btob{} addresses these challenges in two ways. First, it provides a generator of EnergyPlus building files that enables the creation of numerous building environments in a principled way, allowing sensors and actuators to be extracted automatically. Second, it includes a processing pipeline that automatically converts EnergyPlus models into Python RL environments following the Gymnasium interface, allowing direct use with existing RL algorithms.
+
+
+\begin{table}[ht]
+\centering
+\caption{EnergyPlus simulation step time per building type, computed over 10000 steps}
+\label{tab:step_time}
+\begin{tabular}{l r r r r}
+\toprule
+Building Type & Mean (ms/step) & Std (ms/step) \\
+\midrule
+Office Small & 0.170 & 0.018 &  \\
+Office Medium & 0.410 & 0.096 & \\
+Retail Standalone & 0.153 & 0.021 & \\
+Restaurant Fast Food & 0.059 & 0.006 \\
+Warehouse & 0.209 & 0.044  \\
+Single-Family House & 0.021 & 0.002 \\
+\bottomrule
+\end{tabular}
+\end{table} 
+
+\section{Baseline controllers}
+\label{apdx:baseline_controllers}
+
+\subsection{Reactive Control Logic for Unitary Systems}
+\label{apdx:reactive_control_logic_unitray}
+
+ For zones equiped with a unitary system, the action space is the supply fan air mass flow rate and the supply air temperature setpoint. The control logic follows supervisory principles of ASHRAE Guideline-36, adapted to a 5 minutes timestep. The zone temperature is regulated using a PI controller that modulates the supply aire flow rate. Let $T_z$ denote the zone air temperature and $T_{sp}$ the active temperature setpoint (cooling or heating). The control error is defined as
+
+    \begin{equation}
+    e(t) = T_z(t) - T_{sp}(t).
+    \end{equation}
+    
+    The airflow command is
+    
+    \begin{equation}
+    \dot m_{sa}(t) =
+    \dot m_{\min}
+    + \left[
+    K_p e(t) +
+    K_i \int_{0}^{t} e(\tau)\, d\tau
+    \right]
+    \left(\dot m_{\max} - \dot m_{\min}\right),
+    \end{equation}
+    
+    subject to saturation:
+    
+    \begin{equation}
+    \dot m_{sa} \in [\dot m_{\min}, \dot m_{\max}].
+    \end{equation}
+    
+    The gains $K_p$ and $K_i$ are tuned for stability under a 15-minute timestep.
+    When the zone temperature lies within the deadband, airflow is reduced to
+    $\dot m_{\min}$.
+
+    The supply air temperature setpoint is adjusted using a Trim-and-Respond logic based on the zone demand. For instance, in a cooling regime:
+
+    \begin{equation}
+    T_{sa,sp}^{k+1} =
+    \begin{cases}
+    T_{sa,sp}^{k} - \Delta_{\text{resp}}, & \text{if } e_c^k > \delta \\
+    T_{sa,sp}^{k} + \Delta_{\text{trim}}, & \text{otherwise}
+    \end{cases}
+    \end{equation}
+
+    subject to bounds:
+    
+    \begin{equation}
+    T_{sa,sp} \in [T_{sa,\min},\, T_{sa,\max}].
+    \end{equation}
+    
+    Here $\Delta_{\text{resp}}$ and $\Delta_{\text{trim}}$ represent the respond and trim
+    increments, respectively.
+
+    
+\subsection{Reactive Control Logic for Air Loops}
+\label{apdx:reactive_control_logic_air_loop}
+For zones served by a central air loop, the action space consists of the central supply air temperature setpoint $T_{sa,sp}$ and the per-zone damper opening fraction $\alpha_i \in [0,1]$. Each zone $i$ is equipped with a thermostat that modulates the local reheat coil. The zone temperature is regulated through the damper position using a PI controller. Let $T_{z,i}$ denote the zone air temperature and $T_{sp,i}$ the active temperature setpoint. The control error is
+
+\begin{equation}
+e_i(t) = T_{z,i}(t) - T_{sp,i}(t).
+\end{equation}
+
+The commanded damper opening fraction is
+
+\begin{equation}
+\alpha_i(t) =
+\alpha_{\min}
++
+\left[
+K_p e_i(t) +
+K_i \int_0^t e_i(\tau)\, d\tau
+\right]
+(\alpha_{\max} - \alpha_{\min}),
+\end{equation}
+
+subject to
+
+\begin{equation}
+\alpha_i \in [\alpha_{\min}, \alpha_{\max}].
+\end{equation}
+
+When the zone temperature lies within the deadband, the damper position is
+maintained at $\alpha_{\min}$.
+
+Each zone thermostat activates the reheat coil when the zone temperature falls
+below the heating setpoint. The reheat power $Q_{rh,i}$ is modulated
+proportionally to the heating error
+
+\begin{equation}
+Q_{rh,i}(t) = K_{rh}\,[T_{sp,i}(t) - T_{z,i}(t)]_+ ,
+\end{equation}
+
+where $[x]_+ = \max(0,x)$.
+
+The central supply air temperature setpoint is adjusted using a Trim-and-Respond
+logic based on aggregate cooling demand:
+
+\begin{equation}
+T_{sa,sp}^{k+1} =
+\begin{cases}
+T_{sa,sp}^{k} - \Delta_{\text{resp}}, & \text{if } D_c^k > \delta \\
+T_{sa,sp}^{k} + \Delta_{\text{trim}}, & \text{otherwise}
+\end{cases}
+\end{equation}
+
+subject to
+
+\begin{equation}
+T_{sa,sp} \in [T_{sa,\min}, T_{sa,\max}].
+\end{equation}
+    
+
+\subsection{PPO implementation}
+
+We use Stable-Baseline3 \cite{stable-baselines3} for the PPO implementation. Rollouts are collected on 14 environments in parallel. The training is done other 5M environment steps. The hyperparameters used are summarized in Table~\ref{tab:ppo_hyperparameters}.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Hyperparameters used for PPO training.}
+\label{tab:ppo_hyperparameters}
+\begin{tabular}{ll ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Parameter} & \textbf{Value} \\
+\midrule
+Policy type & MLP & Learning rate & $5\times10^{-5}$ \\
+Batch size & 336 & $n\_steps$ & 672 \\
+Target KL & 0.02 & $n\_epochs$ & 5 \\
+$\gamma$ & 0.98 & $\lambda$ (GAE) & 0.95 \\
+Clip range & 0.2 & Entropy coef. & 0.01 \\
+Value function coef. & 0.5 & Max grad norm & 0.5 \\
+Use SDE & False & SDE sample freq. & 96 \\
+\midrule
+\multicolumn{4}{l}{\textbf{Policy network architecture}} \\
+\midrule
+Actor layers & [256, 256] & Critic layers & [256, 256] \\
+Activation & Tanh & Orthogonal init & True \\
+Initial log std & -1.0 & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Additional experiments}
+\label{apdx:additional_experiments}
+
+\subsection{Reactive control logic}
+\label{apdx:additional_experiments-reactive_control_logic}
+
+In this section we present the results of the reactive controller on the test buildings. The parameters of each controller were tuned on one instance of each building type per climate zone using Bayesian optimization, with Task~1 as the optimization objective. The resulting parameters were then used for all other buildings of the same type and location.
+
+Table~\ref{tab:baseline_temperature_results} presents the average performance of the reactive controllers. Most of the time, the temperature in each controlled zone remains within the target interval. Failure to maintain temperatures within the controller's deadband may result from suboptimal control actions, but also from building design and weather conditions that make temperature control impossible. \Cref{fig:baseline_hist_fixed} and \Cref{fig:baseline_hist_occ} illustrate the differences in performance across buildings. \Cref{fig:baseline_vs_weather} highlights the impact of the climate zone on control quality. Hotter zones are harder to control, primarily because of HVAC sizing.
+
+\begin{table}[h]
+\centering
+\caption{Percentage of time that zone temperatures remain inside the deadband across test buildings.}
+\label{tab:baseline_temperature_results}
+\begin{tabular}{l r r r}
+\toprule
+Building & Mean & Median & Std \\
+\midrule
+Small Office & 92.86 & 97.55 & 10.85 \\
+Medium Office & 83.8 & 93.17 & 15.11 \\
+Fast-Food Restaurant & 82.82 & 92.93 & 21.38 \\
+Retail Store & 88.98 & 89.23 & 7.92 \\
+Warehouse & 90.44 & 91.42 & 7.28 \\
+Single-Zone House & 83.30 & 85.73 & 15.69 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{0}
+
+\newcommand{\cellh}{3.4cm}
+
+\begin{tabular}{@{}ccc@{}}
+
+& \multicolumn{2}{c}{\textbf{Fixed setpoints}} \\
+
+& \scriptsize Temperature Satisfaction & \scriptsize Return \\
+
+% ---- OfficeSmall ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{Small Office}}}&
+\includegraphics[height=\cellh]{figures/baselines/OfficeSmall_deadband_ew001_const.png} &
+\includegraphics[height=\cellh]{figures/returns/OfficeSmall_deadband_ew001_const.png} \\
+
+% ---- OfficeMedium ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{Medium Office}}} &
+\includegraphics[height=\cellh]{figures/baselines/OfficeMedium_deadband_ew001_const.png} &
+\includegraphics[height=\cellh]{figures/returns/OfficeMedium_deadband_ew001_const.png} \\
+
+% ---- RestaurantFastFood ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{Restaurant}}} &
+\includegraphics[height=\cellh]{figures/baselines/RestaurantFastFood_deadband_ew001_const.png} &
+\includegraphics[height=\cellh]{figures/returns/RestaurantFastFood_deadband_ew001_const.png} \\
+
+% ---- RetailStandalone ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{Retail}}} &
+\includegraphics[height=\cellh]{figures/baselines/RetailStandalone_deadband_ew001_const.png} &
+\includegraphics[height=\cellh]{figures/returns/RetailStandalone_deadband_ew001_const.png} \\
+
+% ---- Warehouse ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{Warehouse}}} &
+\includegraphics[height=\cellh]{figures/baselines/Warehouse_deadband_ew001_const.png} &
+\includegraphics[height=\cellh]{figures/returns/Warehouse_deadband_ew001_const.png} \\
+
+% ---- House ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{House}}} &
+\includegraphics[height=\cellh]{figures/baselines/SingleZone_deadband_ew001_const.png} &
+\includegraphics[height=\cellh]{figures/returns/SingleZone_deadband_ew001_const.png} \\
+
+\end{tabular}
+
+\caption{Histograms of temperature satisfaction and returns for fixed setpoints (task 1).}
+\label{fig:baseline_hist_fixed}
+
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{0}
+
+\newcommand{\cellh}{3.4cm}
+
+\begin{tabular}{@{}ccc@{}}
+
+& \multicolumn{2}{c}{\textbf{Occupancy-based setpoints}} \\
+
+& \scriptsize Temperature Satisfaction & \scriptsize Return \\
+
+% ---- OfficeSmall ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{Small Office}}}&
+\includegraphics[height=\cellh]{figures/baselines/OfficeSmall_deadband_ew001_occ.png} &
+\includegraphics[height=\cellh]{figures/returns/OfficeSmall_deadband_ew001_occ.png} \\
+
+% ---- OfficeMedium ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{Medium Office}}} &
+\includegraphics[height=\cellh]{figures/baselines/OfficeMedium_deadband_ew001_occ.png} &
+\includegraphics[height=\cellh]{figures/returns/OfficeMedium_deadband_ew001_occ.png} \\
+
+% ---- RestaurantFastFood ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{Restaurant}}} &
+\includegraphics[height=\cellh]{figures/baselines/RestaurantFastFood_deadband_ew001_occ.png} &
+\includegraphics[height=\cellh]{figures/returns/RestaurantFastFood_deadband_ew001_occ.png} \\
+
+% ---- RetailStandalone ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{Retail}}} &
+\includegraphics[height=\cellh]{figures/baselines/RetailStandalone_deadband_ew001_occ.png} &
+\includegraphics[height=\cellh]{figures/returns/RetailStandalone_deadband_ew001_occ.png} \\
+
+% ---- Warehouse ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{Warehouse}}} &
+\includegraphics[height=\cellh]{figures/baselines/Warehouse_deadband_ew001_occ.png} &
+\includegraphics[height=\cellh]{figures/returns/Warehouse_deadband_ew001_occ.png} \\
+
+% ---- House ----
+\rotatebox{90}{\parbox[c][\cellh][c]{3.4cm}{\centering\textbf{House}}} &
+\includegraphics[height=\cellh]{figures/baselines/SingleZone_deadband_ew001_occ.png} &
+\includegraphics[height=\cellh]{figures/returns/SingleZone_deadband_ew001_occ.png} \\
+
+\end{tabular}
+
+\caption{Histograms of temperature satisfaction and returns for occupancy-based setpoints (task 3).}
+\label{fig:baseline_hist_occ}
+
+\end{figure*}
+
+\subsection{PPO control}
+\label{apdx:PPO_results}
+
+Table~\ref{tab:ppo_results_summary} presents the results of the PPO agents on each test building type, average over the locations. The normalized score is computed by deviding by the reactive control baseline. As we can see, the RL agent does not perform as well as the baseline. Figure~\ref{fig:temperature_violin} presents the temperature distribution for two of the four tasks. As we see, the mean temperature is close to the target temperautre, however, a wider distribution causes accumlated penalties that results in lesser return than the baseline.
+
+
+\begin{figure}[h]
+\centering
+
+\begin{subfigure}{\linewidth}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/violon_ppo_task1.png}
+    \caption{Task 1}
+    \label{fig:violin_barrier}
+\end{subfigure}
+
+\begin{subfigure}{\linewidth}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/violon_ppo_task4.png}
+    \caption{Task 4}
+    \label{fig:violin_deadband}
+\end{subfigure}
+
+\caption{Temperature performance across test buildings under two tasks}
+\label{fig:temperature_violin}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/deadband_ew001_const.png}
+    \caption{Influence of the climate zone on the control. Climate zones are ordered from hottest to coldest}
+    \label{fig:baseline_vs_weather}
+\end{figure}
+\begin{table}[h]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l l r r}
+\toprule
+Building & Task & Mean Temp. In Band (\%) & Normalized Return \\
+\midrule
+Small Office & Task 1 & 47.06 & 6.04 \\
+ & Task 2 & 40.56 & 4.23 \\
+ & Task 3 & 35.45 & 4.34 \\
+ & Task 4 & 46.89 & 15.77 \\
+\midrule
+Medium Office & Task 1 & 44.85 & 4.69 \\
+ & Task 2 & 46.29 & 3.27 \\
+ & Task 3 & 37.76 &  \\
+ & Task 4 & 45.95 &  \\
+\midrule
+Fast-Food Rest. & Task 1 & 36.44 & 4.51 \\
+ & Task 2 & 20.21 & 2.72 \\
+ & Task 3 & 34.00 & 3.68 \\
+ & Task 4 & 24.51 & 1.81 \\
+\midrule
+Standalone Retail & Task 1 & 43.73 & 3.64 \\
+ & Task 2 & 36.86 & 2.46 \\
+ & Task 3 & 17.75 & 4.00 \\
+ & Task 4 & 37.89 & 5.46 \\
+\midrule
+Warehouse & Task 1 & 35.11 & 3.96 \\
+ & Task 2 & 37.75 & 3.38 \\
+ & Task 3 & 58.84 & 1.00 \\
+ & Task 4 & 54.68 & 3.75 \\
+\bottomrule
+\end{tabular}
+\caption{}
+\label{tab:ppo_results_summary}
+\end{table}
+
+
+\subsection{Dynamics adaptation}
+\label{apdx:dynamics_adaptation}
+
+All buildings have a two dimensional action space and their observation space is padded to 20 dimensions (some differ due to varying numbers of unconditioned zones. Each model is trained with 4 million timesteps, with each episode spanning 8928 timesteps (1 month) in the winter period. (2) and (3) were trained with 16 different buildings running in parallel that were resampled from the training set with each episode. Policy and value networks for all models were neural networks with tanh activation and 2 hidden layers with 256 neurons.
+
+\subsection{cross domain transfer}
+\label{apdx:cross_domain}
+
+let $\mathsf{Emb} = \mathbb{R}^n$ denote the embedding space for a fixed embedding dimension $n$. The learnable components of the policy are (i) type-specific linear encoders $\{e_t : S(t) \to \mathsf{Emb}\}_{t \in T}$, (ii) a multi-layer transformer $\mathsf{trans} : \mathsf{Emb}^{|V|} \to \mathsf{Emb}^{|V|}$, and (iii) type-specific linear decoders $\{d_t : \mathsf{Emb} \to A(t)\}_{t \in T}$. Policy evaluation proceeds as follows:
+
+\begin{algorithmic}[1]
+\Function{Policy}{$s_\text{raw}$}
+    \State $s_v \gets \mathsf{split}(s_\text{raw})_v \quad \forall v$
+    \State $i_v \gets e_{t(v)}(s_v) \quad \forall v$
+    
+    \State $o \gets \mathsf{trans}(i)$
+    \State $a_v \gets d_{t(v)}(o_v) \quad \forall v$
+    \State \Return $\mathsf{join}(a)$
+\EndFunction
+\end{algorithmic}
+
+
+
+% \begin{table}[t]
+% \centering
+% \small
+% \setlength{\tabcolsep}{4pt}
+% \begin{tabular}{l l r r r}
+% \toprule
+% Building & Task & Mean & Median & Std \\
+% % \midrule
+% %   House & Barrier ($e_w\!=\!1$) & &  &  \\
+% %    & Deadband ($e_w\!=\!0.01$, const) &  & & \\
+% %    & Deadband ($e_w\!=\!0.01$, occ) &  &  &  \\
+% %    & Deadband ($e_w\!=\!0.1$, const) & &  &  \\
+% \midrule
+%   Small Office  & Barrier ($e_w\!=\!1$) & -28172.6 & -17413.5 & 31844.7 \\
+%    & Deadband ($e_w\!=\!0.01$, const) & -4064.3 & -3347.6 & 2135.2 \\
+%    & Deadband ($e_w\!=\!0.01$, occ) & -16513.7 & -15758.0 & 2602.1 \\
+%    & Deadband ($e_w\!=\!0.1$, const) & -4779.0 & -4204.1 & 1952.7 \\
+% \midrule
+% Medium Office  & Barrier ($e_w\!=\!1$) &  & &  \\
+%    & Deadband ($e_w\!=\!0.01$, const) &  &  &  \\
+%    & Deadband ($e_w\!=\!0.01$, occ) &  &  &  \\
+%    & Deadband ($e_w\!=\!0.1$, const) &  &  &  \\
+% \midrule
+%   Fast-Food Rest.  & Barrier ($e_w\!=\!1$) & -188394.1 & -170024.8 & 87415.7 \\
+%    & Deadband ($e_w\!=\!0.01$, const) & -8131.7 & -5413.9 & 6572.0 \\
+%    & Deadband ($e_w\!=\!0.01$, occ) & -12793.6 & -9784.9 & 6664.1 \\
+%    & Deadband ($e_w\!=\!0.1$, const) & -19040.1 & -17042.8 & 7725.2 \\
+% \midrule
+%   Standalone Retail & Barrier ($e_w\!=\!1$) & -57568.6 & -56120.7 & 29029.9 \\
+%    & Deadband ($e_w\!=\!0.01$, const) & -6304.2 & -6327.7 & 1971.6 \\
+%    & Deadband ($e_w\!=\!0.01$, occ) & -16224.0 & -16159.6 & 2667.6 \\
+%    & Deadband ($e_w\!=\!0.1$, const) & -7497.3 & -7304.1 & 1767.9 \\
+% \midrule
+%   Warehouse & Barrier ($e_w\!=\!1$) & -48996.7 & -40438.4 & 30713.6 \\
+%    & Deadband ($e_w\!=\!0.01$, const) & -5765.4 & -4894.8 & 2230.9 \\
+%    & Deadband ($e_w\!=\!0.01$, occ) & -18440.5 & -17599.1 & 3070.5 \\
+%    & Deadband ($e_w\!=\!0.1$, const) & -7356.7 & -6781.8 & 2295.8 \\
+% \bottomrule
+% \end{tabular}
+% \caption{Episode Return: mean, median and standard deviation per building type and task.}
+% \end{table}
+
+\end{document}
+
+

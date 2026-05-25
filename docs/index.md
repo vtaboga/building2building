@@ -40,7 +40,7 @@ RL**, and **meta-learning** for building energy management.
 import building2building as b2b
 
 # Create a Gymnasium environment
-env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task1")
+env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task_const_e0")
 
 obs, info = env.reset()
 done = False
@@ -55,7 +55,7 @@ env.close()
 
 ```python
 # Dynamics adaptation: same building type, different instances
-bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task1")
+bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task_const_e0")
 train_envs = bench.make_train_envs(n=4)
 test_envs = bench.make_test_envs(n=4)
 ```
@@ -66,7 +66,7 @@ test_envs = bench.make_test_envs(n=4)
 score = b2b.compute_normalized_score(
     cumulative_return=-5000.0,
     building_type="OfficeSmall",
-    task="task1",
+    task="task_const_e0",
     run_period="full_year",
     building_id="OfficeSmall-0001",
 )

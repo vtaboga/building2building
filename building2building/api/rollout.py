@@ -18,7 +18,7 @@ Example::
     import building2building as b2b
     import numpy as np
 
-    env = b2b.new_make_env("OfficeSmall", task="task1", run_period="winter")
+    env = b2b.new_make_env("OfficeSmall", task="task_const_e0", run_period="winter")
 
     def random_controller(_obs):
         return env.action_space.sample()

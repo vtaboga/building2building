@@ -38,7 +38,7 @@ class CrossDomainGeneralization(BenchmarkProblem):
     def __init__(
         self,
         difficulty: Literal["easy", "medium", "hard"] = "easy",
-        task: str = "task1",
+        task: str = "task_const_e0",
         n_train: int = 8,
         n_test: int = 8,
         seed: int = 0,

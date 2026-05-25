@@ -22,7 +22,7 @@ import building2building as b2b
 
 bench = b2b.benchmarks.DynamicsAdaptation(
     difficulty="easy",   # "easy", "medium", or "hard"
-    task="task1",        # task preset
+    task="task_const_e0",        # task preset
     n_train=900,         # number of training buildings
     n_test=71,           # number of test buildings
 )

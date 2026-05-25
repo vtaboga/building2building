@@ -2,11 +2,16 @@
 
 Defines task, reward, actuator, and building configuration dataclasses
 used across the simulation and RL pipeline.
+
+The only supported reward type is
+:class:`NormalizedDeadbandRewardConfig`, which carries per-bucket
+``(tau_T, tau_E)`` normalizers so that ``energy_weight`` is
+dimensionless and comparable across buildings.
 """
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Protocol, Sequence, Union
+from typing import Any, ClassVar, Literal, Protocol, Sequence
 
 
 RunPeriodName = Literal["full_year", "winter", "summer"]
@@ -222,7 +227,7 @@ class ZoneTargetTemperatureConfig:
 
 @dataclass(frozen=True)
 class RandomScheduleConfig:
-    """Configuration for the per-day random occupancy schedule (``task5``).
+    """Configuration for the per-day random occupancy schedule.
 
     This drives ``target_temperature_mode == "random_schedule"``: each
     simulated day a fresh arrival time, departure time, occupied
@@ -386,46 +391,6 @@ class TaskConfig:
         return self.zone_target_temperatures.get(key, self.default_zone_target_temperature)
 
 
-@dataclass
-class BaseRewardConfig:
-    """Reward configuration using only weighted energy consumption.
-
-    Attributes:
-        energy_weight: Multiplicative weight applied to energy cost.
-    """
-
-    energy_weight: float
-
-
-@dataclass
-class BarrierRewardConfig:
-    """Reward with a barrier penalty for temperature-band violations.
-
-    Attributes:
-        energy_weight: Multiplicative weight applied to energy cost.
-        dT: Half-width of the acceptable temperature band (°C).
-        violation_penalty: Penalty magnitude when temperature exits the
-            deadband.
-    """
-
-    energy_weight: float
-    dT: float = 0.5
-    violation_penalty: float = 100.0
-
-
-@dataclass
-class DeadbandRewardConfig:
-    """Reward that penalises deviations from a temperature deadband.
-
-    Attributes:
-        energy_weight: Multiplicative weight applied to energy cost.
-        dT: Half-width of the temperature deadband (°C).
-    """
-
-    energy_weight: float
-    dT: float
-
-
 @dataclass(frozen=True)
 class NormalizedDeadbandRewardConfig:
     """Deadband reward with per-bucket comfort/energy normalizers.
@@ -506,22 +471,10 @@ class NormalizedDeadbandRewardConfig:
         return replace(self, tau_T=float(tau_T), tau_E=float(tau_E))
 
 
-RewardConfig = Union[
-    DeadbandRewardConfig,
-    BaseRewardConfig,
-    BarrierRewardConfig,
-    NormalizedDeadbandRewardConfig,
-]
+RewardConfig = NormalizedDeadbandRewardConfig
 
 
-VALID_REWARD_TYPES = frozenset(
-    {
-        "DeadbandRewardConfig",
-        "BarrierRewardConfig",
-        "BaseRewardConfig",
-        "NormalizedDeadbandRewardConfig",
-    }
-)
+VALID_REWARD_TYPES = frozenset({"NormalizedDeadbandRewardConfig"})
 
 
 def reward_config_from_dict(
@@ -529,18 +482,15 @@ def reward_config_from_dict(
 ) -> RewardConfig:
     """Instantiate a reward config from a raw dictionary.
 
-    The ``"reward_type"`` key selects the concrete config class:
-
-    * ``"DeadbandRewardConfig"`` -> :class:`DeadbandRewardConfig`
-    * ``"BarrierRewardConfig"``  -> :class:`BarrierRewardConfig`
-    * ``"BaseRewardConfig"``     -> :class:`BaseRewardConfig`
+    The ``"reward_type"`` key must be ``"NormalizedDeadbandRewardConfig"``.
 
     Args:
         reward_section: Dictionary with a mandatory ``"reward_type"`` key
-            and type-specific parameters.
+            and type-specific parameters (``energy_weight``, ``dT``,
+            and optionally ``tau_T`` / ``tau_E``).
 
     Returns:
-        The appropriate ``RewardConfig`` variant.
+        A :class:`NormalizedDeadbandRewardConfig`.
 
     Raises:
         ValueError: If ``"reward_type"`` is missing or not recognised.
@@ -548,24 +498,9 @@ def reward_config_from_dict(
     reward_type = reward_section.get("reward_type")
     if reward_type is None:
         raise ValueError(
-            "reward.reward_type is required — specify one of "
-            f"{sorted(VALID_REWARD_TYPES)}.  "
+            "reward.reward_type is required — must be "
+            "'NormalizedDeadbandRewardConfig'. "
             "Pass an explicit reward config to avoid silent defaults."
-        )
-    if reward_type == "DeadbandRewardConfig":
-        return DeadbandRewardConfig(
-            energy_weight=float(reward_section.get("energy_weight", 0.01)),
-            dT=float(reward_section.get("dT", 1.0)),
-        )
-    if reward_type == "BarrierRewardConfig":
-        return BarrierRewardConfig(
-            energy_weight=float(reward_section.get("energy_weight", 1.0)),
-            dT=float(reward_section.get("dT", 100)),
-            violation_penalty=float(reward_section.get("violation_penalty", 10.0)),
-        )
-    if reward_type == "BaseRewardConfig":
-        return BaseRewardConfig(
-            energy_weight=float(reward_section.get("energy_weight", 0.0))
         )
     if reward_type == "NormalizedDeadbandRewardConfig":
         # Both tau_T and tau_E are optional in the dict form: missing

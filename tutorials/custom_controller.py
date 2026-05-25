@@ -85,7 +85,7 @@ class ProportionalController:
 
 def main() -> None:
     building_type = "OfficeSmall"
-    task = "task1"
+    task = "task_const_e0"
     run_period = "winter"
 
     # -- Compare controllers on a single building --

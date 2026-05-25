@@ -13,15 +13,6 @@ this file captures what is still relevant).
 
 ---
 
-## Active decisions pending
-
-### Task preset names
-
-Current names are mechanical (`task_const_w0`, `task_occ_wmed`, ...).
-Once legacy `task1`–`task5` is deleted, free hand to rename. Open
-question: `comfort_only` / `balanced` / `energy_priority` ×
-`const` / `occ` / `rand`? Defer until D9 (documentation pass).
-
 ---
 
 ## Calibration sanity plot
@@ -67,7 +58,7 @@ Calibration regime (load-bearing for Phase A/B/C):
   bucket (key `cz0`, no ASHRAE CZ assignment).
 
 Task family: nine presets `task_<mode>_<level>` over the 3×3 grid.
-mode ∈ {`const`, `occ`, `rand`}; level ∈ {`w0`, `wmed`, `whigh`}
+mode ∈ {`const`, `occ`, `rand`}; level ∈ {`e0`, `emed`, `ehigh`}
 with `w_E ∈ {0.0, 1.0, 5.0}`.
 
 Implementation map:
@@ -128,7 +119,7 @@ These are documented mechanisms, not bugs. They drive Phase B.
   penalty, repeat-action wrapper / lower control cadence, observation
   history.
 
-### SAC B2 ablation — 5-cell × 3-seed × 6-building on task_occ_wmed / full_year
+### SAC B2 ablation — 5-cell × 3-seed × 6-building on task_occ_emed / full_year
 
 Script: `analysis/task_study/sac_diagnostic/submit_ablation.sh`
 Submit: `sbatch --array=0-89 analysis/task_study/sac_diagnostic/submit_ablation.sh`
@@ -257,7 +248,7 @@ Monitor ( NormalizeObservation ( RescaleAction ( TimeLimit ( EnergyPlusSimulator
   the old files first.
 - `SubprocVecEnv` workers are single-threaded EnergyPlus; `N_ENVS =
   cpus - 2` is the sweet spot. Default sweeps use 14 envs on 16 CPUs.
-- `task_occ_w0` has `w_E = 0`, so the dominance-ratio plot is NaN
+- `task_occ_e0` has `w_E = 0`, so the dominance-ratio plot is NaN
   by construction — expected, not a bug.
 - **EnergyPlus resource leak (B0) — fixed upstream.** The leak-free
   lifecycle (stop the simulation thread, join it, `gc.collect()`, rmtree
@@ -387,7 +378,7 @@ Research deliverables:
 | PPO under new reward | Trained on winter only; freezes at `w_E ≥ 10`, `target_kl=0.02` too tight; **full-year sweep + retune pending** (B3, B4) |
 | SAC under new reward | `sac.yaml` updated with critic-stability fixes. **Conflicts with under-exploration narrative in § SAC; reconcile before Phase B closes** (B1, B2) |
 | EnergyPlus resource leak | **Fixed (B0).** Upstream `EnergyPlusEnvironment.close()` is leak-free (vtaboga/minergym@956c3e1). Residual ~14 MB/cycle EnergyPlus-native growth is irreducible from Python; see Operational gotchas. |
-| Legacy reward family (`task1`–`task5`, `BarrierReward`, un-norm `DeadbandReward`) | Still present; **deletion before paper rerun** (D2) |
+| Legacy reward family (`task1`–`task5`, `BarrierReward`, un-norm `DeadbandReward`) | **Deleted (D2).** Presets renamed to `task_<mode>_<e0/emed/ehigh>`. |
 | Paper figures and tables | Old reward; rerun pending (Phase C) |
 | `baseline_returns.csv` | Old reward; regen post-deletion (C1) |
 
@@ -402,7 +393,7 @@ OSS-readiness deliverables:
 | LICENSE | Missing (D1) |
 | Eval bug fixes (`eval_ppo.py`, `eval_dynamics_adaptation.py`) | Partially edited; regression tests pending (D3) |
 | CI | None (D7) |
-| Tutorials | 5 `.py` + 5 `.md`; **drifted; uses legacy `task1` family** (D9) |
+| Tutorials | 5 `.py` + 5 `.md`; **drifted; updated to normalized preset names** (D9) |
 | `REPRODUCING.md` | Pending (D5) |
 | Docs site | Builds; uses legacy task names; needs reward + benchmark-problem pages (D9, D14) |
 

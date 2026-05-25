@@ -4,7 +4,7 @@ name: dynamics_baseline
 
 defaults:
   - override /policy: ppo
-  - override /reward: task1
+  - override /reward: task_const_e0
   - override /training: default
 
 difficulty: easy

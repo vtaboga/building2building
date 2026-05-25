@@ -1,4 +1,4 @@
-"""Random daily occupancy/setpoint schedules for ``task5``.
+"""Random daily occupancy/setpoint schedules for ``task_rand_*`` presets.
 
 Defines per-building-type distributions for arrival and departure times
 as well as occupied/unoccupied setpoint ranges, and provides a

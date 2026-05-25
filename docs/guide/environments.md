@@ -29,7 +29,7 @@ env = b2b.new_make_env(
     "OfficeSmall",
     split="train",
     index=0,
-    task="task1",
+    task="task_const_e0",
     run_period="winter",
 )
 ```
@@ -42,7 +42,7 @@ env = b2b.new_make_env(
 | `split` | `"train"` / `"test"` | Dataset split |
 | `index` | `int` | Zero-based index into the split |
 | `building_id` | `str` | Explicit building ID (overrides split+index) |
-| `task` | `str` / `TaskPreset` | `"task1"`--`"task5"` or a `TaskPreset` |
+| `task` | `str` / `TaskPreset` | preset name (e.g. `"task_const_e0"`) or a `TaskPreset` |
 | `reward` | `RewardConfig` | Override reward (default: from task preset) |
 | `run_period` | `str` | `"full_year"`, `"winter"`, or `"summer"` |
 | `timesteps_per_hour` | `int` | Simulation resolution (default: 12 = 5 min) |
@@ -67,7 +67,7 @@ cfg = EnvBuildConfig(
         split_index=5,
     ),
     task=TaskConfig.from_dict({"run_period": "summer"}),
-    reward=reward_config_from_dict({"reward_type": "BarrierRewardConfig", "energy_weight": 0.1}),
+    reward=reward_config_from_dict({"reward_type": "NormalizedDeadbandRewardConfig", "energy_weight": 1.0, "dT": 1.0}),
     env_max_steps=8640,
 )
 env = make_env(cfg, eplus_output_dir="outputs/eplus")
@@ -80,13 +80,13 @@ B2B environments are also registered as Gymnasium environments:
 ```python
 import gymnasium as gym
 
-env = gym.make("b2b/OfficeSmall-v0", split="train", index=0, task="task1")
+env = gym.make("b2b/OfficeSmall-v0", split="train", index=0, task="task_const_e0")
 ```
 
 ## Environment Lifecycle
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
 
 obs, info = env.reset()         # Start EnergyPlus simulation
 for _ in range(100):

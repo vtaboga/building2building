@@ -20,17 +20,11 @@ from building2building.simulator.observation_spaces import (
     flat_observation_info,
 )
 from building2building.simulator.rewards import (
-    BarrierReward,
-    BaseReward,
-    DeadbandReward,
     NormalizedDeadbandReward,
 )
 from building2building.morphology import build_morphology
 from building2building.types import (
-    BarrierRewardConfig,
-    BaseRewardConfig,
     BuildingConfig,
-    DeadbandRewardConfig,
     NormalizedDeadbandRewardConfig,
     TaskConfig,
 )
@@ -241,63 +235,44 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         else controlled_zones
     )
 
-    if isinstance(building_config.reward_config, BarrierRewardConfig):
-        reward_function = BarrierReward(
-            controlled_zones=reward_zones,
-            energy_weight=building_config.reward_config.energy_weight,
-            dT=building_config.reward_config.dT,
-            violation_penalty=building_config.reward_config.violation_penalty,
-            task_config=task_config,
+    if not isinstance(building_config.reward_config, NormalizedDeadbandRewardConfig):
+        raise ValueError(
+            f"Unsupported reward type: {type(building_config.reward_config).__name__}. "
+            "Only NormalizedDeadbandRewardConfig is supported."
         )
-    elif isinstance(building_config.reward_config, BaseRewardConfig):
-        reward_function = BaseReward(
-            controlled_zones=reward_zones,
-            energy_weight=building_config.reward_config.energy_weight,
-            task_config=task_config,
+    cfg = building_config.reward_config
+    if not cfg.is_filled:
+        raise ValueError(
+            "NormalizedDeadbandRewardConfig has unfilled tau_T/tau_E. "
+            "This config is a preset sentinel; call "
+            "`building2building.api.new_make_env(...)` (which auto-fills "
+            "the constants from reward_normalizers.yaml) or explicitly "
+            "call `cfg.filled(tau_T, tau_E)` before constructing the "
+            "simulator."
         )
-    elif isinstance(building_config.reward_config, DeadbandRewardConfig):
-        reward_function = DeadbandReward(
-            controlled_zones=reward_zones,
-            energy_weight=building_config.reward_config.energy_weight,
-            dT=building_config.reward_config.dT,
-            task_config=task_config,
-        )
-    elif isinstance(building_config.reward_config, NormalizedDeadbandRewardConfig):
-        cfg = building_config.reward_config
-        if not cfg.is_filled:
-            raise ValueError(
-                "NormalizedDeadbandRewardConfig has unfilled tau_T/tau_E. "
-                "This config is a preset sentinel; call "
-                "`building2building.api.new_make_env(...)` (which auto-fills "
-                "the constants from reward_normalizers.yaml) or explicitly "
-                "call `cfg.filled(tau_T, tau_E)` before constructing the "
-                "simulator."
-            )
-        # ``cfg.is_filled`` guarantees these are positive floats.
-        assert cfg.tau_T is not None and cfg.tau_E is not None
-        reward_function = NormalizedDeadbandReward(
-            controlled_zones=reward_zones,
-            energy_weight=cfg.energy_weight,
-            dT=cfg.dT,
-            tau_T=cfg.tau_T,
-            tau_E=cfg.tau_E,
-            task_config=task_config,
-        )
-        source_meta = (
-            building_config.source_metadata
-            if isinstance(building_config.source_metadata, dict)
-            else {}
-        )
-        _maybe_warn_normalized_deadband(
-            task_config=task_config,
-            dT=cfg.dT,
-            building_type=source_meta.get("building_type"),
-            building_id=source_meta.get("building_id"),
-            tau_T=cfg.tau_T,
-            tau_E=cfg.tau_E,
-        )
-    else:
-        raise ValueError(f"Invalid reward type: {building_config.reward_config}")
+    # ``cfg.is_filled`` guarantees these are positive floats.
+    assert cfg.tau_T is not None and cfg.tau_E is not None
+    reward_function = NormalizedDeadbandReward(
+        controlled_zones=reward_zones,
+        energy_weight=cfg.energy_weight,
+        dT=cfg.dT,
+        tau_T=cfg.tau_T,
+        tau_E=cfg.tau_E,
+        task_config=task_config,
+    )
+    source_meta = (
+        building_config.source_metadata
+        if isinstance(building_config.source_metadata, dict)
+        else {}
+    )
+    _maybe_warn_normalized_deadband(
+        task_config=task_config,
+        dT=cfg.dT,
+        building_type=source_meta.get("building_type"),
+        building_id=source_meta.get("building_id"),
+        tau_T=cfg.tau_T,
+        tau_E=cfg.tau_E,
+    )
 
     # Finally, we compute the data necessary to fillin the metadata
     all_zones = set(str(z) for z in ont.zones())

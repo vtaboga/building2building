@@ -22,7 +22,7 @@ RUN_PERIOD = "winter"
 
 
 def main() -> None:
-    bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task1")
+    bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task_const_e0")
     train_ids = bench.train_building_ids()[:N_TRAIN_BUILDINGS]
     test_ids = bench.test_building_ids()[:N_TEST_BUILDINGS]
 
@@ -34,7 +34,7 @@ def main() -> None:
         env = b2b.new_make_env(
             bench.building_type,
             building_id=train_ids[idx % len(train_ids)],
-            task="task1",
+            task="task_const_e0",
             run_period=RUN_PERIOD,
         )
         env = b2b.PadObservation(env, target_size=PAD_SIZE)
@@ -62,7 +62,7 @@ def main() -> None:
         eval_env = b2b.new_make_env(
             bench.building_type,
             building_id=bid,
-            task="task1",
+            task="task_const_e0",
             run_period=RUN_PERIOD,
         )
         eval_env = b2b.PadObservation(eval_env, target_size=PAD_SIZE)

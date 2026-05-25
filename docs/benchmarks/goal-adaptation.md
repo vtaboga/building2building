@@ -14,8 +14,8 @@ import building2building as b2b
 bench = b2b.benchmarks.GoalAdaptation(
     building_type="OfficeSmall",
     split_index=0,
-    train_task="task1",   # train with Deadband, energy_weight=0.01
-    test_task="task2",    # test with Deadband, energy_weight=0.10
+    train_task="task_occ_emed",   # train: occupancy setpoints, balanced trade-off
+    test_task="task_occ_ehigh",   # test: same mode, higher energy emphasis
     run_period="full_year",
 )
 
@@ -34,10 +34,10 @@ Meaningful train/test combinations to explore:
 
 | Train | Test | What Changes |
 |---|---|---|
-| `task1` | `task2` | Energy weight increases 10x |
-| `task1` | `task3` | Temperature mode: constant to occupancy |
-| `task1` | `task4` | Reward type: deadband to barrier |
-| `task3` | `task1` | Temperature mode: occupancy to constant |
+| `task_occ_emed` | `task_occ_e0` | Energy weight: balanced → comfort-only |
+| `task_occ_emed` | `task_occ_ehigh` | Energy weight: balanced → energy-emphasis |
+| `task_occ_emed` | `task_const_emed` | Setpoint mode: occupancy → constant |
+| `task_occ_emed` | `task_rand_emed` | Setpoint mode: occupancy → random schedule |
 
 ## Parameters
 
@@ -45,6 +45,6 @@ Meaningful train/test combinations to explore:
 |---|---|---|---|
 | `building_type` | `BuildingType` | `"OfficeSmall"` | Building type to use |
 | `split_index` | `int` | `0` | Index within the train split |
-| `train_task` | `str` | `"task1"` | Task preset for training |
-| `test_task` | `str` | `"task2"` | Task preset for testing |
+| `train_task` | `str` | `"task_occ_emed"` | Task preset for training |
+| `test_task` | `str` | `"task_occ_ehigh"` | Task preset for testing |
 | `run_period` | `str` | `"full_year"` | Simulation run period |

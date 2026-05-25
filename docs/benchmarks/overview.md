@@ -35,7 +35,7 @@ Usage:
 ```python
 import building2building as b2b
 
-bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task1")
+bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task_const_e0")
 train_envs = bench.make_train_envs(n=4)
 test_envs = bench.make_test_envs(n=4)
 ```
@@ -44,8 +44,8 @@ test_envs = bench.make_test_envs(n=4)
 
 1. **Reproducible splits** -- building selections are deterministic and
    seeded.
-2. **Named task presets** -- `"task1"` through `"task5"` reproduce exact
-   paper conditions.
+2. **Named task presets** -- the 9 normalized presets (`task_<mode>_<level>`)
+   reproduce paper conditions.
 3. **Normalized scoring** -- `b2b.compute_normalized_score()` compares agent
    returns to the reactive-controller baseline for the same building.
 4. **Season-aware tasks** -- each side can specify a `run_period` (`winter`,

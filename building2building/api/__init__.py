@@ -174,7 +174,7 @@ def new_make_env(
     split: Literal["train", "test", "test_small"] = "train",
     index: int = 0,
     building_id: str | None = None,
-    task: str | TaskPreset = "task1",
+    task: str | TaskPreset = "task_const_e0",
     reward: str | RewardConfig | None = None,
     run_period: str = "full_year",
     normalizer_path: Path | None = None,
@@ -198,15 +198,14 @@ def new_make_env(
         building_id: Explicit building ID, overrides *split*/*index*.
         task: Named task preset or a
             :class:`~building2building.config.tasks.TaskPreset` instance.
-            Recognised names are the legacy paper presets
-            (``"task1"`` … ``"task5"``) and the 9 normalized presets
+            Recognised names are the 9 normalized presets
             ``"task_<mode>_<level>"`` with
-            ``mode ∈ {const, occ, rand}`` and ``level ∈ {w0, wmed, whigh}``.
-            For the normalized family, ``(tau_T, tau_E)`` are
-            auto-resolved from
+            ``mode ∈ {const, occ, rand}`` and ``level ∈ {e0, emed, ehigh}``.
+            ``(tau_T, tau_E)`` are auto-resolved from
             :file:`building2building/data/reward_normalizers.yaml`
-            using the building's
-            ``(building_type, climate_zone)`` bucket.
+            using the building's ``(building_type, climate_zone)`` bucket.
+            Defaults to ``"task_const_e0"`` (constant setpoint,
+            comfort-only).
         reward: Override reward.  If ``None``, uses the task default.
         run_period: Simulation run period name (``"full_year"``,
             ``"winter"``, ``"summer"``).
@@ -218,11 +217,11 @@ def new_make_env(
         target_temperature_mode: Override the preset's target mode
             (``"constant"``, ``"occupancy"``, or ``"random_schedule"``).
             When ``None`` (default), the mode is taken from the task
-            preset, so that e.g. ``task="task3"`` automatically uses
-            occupancy-based targets.
+            preset, so that e.g. ``task="task_occ_e0"`` automatically
+            uses occupancy-based targets.
         random_schedule_seed: Base seed for the per-day schedule
-            generator used by ``task5``.  ``None`` falls back to the
-            value on the preset's task config (default ``0``).
+            generator used by ``task_rand_*`` presets.  ``None`` falls
+            back to the value on the preset's task config (default ``0``).
         eplus_output_dir: Directory for EnergyPlus output.  If ``None``,
             a temporary directory is used.
         max_episode_steps: Maximum episode length.
@@ -265,7 +264,7 @@ def new_make_env(
     # Auto-fill unfilled NormalizedDeadbandRewardConfig sentinels using
     # the per-(building_type, climate_zone) constants in
     # reward_normalizers.yaml.  This is what makes
-    # ``new_make_env(task="task_occ_wmed", building_id=...)``
+    # ``new_make_env(task="task_occ_emed", building_id=...)``
     # "just work" — the preset stores ``tau_T = tau_E = None``, and
     # we resolve them once we know which building we're building.
     if (

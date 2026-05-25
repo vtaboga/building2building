@@ -54,7 +54,7 @@ class ConstantController:
 import building2building as b2b
 from baselines.utils.evaluation import run_episode
 
-env = b2b.new_make_env("SingleFamilyHouse", split="test", index=0, task="task1")
+env = b2b.new_make_env("SingleFamilyHouse", split="test", index=0, task="task_const_e0")
 policy = ConstantController(target_temp=21.0, fan_fraction=0.5)
 policy.bind_env(env)
 
@@ -123,7 +123,7 @@ class ProportionalController:
 ## Step 4: Compare Controllers
 
 ```python
-env = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task1")
+env = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task_const_e0")
 
 for Controller, kwargs in [
     (ConstantController, {"target_temp": 21.0, "fan_fraction": 0.5}),
@@ -146,7 +146,7 @@ policy = ProportionalController(target_temp=21.0, kp=0.15)
 returns = []
 
 for idx in range(5):
-    env = b2b.new_make_env("OfficeSmall", split="test", index=idx, task="task1",
+    env = b2b.new_make_env("OfficeSmall", split="test", index=idx, task="task_const_e0",
                            run_period="winter")
     policy.bind_env(env)
     result = run_episode(env, policy)

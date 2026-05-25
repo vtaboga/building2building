@@ -19,13 +19,13 @@ building types with different observation and action dimensions.
 ```python
 import building2building as b2b
 
-bench = b2b.benchmarks.CrossDomainGeneralization(difficulty="easy", task="task1")
+bench = b2b.benchmarks.CrossDomainGeneralization(difficulty="easy", task="task_const_e0")
 print(f"Train type: {bench.train_type}")   # RetailStandalone
 print(f"Test type: {bench.test_type}")     # OfficeSmall
 
 # Compare the two building types
-train_env = b2b.new_make_env(bench.train_type, split="train", index=0, task="task1")
-test_env = b2b.new_make_env(bench.test_type, split="test", index=0, task="task1")
+train_env = b2b.new_make_env(bench.train_type, split="train", index=0, task="task_const_e0")
+test_env = b2b.new_make_env(bench.test_type, split="test", index=0, task="task_const_e0")
 
 print(f"\nTrain: obs={train_env.observation_space.shape[0]}, act={train_env.action_space.shape[0]}")
 print(f"Test:  obs={test_env.observation_space.shape[0]}, act={test_env.action_space.shape[0]}")
@@ -36,7 +36,7 @@ test_env.close()
 ## Step 2: Explore the Morphology
 
 ```python
-env = b2b.new_make_env("RetailStandalone", split="train", index=0, task="task1")
+env = b2b.new_make_env("RetailStandalone", split="train", index=0, task="task_const_e0")
 morph = env.metadata["morphology"]
 
 print(f"Nodes: {len(morph.nodes)}")
@@ -53,7 +53,7 @@ env.close()
 import torch
 from baselines.models.amorpheus import AmorpheusPolicy
 
-env = b2b.new_make_env("RetailStandalone", split="train", index=0, task="task1")
+env = b2b.new_make_env("RetailStandalone", split="train", index=0, task="task_const_e0")
 morph = env.metadata["morphology"]
 
 policy = AmorpheusPolicy(morphology=morph, embed_dim=64)
@@ -72,7 +72,7 @@ env.close()
 
 ```python
 # Switch to OfficeSmall
-env2 = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task1")
+env2 = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task_const_e0")
 morph2 = env2.metadata["morphology"]
 
 # The SAME policy parameters, different morphology

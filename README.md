@@ -50,7 +50,7 @@ print(b2b.list_building_types())
 # ['SingleFamilyHouse', 'OfficeSmall', 'OfficeMedium', ...]
 
 # Create a Gymnasium environment
-env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task1")
+env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task_const_e0")
 
 obs, info = env.reset()
 done = False
@@ -82,19 +82,26 @@ env.close()
 
 ## Task Presets
 
-The paper defines five named task presets that control the reward function and
-target temperature behaviour:
+Nine named presets form a 3×3 grid over setpoint mode and energy weight,
+all using the normalized deadband reward with per-bucket `(tau_T, tau_E)`
+calibration constants:
 
-| Task | Reward | Energy Weight | Temperature Mode | dT |
-|---|---|---|---|---|
-| `task1` | Deadband | 0.01 | Constant | 1.0 |
-| `task2` | Deadband | 0.10 | Constant | 1.0 |
-| `task3` | Deadband | 0.01 | Occupancy (seasonal unoccupied setpoint) | 1.0 |
-| `task4` | Barrier | 0.01 | Constant | 1.0 |
-| `task5` | Deadband | 0.01 | Random daily schedule (per-building-type distribution) | 1.0 |
+| Task | Mode | Energy Weight |
+|---|---|---|
+| `task_const_e0` | Constant | 0.0 (comfort-only) |
+| `task_const_emed` | Constant | 1.0 (balanced) |
+| `task_const_ehigh` | Constant | 5.0 (energy-emphasis) |
+| `task_occ_e0` | Occupancy (seasonal) | 0.0 |
+| `task_occ_emed` | Occupancy (seasonal) | 1.0 |
+| `task_occ_ehigh` | Occupancy (seasonal) | 5.0 |
+| `task_rand_e0` | Random schedule | 0.0 |
+| `task_rand_emed` | Random schedule | 1.0 |
+| `task_rand_ehigh` | Random schedule | 5.0 |
+
+The default is `task_const_e0` (constant setpoint, comfort-only).
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task2")
+env = b2b.new_make_env("OfficeSmall", task="task_occ_emed")
 ```
 
 ---
@@ -111,7 +118,7 @@ Each benchmark class tests a different generalization axis:
 | `ActionSpaceTransfer` | Controllable actuators | Building, reward |
 
 ```python
-bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task1")
+bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task_const_e0")
 train_ids = bench.train_building_ids()
 test_ids = bench.test_building_ids()
 train_envs = bench.make_train_envs(n=4)
@@ -150,7 +157,7 @@ Score an agent relative to the reactive-controller baseline:
 score = b2b.compute_normalized_score(
     cumulative_return=-5000.0,
     building_type="OfficeSmall",
-    task="task1",
+    task="task_const_e0",
     run_period="full_year",
     building_id="OfficeSmall-0001",
 )

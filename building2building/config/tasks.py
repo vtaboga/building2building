@@ -3,36 +3,29 @@
 Each preset fully specifies the reward function, target temperature mode,
 and temperature setpoints for a reproducible benchmark task.
 
-Two families are currently defined:
+Nine presets form a 3x3 grid parameterized along
+``(setpoint_mode, energy_weight_level)``.  All use
+:class:`~building2building.types.NormalizedDeadbandRewardConfig`
+with ``dT=1.0`` and ``(tau_T, tau_E) = (None, None)`` (the unfilled
+sentinel state); :func:`building2building.api.new_make_env` resolves
+the per-(building_type, climate_zone) constants from
+:file:`building2building/data/reward_normalizers.yaml` at env-build
+time via :func:`make_normalized_deadband_task`.
 
-* **Legacy paper presets** (``task1`` … ``task5``): kept for backward
-  compatibility with existing PPO results in ``analysis/`` and
-  ``baseline_returns.csv``.  These use the un-normalized
-  :class:`~building2building.types.DeadbandRewardConfig` /
-  :class:`~building2building.types.BarrierRewardConfig`.
-* **Normalized 3×3 family** (``task_{const,occ,rand}_{w0,wmed,whigh}``):
-  9 presets parameterized along ``(setpoint_mode, energy_weight_level)``.
-  All use :class:`~building2building.types.NormalizedDeadbandRewardConfig`
-  with ``dT=1.0`` and ``(tau_T, tau_E) = (None, None)`` (the unfilled
-  sentinel state); :func:`building2building.api.new_make_env` resolves
-  the per-(building_type, climate_zone) constants from
-  :file:`building2building/data/reward_normalizers.yaml` at env-build
-  time via :func:`make_normalized_deadband_task`.
-
-Naming convention for the normalized family:
+Naming convention:
 
 * mode component (calibration regime is ``occ``):
-    * ``const`` — ``target_temperature_mode="constant"``, 21 °C / 21 °C.
-    * ``occ``   — ``target_temperature_mode="occupancy"`` with the
-      seasonal unoccupied policy (winter 18 °C / shoulder 21 °C /
-      summer 26 °C).  **This is the calibration regime**.
-    * ``rand``  — ``target_temperature_mode="random_schedule"``
+    * ``const`` -- ``target_temperature_mode="constant"``, 21 C / 21 C.
+    * ``occ``   -- ``target_temperature_mode="occupancy"`` with the
+      seasonal unoccupied policy (winter 18 C / shoulder 21 C /
+      summer 26 C).  **This is the calibration regime**.
+    * ``rand``  -- ``target_temperature_mode="random_schedule"``
       (per-day arrival/departure + setpoints).
-* weight component:
-    * ``w0``    — ``energy_weight = 0.0`` (comfort-only upper bound).
-    * ``wmed``  — ``energy_weight = 1.0`` (balanced under the
+* energy-weight component:
+    * ``e0``    -- ``energy_weight = 0.0`` (comfort-only).
+    * ``emed``  -- ``energy_weight = 1.0`` (balanced under the
       calibration random policy by construction).
-    * ``whigh`` — ``energy_weight = 5.0`` (energy emphasis).
+    * ``ehigh`` -- ``energy_weight = 5.0`` (energy emphasis).
 """
 
 from __future__ import annotations
@@ -42,8 +35,6 @@ from typing import Literal
 
 from building2building.types import (
     DEFAULT_SEASONAL_UNOCCUPIED_C,
-    BarrierRewardConfig,
-    DeadbandRewardConfig,
     NormalizedDeadbandRewardConfig,
     RewardConfig,
     SeasonName,
@@ -53,17 +44,17 @@ from building2building.types import (
 
 
 SetpointMode = Literal["constant", "occupancy", "random_schedule"]
-WeightLevel = Literal["w0", "wmed", "whigh"]
+WeightLevel = Literal["e0", "emed", "ehigh"]
 ModeShort = Literal["const", "occ", "rand"]
 
-#: Energy-weight values for the 3-level grid.  ``wmed = 1.0`` is the
+#: Energy-weight values for the 3-level grid.  ``emed = 1.0`` is the
 #: "balanced under the calibration random policy" anchor; the two
 #: endpoints are chosen to span comfort-only and energy-emphasis regimes
 #: without making the comparison degenerate.
 NORMALIZED_WEIGHT_LEVELS: dict[WeightLevel, float] = {
-    "w0": 0.0,
-    "wmed": 1.0,
-    "whigh": 5.0,
+    "e0": 0.0,
+    "emed": 1.0,
+    "ehigh": 5.0,
 }
 
 #: Map between short preset names and full :class:`TaskConfig` modes.
@@ -73,7 +64,7 @@ NORMALIZED_MODES: dict[ModeShort, SetpointMode] = {
     "rand": "random_schedule",
 }
 
-#: Calibration regime baked into ``reward_normalizers.yaml`` — used
+#: Calibration regime baked into ``reward_normalizers.yaml`` -- used
 #: only to flag the ``task_occ_*`` presets as the "in-distribution"
 #: subgroup in this module's docstring; the actual runtime check
 #: lives in :mod:`building2building.simulator`.
@@ -91,16 +82,16 @@ class TaskPreset:
             (``"constant"``, ``"occupancy"``-based, or
             ``"random_schedule"``).
         target_temperature_occupied: Target when zone is occupied
-            (°C).  Used as the *fallback* occupied setpoint for
+            (C).  Used as the *fallback* occupied setpoint for
             ``"random_schedule"``.
         target_temperature_unoccupied: Target when zone is unoccupied
-            (°C).  Used when ``unoccupied_policy == "fixed"``; acts
+            (C).  Used when ``unoccupied_policy == "fixed"``; acts
             as fallback otherwise.
         unoccupied_policy: ``"fixed"`` (default) keeps
             :attr:`target_temperature_unoccupied` constant;
             ``"seasonal"`` dispatches to :attr:`seasonal_unoccupied_c`
             based on the simulation month.
-        seasonal_unoccupied_c: Per-season unoccupied setpoints (°C)
+        seasonal_unoccupied_c: Per-season unoccupied setpoints (C)
             used when ``unoccupied_policy == "seasonal"``.  ``None``
             means "fall back to :data:`DEFAULT_SEASONAL_UNOCCUPIED_C`"
             at the resolution site.
@@ -147,10 +138,9 @@ def _build_normalized_preset(
             target_temperature_unoccupied=21.0,
         )
     if mode == "occupancy":
-        # Seasonal unoccupied policy matches ``task3`` (the calibration
-        # regime); fallback ``unoccupied_c=18`` is used only when
-        # ``unoccupied_policy="fixed"`` overrides at the env factory
-        # site.
+        # Seasonal unoccupied policy for the occupancy calibration regime.
+        # Fallback unoccupied_c=18 is used only when
+        # unoccupied_policy="fixed" overrides at the env factory site.
         return TaskPreset(
             reward=reward,
             target_temperature_mode="occupancy",
@@ -178,52 +168,11 @@ _NORMALIZED_TASK_PRESETS: dict[str, TaskPreset] = {
         mode_short=mode_short, level=level
     )
     for mode_short in ("const", "occ", "rand")
-    for level in ("w0", "wmed", "whigh")
+    for level in ("e0", "emed", "ehigh")
 }
 
 
-_LEGACY_TASK_PRESETS: dict[str, TaskPreset] = {
-    "task1": TaskPreset(
-        reward=DeadbandRewardConfig(energy_weight=0.01, dT=1.0),
-        target_temperature_mode="constant",
-        target_temperature_occupied=21.0,
-        target_temperature_unoccupied=21.0,
-    ),
-    "task2": TaskPreset(
-        reward=DeadbandRewardConfig(energy_weight=0.10, dT=1.0),
-        target_temperature_mode="constant",
-        target_temperature_occupied=21.0,
-        target_temperature_unoccupied=21.0,
-    ),
-    "task3": TaskPreset(
-        reward=DeadbandRewardConfig(energy_weight=0.01, dT=1.0),
-        target_temperature_mode="occupancy",
-        target_temperature_occupied=21.0,
-        target_temperature_unoccupied=18.0,
-        unoccupied_policy="seasonal",
-        seasonal_unoccupied_c=dict(DEFAULT_SEASONAL_UNOCCUPIED_C),
-    ),
-    "task4": TaskPreset(
-        reward=BarrierRewardConfig(
-            energy_weight=0.01, dT=1.0, violation_penalty=10.0
-        ),
-        target_temperature_mode="constant",
-        target_temperature_occupied=21.0,
-        target_temperature_unoccupied=21.0,
-    ),
-    "task5": TaskPreset(
-        reward=DeadbandRewardConfig(energy_weight=0.01, dT=1.0),
-        target_temperature_mode="random_schedule",
-        target_temperature_occupied=21.0,
-        target_temperature_unoccupied=18.0,
-    ),
-}
-
-
-TASK_PRESETS: dict[str, TaskPreset] = {
-    **_LEGACY_TASK_PRESETS,
-    **_NORMALIZED_TASK_PRESETS,
-}
+TASK_PRESETS: dict[str, TaskPreset] = dict(_NORMALIZED_TASK_PRESETS)
 
 
 def resolve_task_preset(task: str) -> TaskPreset:
@@ -231,10 +180,8 @@ def resolve_task_preset(task: str) -> TaskPreset:
 
     Recognised names:
 
-    * Legacy: ``"task1"``, ``"task2"``, ``"task3"``, ``"task4"``,
-      ``"task5"``.
-    * Normalized 3×3 family: ``"task_<mode>_<level>"`` where ``mode ∈
-      {const, occ, rand}`` and ``level ∈ {w0, wmed, whigh}`` — 9
+    * Normalized 3x3 family: ``"task_<mode>_<level>"`` where ``mode ∈
+      {const, occ, rand}`` and ``level ∈ {e0, emed, ehigh}`` -- 9
       combinations total.
 
     Args:
@@ -280,7 +227,7 @@ def make_normalized_deadband_task(
         mode: Setpoint mode.  Calibration assumes ``"occupancy"``;
             other values are accepted but cause the simulator to emit
             a calibration-mismatch :class:`RuntimeWarning`.
-        dT: Comfort deadband (°C); same caveat — calibration uses 1.0.
+        dT: Comfort deadband (C); same caveat -- calibration uses 1.0.
 
     Returns:
         A :class:`TaskPreset` whose reward is a *filled*

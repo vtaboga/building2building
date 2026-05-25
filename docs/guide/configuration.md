@@ -32,8 +32,7 @@ baselines/configs/
 │   ├── ppo_parameterized.yaml
 │   ├── unitary_hvac.yaml
 │   └── air_loop.yaml
-├── reward/               # Task reward definitions
-│   ├── task1.yaml ... task5.yaml
+├── reward/               # Task reward definitions (normalized presets only)
 ├── training/
 │   └── default.yaml      # Training loop parameters
 ├── tuned_controllers/    # Optuna-optimized controller configs
@@ -82,13 +81,11 @@ gae_lambda: 0.95
 
 ### Reward
 
-Task presets are mirrored as Hydra configs:
+Task presets are referenced by name in experiment configs:
 
 ```yaml
-# baselines/configs/reward/task1.yaml
-reward_type: DeadbandRewardConfig
-energy_weight: 0.01
-dT: 1.0
+defaults:
+  - override /reward: task_const_e0  # constant setpoint, comfort-only
 ```
 
 ### Training
