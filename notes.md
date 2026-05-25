@@ -128,6 +128,37 @@ These are documented mechanisms, not bugs. They drive Phase B.
   penalty, repeat-action wrapper / lower control cadence, observation
   history.
 
+### SAC B2 ablation — 5-cell × 3-seed × 6-building on task_occ_wmed / full_year
+
+Script: `analysis/task_study/sac_diagnostic/submit_ablation.sh`
+Submit: `sbatch --array=0-89 analysis/task_study/sac_diagnostic/submit_ablation.sh`
+Data: `$SCRATCH/b2b_sac_diagnostic/cell{N}_{name}/seed{S}/data/`
+Status: **PENDING** (not yet submitted)
+
+Ablation cells (all other hparams from the B1 sac.yaml):
+
+| Cell | Name | log_std_init | ent_coef | use_sde |
+|------|------|-------------|----------|---------|
+| 0 | baseline   | −3.0 | auto | True  |
+| 1 | fix_log_std | 0.0 | auto | True  |
+| 2 | fix_ent_coef | −3.0 | 0.2 | True  |
+| 3 | fix_sde | −3.0 | auto | False |
+| 4 | all_fixes  |  0.0 | 0.2 | False |
+
+Acceptance: cell 4 shows 0/18 runs with `best − final > 0.1`;
+action saturation < 10% at every checkpoint.
+
+Results (to be filled after run completes):
+
+<!-- RESULT PLACEHOLDER — replace once sbatch finishes -->
+| Cell | % degraded (best−final>0.1) | action sat. | notes |
+|------|----------------------------|-------------|-------|
+| 0    | _/18                       | _           |       |
+| 1    | _/18                       | _           |       |
+| 2    | _/18                       | _           |       |
+| 3    | _/18                       | _           |       |
+| 4    | _/18                       | _           |       |
+
 ### Cross-checks under PPO/SAC reruns
 
 - Constant-setpoint sweep (`task_const_*`) is a useful confounder

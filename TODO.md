@@ -175,7 +175,7 @@ pinned in `pyproject.toml`.
   upstream `EnergyPlusEnvironment` directly (i.e. without the
   in-tree subclass), proving the fix is complete upstream.
 
-### B1. Apply SAC fixes 1–3 to the policy config
+### ~~B1. Apply SAC fixes 1–3 to the policy config~~ ✓ done
 
 - Files: `baselines/configs/policy/sac.yaml` —
   `log_std_init: 0.0`, `ent_coef: 0.2`, `use_sde: false`. Add an
@@ -184,6 +184,7 @@ pinned in `pyproject.toml`.
   passes; SAC training launcher still produces valid trajectories
   on a 50 k-step smoke test.
 - Reference: `notes.md` § "SAC".
+- **Commit**: `64a4eb5` (feature/reward-normalization)
 
 ### B2. SAC ablation on the calibration anchor
 
@@ -196,6 +197,9 @@ learning. Commit a result note.
 - Acceptance: 0/18 (or near-zero) runs show
   `best - final > 0.1`; action saturation stays below 10% at every
   checkpoint; plot in `notes.md` quick-reference table.
+- **Script committed** — submit with:
+  `sbatch --array=0-89 analysis/task_study/sac_diagnostic/submit_ablation.sh`
+- **Status**: waiting for Slurm run; fill result table in `notes.md` § "SAC B2 ablation".
 
 ### B3. Re-tune PPO `target_kl` for the normalized regime
 
