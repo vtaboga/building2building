@@ -403,16 +403,28 @@ It is incomplete and shadows `pyproject.toml[training]`.
 - Acceptance: `requirements.txt` is gone; install instructions point
   exclusively at `pyproject.toml`.
 
-### D5. Write `REPRODUCING.md`
+### ~~D5. Write `REPRODUCING.md`~~ ✓
 
 A single document mapping every paper figure / table to the exact
 command (Hydra invocation, expected outputs, plotting command).
 
-- Files: new `REPRODUCING.md` at repo root; cross-link from
-  `README.md` and `design_doc.md`.
-- Acceptance: each Phase-C deliverable (PPO specialist, dynamics
-  adaptation, cross-domain, baseline_returns.csv) has an entry
-  with the exact one- or two-line command.
+- Files: new `REPRODUCING.md` at repo root; cross-linked from
+  `README.md` (Documentation section) and `design_doc.md`
+  (§2 Reproducibility principle).
+- Coverage: Phase-C deliverables (`baseline_returns.csv`, PPO
+  specialist, **SAC specialist** (camera-ready addition),
+  dynamics adaptation, cross-domain Amorpheus); plus extended
+  scope — Phase-B calibration / B2 SAC ablation / B3 PPO `target_kl`,
+  reactive-controller Optuna tuning, PPO CHS hyperparameter sweep,
+  smoke-test tier. Each entry has the exact Hydra one-/two-liner
+  *and* the plotting command, plus expected artefact paths.
+- Camera-ready note: commands target the normalized 3 × 3 task
+  family (`task_{const,occ,rand}_{w0,wmed,whigh}`); `REPRODUCING.md`
+  flags every spot where a config still defaults to a legacy
+  `task1`–`task5` reference and will be updated as part of D2 / C1.
+- Follow-up tracked: `plot_ppo_specialist.py` needs a third
+  bar-group for SAC (or a duplicate `plot_specialists.py`) before
+  the camera-ready figures can render PPO + SAC side-by-side.
 
 ### D6. Add `baselines/` smoke tests
 

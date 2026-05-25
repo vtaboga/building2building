@@ -57,7 +57,7 @@ researcher extending the benchmark via `building2building/pipeline/`
   deterministic obs normalization (`observation_space.low/high`) over
   running stats; committed `baseline_returns.csv` over regenerate;
   concrete seeds over `null`. Every shipped number reproducible from
-  one command (`REPRODUCING.md`, Phase D).
+  one command — see [`REPRODUCING.md`](REPRODUCING.md) (Phase D).
 - **Fail loudly** (per `AGENTS.md`). No silent fallbacks, no swallowing
   try/except. Sole sanctioned non-fatal signal: the off-calibration
   `RuntimeWarning` in `simulator/__init__.py` (deduped, never

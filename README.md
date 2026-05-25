@@ -171,6 +171,9 @@ pip install -e ".[docs]"
 mkdocs serve          # http://localhost:8000
 ```
 
+To reproduce every figure and table from the paper, see
+[`REPRODUCING.md`](REPRODUCING.md).
+
 ---
 
 ## Tests
