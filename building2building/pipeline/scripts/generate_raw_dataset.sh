@@ -40,6 +40,10 @@ source "$HOME/Building2Building/.venv/bin/activate"
 cd "$HOME/Building2Building" || exit 1
 
 export TMPDIR="${SLURM_TMPDIR:?}"
+# Route the store to persistent scratch so it survives across jobs and
+# does not fill the 100 GB home quota.
+export STORE_PATH="${SCRATCH:?SCRATCH must be set}/b2b"
+mkdir -p "$STORE_PATH"
 
 BUILDING_TYPES=("Warehouse" "HotelSmall" "RetailStandalone" "RestaurantFastFood" "OfficeMedium" "OfficeSmall")
 SHARD_COUNT=6

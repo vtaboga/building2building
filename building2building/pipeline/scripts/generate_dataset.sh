@@ -32,6 +32,10 @@ source "$HOME/Building2Building/.venv/bin/activate"
 cd "$HOME/Building2Building" || exit 1
 
 export TMPDIR="${SLURM_TMPDIR:?}"
+# Route the store to persistent scratch so it survives across jobs and
+# does not fill the 100 GB home quota.
+export STORE_PATH="${SCRATCH:?SCRATCH must be set}/b2b"
+mkdir -p "$STORE_PATH"
 
 # Set via --export=BUILDING_TYPE=... on the sbatch command line, or override here.
 BUILDING_TYPE="${BUILDING_TYPE:-OfficeMedium}"
