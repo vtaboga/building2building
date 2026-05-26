@@ -63,6 +63,15 @@ class AirLoopConfig:
     clg_sp_default: float = 22.0
     error_ema_alpha: float = 0.3
 
+    # Per-loop outdoor-air mass-flow command written by the reactive
+    # baseline at every step.  Pinned to the DOE OfficeMedium autosized
+    # minimum ventilation flow (~1.12 m³/s × 1.225 kg/m³ ≈ 1.37 kg/s);
+    # see notes.md § "OfficeMedium OA-mixer fix" Q3.  This knob is
+    # intentionally NOT in the Optuna search space -- the agent is the
+    # one learning to modulate OA, the RBC just provides a constant
+    # floor against which agent learning is measured.
+    oa_mass_flow: float = 1.37
+
 
 # ---------------------------------------------------------------------------
 # Internal state
@@ -86,6 +95,13 @@ class _ZoneState:
 @dataclass
 class _LoopState:
     sat_act_idx: int
+    # Index of the per-loop OA-mixer actuator in the env's flat
+    # ``action_names`` list.  Required: every VAVSystem produced by
+    # ``make_vav_system_controllable`` (post-M1) carries an OA actuator
+    # (see notes.md § "OfficeMedium OA-mixer fix" Q2).  Stale
+    # equipment.json files predating M1 will already fail to load via
+    # ``cattrs.structure`` before reaching this point.
+    oa_act_idx: int
     zones: list[_ZoneState] = field(default_factory=list)
     prev_sat: float = 20.5
 
@@ -173,6 +189,14 @@ class AirLoopPolicy:
             )
             assert sat_idx is not None
 
+            oa_idx = _match_actuator(
+                act_names,
+                vav.oa_mass_flow.component_type,
+                vav.oa_mass_flow.control_type,
+                vav.oa_mass_flow.component_name,
+            )
+            assert oa_idx is not None
+
             zones: list[_ZoneState] = []
             for term in vav.terminals:
                 flow_idx = _match_actuator(
@@ -213,6 +237,7 @@ class AirLoopPolicy:
             self._loops.append(
                 _LoopState(
                     sat_act_idx=sat_idx,
+                    oa_act_idx=oa_idx,
                     zones=zones,
                     prev_sat=cfg.sat_neutral,
                 )
@@ -306,6 +331,12 @@ class AirLoopPolicy:
             )
             action[loop.sat_act_idx] = sat
             loop.prev_sat = sat
+
+            # OA mixer: pinned at the constant configured value
+            # (per notes.md § "OfficeMedium OA-mixer fix" Q3).  Not
+            # rate-limited or modulated -- the agent learns OA
+            # modulation; the RBC supplies a constant minimum floor.
+            action[loop.oa_act_idx] = cfg.oa_mass_flow
 
             # Flow
             for i, z in enumerate(loop.zones):
