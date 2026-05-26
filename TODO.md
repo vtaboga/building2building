@@ -132,6 +132,270 @@ See `notes.md` § "Reward — calibration regime and impl map" and
 
 ---
 
+## Phase G — Reproducible dataset generation pipeline ≈
+
+**Status (2026-05-26).** Started on branch
+`phase/g-dataset-generation`. Phase G fills a structural gap: the
+HuggingFace dataset `vtaboga/building2building_dataset` was historically
+populated by an ad-hoc, never-committed script. M2's `regen_dataset.py`
+filled half the gap (Stage 2 — pipeline processing), but the LHS step
+(Stage 1 — IDF -> raw epJSON dataset) had no committed entry point at
+all (`scripts/generate_dataset.py` was deleted in commit `1f57775`,
+April 2026). Phase G separates the two stages cleanly, restores both
+entry points, and validates Stage 1 reproducibility against the existing
+`vtaboga/multizones_reference_buildings.zip`.
+
+| Item | Code commit | Outstanding follow-up |
+| --- | --- | --- |
+| G1 — restore deleted IDF source as `building2building/sources/ashrae_90_1.py` | this commit | — |
+| G2 — Stage 1 generator (`generate_raw_dataset.py` + Slurm wrapper) | pending | — |
+| G3 — Stage 1 validation (one-off; **does not** replace the live HF zip) | pending | user runs `sbatch ...generate_raw_dataset.sh`; agent runs the metadata.csv byte-diff + per-type 5-sample E+ smoke locally |
+| G4 — Stage 2 generator (`generate_dataset.py`; replaces M2's `regen_dataset.py` + `regen_officemedium.sh`) | pending | — |
+| G5 — Stage 2 validation + Phase M (M2) re-run | pending | user runs `sbatch ...generate_dataset.sh --building-type OfficeMedium` and `huggingface-cli upload` |
+
+**Two-stage architecture (mirrored in the file layout):**
+
+```
+Stage 1 (LHS sampling — runs once per dataset version)
+  ASHRAE 90.1-2022 base IDFs (96) + 16 EPWs from
+  energycodes.gov/ASHRAE901_all.zip
+        + building2building/pipeline/generate_raw_dataset.py
+        + Latin Hypercube Sampling over 7 envelope/geometry params
+              ↓
+  vtaboga/multizones_reference_buildings.zip (6000 epJSONs +
+                                              metadata.csv + 16 EPWs)
+
+Stage 2 (Pipeline processing — runs whenever pipeline code changes)
+  multizones_reference_buildings.zip
+        + building2building/pipeline/generate_dataset.py (Phase G4)
+        + building2building/pipeline/_build_control_derivation
+              ↓
+  vtaboga/building2building_dataset    (per-building.epjson,
+                                        equipment.json,
+                                        metadata.json,
+                                        metadata.parquet,
+                                        splits.json)
+```
+
+**Why Phase G blocks Phase M (M2).** M2 was originally going to run
+through `regen_dataset.py` + `regen_officemedium.sh`. Those two files
+are scheduled for deletion in G4 (replaced by `generate_dataset.py`
++ `generate_dataset.sh`). G4's new entry point is a strict superset:
+it accepts the same `--building-type OfficeMedium` flag, drops the
+brittle hardcoded equipment-type counter in `rebuild_metadata_parquet`
+in favour of counting actuators directly via `actuator_descriptions()`,
+and adds a `--force` / skip-existing semantic that makes resumed Slurm
+runs trivial. M2's acceptance criterion ("OfficeMedium HF dataset
+regenerated under the post-M1 pipeline") is preserved verbatim;
+**only the script path moves** (M2's `regen_officemedium.sh` ->
+G4's `generate_dataset.sh --building-type OfficeMedium`).
+
+### G1. Restore `building2building/sources/ashrae_90_1.py`
+
+The Stage-1 generator needs read access to the 96 ASHRAE 90.1-2022
+prototype IDFs (6 building types × 16 climate locations) plus the 16
+TMY3 EPWs. The historical source `b2b/sources/energycodes.py` exposed
+exactly this and was deleted in commit `1f57775` (April 2026
+refactoring). G1 restores it as
+`building2building/sources/ashrae_90_1.py`, modernised to the current
+`store.py` API:
+
+- `ASHRAE901_all_zip()`: a `DownloadFile` derivation pinned to the
+  official URL
+  `https://www.energycodes.gov/sites/default/files/2023-10/ASHRAE901_all.zip`
+  with the same SHA-256 hash the historical module used
+  (`de35252d...e212ab`). Re-download is content-verified.
+- `ASHRAE901_all()`: the extracted-on-disk tree (via `ExtractZip`).
+- `_index_buildings`, `_index_weathers`: `@derivation`-decorated
+  parquet indices over the IDF and EPW filename conventions.
+- `search_buildings(building_type=, year=, place=)` and
+  `search_weathers(state=, filename=)`: thin DuckDB queries returning
+  `pd.DataFrame` with a `path` column. Stage 1 reads IDF/EPW bytes
+  directly off the content-hashed extracted tree, so unlike the
+  historical version there is no `derivation` thunk column.
+
+- Files: `building2building/sources/ashrae_90_1.py` (new).
+- Acceptance: module imports cleanly; `ASHRAE901_all_zip()`,
+  `ASHRAE901_all()`, `_index_buildings(...)`, `_index_weathers(...)`
+  all construct without error and the `DownloadFile` carries the pinned
+  hash. (Live download + index build is exercised in G2's smoke test;
+  the G1 commit deliberately avoids triggering a 100 MB download
+  during a normal `pytest` collection cycle.)
+
+### G2. Stage 1 generator
+
+`building2building/pipeline/generate_raw_dataset.py` (new) reproduces
+the layout of `vtaboga/multizones_reference_buildings.zip` from the
+G1 source. The historical `scripts/generate_dataset.py` (deleted in
+`1f57775`) is the implementation reference; the modernised version
+lives inside the package (per `AGENTS.md`'s "OSS release ships Python
+entry points, not Slurm scripts" principle).
+
+- Inputs (CLI):
+  - `--output-dir <staging>` (required).
+  - `--samples-per-type 1000` (matches existing zip).
+  - `--seed 42` (matches existing zip).
+  - `--building-type` (repeatable; defaults to all 6 of
+    Warehouse, HotelSmall, RetailStandalone, RestaurantFastFood,
+    OfficeMedium, OfficeSmall).
+  - `--shard-index N --shard-count K` (Slurm parallelism; sharded by
+    building type so shards write disjoint epJSON ID ranges).
+  - `--force` (default off; skip-existing semantic on the per-building
+    epJSON files).
+- Output layout (matches existing zip):
+
+      <staging>/
+          metadata.csv                 (single file; full schema
+                                        building_id, building_type, place,
+                                        source_idf, weather_file, +
+                                        the 7 LHS parameter columns)
+          weather/*.epw                (16 files copied from the IDF
+                                        zip's extracted tree)
+          1.epJSON .. 6000.epJSON      (one per building, root-level)
+
+- Per-type LHS loop (lifted from the historical script with no logic
+  changes — the same `LatinHypercube(d=7, seed=42)` produces the same
+  sample matrix):
+  1. Resolve `(building_type, place)` rows via
+     `search_buildings(building_type=bt, year=2022)`.
+  2. Convert each base IDF to epJSON via
+     `building2building.simulator.generator.convert_to_epjson`.
+  3. For `i in range(samples_per_type)`: pick the base epJSON via
+     `base_indices[i]`, deepcopy, apply
+     `BuildingModification(**lhs_row)`, write
+     `<staging>/{building_id}.epJSON`.
+  4. Append a row to a per-shard partial `metadata_<shard>.csv`. After
+     all shards finish, the last shard merges them into `metadata.csv`.
+- A thin `building2building/pipeline/scripts/generate_raw_dataset.sh`
+  Slurm wrapper handles the array submission (one task per building
+  type, the last task does the merge).
+
+- Files: `building2building/pipeline/generate_raw_dataset.py`,
+  `building2building/pipeline/scripts/generate_raw_dataset.sh`,
+  `REPRODUCING.md` § "Dataset regeneration" updated to document Stage 1.
+- Acceptance: single-machine run with `--samples-per-type 1
+  --building-type Warehouse` produces 1 epJSON, a 1-row
+  `metadata.csv`, and the 16 EPW files; the row's
+  `(building_type, place, source_idf, weather_file)` exactly match the
+  upstream zip's row for `building_id=1`; the LHS parameter values
+  match to float precision (LHS is deterministic given seed + d + n).
+
+### G3. Stage 1 validation
+
+A one-off validation that confirms Stage 1 actually reproduces the
+existing `multizones_reference_buildings.zip`. **The existing live HF
+artefact is NOT replaced** — Stage 1 just demonstrates it could be.
+
+- Smoke test (committed under `tests/long/`, marked `@pytest.mark.long`
+  so `pytest -m quick` skips it; runs a few minutes):
+  `tests/long/test_generate_raw_dataset_matches_existing.py`:
+  - Generate 1 building per type (`--samples-per-type 1`).
+  - For each generated building, assert its row in the new
+    `metadata.csv` is byte-equal (modulo float repr) to the
+    corresponding row in the upstream zip's `metadata.csv`.
+  - Round-trip the new epJSON through a 1-day E+ simulation; assert
+    zero severe / fatal messages.
+- Full metadata diff (exercised once, by the user, on the cluster):
+  `sbatch building2building/pipeline/scripts/generate_raw_dataset.sh`
+  with `--samples-per-type 1000` produces a 6000-row `metadata.csv`;
+  the user diffs against the upstream zip's `metadata.csv`. The diff
+  must be empty for the
+  `(building_id, building_type, place, source_idf, weather_file)`
+  columns; the 7 LHS parameter columns must match to at least 12
+  decimal places (numpy LHS is deterministic but the dtype is
+  float64).
+- Per-type 5-sample E+ simulation (also under `tests/long/`):
+  pick 5 random building IDs per type, run a 1-day E+ on each
+  generated epJSON, assert all 30 sims complete with zero severe /
+  fatal messages. Catches any regression in the IDF -> epJSON path.
+
+- Acceptance: the smoke test passes locally; the user's full-grid
+  diff is empty (or differs only on float-repr columns within 1e-12);
+  the per-type E+ smoke completes 30/30.
+
+### G4. Stage 2 generator (replaces M2's `regen_dataset.py`)
+
+`building2building/pipeline/generate_dataset.py` (new) replaces
+`building2building/pipeline/regen_dataset.py` and
+`building2building/pipeline/scripts/regen_officemedium.sh`. M2's
+acceptance criterion is preserved by routing the OfficeMedium re-run
+through the new entry point.
+
+- Building-list source: download `splits.json` from
+  `vtaboga/building2building_dataset@main` (existing
+  `building2building/data/download.py::download_splits`); take the
+  union of `train ∪ test ∪ test_small` IDs for the requested building
+  types. Single source of truth, no local `<BT>_*_data.json` files
+  needed (those split files are not in the current tree anyway).
+- Per-building loop:
+  - Parse `processed_id = "OfficeMedium-4001"` -> `source_id = 4001`
+    via `int(processed_id.rsplit("-", 1)[1])`. Fail loud on
+    malformed IDs (no fallback to reading the existing HF cache).
+  - Skip if all three artefact files (`building.epjson`,
+    `equipment.json`, `metadata.json`) already exist under
+    `<output_dir>/<building_type>/<processed_id>/` and `--force` is
+    not set.
+  - Otherwise call
+    `building2building.sources.multizones_reference_buildings.\
+    _build_control_derivation(zip, f"{source_id}.epJSON",
+    "full_year")` (existing function; Stage 2 just drives it).
+  - Run `extract_discovery_metadata(...)` to compute
+    `net_conditioned_area` and `warmup_phases`. **No shortcut
+    --rerun-discovery flag** (always runs from scratch).
+  - Write the three artefacts.
+- `metadata.parquet` rebuild rewrites the `action_dim` column for the
+  regenerated rows by counting actuators directly from the
+  `equipment_list` returned by `_build_control_derivation` (i.e.
+  `sum(len(e.actuator_descriptions()) for e in equipment_list)`),
+  rather than re-parsing `equipment.json` via the brittle hardcoded
+  per-equipment-type counter currently in
+  `regen_dataset.rebuild_metadata_parquet`. Other columns
+  (`num_zones`, `observation_dim`, `weather_file`, `hvac_type`,
+  `climate_zone`) are copied from the upstream parquet unchanged for
+  non-regenerated rows; for regenerated rows the per-building
+  summary dict carries them through. **No silent skip** for missing
+  per-building dirs (current M2 logic warns and continues; new logic
+  raises).
+- `splits.json`: copied unchanged from the existing HF dataset (we
+  are keeping the same buildings — see Phase M Q5).
+- CLI: `python -m building2building.pipeline.generate_dataset
+  --output-dir <staging> [--building-type <bt> ...]
+  [--shard-index N --shard-count K] [--force]
+  [--write-metadata-parquet]`. Slurm wrapper at
+  `building2building/pipeline/scripts/generate_dataset.sh` (generic
+  over `--building-type`).
+- **Deletions in the same commit:**
+  - `building2building/pipeline/regen_dataset.py`.
+  - `building2building/pipeline/scripts/regen_officemedium.sh`.
+  - `REPRODUCING.md` § "Dataset regeneration" rewritten to point at
+    the new entry points.
+
+- Acceptance: smoke test (committed under `tests/long/` with skip-if-no-HF
+  marker) regenerates 1 OfficeMedium building, asserts the new
+  `equipment.json` round-trips through `cattrs.structure`,
+  `action_dim` in the rewritten parquet matches
+  `len(equipment_list[*].actuator_descriptions())`, and `splits.json`
+  is bit-identical to the upstream copy.
+
+### G5. Stage 2 validation + M2 re-run
+
+The user runs the new Slurm wrapper for OfficeMedium and uploads
+the resulting staging dir to HF. This subsumes Phase M's M2.
+
+- `sbatch building2building/pipeline/scripts/generate_dataset.sh
+  --building-type OfficeMedium`.
+- After all shards finish, push to HF per `REPRODUCING.md` § "Dataset
+  regeneration".
+- Update Phase M (M2) status: "subsumed by Phase G4 commit; user
+  Slurm follow-up redirects to G5".
+
+- Acceptance: the new HF revision loads via `b2b.new_make_env(
+  "OfficeMedium", split="train", index=k)` for `k` in
+  `splits["train"]["OfficeMedium"]`; `env.action_space.shape[0]`
+  reflects the post-M1 actuator count (36 = 33 + 3 OA mixers).
+
+---
+
 ## Phase M — OfficeMedium OA-mixer action-space fix ≈
 
 **Status (2026-05-25).** Code-side complete on branch
@@ -143,7 +407,7 @@ Slurm runs are tracked as outstanding follow-up commits.
 | --- | --- | --- |
 | M0 — design note | `3c84984` | — |
 | M1 — pipeline change | `5a9772d` | — |
-| M2 — HF dataset regen | `28f2e0a` | user runs `sbatch building2building/pipeline/scripts/regen_officemedium.sh` and `huggingface-cli upload` (see `REPRODUCING.md` § "Dataset regeneration") |
+| M2 — HF dataset regen | `28f2e0a` (interim — superseded by Phase G4) | **superseded by Phase G4.** Once G4 lands, M2's Slurm follow-up redirects to G5 (`sbatch building2building/pipeline/scripts/generate_dataset.sh --building-type OfficeMedium`). The interim `regen_dataset.py` + `regen_officemedium.sh` files are deleted in G4. |
 | M3 — RBC pins OA + retune | `0141961` | user runs `sbatch baselines/scripts/tune_controller.sh`, then commits the 8 new `air_loop_officemedium_cz{1..8}.yaml` |
 | M4 — reward normalizers | `e9da856` | user runs the cache-invalidation + `sbatch --array=9-16 .../launch_compute_random_policy_reward_normalizers.sh` + `--mode aggregate`, then commits the resulting `reward_normalizers.yaml` diff |
 
