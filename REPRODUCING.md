@@ -336,6 +336,40 @@ python -m analysis.task_study.compute_random_policy_reward_normalizers \
 (committed). Sanity plot lives under `analysis/` (gitignored;
 location documented in `notes.md` § "Calibration sanity plot").
 
+#### Partial regeneration (single building type)
+
+When the pipeline changes the action space of one building type (e.g.
+Phase M's OfficeMedium OA-mixer fix), only that type's
+`(τ_T, τ_E)` rows need to be recalibrated.  The per-building rollout
+cache under
+`$SCRATCH/b2b_reward_normalizers_random/data/<run_period>/<bt>/`
+is keyed by `(run_period, building_type, building_id)` only -- no
+content hash -- so stale OfficeMedium caches would silently shadow
+the new action space.  Invalidate and re-run:
+
+```bash
+# 1. Drop stale OfficeMedium caches.
+rm -rf $SCRATCH/b2b_reward_normalizers_random/data/*/OfficeMedium/
+
+# 2. Re-roll OfficeMedium across all 8 climate zones.  The launcher's
+#    array indices 9..16 are the (OfficeMedium, CZ 1..8) buckets
+#    (see analysis/task_study/scripts/launch_compute_random_policy_reward_normalizers.sh,
+#    bucket index = type_index * 8 + (cz - 1), OfficeMedium is type_index 1).
+sbatch --array=9-16 \
+    analysis/task_study/scripts/launch_compute_random_policy_reward_normalizers.sh
+
+# 3. After the array finishes, aggregate over ALL building types.
+#    Non-OfficeMedium caches are unchanged, so their rows in the YAML
+#    come out bit-identical to the pre-regen version; only the
+#    OfficeMedium rows shift.
+python -m analysis.task_study.compute_random_policy_reward_normalizers \
+    --mode aggregate
+```
+
+Then commit the resulting `building2building/data/reward_normalizers.yaml`
+diff (which `git diff` shows touches only the OfficeMedium `cz{1..8}`
+rows across the three seasons).
+
 ### B2. SAC diagnostic ablation
 
 5-cell × 3-seed × 6-building ablation on `task_occ_emed` /

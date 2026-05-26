@@ -682,6 +682,20 @@ expected to load against the new dataset.**
     territory**; M4 uses whichever path is current at the time.
     If F2 has not yet moved it, M4 runs the analysis-path
     invocation and files no migration sub-commit.
+  - The existing script already supports the partial regen via
+    `--building-types OfficeMedium`, and the per-building cache is
+    keyed by `(run_period, building_type, building_id)` only.
+    **Operational caveat:** the cache has no content hash, so stale
+    OfficeMedium JSON caches under
+    `$SCRATCH/b2b_reward_normalizers_random/data/*/OfficeMedium/`
+    must be deleted before re-rollout. `REPRODUCING.md` § B/A now
+    documents the exact `rm` + `sbatch --array=9-16` + `--mode
+    aggregate` sequence.  Other building types' cached samples are
+    bit-identical pre-/post-M, so their YAML rows come out
+    bit-identical; only OfficeMedium rows shift.
+  - This commit ships only the documentation update; the YAML
+    update lands as the follow-up commit after the user runs the
+    Slurm array and the aggregate step.
 
 ---
 
