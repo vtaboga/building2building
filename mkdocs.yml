@@ -109,6 +109,7 @@ nav:
       - building2building.envs: api/envs.md
       - building2building.data: api/data.md
       - baselines: api/baselines.md
+      - API Stability: api/stability.md
   - About:
       - Known Issues: about/known-issues.md
       - Testing: about/testing.md

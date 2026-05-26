@@ -203,7 +203,9 @@ B2B_RUN_LONG_TESTS=1 pytest              # Full suite
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE). See [`CHANGELOG.md`](CHANGELOG.md) for
+version history and [`docs/api/stability.md`](docs/api/stability.md) for the
+public API contract and deprecation policy.
 
 ---
 
