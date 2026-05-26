@@ -940,58 +940,54 @@ references stay valid); the table below maps each item to its track.
 
 New items added when Phase D was split into two tracks (2026-05-13):
 
-### D12. Define and label the API contract test tier (D-API)
+### ~~D12. Define and label the API contract test tier (D-API)~~ ✓ partial (commit `3017b5c`, 2026-05-26)
 
-Per `design_doc.md` §4 (Tier 1): `tests/quick/test_api*.py`,
+`api_contract` marker registered in `pyproject.toml`; auto-applied
+by `tests/conftest.py::pytest_collection_modifyitems` to the eight
+glob-listed files (`test_api.py`, `test_api_mode_default.py`,
 `test_new_api.py`, `test_gym_registration.py`, `test_climate_zones.py`,
 `test_data_registry.py`, `test_selection_and_env_creation.py`,
-`test_types.py` collectively pin the public surface listed in §3.2.
+`test_types.py`). Each file received the 3-line contract header.
+`pytest -m api_contract` selects exactly those eight files.
 
-- Files: add `@pytest.mark.api_contract` marker (register in
-  `pyproject.toml [tool.pytest.ini_options].markers`); add a 3-line
-  comment header to each file stating "this file pins the public
-  API contract; changes here = breaking API changes; requires a
-  `CHANGELOG.md` entry"; expand `conftest.py` `pytest_collection_modifyitems`
-  to auto-apply the marker by file glob if convenient.
-- Acceptance: `pytest -m api_contract` selects exactly the files
-  listed above; `pytest -m "quick and not api_contract"` selects the
-  Tier-2 pure-logic tests; a deliberate breaking change to
-  `building2building/__init__.py` exports causes at least one
-  `api_contract` test to fail.
+**Deferred to Phase T:** the contract-coverage acceptance
+("a deliberate breaking change to `building2building/__init__.py`
+exports causes at least one `api_contract` test to fail") is met
+for a subset of `__all__` but not all of it. `test_new_api.py`
+only `hasattr`-checks `list_building_types`, `list_buildings`,
+`new_make_env`, `compute_normalized_score`, `benchmarks`,
+`NormalizedDeadbandRewardConfig`, and `RewardConfig`; removing
+`wrap_env_for_rl`, `Morphology`, equipment types, etc. from
+`__all__` would still pass. Tightening the assertion to iterate
+over the full `__all__` list belongs with the Phase T `tests/`
+sweep (T27, contract-focused docstring + assertion pass).
 
-### D13. Add `CHANGELOG.md` + deprecation policy (D-API)
+### ~~D13. Add `CHANGELOG.md` + deprecation policy (D-API)~~ ✓ (commit `333f46b`, 2026-05-26)
 
-A `CHANGELOG.md` at the repo root with a Keep-a-Changelog format, and
-a one-paragraph deprecation policy: how long a deprecated symbol
-stays before removal, how `DeprecationWarning` is raised, where it is
-documented.
+`CHANGELOG.md` at repo root in Keep-a-Changelog format with an
+`[Unreleased]` section and a planned `[0.1.0]` entry.
+`docs/api/stability.md` lists every symbol in
+`building2building/__init__.py.__all__` and documents the
+deprecation policy (deprecation window, how to raise
+`DeprecationWarning`, breaking-change checklist). Both are
+cross-linked from the `README.md` License section and registered
+in `mkdocs.yml`.
 
-- Files: new `CHANGELOG.md` (start with the OSS release as v0.1.0),
-  `docs/api/stability.md` (one page summarizing §3.2 + the deprecation
-  policy), cross-link from `README.md`.
-- Acceptance: `CHANGELOG.md` parses with a Keep-a-Changelog linter;
-  `docs/api/stability.md` lists every symbol in
-  `building2building/__init__.py.__all__`.
+### ~~D14. Document the four benchmark problems on the docs site (D-API)~~ ✓ (commit `1e60d3c`, 2026-05-26)
 
-### D14. Document the four benchmark problems on the docs site (D-API)
+One page per benchmark under `docs/benchmarks/`. The pre-existing
+kebab-case filenames (`cross-domain.md`, `dynamics-adaptation.md`,
+`goal-adaptation.md`, `action-transfer.md`) were extended in place
+rather than creating the snake_case names in the spec; the
+`mkdocs.yml` nav already pointed at the kebab-case files.
+Each page now includes a metric / axis table and a minimal
+`new_make_env` + benchmark-class code block, cross-linked from
+`README.md`.
 
-Each problem (cross-domain, dynamics adaptation, goal adaptation,
-action-space transfer) gets one docs page that explains: the train/test
-split, the held-constant axes, the metric, the relevant baseline, and
-one minimal code example using `new_make_env` + a benchmark class.
+### ~~D1. Add MIT LICENSE~~ ✓ (commit `83711d0`, 2026-05-26)
 
-- Files: `docs/benchmarks/{cross_domain,dynamics_adaptation,goal_adaptation,action_space_transfer}.md`,
-  `mkdocs.yml` nav update.
-- Acceptance: `mkdocs build --strict` passes; each page renders an
-  end-to-end runnable code block; cross-linked from the paper PDF
-  link in `README.md`.
-
-### D1. Add MIT LICENSE
-
-- Files: new `LICENSE` (MIT, year + author lines populated);
-  `pyproject.toml` (`license` field); `README.md` footer.
-- Acceptance: `LICENSE` file exists; `pyproject.toml` parses; README
-  cites it.
+`LICENSE` (MIT) at repo root, `pyproject.toml` `license` field, and
+`README.md` footer all updated.
 
 ### ~~D2. Delete the legacy reward family~~ ✓ (commit `574baaa`, 2026-05-25)
 
@@ -1022,16 +1018,49 @@ each TODO item that adds, moves, or removes a runnable script
 (Cross-phase principle 2). Outstanding follow-up: the side-by-
 side PPO + SAC specialist figure command (tracked under C2).
 
-### D6. Add `baselines/` smoke tests
+### ~~D6. Add `baselines/` smoke tests~~ ✓ partial (commit `89d7f34`, 2026-05-26)
 
-- Files: new `tests/quick/test_train_ppo_smoke.py`,
-  `tests/quick/test_train_sac_smoke.py` (extend existing),
-  `tests/quick/test_eval_ppo.py` covering D3 fixes,
-  `tests/quick/test_run_reactive_control_smoke.py`.
-- Acceptance: all new tests run in < 60 s total; `pytest -m quick`
-  green.
+Landed: `tests/quick/test_train_ppo_smoke.py` (5 PPO build tests +
+import smoke) and `tests/quick/test_run_reactive_control_smoke.py`
+(import, `RunResult` schema, CSV schema, `_select_policy`
+signature). Both run in < 5 s combined.
 
-### D6.5. Audit and triage the test suite (precedes D7)
+**Deferred to Phase T:**
+
+- Extending the existing `tests/quick/test_train_sac_smoke.py` was
+  not done. The existing file already asserts most of what D6
+  asked for (`build_sac` construction, hyperparameter overrides,
+  activation-fn string conversion, `PAPER_SAC_DEFAULTS` keys,
+  module importability); any additional coverage is folded into
+  Phase T's wrapper / training-helper rewrites.
+- `tests/quick/test_eval_ppo.py` was not created. D3's regression
+  contracts live in `tests/quick/test_eval_bugs.py`, which T1 and
+  T27 step 3 explicitly re-scope: the worth-keeping path-layout
+  contract migrates to `tests/quick/test_eval_path_layout.py`,
+  and the historical CSV-column / `pad_obs_size` checks are
+  dropped. No new `test_eval_ppo.py` file is needed.
+
+### ~~D6.5. Audit and triage the test suite (precedes D7)~~ ✓ partial (commit `e1c7a3c`, 2026-05-26)
+
+Quick-tier collection errors and stale preset names cleared in
+`tests/quick/`. Two scopes were **not** addressed and are deferred
+to Phase T (see new item **T-pre** below):
+
+1. The same `BaseRewardConfig` / `DeadbandReward` import errors
+   exist in `tests/long/` (`test_observation_dimension.py`,
+   `test_occupancy_observation.py`, `test_random_schedule_rollout.py`,
+   `test_rescale_action.py`, `test_seasonal_unoccupied.py`), causing
+   `pytest -m quick` itself to abort at collection time on a fresh
+   checkout because pytest collects then filters. D6.5 only swept
+   `tests/quick/`.
+2. Six tests in `tests/quick/test_rl_wrappers.py`
+   (`test_wrap_env_for_rl_*`, `test_get_reward_params_walks_through_wrappers`,
+   `test_make_rl_env_fn_returns_monitor_wrapped_env`) pass in
+   isolation but fail when the full quick suite runs first — a
+   collection-order leak from another test file. D6.5 noted this
+   in its commit body and deferred it; it now blocks D7's CI.
+
+Original brainstorm text retained below for the historical record.
 
 **Start with a user brainstorm** before touching any files. The agent
 must present the candidate changes (keep / add / remove / fix) and get
@@ -1080,25 +1109,40 @@ pre-existing and unrelated to recent code changes. Four root causes:
   (no training extras, no dataset download); the brainstorm document is
   preserved as a comment in this TODO item or a linked PR description.
 
-### D7. Add CI
+### ~~D7. Add CI~~ ✓ workflow committed (commit `3017b5c`, 2026-05-26) — **red on `main` until Phase T T-pre lands**
 
-A minimal GitHub Actions workflow.
+`.github/workflows/test.yml` runs `pytest -m quick -q` on push and
+PR, matrix over Python 3.10 + 3.11, after `pip install -e ".[test]"`.
+The workflow file itself is correct.
 
-- Files: `.github/workflows/test.yml` running `pip install -e ".[test]"`
-  and `pytest -m quick` on push and PR; matrix over Python 3.10 + 3.11.
-- Acceptance: workflow file is valid (`actionlint` or equivalent);
-  passes when triggered.
+The workflow currently **fails on every push** because of the two
+issues catalogued under D6.5 above (long-tier `BaseRewardConfig`
+import errors abort collection; six `test_rl_wrappers.py` tests
+fail under the full quick-suite order). Both are deferred to Phase
+T item **T-pre**; CI goes green once that lands. No production-code
+change is needed in D7 itself.
 
 ### D8. Update `README.md` "Known Issues" section
 
-After D3 lands.
+After D3, D6, and D7 have landed (all done as of 2026-05-26).
 
 - Files: `README.md`.
-- Acceptance: items fixed in D3 are removed; remaining limitations
-  (e.g. legacy SAC stability if Phase B is incomplete at release
-  time) are listed honestly.
+- Acceptance: items fixed in D3 are removed; the stale
+  "No tests exist for `baselines/` code" bullet (line 203) is
+  removed or narrowed now that D6 added PPO + reactive-control
+  smoke tests; remaining honest limitations (legacy SAC stability
+  if Phase B is incomplete at release time, CI red until Phase T
+  T-pre) are listed.
 
-### D9. Documentation pass for the new reward family
+### ~~D9. Documentation pass for the new reward family~~ ✓ (commit `f7fa693`, 2026-05-26)
+
+D-lite option taken: each `docs/tutorials/*.md` was converted to
+thin prose + a link to its runnable `tutorials/*.py` counterpart.
+`rg 'task[1-5]'` returns nothing under `docs/` or `tutorials/`. No
+code block in `docs/tutorials/*.md` duplicates code that also
+lives in `tutorials/*.py`. The preset-rename open question was
+already settled in D2 (`task_<mode>_<level>`); no further renaming
+was needed here. Original spec kept below for reference.
 
 Three concerns roll into this single docs pass:
 
@@ -1136,27 +1180,37 @@ Three concerns roll into this single docs pass:
   `docs/tutorials/*.md` duplicates code that also lives in
   `tutorials/*.py`.
 
-### D10. Final cleanup
+### ~~D10. Final cleanup~~ ✓ partial (commit `1abfc42`, 2026-05-26)
 
-- Files: confirm `.gitignore` covers any remaining ignored working
-  dirs (the 2026-05-12 cleanup deleted `scrap/`, `staging/`,
-  `refactoring/`, `plans/`, `wandb/`, `site/`, `logs/`; the
-  `.gitignore` entries are retained as tripwires); run `black .`;
-  run `pyright building2building baselines`; review and resolve any
-  remaining `WIP` / `TODO` comments in code.
-- Acceptance: `git status` after a clean checkout is empty for
-  ignored dirs; `black --check .` and `pyright` are clean (or any
-  remaining issues are documented in `notes.md`).
+`black .` pass landed across `building2building/`, `baselines/`,
+`tests/`, `tutorials/`. `pyright building2building baselines` was
+run; the remaining 242 errors (matplotlib/torch private-import
+stubs, Hydra-typed `str → BuildingType` Literals, `PolicyLike`
+gaps, pipeline internals) are catalogued in
+`notes.md § "D10 — pyright status (2026-05-26)"` and left for
+follow-up phases.
 
-### D11. Delete `summaries/`
+**Deferred:** The commit subject claims "remove dead
+ThermostatSetpoint stub" but the actual diff for
+`building2building/pipeline/steps/thermostat_setpoints.py` only
+contains black reformatting — no removal landed.
+`AddSetpointControl` / `add_setpoint_control` /
+`get_temperature_setpoints` are still imported and re-exported
+in `building2building/pipeline/__init__.py.__all__` despite
+having no remaining call site in `building2building/` or
+`baselines/`. The cleanup is folded into Phase T item **T27 step
+7** (stale fixture / dead public-surface audit), which is the
+natural home for "this is re-exported but called from nowhere"
+removals.
 
-After `notes.md` has been validated as a complete substitute and
-nothing in `summaries/` is still referenced.
+### ~~D11. Delete `summaries/`~~ ✓ (commit `d0767a2`, 2026-05-26)
 
-- Files: `git rm -r summaries/`; remove any leftover references in
-  `design_doc.md` / `notes.md`.
-- Acceptance: `rg summaries/` returns nothing; user has confirmed
-  `notes.md` is sufficient.
+`summaries/` directory removed (was already untracked /
+gitignored; its content had been absorbed into `notes.md`). Live
+references in `notes.md` and `design_doc.md` were updated.
+Remaining mentions are intentional historical context
+(`notes.md:11`, `notes.md:892`) and the gitignore tripwire
+(`.gitignore:54`); they do not refer to live content.
 
 ### D15. Execute the `analysis/` → `baselines/` migration
 
@@ -1304,6 +1358,55 @@ false reassurance.
 
 These are guidelines, not absolute rules — the goal is fewer
 sources of false positives, not maximum integration-test purity.
+
+### T-pre. Unblock CI (deferred from Phase D D6.5 / D7)
+
+**Land first in Phase T.** D7 shipped a GitHub Actions workflow
+that runs `pytest -m quick -q`, but two pre-existing issues —
+both partially addressed in D6.5 and explicitly deferred — keep
+CI red on every push:
+
+1. **`tests/long/` import errors.** Five files
+   (`test_observation_dimension.py`, `test_occupancy_observation.py`,
+   `test_random_schedule_rollout.py`, `test_rescale_action.py`,
+   `test_seasonal_unoccupied.py`) still
+   `from building2building.types import BaseRewardConfig`, a
+   symbol deleted in D2. `pytest -m quick` collects then filters,
+   so the collection errors abort the run before any test executes.
+   Fix: same sweep D6.5 ran against `tests/quick/` —
+   replace deleted-symbol imports with `NormalizedDeadbandRewardConfig`
+   / `RewardConfig` and adapt the construction call sites. Some of
+   these files are slated for relocation or deletion under T3 /
+   T27 anyway; the unblocking patch only needs to keep collection
+   green, not preserve every assertion.
+2. **`tests/quick/test_rl_wrappers.py` ordering leak.** Six tests
+   (`test_wrap_env_for_rl_observation_space_is_unit_interval`,
+   `test_wrap_env_for_rl_action_in_minus_one_one`,
+   `test_wrap_env_for_rl_action_default_off`,
+   `test_wrap_env_for_rl_flags_are_independent`,
+   `test_get_reward_params_walks_through_wrappers`,
+   `test_make_rl_env_fn_returns_monitor_wrapped_env`) pass when
+   the file runs in isolation but fail when the full quick suite
+   runs first. A leak from an earlier test is mutating shared
+   state (likely a gymnasium registry side-effect, env-var,
+   working directory, or singleton in
+   `building2building.simulator`). Find the offender via
+   `pytest tests/quick -q --maxfail=1 -x` bisection. Fix at the
+   source — either reset state in a fixture (`autouse=True`,
+   `monkeypatch`-style), or rewrite the leaking test to not
+   mutate shared state. **Do not paper over with
+   `pytest-randomly`-style ordering pins**; the leak is real and
+   blocks T24's wrapper rewrites.
+
+The fix should land as two commits (one per root cause) so each
+is bisectable. After T-pre, `pytest -m quick` exits 0 from a
+fresh checkout with `pip install -e ".[test]"` and the D7 CI
+workflow turns green.
+
+- Files: `tests/long/test_*.py` (5 files for import sweep);
+  whichever file is leaking state for the ordering fix.
+- Acceptance: `pytest -m quick` green on a fresh checkout under
+  Python 3.10 and 3.11; the GitHub Actions matrix from D7 passes.
 
 ### T0. Minimal-building fixture matrix + shared registry helper
 
@@ -2442,6 +2545,15 @@ detail; T27b executes):
    references it, `git rm` it. Document the deletions in the
    commit message so a contributor who later needs an EDD fixture
    knows it used to exist.
+   **Also covers the D10 deferred ThermostatSetpoint stub:** the
+   `building2building/pipeline/steps/thermostat_setpoints.py` module
+   (`AddSetpointControl`, `add_setpoint_control`,
+   `get_temperature_setpoints`) is imported and re-exported from
+   `building2building/pipeline/__init__.py.__all__` but has no
+   remaining call site. Confirm with `rg` and remove the file +
+   the `__all__` entries in the same commit. If `rg` finds a live
+   call site that was missed in the D10 audit, leave the module
+   alone and document the call site.
 8. **Re-evaluate `test_reward_normalizers.py::test_default_path_constant_points_inside_package`.**
    T1 kept it; T27 decides if it has earned its place now that
    `data/` should have stabilised. Keep if `data/` is still moving;
