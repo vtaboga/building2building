@@ -26,7 +26,20 @@ except ModuleNotFoundError:
 
 
 def pytest_collection_modifyitems(items: List[pytest.Item]) -> None:
+    _API_CONTRACT_GLOBS = {
+        "test_api.py",
+        "test_api_mode_default.py",
+        "test_new_api.py",
+        "test_gym_registration.py",
+        "test_climate_zones.py",
+        "test_data_registry.py",
+        "test_selection_and_env_creation.py",
+        "test_types.py",
+    }
+    api_contract_marker = pytest.mark.api_contract
     for item in items:
+        if Path(item.fspath).name in _API_CONTRACT_GLOBS:
+            item.add_marker(api_contract_marker)
         if "quick" in item.keywords or "long" in item.keywords:
             continue
         item.add_marker(pytest.mark.quick)

@@ -8,6 +8,10 @@ behaviour when the ``climate_zone`` column is missing from the metadata.
 The tests use the fake-dataset fixture defined in ``tests/conftest.py``; they
 do not hit HuggingFace.
 """
+# This file pins the public API contract.
+# Changes here = breaking API changes; requires a CHANGELOG.md entry.
+# Marker applied automatically by conftest.py (api_contract glob).
+
 
 from __future__ import annotations
 

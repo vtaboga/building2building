@@ -11,6 +11,10 @@ The tests exercise a lightweight patched version of ``new_make_env``
 that stops right after the ``TaskConfig`` is built, so they do **not**
 require the HuggingFace registry or EnergyPlus.
 """
+# This file pins the public API contract.
+# Changes here = breaking API changes; requires a CHANGELOG.md entry.
+# Marker applied automatically by conftest.py (api_contract glob).
+
 
 from __future__ import annotations
 
