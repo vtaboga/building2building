@@ -8,7 +8,7 @@ Update as the project moves; keep it short and context-efficient.
 Companion: `design_doc.md` (slow-changing intent + roadmap),
 `TODO.md` (atomic action items), `paper/main.tex` (final results).
 
-Distilled from `summaries/` (which will be deleted once everyone agrees
+Distilled from the now-deleted `summaries/` directory (content absorbed here).
 this file captures what is still relevant).
 
 ---
@@ -889,8 +889,7 @@ reader can find the trail if needed.
   (max actuator saturation ≥ 50%, mean |T−setpoint| during saturation
   > 1 °C), not policy-suboptimal. Read: the RBC tuning is fine; those
   buildings have undersized HVAC.
-- `summaries/` (4 .md files): distilled into this `notes.md`; safe
-  to delete per TODO D11.
+- `summaries/` (4 .md files): distilled into this `notes.md`; deleted in D11.
 - `plans/parallel_seeds_single_node.md`: planning note for parallel
   SAC seed runs; superseded by `baselines/scripts/train_sac_array.sh`.
 - `refactoring/` (4 files): historical refactoring notes; the two
