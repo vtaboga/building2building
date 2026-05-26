@@ -133,6 +133,18 @@ def _make_cooling_sp_actuator(name: str) -> ActuatorDescription:
     )
 
 
+def _make_oa_mass_flow_actuator(name: str) -> ActuatorDescription:
+    """Stub OA mixer actuator for VAVSystem fixtures, added in Phase M."""
+    return ActuatorDescription(
+        component_type="Outdoor Air Controller",
+        control_type="Air Mass Flow Rate",
+        component_name=name,
+        units="[kg/s]",
+        lower_bound=0.0,
+        upper_bound=5.0,
+    )
+
+
 @pytest.mark.quick
 class TestActionSpaceTransfer:
     def test_defaults(self) -> None:
@@ -188,7 +200,11 @@ class TestUnitarySatOverrides:
             heating_setpoint=_make_heating_sp_actuator("htg_z1"),
             cooling_setpoint=_make_cooling_sp_actuator("clg_z1"),
         )
-        vav = VAVSystem(supply_temp_setpoint=central_sat, terminals=[terminal])
+        vav = VAVSystem(
+            supply_temp_setpoint=central_sat,
+            terminals=[terminal],
+            oa_mass_flow=_make_oa_mass_flow_actuator("oa_loop1"),
+        )
         overrides = _unitary_sat_overrides([vav])
         assert overrides == {}
 
@@ -229,7 +245,13 @@ class TestCentralSatOverrides:
             heating_setpoint=_make_heating_sp_actuator("htg_z1"),
             cooling_setpoint=_make_cooling_sp_actuator("clg_z1"),
         )
-        equipment = [VAVSystem(supply_temp_setpoint=central_sat, terminals=[terminal])]
+        equipment = [
+            VAVSystem(
+                supply_temp_setpoint=central_sat,
+                terminals=[terminal],
+                oa_mass_flow=_make_oa_mass_flow_actuator("oa_loop1"),
+            )
+        ]
 
         overrides = _central_sat_overrides(equipment)
         assert overrides == {"central_sat_loop1": _DEFAULT_CENTRAL_SAT_VALUE}
@@ -250,7 +272,13 @@ class TestCentralSatOverrides:
                 heating_setpoint=_make_heating_sp_actuator(f"htg_z{i}"),
                 cooling_setpoint=_make_cooling_sp_actuator(f"clg_z{i}"),
             )
-            equipment.append(VAVSystem(supply_temp_setpoint=central_sat, terminals=[terminal]))
+            equipment.append(
+                VAVSystem(
+                    supply_temp_setpoint=central_sat,
+                    terminals=[terminal],
+                    oa_mass_flow=_make_oa_mass_flow_actuator(f"oa_loop{i}"),
+                )
+            )
 
         overrides = _central_sat_overrides(equipment)
         assert len(overrides) == 3
@@ -265,7 +293,13 @@ class TestCentralSatOverrides:
             heating_setpoint=_make_heating_sp_actuator("htg"),
             cooling_setpoint=_make_cooling_sp_actuator("clg"),
         )
-        equipment = [VAVSystem(supply_temp_setpoint=central_sat, terminals=[terminal])]
+        equipment = [
+            VAVSystem(
+                supply_temp_setpoint=central_sat,
+                terminals=[terminal],
+                oa_mass_flow=_make_oa_mass_flow_actuator("oa"),
+            )
+        ]
         overrides = _central_sat_overrides(equipment, fixed_value=15.0)
         assert overrides == {"csat": 15.0}
 
@@ -358,7 +392,13 @@ class TestActionSpaceTransferComputeOverrides:
             heating_setpoint=_make_heating_sp_actuator("htg_z1"),
             cooling_setpoint=_make_cooling_sp_actuator("clg_z1"),
         )
-        return [VAVSystem(supply_temp_setpoint=central_sat, terminals=[terminal])]
+        return [
+            VAVSystem(
+                supply_temp_setpoint=central_sat,
+                terminals=[terminal],
+                oa_mass_flow=_make_oa_mass_flow_actuator("oa"),
+            )
+        ]
 
     def test_unitary_reduced_fixes_sat(self) -> None:
         bm = ActionSpaceTransfer(system_type="unitary")
