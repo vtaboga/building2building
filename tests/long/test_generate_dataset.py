@@ -103,9 +103,9 @@ def test_generate_dataset_officemedium_smoke(tmp_path: Path) -> None:
 
     df = pd.read_parquet(parquet_path)
     row = df[df["building_id"] == processed_id]
-    assert len(row) == 1, (
-        f"processed_id={processed_id!r} not found in rewritten metadata.parquet"
-    )
+    assert (
+        len(row) == 1
+    ), f"processed_id={processed_id!r} not found in rewritten metadata.parquet"
     assert int(row.iloc[0]["action_dim"]) == n_actuators_from_eq, (
         f"action_dim in parquet ({row.iloc[0]['action_dim']}) "
         f"!= actuator count ({n_actuators_from_eq})"
@@ -115,6 +115,6 @@ def test_generate_dataset_officemedium_smoke(tmp_path: Path) -> None:
     copy_splits(out_root)
     staging_splits = json.loads((out_root / "splits.json").read_text())
     upstream_splits = json.loads(download_splits().read_text())
-    assert staging_splits == upstream_splits, (
-        "splits.json written by copy_splits differs from the HF upstream"
-    )
+    assert (
+        staging_splits == upstream_splits
+    ), "splits.json written by copy_splits differs from the HF upstream"

@@ -31,12 +31,8 @@ from building2building.pipeline.actuators import (
     gensym,
 )
 
-
 FIXTURE_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "fixtures"
-    / "minimal_vav"
-    / "building.epjson"
+    Path(__file__).resolve().parents[1] / "fixtures" / "minimal_vav" / "building.epjson"
 )
 
 
@@ -63,8 +59,7 @@ def test_three_vav_loops_yield_three_oa_actuators(
     # constant elsewhere in the pipeline (Q1) but we assert it here so
     # that any regression that drops or duplicates a loop is caught.
     assert len(vav_systems) == 3, (
-        f"Expected 3 VAV loops on the OfficeMedium fixture, got "
-        f"{len(vav_systems)}"
+        f"Expected 3 VAV loops on the OfficeMedium fixture, got " f"{len(vav_systems)}"
     )
 
     oa_actuators = []
@@ -174,12 +169,12 @@ def test_no_ems_program_overrides_agent_actuators(
     ems_actuators = obj.get("EnergyManagementSystem:Actuator", {})
     for name, act in ems_actuators.items():
         comp_name = act.get("actuated_component_unique_name", "")
-        assert "CLGSETP_SCH" not in comp_name, (
-            f"EMS actuator {name!r} still targets CLGSETP_SCH"
-        )
-        assert "HTGSETP_SCH" not in comp_name, (
-            f"EMS actuator {name!r} still targets HTGSETP_SCH"
-        )
+        assert (
+            "CLGSETP_SCH" not in comp_name
+        ), f"EMS actuator {name!r} still targets CLGSETP_SCH"
+        assert (
+            "HTGSETP_SCH" not in comp_name
+        ), f"EMS actuator {name!r} still targets HTGSETP_SCH"
 
 
 def test_actuator_count_matches_design(
@@ -194,6 +189,5 @@ def test_actuator_count_matches_design(
     vav_systems = [e for e in equipment if isinstance(e, VAVSystem)]
     total = sum(len(v.actuator_descriptions()) for v in vav_systems)
     assert total == 51, (
-        f"Expected 51 VAV-side actuators for the OfficeMedium fixture, "
-        f"got {total}"
+        f"Expected 51 VAV-side actuators for the OfficeMedium fixture, " f"got {total}"
     )

@@ -52,9 +52,7 @@ class BuildingModification:
 # ---------------------------------------------------------------------------
 
 
-def _scale_envelope_conductivity(
-    epjson: dict[str, Any], scale: float
-) -> None:
+def _scale_envelope_conductivity(epjson: dict[str, Any], scale: float) -> None:
     """Scale the ``conductivity`` field of every ``Material`` object."""
     for _name, mat in epjson.get("Material", {}).items():
         if "conductivity" in mat:
@@ -155,9 +153,15 @@ def _set_fenestration_to_wall_ratio(
 
         cx, cy, cz = _centroid(fen_verts)
         for v in fen_verts:
-            v["vertex_x_coordinate"] = cx + (v["vertex_x_coordinate"] - cx) * linear_scale
-            v["vertex_y_coordinate"] = cy + (v["vertex_y_coordinate"] - cy) * linear_scale
-            v["vertex_z_coordinate"] = cz + (v["vertex_z_coordinate"] - cz) * linear_scale
+            v["vertex_x_coordinate"] = (
+                cx + (v["vertex_x_coordinate"] - cx) * linear_scale
+            )
+            v["vertex_y_coordinate"] = (
+                cy + (v["vertex_y_coordinate"] - cy) * linear_scale
+            )
+            v["vertex_z_coordinate"] = (
+                cz + (v["vertex_z_coordinate"] - cz) * linear_scale
+            )
 
         _set_fenestration_vertices(fen, fen_verts)
 

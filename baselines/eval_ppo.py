@@ -116,9 +116,7 @@ def main() -> None:
     parser.add_argument(
         "--output", type=str, default="results_ppo.csv", help="Output CSV path"
     )
-    parser.add_argument(
-        "--n-episodes", type=int, default=1, help="Episodes per model"
-    )
+    parser.add_argument("--n-episodes", type=int, default=1, help="Episodes per model")
     parser.add_argument(
         "--run-period",
         type=str,
@@ -193,9 +191,7 @@ def main() -> None:
     logger.info("Wrote %d results to %s", len(all_results), out_path)
     if all_results:
         scores = [
-            r.normalized_score
-            for r in all_results
-            if r.normalized_score is not None
+            r.normalized_score for r in all_results if r.normalized_score is not None
         ]
         if scores:
             logger.info(

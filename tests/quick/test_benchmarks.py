@@ -78,6 +78,7 @@ class TestDynamicsAdaptation:
 # ActionSpaceTransfer
 # ---------------------------------------------------------------------------
 
+
 def _make_fan_actuator(name: str) -> ActuatorDescription:
     return ActuatorDescription(
         component_type="Fan",
@@ -212,7 +213,10 @@ class TestUnitarySatOverrides:
         equipment = [
             UnitarySystem(
                 zone=f"Zone{i}",
-                actuators=[_make_fan_actuator(f"fan_z{i}"), _make_sat_actuator(f"sat_z{i}")],
+                actuators=[
+                    _make_fan_actuator(f"fan_z{i}"),
+                    _make_sat_actuator(f"sat_z{i}"),
+                ],
             )
             for i in range(5)
         ]
@@ -363,9 +367,7 @@ class TestHvacActionSpaceAdditionalFixed:
         fan = _make_fan_actuator("fan")
         sat = _make_sat_actuator("sat")
 
-        result = hvac_action_space(
-            [fan, sat, vav_clg], additional_fixed={"sat": 22.0}
-        )
+        result = hvac_action_space([fan, sat, vav_clg], additional_fixed={"sat": 22.0})
         assert len(result.agent_actuators) == 1
         assert result.agent_actuators[0].component_name == "fan"
         assert len(result.fixed_indices) == 2

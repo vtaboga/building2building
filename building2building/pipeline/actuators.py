@@ -57,7 +57,9 @@ temp_stl_upper_bound = 50.0  # fallback; overridden per-system when possible
 
 STD_AIR_DENSITY = 1.2  # kg/m³ at ~20 °C, 101.325 kPa
 DEFAULT_FAN_MAX_KGS = 15.0  # fallback when design data is unavailable
-DEFAULT_SAT_MAX_C = 60.0  # fallback when maximum_supply_air_temperature is Autosize or missing
+DEFAULT_SAT_MAX_C = (
+    60.0  # fallback when maximum_supply_air_temperature is Autosize or missing
+)
 # Upper bound on the ``Controller:OutdoorAir × Air Mass Flow Rate`` EMS
 # actuator (kg/s). 5.0 kg/s exceeds the DOE OfficeMedium per-loop design
 # supply-air flow (~4-6 kg/s) while staying well below the unphysical
@@ -100,9 +102,7 @@ def _set_dx_cooling_compressor_lockout(
             return
 
 
-def _read_fan_design_flow_kgs(
-    obj: dict[str, Any], fan_name: str
-) -> float | None:
+def _read_fan_design_flow_kgs(obj: dict[str, Any], fan_name: str) -> float | None:
     """Read the fan's design max air flow [m³/s] from the epJSON and convert to kg/s.
 
     EnergyPlus object names are case-insensitive, so we fall back to a
@@ -182,9 +182,7 @@ def _ensure_always_on_availability(
     avail_list_name = loop_obj.get("availability_manager_list_name")
     if not avail_list_name:
         return
-    avail_list = obj.get("AvailabilityManagerAssignmentList", {}).get(
-        avail_list_name
-    )
+    avail_list = obj.get("AvailabilityManagerAssignmentList", {}).get(avail_list_name)
     if avail_list is None:
         return
 
@@ -192,7 +190,10 @@ def _ensure_always_on_availability(
     scheduled_mgrs = obj.setdefault("AvailabilityManager:Scheduled", {})
 
     for mgr in avail_list.get("managers", []):
-        if mgr.get("availability_manager_object_type") != "AvailabilityManager:NightCycle":
+        if (
+            mgr.get("availability_manager_object_type")
+            != "AvailabilityManager:NightCycle"
+        ):
             continue
         old_name = mgr.get("availability_manager_name", "")
         night_cycle_mgrs.pop(old_name, None)
@@ -203,7 +204,10 @@ def _ensure_always_on_availability(
         mgr["availability_manager_name"] = new_name
         mgr["availability_manager_object_type"] = "AvailabilityManager:Scheduled"
 
-    if "AvailabilityManager:NightCycle" in obj and not obj["AvailabilityManager:NightCycle"]:
+    if (
+        "AvailabilityManager:NightCycle" in obj
+        and not obj["AvailabilityManager:NightCycle"]
+    ):
         del obj["AvailabilityManager:NightCycle"]
 
 
@@ -315,8 +319,7 @@ def make_unitary_controllable(
     # Step 1: zone -> terminal_inlet_node
     # Walk: EquipmentConnections -> EquipmentList -> ADU -> NoReheat terminal
     zone_to_terminal_inlet: dict[str, str] = {
-        str(row.zone): str(row.terminalInletNode)
-        for row in g.query("""
+        str(row.zone): str(row.terminalInletNode) for row in g.query("""
             SELECT ?zone ?terminalInletNode
             WHERE {
                 ?equipConn a "ZoneHVAC:EquipmentConnections" .
@@ -355,8 +358,7 @@ def make_unitary_controllable(
     # demand_side_inlet_node_names can be either a direct node literal (VAV
     # buildings) or a NodeList name (UnitarySystem buildings) — handle both.
     splitter_inlet_to_loop: dict[str, str] = {
-        str(row.demandInletNode): str(row.loop)
-        for row in g.query("""
+        str(row.demandInletNode): str(row.loop) for row in g.query("""
             SELECT ?loop ?demandInletNode
             WHERE {
                 ?loop a "AirLoopHVAC" .
@@ -406,8 +408,7 @@ def make_unitary_controllable(
     # Step 5: loop_name -> demand_side_inlet_node
     # Needed to clean up SingleZone SPMs that target the demand inlet.
     loop_to_demand_inlet: dict[str, str] = {
-        str(row.loop): str(row.demandInletNode)
-        for row in g.query("""
+        str(row.loop): str(row.demandInletNode) for row in g.query("""
             SELECT ?loop ?demandInletNode
             WHERE {
                 ?loop a "AirLoopHVAC" .
@@ -501,7 +502,9 @@ def make_unitary_controllable(
             )
             sat_max = DEFAULT_SAT_MAX_C
         temp_stl_name = create_temp_stl(
-            obj, temp_stl_lower_bound, sat_max,
+            obj,
+            temp_stl_lower_bound,
+            sat_max,
             name="unitaryhvac temperature setpoints stl",
         )
 
@@ -518,8 +521,7 @@ def make_unitary_controllable(
             to_delete = [
                 name
                 for name, spm in obj[spm_type].items()
-                if spm.get("setpoint_node_or_nodelist_name", "").upper()
-                == outlet_upper
+                if spm.get("setpoint_node_or_nodelist_name", "").upper() == outlet_upper
             ]
             for name in to_delete:
                 del obj[spm_type][name]
@@ -530,9 +532,7 @@ def make_unitary_controllable(
             22,
             name="unitaryhvac temp setpoint schedule",
         )
-        spm_label = (
-            f"B2B Unitary TEMP SPM for {outlet_node} ({gensym()})"
-        )
+        spm_label = f"B2B Unitary TEMP SPM for {outlet_node} ({gensym()})"
         setpoint_managers[spm_label] = {
             "control_variable": "Temperature",
             "schedule_name": sched_constant_name,
@@ -680,9 +680,7 @@ def make_heating_only_controllable(
     ont = Ontology.from_object(obj)
     g = ont.rdf
 
-    htg_stl_name = create_temp_stl(
-        obj, 10.0, 35.0, name="heating only setpoint stl"
-    )
+    htg_stl_name = create_temp_stl(obj, 10.0, 35.0, name="heating only setpoint stl")
 
     onoff_stl = create_onoff_availability_stl(obj, name="heating only availability")
     always_on_sched = create_schedule_constant(
@@ -709,17 +707,13 @@ def make_heating_only_controllable(
 
     for heating_type in HEATING_ONLY_EQUIPMENT_TYPES:
         type_literal = rdflib.Literal(heating_type)
-        for row in g.query(
-            equip_query, initBindings={"equipType": type_literal}
-        ):
+        for row in g.query(equip_query, initBindings={"equipType": type_literal}):
             zone = str(row.zone)
             equip_name = str(row.equipName)
 
             type_section = obj.get(heating_type, {})
             if equip_name in type_section:
-                type_section[equip_name]["availability_schedule_name"] = (
-                    always_on_sched
-                )
+                type_section[equip_name]["availability_schedule_name"] = always_on_sched
 
             if zone in zones_seen:
                 continue
@@ -833,9 +827,7 @@ def remove_thermostat_ems_overrides(obj: dict[str, Any]) -> None:
     ems_programs = obj.get("EnergyManagementSystem:Program", {})
     programs_to_remove: set[str] = set()
     for prog_name, prog in ems_programs.items():
-        lines = " ".join(
-            l.get("program_line", "") for l in prog.get("lines", [])
-        )
+        lines = " ".join(l.get("program_line", "") for l in prog.get("lines", []))
         if any(act_name in lines for act_name in target_actuator_names):
             programs_to_remove.add(prog_name)
 
@@ -844,9 +836,7 @@ def remove_thermostat_ems_overrides(obj: dict[str, Any]) -> None:
     ivar_names: set[str] = set()
     for prog_name in programs_to_remove:
         prog = ems_programs[prog_name]
-        lines = " ".join(
-            l.get("program_line", "") for l in prog.get("lines", [])
-        )
+        lines = " ".join(l.get("program_line", "") for l in prog.get("lines", []))
         for sname in obj.get("EnergyManagementSystem:Sensor", {}):
             if sname in lines:
                 sensor_names.add(sname)
@@ -855,9 +845,7 @@ def remove_thermostat_ems_overrides(obj: dict[str, Any]) -> None:
                 ivar_names.add(ivname)
 
     # 4. Delete calling managers that reference removed programs.
-    for pcm_name in list(
-        obj.get("EnergyManagementSystem:ProgramCallingManager", {})
-    ):
+    for pcm_name in list(obj.get("EnergyManagementSystem:ProgramCallingManager", {})):
         pcm = obj["EnergyManagementSystem:ProgramCallingManager"][pcm_name]
         progs = [p.get("program_name", "") for p in pcm.get("programs", [])]
         if any(p in programs_to_remove for p in progs):
@@ -1099,7 +1087,9 @@ def make_vav_system_controllable(
     # commands on the SAT or flow-fraction actuators, which mechanically
     # caps cooling control.  ``AvailabilityManager:NightCycle`` on the
     # air loop is also neutralized for the same reason.
-    vav_onoff_stl = create_onoff_availability_stl(obj, name="vav always on availability")
+    vav_onoff_stl = create_onoff_availability_stl(
+        obj, name="vav always on availability"
+    )
     vav_always_on_sched = create_schedule_constant(
         obj, vav_onoff_stl, 1, name="vav always on availability"
     )

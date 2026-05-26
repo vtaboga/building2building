@@ -32,9 +32,7 @@ class TestListBuildings:
 
             result = list_buildings("OfficeSmall", "train")
             assert result == ["OS-0001", "OS-0002"]
-            mock_registry.list_buildings.assert_called_once_with(
-                "OfficeSmall", "train"
-            )
+            mock_registry.list_buildings.assert_called_once_with("OfficeSmall", "train")
 
     def test_delegates_test_small_to_registry(self) -> None:
         mock_registry = MagicMock()

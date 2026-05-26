@@ -24,7 +24,12 @@ class TestComputeNormalizedScore:
             ("OfficeSmall", "task1", "winter", "OfficeSmall-0001"): -12000.0,
             ("OfficeSmall", "task1", "summer", "OfficeSmall-0001"): -18000.0,
             ("Warehouse", "task1", "full_year", "Warehouse-0001"): -40000.0,
-            ("SingleFamilyHouse", "task1", "full_year", "SingleFamilyHouse-0001"): -10000.0,
+            (
+                "SingleFamilyHouse",
+                "task1",
+                "full_year",
+                "SingleFamilyHouse-0001",
+            ): -10000.0,
         }
 
     def test_by_building_id(self) -> None:

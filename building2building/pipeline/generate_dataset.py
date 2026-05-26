@@ -215,9 +215,7 @@ def generate_one_building(
     # weather_file is like "weather/USA_NY_Buffalo.Niagara.Intl.AP.725280_TMY3.epw"
     epw_derivation = ExtractFromZip(root_zip, weather_file)
 
-    meta_expr = extract_discovery_metadata(
-        Constant(epjson_path), epw_derivation
-    )
+    meta_expr = extract_discovery_metadata(Constant(epjson_path), epw_derivation)
     meta = realize(STORE_PATH.get(), meta_expr)
     net_conditioned_area = float(meta.net_conditioned_area)
     warmup_phases = int(meta.warmup_phases)
@@ -246,9 +244,7 @@ def generate_one_building(
     with open(target_dir / "metadata.json", "w") as f:
         json.dump(new_meta, f, indent=2)
 
-    num_actuators = sum(
-        len(e.actuator_descriptions()) for e in equipment_list
-    )
+    num_actuators = sum(len(e.actuator_descriptions()) for e in equipment_list)
 
     return {
         "building_id": processed_id,
@@ -272,9 +268,7 @@ def generate_building_type(
     Sharding is index-based over ``all_ids``: shard N processes IDs whose
     position in ``all_ids`` satisfies ``position % shard_count == shard_index``.
     """
-    my_ids = [
-        pid for i, pid in enumerate(all_ids) if i % shard_count == shard_index
-    ]
+    my_ids = [pid for i, pid in enumerate(all_ids) if i % shard_count == shard_index]
     logger.info(
         "Shard %d/%d: %d/%d %s buildings to process",
         shard_index,
@@ -290,11 +284,15 @@ def generate_building_type(
         # A complete per-building dir holds the 3 JSON/epJSON artefacts plus
         # the canonical-name EPW (``<sha256>-<basename>.epw``).  Any of these
         # missing means the previous run was partial and we must regenerate.
-        if not force and target_dir.is_dir() and (
-            (target_dir / "building.epjson").exists()
-            and (target_dir / "equipment.json").exists()
-            and (target_dir / "metadata.json").exists()
-            and any(target_dir.glob("*.epw"))
+        if (
+            not force
+            and target_dir.is_dir()
+            and (
+                (target_dir / "building.epjson").exists()
+                and (target_dir / "equipment.json").exists()
+                and (target_dir / "metadata.json").exists()
+                and any(target_dir.glob("*.epw"))
+            )
         ):
             logger.debug("[%d/%d] %s already exists, skipping.", k, len(my_ids), pid)
             continue
@@ -367,9 +365,7 @@ def rebuild_metadata_parquet(
                 )
             eq_path = bldg_dir / "equipment.json"
             if not eq_path.exists():
-                raise FileNotFoundError(
-                    f"equipment.json missing at {eq_path}."
-                )
+                raise FileNotFoundError(f"equipment.json missing at {eq_path}.")
             equipment_list = structure(
                 json.loads(eq_path.read_text()), list[AnyEquipment]
             )

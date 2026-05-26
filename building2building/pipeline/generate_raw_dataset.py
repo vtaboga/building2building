@@ -217,9 +217,7 @@ def get_parameter_ranges(climate_zone: int) -> list[ParameterRange]:
     shgc_low = 0.15
 
     return [
-        ParameterRange(
-            "envelope_conductivity_scale", 0.5, round(envelope_max, 3)
-        ),
+        ParameterRange("envelope_conductivity_scale", 0.5, round(envelope_max, 3)),
         ParameterRange(
             "window_u_factor", round(0.8 * a.u_max, 3), round(1.3 * a.u_max, 3)
         ),
@@ -555,8 +553,7 @@ def _parse_args() -> argparse.Namespace:
         action="append",
         choices=ALL_BUILDING_TYPES,
         help=(
-            "Building type to generate.  Can be repeated.  "
-            "Defaults to all 6 types."
+            "Building type to generate.  Can be repeated.  " "Defaults to all 6 types."
         ),
     )
     parser.add_argument(
@@ -615,9 +612,7 @@ def main() -> int:
 
     # Validate sharding args.
     if (shard_index is None) != (shard_count is None):
-        raise ValueError(
-            "--shard-index and --shard-count must be given together."
-        )
+        raise ValueError("--shard-index and --shard-count must be given together.")
     if shard_index is not None and shard_count is not None:
         if shard_count != len(building_types):
             raise ValueError(

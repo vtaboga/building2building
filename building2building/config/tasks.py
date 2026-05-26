@@ -42,7 +42,6 @@ from building2building.types import (
     UnoccupiedPolicy,
 )
 
-
 SetpointMode = Literal["constant", "occupancy", "random_schedule"]
 WeightLevel = Literal["e0", "emed", "ehigh"]
 ModeShort = Literal["const", "occ", "rand"]

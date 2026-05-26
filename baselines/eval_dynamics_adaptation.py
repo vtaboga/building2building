@@ -177,9 +177,7 @@ def write_csv(results: list[TestResult], path: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Evaluate dynamics adaptation models"
-    )
+    parser = argparse.ArgumentParser(description="Evaluate dynamics adaptation models")
     parser.add_argument("--model-path", type=str, required=True)
     parser.add_argument(
         "--difficulty",
@@ -225,9 +223,7 @@ def main() -> None:
 
     if args.approach == "specialist":
         model_dir = Path(args.model_path)
-        results = evaluate_specialist(
-            model_dir, bench, n_episodes=args.n_episodes
-        )
+        results = evaluate_specialist(model_dir, bench, n_episodes=args.n_episodes)
     elif args.approach in ("baseline", "parameterized"):
         pad_obs_size: int | None = args.pad_obs_size
         if pad_obs_size is None:
@@ -238,9 +234,7 @@ def main() -> None:
                     "Pass --pad-obs-size explicitly or re-run training to "
                     "generate the metadata file."
                 )
-            pad_obs_size = int(
-                json.loads(metadata_path.read_text())["pad_obs_size"]
-            )
+            pad_obs_size = int(json.loads(metadata_path.read_text())["pad_obs_size"])
         logger.info("Using pad_obs_size=%d", pad_obs_size)
         results = evaluate_multi_building(
             Path(args.model_path),
@@ -255,11 +249,7 @@ def main() -> None:
     write_csv(results, Path(args.output))
 
     if results:
-        scores = [
-            r.normalized_score
-            for r in results
-            if r.normalized_score is not None
-        ]
+        scores = [r.normalized_score for r in results if r.normalized_score is not None]
         if scores:
             logger.info(
                 "Mean normalized score: %.4f (std=%.4f, n=%d)",

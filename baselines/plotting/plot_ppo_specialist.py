@@ -46,16 +46,12 @@ def main() -> None:
     ppo_rows = load_results_csv(Path(args.ppo_csv))
     baseline_rows = load_results_csv(Path(args.baseline_csv))
 
-    ppo_by_type = group_by_building_type(
-        [r for r in ppo_rows if r.task == args.task]
-    )
+    ppo_by_type = group_by_building_type([r for r in ppo_rows if r.task == args.task])
     baseline_by_type = group_by_building_type(
         [r for r in baseline_rows if r.task == args.task]
     )
 
-    types_present = [
-        bt for bt in BUILDING_TYPE_ORDER if bt in ppo_by_type
-    ]
+    types_present = [bt for bt in BUILDING_TYPE_ORDER if bt in ppo_by_type]
     labels = [BUILDING_TYPE_LABELS.get(bt, bt) for bt in types_present]
 
     baseline_means = []

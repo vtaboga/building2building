@@ -180,10 +180,14 @@ class BenchmarkSelectionConfig:
                 "selection.mode must be one of {'random', 'indices', 'search_config'}"
             )
         indices = raw.get("indices", [])
-        if not isinstance(indices, list) or not all(isinstance(x, int) for x in indices):
+        if not isinstance(indices, list) or not all(
+            isinstance(x, int) for x in indices
+        ):
             raise TypeError("selection.indices must be list[int]")
         queries = raw.get("queries", [])
-        if not isinstance(queries, list) or not all(isinstance(x, dict) for x in queries):
+        if not isinstance(queries, list) or not all(
+            isinstance(x, dict) for x in queries
+        ):
             raise TypeError("selection.queries must be list[dict]")
         seed_raw = raw.get("seed")
         seed = int(seed_raw) if seed_raw is not None else None
@@ -236,7 +240,9 @@ class BenchmarkSideConfig:
         reward_raw = _require_mapping("benchmark side reward", config.get("reward", {}))
         task = TaskConfig.from_dict(task_raw)
         reward = reward_config_from_dict(reward_raw)
-        actuator_access = ActuatorAccessConfig.from_dict(config.get("actuator_access", {}))
+        actuator_access = ActuatorAccessConfig.from_dict(
+            config.get("actuator_access", {})
+        )
         return cls(
             selection=selection,
             task=task,
@@ -332,9 +338,7 @@ class EnvBuildConfig:
         actuator_access = ActuatorAccessConfig.from_dict(raw.get("actuator_access", {}))
         max_steps_raw = raw.get("env_max_steps")
         env_max_steps = int(max_steps_raw) if max_steps_raw is not None else None
-        expose_heating_only_zones = bool(
-            raw.get("expose_heating_only_zones", True)
-        )
+        expose_heating_only_zones = bool(raw.get("expose_heating_only_zones", True))
         return cls(
             dataset_selection=dataset_selection,
             task=task,
@@ -396,7 +400,9 @@ def parse_benchmark_config(data: dict[str, Any]) -> BenchmarkConfig:
             train=train,
             test=test,
         )
-    raise ValueError("benchmark_interface.mode must be one of {'single_type','multi_type'}")
+    raise ValueError(
+        "benchmark_interface.mode must be one of {'single_type','multi_type'}"
+    )
 
 
 def reward_to_dict(reward: RewardConfig) -> dict[str, Any]:

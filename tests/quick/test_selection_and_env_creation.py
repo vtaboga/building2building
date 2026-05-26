@@ -9,9 +9,12 @@ import gymnasium as gym
 import numpy as np
 import pytest
 
-from building2building.config import DatasetSelectionConfig, EnvBuildConfig, parse_benchmark_config
+from building2building.config import (
+    DatasetSelectionConfig,
+    EnvBuildConfig,
+    parse_benchmark_config,
+)
 from building2building.types import BaseRewardConfig
-
 
 pytestmark = pytest.mark.quick
 

@@ -274,9 +274,7 @@ def rollout(
         obs, reward, terminated, truncated, info = env.step(action)
         observations_list.append(deepcopy(obs))
         raw_observations.append(deepcopy(info.get("raw_observation")))
-        infos_list.append(
-            {k: v for k, v in info.items() if k != "raw_observation"}
-        )
+        infos_list.append({k: v for k, v in info.items() if k != "raw_observation"})
         actions_list.append(np.asarray(action))
         rewards_list.append(float(reward))
         terminateds_list.append(bool(terminated))

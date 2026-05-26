@@ -17,7 +17,6 @@ from building2building.config.models import DatasetSelectionConfig, EnvBuildConf
 from building2building.envs.factory import make_env_from_config
 from building2building.types import BaseRewardConfig, TaskConfig
 
-
 pytestmark = pytest.mark.long
 
 OCCUPIED_C = 22.0
@@ -100,18 +99,20 @@ def test_occupancy_varies_and_drives_target_temperature(tmp_path: Path) -> None:
         unique_targets = np.unique(tgt)
 
         print(f"  Zone: {zone}")
-        print(f"    Occupancy: min={occ.min():.1f}  max={occ.max():.1f}  "
-              f"occupied_steps={n_occupied}  unoccupied_steps={n_unoccupied}")
+        print(
+            f"    Occupancy: min={occ.min():.1f}  max={occ.max():.1f}  "
+            f"occupied_steps={n_occupied}  unoccupied_steps={n_unoccupied}"
+        )
         print(f"    Target temps: {sorted(unique_targets)}")
 
         if n_occupied > 0 and n_unoccupied > 0:
             any_zone_varies = True
-            assert OCCUPIED_C in unique_targets, (
-                f"Zone {zone}: expected {OCCUPIED_C}°C in targets when occupied"
-            )
-            assert UNOCCUPIED_C in unique_targets, (
-                f"Zone {zone}: expected {UNOCCUPIED_C}°C in targets when unoccupied"
-            )
+            assert (
+                OCCUPIED_C in unique_targets
+            ), f"Zone {zone}: expected {OCCUPIED_C}°C in targets when occupied"
+            assert (
+                UNOCCUPIED_C in unique_targets
+            ), f"Zone {zone}: expected {UNOCCUPIED_C}°C in targets when unoccupied"
 
     assert any_zone_varies, (
         "Expected at least one zone with both occupied and unoccupied timesteps "

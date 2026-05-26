@@ -55,9 +55,7 @@ def main() -> None:
     parser.add_argument("--embed-dim", type=int, default=64)
     parser.add_argument("--n-heads", type=int, default=4)
     parser.add_argument("--n-layers", type=int, default=2)
-    parser.add_argument(
-        "--output", type=str, default="results_cross_domain.csv"
-    )
+    parser.add_argument("--output", type=str, default="results_cross_domain.csv")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -89,9 +87,7 @@ def main() -> None:
         logger.info("Testing on %s (%d buildings)", bt, args.n_test)
         for i in range(args.n_test):
             try:
-                env = b2b.new_make_env(
-                    bt, split="test", index=i, task=args.task
-                )
+                env = b2b.new_make_env(bt, split="test", index=i, task=args.task)
                 morph = env.metadata["morphology"]
                 policy.morphology = morph
 

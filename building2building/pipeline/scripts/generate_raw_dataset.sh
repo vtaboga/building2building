@@ -45,10 +45,17 @@ export TMPDIR="${SLURM_TMPDIR:?}"
 export STORE_PATH="${SCRATCH:?SCRATCH must be set}/b2b"
 mkdir -p "$STORE_PATH"
 
-BUILDING_TYPES=("Warehouse" "HotelSmall" "RetailStandalone" "RestaurantFastFood" "OfficeMedium" "OfficeSmall")
+# The Python entry point defines the canonical mapping
+#   shard_index -> ALL_BUILDING_TYPES[shard_index]
+# (see generate_raw_dataset.py::ALL_BUILDING_TYPES + the
+# `type_shard_index = ALL_BUILDING_TYPES.index(bt)` slice in main()).
+# Do NOT pass --building-type here: the validation in main() requires
+# shard_count == len(building_types), which would collapse to 1 if we
+# narrowed the type list and break sharded runs.  Instead, let
+# building_types default to ALL_BUILDING_TYPES and let --shard-index
+# pick the single type to process this task.
 SHARD_COUNT=6
 SHARD_INDEX=${SLURM_ARRAY_TASK_ID:?Must be run as a SLURM array job}
-BT=${BUILDING_TYPES[$SHARD_INDEX]}
 
 OUT_DIR="$SCRATCH/b2b_raw_dataset"
 mkdir -p "$OUT_DIR"
@@ -59,11 +66,10 @@ if (( SHARD_INDEX == SHARD_COUNT - 1 )); then
     EXTRA_FLAGS+=(--merge-metadata)
 fi
 
-echo "=== Shard $SHARD_INDEX / $SHARD_COUNT  building-type=$BT ==="
+echo "=== Shard $SHARD_INDEX / $SHARD_COUNT ==="
 
 python -m building2building.pipeline.generate_raw_dataset \
     --output-dir "$OUT_DIR" \
-    --building-type "$BT" \
     --shard-index "$SHARD_INDEX" \
     --shard-count "$SHARD_COUNT" \
     --samples-per-type 1000 \

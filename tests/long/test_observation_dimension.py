@@ -20,7 +20,6 @@ from building2building.config.models import DatasetSelectionConfig, EnvBuildConf
 from building2building.envs.factory import make_env_from_config
 from building2building.types import BaseRewardConfig, RandomScheduleConfig, TaskConfig
 
-
 pytestmark = pytest.mark.long
 
 N_STEPS = 4

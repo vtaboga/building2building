@@ -71,9 +71,7 @@ class UnitaryHvacConfig:
     #                       loop is active for every non-zero deviation from
     #                       the band center.
     fan_error_mode: FanErrorMode = "nearest_setpoint"
-    target_schedule: TargetScheduleConfig = field(
-        default_factory=TargetScheduleConfig
-    )
+    target_schedule: TargetScheduleConfig = field(default_factory=TargetScheduleConfig)
 
     def __post_init__(self) -> None:
         if self.fan_error_mode not in _FAN_ERROR_MODES:
@@ -139,15 +137,13 @@ def _match_actuator_index(
     raise RuntimeError(f"Could not find action for actuator: {target!r}")
 
 
-def _find_target_temp_index(
-    obs_names: list[str], zone_name: str
-) -> int | None:
+def _find_target_temp_index(obs_names: list[str], zone_name: str) -> int | None:
     prefix = "target_temperature"
     zn = zone_name.strip().lower()
     for i, name in enumerate(obs_names):
         nl = name.strip().lower()
         if nl.startswith(prefix):
-            zone_part = nl[len(prefix):].strip()
+            zone_part = nl[len(prefix) :].strip()
             if zone_part == zn or zn in zone_part or zone_part in zn:
                 return i
     return None
@@ -228,9 +224,7 @@ class UnitaryHvacPolicy:
 
         highs = None
         try:
-            if hasattr(env, "action_space") and hasattr(
-                env.action_space, "high"
-            ):
+            if hasattr(env, "action_space") and hasattr(env.action_space, "high"):
                 highs = np.asarray(env.action_space.high, dtype=float).ravel()
         except Exception:
             pass
@@ -283,17 +277,13 @@ class UnitaryHvacPolicy:
                     sat_idx=sat_idx,
                     temp_obs_idx=temp_idx,
                     fan_max=fan_max,
-                    target_obs_idx=_find_target_temp_index(
-                        obs_names, sys.zones()[0]
-                    ),
+                    target_obs_idx=_find_target_temp_index(obs_names, sys.zones()[0]),
                     sat_sp=self.sat_initial_c,
                 )
             )
 
         heating_only = [
-            e
-            for e in equipment
-            if getattr(e, "equipment_type", None) == "heating_only"
+            e for e in equipment if getattr(e, "equipment_type", None) == "heating_only"
         ]
 
         self._baseboards = []
@@ -311,9 +301,7 @@ class UnitaryHvacPolicy:
                     act.control_type,
                     act.component_name,
                 )
-                temp_idx = find_zone_air_temp_index(
-                    obs_names, bb.zones()[0]
-                )
+                temp_idx = find_zone_air_temp_index(obs_names, bb.zones()[0])
                 self._baseboards.append(
                     _BaseboardState(htg_sp_idx=idx, temp_obs_idx=temp_idx)
                 )
@@ -347,11 +335,7 @@ class UnitaryHvacPolicy:
             half = gap / 2.0
             return target - half, target + half
 
-        if (
-            not self._sched_enabled
-            or self._tod_idx is None
-            or self._dow_idx is None
-        ):
+        if not self._sched_enabled or self._tod_idx is None or self._dow_idx is None:
             return self.heating_sp_c, self.cooling_sp_c
 
         hour = float(obs_arr[self._tod_idx])
@@ -403,13 +387,9 @@ class UnitaryHvacPolicy:
         z.sat_sp = float(np.clip(z.sat_sp, self.sat_min_c, self.sat_max_c))
         return z.sat_sp
 
-    def predict(
-        self, obs: Any, deterministic: bool = True
-    ) -> tuple[np.ndarray, None]:
+    def predict(self, obs: Any, deterministic: bool = True) -> tuple[np.ndarray, None]:
         if not self._zones and not self._baseboards:
-            raise RuntimeError(
-                "Policy not bound to an env; call bind_env() first."
-            )
+            raise RuntimeError("Policy not bound to an env; call bind_env() first.")
 
         obs_arr = np.asarray(obs, dtype=float).ravel()
         action = np.zeros(self._n_act, dtype=float)
@@ -421,19 +401,12 @@ class UnitaryHvacPolicy:
             heat_sp, cool_sp = self._current_setpoints(obs_arr, zone=z)
             tz = float(obs_arr[z.temp_obs_idx])
 
-            if (
-                z.prev_temp is not None
-                and abs(tz - z.prev_temp) > _WARMUP_JUMP_C
-            ):
+            if z.prev_temp is not None and abs(tz - z.prev_temp) > _WARMUP_JUMP_C:
                 z.air_pi = _PIState()
             z.prev_temp = tz
 
-            action[z.fan_idx] = self._airflow_command(
-                z, tz, heat_sp, cool_sp
-            )
-            action[z.sat_idx] = self._sat_trim_and_respond(
-                z, tz, heat_sp, cool_sp
-            )
+            action[z.fan_idx] = self._airflow_command(z, tz, heat_sp, cool_sp)
+            action[z.sat_idx] = self._sat_trim_and_respond(z, tz, heat_sp, cool_sp)
 
         for bb in self._baseboards:
             heat_sp, _ = self._current_setpoints(obs_arr)

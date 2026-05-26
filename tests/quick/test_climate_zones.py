@@ -47,34 +47,22 @@ class TestClimateZoneModule:
 @pytest.mark.quick
 class TestListBuildingsByClimateZone:
     def test_returns_matching_ids(self, registry: BuildingRegistry) -> None:
-        ids = registry.list_buildings_by_climate_zone(
-            "OfficeSmall", 5, "train"
-        )
+        ids = registry.list_buildings_by_climate_zone("OfficeSmall", 5, "train")
         assert ids == ["OfficeSmall-0001"]
 
-    def test_returns_empty_when_no_match(
-        self, registry: BuildingRegistry
-    ) -> None:
-        ids = registry.list_buildings_by_climate_zone(
-            "OfficeSmall", 7, "train"
-        )
+    def test_returns_empty_when_no_match(self, registry: BuildingRegistry) -> None:
+        ids = registry.list_buildings_by_climate_zone("OfficeSmall", 7, "train")
         assert ids == []
 
     def test_respects_split(self, registry: BuildingRegistry) -> None:
-        train_ids = registry.list_buildings_by_climate_zone(
-            "OfficeSmall", 5, "train"
-        )
-        test_ids = registry.list_buildings_by_climate_zone(
-            "OfficeSmall", 3, "test"
-        )
+        train_ids = registry.list_buildings_by_climate_zone("OfficeSmall", 5, "train")
+        test_ids = registry.list_buildings_by_climate_zone("OfficeSmall", 3, "test")
         assert train_ids == ["OfficeSmall-0001"]
         assert test_ids == ["OfficeSmall-0002"]
 
     def test_raises_for_sfh(self, registry: BuildingRegistry) -> None:
         with pytest.raises(ClimateZoneUnavailableError):
-            registry.list_buildings_by_climate_zone(
-                "SingleFamilyHouse", 3, "train"
-            )
+            registry.list_buildings_by_climate_zone("SingleFamilyHouse", 3, "train")
 
 
 @pytest.mark.quick
@@ -104,9 +92,7 @@ class TestBuildingInfoClimateZone:
 
 @pytest.mark.quick
 class TestMetadataColumnGuard:
-    def test_missing_column_raises(
-        self, fake_metadata: pd.DataFrame
-    ) -> None:
+    def test_missing_column_raises(self, fake_metadata: pd.DataFrame) -> None:
         reg = BuildingRegistry()
         # Simulate an old-revision parquet without the climate_zone column by
         # dropping it and forcing _ensure_loaded to re-read via our mock path.
@@ -170,9 +156,9 @@ class TestRealDatasetClimateZones:
 
         df = get_registry().metadata
         mz = df[~df["building_type"].isin(list(TYPES_WITHOUT_CLIMATE_ZONE))]
-        assert not mz["climate_zone"].isna().any(), (
-            "Every multizones row must have a climate_zone after migration"
-        )
+        assert (
+            not mz["climate_zone"].isna().any()
+        ), "Every multizones row must have a climate_zone after migration"
         assert mz["climate_zone"].astype(int).between(1, 8).all()
 
     def test_all_sfh_rows_have_null_climate_zone(self) -> None:

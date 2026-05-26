@@ -101,9 +101,7 @@ class TestNormalizedTaskFamily:
             assert name in TASK_PRESETS, f"missing normalized preset {name!r}"
 
     @pytest.mark.parametrize("name", _NORMALIZED_NAMES)
-    def test_normalized_preset_uses_unfilled_normalized_config(
-        self, name: str
-    ) -> None:
+    def test_normalized_preset_uses_unfilled_normalized_config(self, name: str) -> None:
         preset = TASK_PRESETS[name]
         assert isinstance(preset.reward, NormalizedDeadbandRewardConfig)
         # Presets must store the unfilled sentinel state; new_make_env
@@ -203,13 +201,7 @@ class TestMakeNormalizedDeadbandTaskFactory:
             content = f.read()
         # The loader import must live inside make_normalized_deadband_task
         # rather than at module top-level.
-        assert (
-            "from building2building.data.reward_normalizers import"
-            in content
-        )
+        assert "from building2building.data.reward_normalizers import" in content
         # Specifically, the import is *not* at file scope.
         head = content.split("def make_normalized_deadband_task", 1)[0]
-        assert (
-            "from building2building.data.reward_normalizers"
-            not in head
-        )
+        assert "from building2building.data.reward_normalizers" not in head

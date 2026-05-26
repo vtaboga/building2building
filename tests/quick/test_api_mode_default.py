@@ -70,9 +70,7 @@ def _patch_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(simulator_mod, "create_simulator", _raise)
 
-    monkeypatch.setattr(
-        api_mod, "_patch_epjson_run_period", lambda *a, **k: None
-    )
+    monkeypatch.setattr(api_mod, "_patch_epjson_run_period", lambda *a, **k: None)
 
 
 @pytest.mark.quick
@@ -127,9 +125,7 @@ class TestNewMakeEnvModeDefault:
     ) -> None:
         _patch_env(monkeypatch, tmp_path)
         with pytest.raises(_CapturedConfig) as excinfo:
-            api_mod.new_make_env(
-                "OfficeSmall", task="task5", random_schedule_seed=42
-            )
+            api_mod.new_make_env("OfficeSmall", task="task5", random_schedule_seed=42)
         rs = excinfo.value.task.random_schedule_config
         assert rs is not None
         assert rs.building_type == "OfficeSmall"

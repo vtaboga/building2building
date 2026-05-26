@@ -128,7 +128,9 @@ class TestRandomDailyScheduleGenerator:
             for d in range(1, 30)
         ]
         warehouse_arrivals = [
-            warehouse.schedule_for(year=2023, day_of_year=d, season="shoulder").arrival_h
+            warehouse.schedule_for(
+                year=2023, day_of_year=d, season="shoulder"
+            ).arrival_h
             for d in range(1, 30)
         ]
         # Warehouse arrives on average earlier than office.

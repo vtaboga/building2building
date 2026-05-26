@@ -59,9 +59,7 @@ class TestParseModelPath:
 
     def test_rglob_discovers_nested_models(self, tmp_path: Path) -> None:
         """eval_ppo main() uses rglob so nested model files are discovered."""
-        nested = (
-            tmp_path / "models" / "OfficeSmall" / "task1"
-        )
+        nested = tmp_path / "models" / "OfficeSmall" / "task1"
         nested.mkdir(parents=True)
         model_zip = nested / "ppo_OfficeSmall-0001.zip"
         model_zip.write_bytes(b"fake")
@@ -165,9 +163,7 @@ class TestDynamicsAdaptationMetadataRoundTrip:
         """eval_dynamics_adaptation loads pad_obs_size from metadata.json."""
         model_dir = tmp_path / "models"
         model_dir.mkdir()
-        (model_dir / "metadata.json").write_text(
-            json.dumps({"pad_obs_size": 42})
-        )
+        (model_dir / "metadata.json").write_text(json.dumps({"pad_obs_size": 42}))
         metadata = json.loads((model_dir / "metadata.json").read_text())
         assert int(metadata["pad_obs_size"]) == 42
 
@@ -180,6 +176,4 @@ class TestDynamicsAdaptationMetadataRoundTrip:
         pad_obs_size_arg: int | None = None
         if pad_obs_size_arg is None and not metadata_path.exists():
             with pytest.raises(FileNotFoundError):
-                raise FileNotFoundError(
-                    f"metadata.json not found at {metadata_path}."
-                )
+                raise FileNotFoundError(f"metadata.json not found at {metadata_path}.")

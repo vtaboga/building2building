@@ -38,7 +38,6 @@ from building2building.store import (
     realize,
 )
 
-
 # Pinned URL + content hash for the official ASHRAE 90.1 prototype bundle.
 # The URL is a stable NREL / energycodes.gov release artefact; the hash
 # guarantees that any future re-download fails loud if upstream is
@@ -90,9 +89,7 @@ def _index_buildings(extracted_root: Path) -> None:
         building_type, year_str, place = match.groups()
         records.append((building_type, int(year_str), place, str(idf_path)))
     records.sort(key=lambda r: (r[0], r[1], r[2]))
-    df = pd.DataFrame(
-        records, columns=["building_type", "year", "place", "path"]
-    )
+    df = pd.DataFrame(records, columns=["building_type", "year", "place", "path"])
     df.to_parquet(str(out))
 
 
@@ -151,8 +148,7 @@ def search_buildings(
         )
     if place is not None:
         rel = rel.filter(
-            duckdb.ColumnExpression("place")
-            == duckdb.ConstantExpression(place)
+            duckdb.ColumnExpression("place") == duckdb.ConstantExpression(place)
         )
     return rel.to_df()
 
@@ -175,12 +171,10 @@ def search_weathers(
     rel = duckdb.from_parquet(str(idx_path))
     if state is not None:
         rel = rel.filter(
-            duckdb.ColumnExpression("state")
-            == duckdb.ConstantExpression(state)
+            duckdb.ColumnExpression("state") == duckdb.ConstantExpression(state)
         )
     if filename is not None:
         rel = rel.filter(
-            duckdb.ColumnExpression("filename")
-            == duckdb.ConstantExpression(filename)
+            duckdb.ColumnExpression("filename") == duckdb.ConstantExpression(filename)
         )
     return rel.to_df()

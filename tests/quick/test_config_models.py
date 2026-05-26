@@ -21,19 +21,23 @@ class TestDatasetSelectionConfig:
         assert cfg.split_index == 0
 
     def test_building_id_mode(self) -> None:
-        cfg = DatasetSelectionConfig.from_dict({
-            "building_type": "OfficeSmall",
-            "mode": "building_id",
-            "building_id": "OfficeSmall-0042",
-        })
+        cfg = DatasetSelectionConfig.from_dict(
+            {
+                "building_type": "OfficeSmall",
+                "mode": "building_id",
+                "building_id": "OfficeSmall-0042",
+            }
+        )
         assert cfg.mode == "building_id"
         assert cfg.building_id == "OfficeSmall-0042"
 
     def test_test_small_split(self) -> None:
-        cfg = DatasetSelectionConfig.from_dict({
-            "building_type": "OfficeSmall",
-            "split": "test_small",
-        })
+        cfg = DatasetSelectionConfig.from_dict(
+            {
+                "building_type": "OfficeSmall",
+                "split": "test_small",
+            }
+        )
         assert cfg.split == "test_small"
 
     def test_invalid_building_type_raises(self) -> None:

@@ -76,11 +76,13 @@ def _load_tuned_unitary_hvac(bt: str, cz: int | None) -> UnitaryHvacConfig:
         if p.exists():
             raw = _load_tuned_yaml(p)
             raw.pop("type", None)
-            return UnitaryHvacConfig(**{
-                k: float(v) if isinstance(v, (int, float)) else v
-                for k, v in raw.items()
-                if k != "target_schedule"
-            })
+            return UnitaryHvacConfig(
+                **{
+                    k: float(v) if isinstance(v, (int, float)) else v
+                    for k, v in raw.items()
+                    if k != "target_schedule"
+                }
+            )
     return UnitaryHvacConfig()
 
 

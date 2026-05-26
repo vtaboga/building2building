@@ -85,9 +85,7 @@ def main() -> None:
     ax_ns = axes[1]
     for i, (approach_name, rows) in enumerate(approaches.items()):
         scores = [
-            float(r["normalized_score"])
-            for r in rows
-            if r.get("normalized_score")
+            float(r["normalized_score"]) for r in rows if r.get("normalized_score")
         ]
         if scores:
             mean_s = np.mean(scores)
@@ -95,16 +93,20 @@ def main() -> None:
             color = APPROACH_COLORS.get(approach_name, f"C{i}")
             label = APPROACH_LABELS.get(approach_name, approach_name)
             ax_ns.bar(
-                i, mean_s, yerr=std_s, color=color, label=label,
-                capsize=3, edgecolor="white", linewidth=0.5, width=0.5,
+                i,
+                mean_s,
+                yerr=std_s,
+                color=color,
+                label=label,
+                capsize=3,
+                edgecolor="white",
+                linewidth=0.5,
+                width=0.5,
             )
 
     ax_ns.set_xticks(range(len(approaches)))
     ax_ns.set_xticklabels(
-        [
-            APPROACH_LABELS.get(a, a)
-            for a in approaches
-        ],
+        [APPROACH_LABELS.get(a, a) for a in approaches],
         rotation=15,
         ha="right",
     )

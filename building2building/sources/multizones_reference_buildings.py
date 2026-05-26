@@ -66,6 +66,7 @@ BuildingType = Literal[
 
 SPLIT_DATA_DIR = Path(__file__).resolve().parent / "data"
 
+
 def load_split_ids(
     building_type: BuildingType,
     split: Literal["train", "test", "test_small"],
@@ -303,7 +304,10 @@ def search_configs(
             epw = realize(STORE_PATH.get(), epw_derivation)
 
             reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
-            if not isinstance(reward_section, dict) or "reward_type" not in reward_section:
+            if (
+                not isinstance(reward_section, dict)
+                or "reward_type" not in reward_section
+            ):
                 raise ValueError(
                     "The 'reward' section with a 'reward_type' key is required "
                     "in the building config."
@@ -337,7 +341,9 @@ def search_configs(
                 with err_path.open("a", encoding="utf-8") as f:
                     f.write(json.dumps(record) + "\n")
             except Exception:
-                logger.exception("Failed to write pipeline error record to %s", err_path)
+                logger.exception(
+                    "Failed to write pipeline error record to %s", err_path
+                )
 
             logger.warning(
                 "Failed to build BuildingConfig for building_id=%s: %s",

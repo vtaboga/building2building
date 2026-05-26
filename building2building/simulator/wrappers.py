@@ -45,7 +45,7 @@ class NormalizeObservation(gym.ObservationWrapper):
         self.obs_high = self.env.observation_space.high
 
         self.obs_range = self.obs_high - self.obs_low
-        
+
         if (self.obs_range == 0).any():
             raise ValueError("Observation space range is zero for at least one feature")
 
@@ -597,7 +597,11 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
             import wandb  # type: ignore[import-untyped]
 
             meta = getattr(self.env, "metadata", None)
-            src = meta.get("building_source_metadata", {}) if isinstance(meta, dict) else {}
+            src = (
+                meta.get("building_source_metadata", {})
+                if isinstance(meta, dict)
+                else {}
+            )
 
             p = self._wandb_prefix
             payload: dict[str, Any] = {

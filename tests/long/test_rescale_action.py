@@ -21,7 +21,6 @@ from building2building.config.models import DatasetSelectionConfig, EnvBuildConf
 from building2building.envs.factory import make_env_from_config
 from building2building.types import BaseRewardConfig, TaskConfig
 
-
 pytestmark = pytest.mark.long
 
 N_STEPS = 4
@@ -67,9 +66,7 @@ def _make_single_zone_env(tmp_path: Path, suffix: str = "") -> gym.Env:
 
 
 @pytest.mark.parametrize("make_env_fn", ["office", "single_zone"])
-def test_raw_action_space_has_physical_bounds(
-    tmp_path: Path, make_env_fn: str
-) -> None:
+def test_raw_action_space_has_physical_bounds(tmp_path: Path, make_env_fn: str) -> None:
     """Without RescaleAction the action space bounds match the physical actuator
     ranges (which are NOT [-1, 1])."""
     _requires_long_runtime()
@@ -89,9 +86,7 @@ def test_raw_action_space_has_physical_bounds(
 
 
 @pytest.mark.parametrize("make_env_fn", ["office", "single_zone"])
-def test_rescale_action_normalizes_bounds(
-    tmp_path: Path, make_env_fn: str
-) -> None:
+def test_rescale_action_normalizes_bounds(tmp_path: Path, make_env_fn: str) -> None:
     """With RescaleAction the agent-facing action space should be [-1, 1]."""
     _requires_long_runtime()
 
@@ -102,20 +97,18 @@ def test_rescale_action_normalizes_bounds(
     )
     env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
 
-    assert np.allclose(env.action_space.low, -1.0), (
-        f"Expected all lows to be -1.0, got {env.action_space.low}"
-    )
-    assert np.allclose(env.action_space.high, 1.0), (
-        f"Expected all highs to be 1.0, got {env.action_space.high}"
-    )
+    assert np.allclose(
+        env.action_space.low, -1.0
+    ), f"Expected all lows to be -1.0, got {env.action_space.low}"
+    assert np.allclose(
+        env.action_space.high, 1.0
+    ), f"Expected all highs to be 1.0, got {env.action_space.high}"
 
     env.close()
 
 
 @pytest.mark.parametrize("make_env_fn", ["office", "single_zone"])
-def test_rescale_action_steps_successfully(
-    tmp_path: Path, make_env_fn: str
-) -> None:
+def test_rescale_action_steps_successfully(tmp_path: Path, make_env_fn: str) -> None:
     """The wrapped env should accept actions in [-1, 1] and step without error."""
     _requires_long_runtime()
 
@@ -142,9 +135,7 @@ def test_rescale_action_steps_successfully(
 
 
 @pytest.mark.parametrize("make_env_fn", ["office", "single_zone"])
-def test_action_dimension_unchanged(
-    tmp_path: Path, make_env_fn: str
-) -> None:
+def test_action_dimension_unchanged(tmp_path: Path, make_env_fn: str) -> None:
     """RescaleAction should not change the number of action dimensions."""
     _requires_long_runtime()
 
@@ -156,8 +147,8 @@ def test_action_dimension_unchanged(
     raw_shape = env.action_space.shape
     env = gym.wrappers.RescaleAction(env, min_action=-1.0, max_action=1.0)
 
-    assert env.action_space.shape == raw_shape, (
-        f"Expected shape {raw_shape}, got {env.action_space.shape}"
-    )
+    assert (
+        env.action_space.shape == raw_shape
+    ), f"Expected shape {raw_shape}, got {env.action_space.shape}"
 
     env.close()

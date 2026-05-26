@@ -54,9 +54,7 @@ class TestZoneTargetTemperatureConfig:
         assert cfg.unoccupied_c == 18.0
 
     def test_from_dict_uses_fallback(self) -> None:
-        cfg = ZoneTargetTemperatureConfig.from_dict(
-            {}, fallback_temperature_c=19.0
-        )
+        cfg = ZoneTargetTemperatureConfig.from_dict({}, fallback_temperature_c=19.0)
         assert cfg.occupied_c == 19.0
         assert cfg.unoccupied_c == 19.0
 
@@ -77,15 +75,17 @@ class TestTaskConfig:
         assert tc.default_zone_target_temperature.occupied_c == 21.0
 
     def test_from_dict_explicit_values(self) -> None:
-        tc = TaskConfig.from_dict({
-            "run_period": "winter",
-            "target_temperature_mode": "occupancy",
-            "timesteps_per_hour": 4,
-            "default_zone_target_temperature": {
-                "occupied_c": 22.0,
-                "unoccupied_c": 18.0,
-            },
-        })
+        tc = TaskConfig.from_dict(
+            {
+                "run_period": "winter",
+                "target_temperature_mode": "occupancy",
+                "timesteps_per_hour": 4,
+                "default_zone_target_temperature": {
+                    "occupied_c": 22.0,
+                    "unoccupied_c": 18.0,
+                },
+            }
+        )
         assert tc.run_period.name == "winter"
         assert tc.target_temperature_mode == "occupancy"
         assert tc.timesteps_per_hour == 4
@@ -104,11 +104,13 @@ class TestTaskConfig:
         assert tc.timesteps_per_hour == tph
 
     def test_zone_target_temperatures(self) -> None:
-        tc = TaskConfig.from_dict({
-            "zone_target_temperatures": {
-                "Core Zone": {"occupied_c": 23.0, "unoccupied_c": 19.0},
-            },
-        })
+        tc = TaskConfig.from_dict(
+            {
+                "zone_target_temperatures": {
+                    "Core Zone": {"occupied_c": 23.0, "unoccupied_c": 19.0},
+                },
+            }
+        )
         target = tc.target_for_zone("Core Zone")
         assert target.occupied_c == 23.0
         target_default = tc.target_for_zone("Unknown Zone")
@@ -219,28 +221,34 @@ class TestRewardConfigs:
 @pytest.mark.quick
 class TestRewardConfigFromDict:
     def test_deadband(self) -> None:
-        cfg = reward_config_from_dict({
-            "reward_type": "DeadbandRewardConfig",
-            "energy_weight": 0.05,
-            "dT": 2.0,
-        })
+        cfg = reward_config_from_dict(
+            {
+                "reward_type": "DeadbandRewardConfig",
+                "energy_weight": 0.05,
+                "dT": 2.0,
+            }
+        )
         assert isinstance(cfg, DeadbandRewardConfig)
         assert cfg.dT == 2.0
 
     def test_barrier(self) -> None:
-        cfg = reward_config_from_dict({
-            "reward_type": "BarrierRewardConfig",
-            "energy_weight": 1.0,
-            "violation_penalty": 50.0,
-        })
+        cfg = reward_config_from_dict(
+            {
+                "reward_type": "BarrierRewardConfig",
+                "energy_weight": 1.0,
+                "violation_penalty": 50.0,
+            }
+        )
         assert isinstance(cfg, BarrierRewardConfig)
         assert cfg.violation_penalty == 50.0
 
     def test_base(self) -> None:
-        cfg = reward_config_from_dict({
-            "reward_type": "BaseRewardConfig",
-            "energy_weight": 0.1,
-        })
+        cfg = reward_config_from_dict(
+            {
+                "reward_type": "BaseRewardConfig",
+                "energy_weight": 0.1,
+            }
+        )
         assert isinstance(cfg, BaseRewardConfig)
 
     def test_missing_reward_type_raises(self) -> None:

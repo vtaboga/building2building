@@ -78,9 +78,7 @@ def _selected_building_ids(
         if building_id.startswith(f"{building_type}-")
     ]
     invalid_ids = [
-        building_id
-        for building_id in selected_ids
-        if building_id not in available_set
+        building_id for building_id in selected_ids if building_id not in available_set
     ]
     if invalid_ids:
         raise ValueError(
@@ -234,9 +232,7 @@ def main(cfg: DictConfig) -> None:
             import wandb
 
             wandb.init(
-                project=OmegaConf.select(
-                    wandb_cfg, "project", default="b2b-baselines"
-                ),
+                project=OmegaConf.select(wandb_cfg, "project", default="b2b-baselines"),
                 entity=OmegaConf.select(wandb_cfg, "entity", default=None),
                 tags=list(OmegaConf.select(wandb_cfg, "tags", default=[])),
                 config=OmegaConf.to_container(cfg, resolve=True),
@@ -280,13 +276,15 @@ def main(cfg: DictConfig) -> None:
                         run_period=run_period,
                     )
                     results.append(result)
-                    _wandb_log({
-                        "eval/total_reward": result.total_reward,
-                        "eval/normalized_score": result.normalized_score,
-                        "eval/building_type": result.building_type,
-                        "eval/building_id": result.building_id,
-                        "eval/task": result.task,
-                    })
+                    _wandb_log(
+                        {
+                            "eval/total_reward": result.total_reward,
+                            "eval/normalized_score": result.normalized_score,
+                            "eval/building_type": result.building_type,
+                            "eval/building_id": result.building_id,
+                            "eval/task": result.task,
+                        }
+                    )
                 except Exception:
                     logger.exception("Failed: %s/%s task=%s", bt, bid, task)
 

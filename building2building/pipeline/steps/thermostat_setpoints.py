@@ -47,13 +47,13 @@ def AddSetpointControl(
             )
 
             if cooling_schedule_name not in epjson["Schedule:Compact"]:
-                epjson["Schedule:Compact"][cooling_schedule_name] = create_schedule_compact(
-                    40.0
+                epjson["Schedule:Compact"][cooling_schedule_name] = (
+                    create_schedule_compact(40.0)
                 )
 
             if heating_schedule_name not in epjson["Schedule:Compact"]:
-                epjson["Schedule:Compact"][heating_schedule_name] = create_schedule_compact(
-                    10.0
+                epjson["Schedule:Compact"][heating_schedule_name] = (
+                    create_schedule_compact(10.0)
                 )
 
         elif control_type == "ThermostatSetpoint:SingleHeating":
@@ -63,8 +63,8 @@ def AddSetpointControl(
             ] = heating_schedule_name
 
             if heating_schedule_name not in epjson["Schedule:Compact"]:
-                epjson["Schedule:Compact"][heating_schedule_name] = create_schedule_compact(
-                    10.0
+                epjson["Schedule:Compact"][heating_schedule_name] = (
+                    create_schedule_compact(10.0)
                 )
 
         elif control_type == "ThermostatSetpoint:SingleCooling":
@@ -74,8 +74,8 @@ def AddSetpointControl(
             ] = cooling_schedule_name
 
             if cooling_schedule_name not in epjson["Schedule:Compact"]:
-                epjson["Schedule:Compact"][cooling_schedule_name] = create_schedule_compact(
-                    40.0
+                epjson["Schedule:Compact"][cooling_schedule_name] = (
+                    create_schedule_compact(40.0)
                 )
 
         elif control_type == "ThermostatSetpoint:SingleHeatingOrCooling":
@@ -93,7 +93,9 @@ def get_temperature_setpoints(epjson_data) -> list[tuple]:
 
     # Look for zone controls that reference thermostat setpoints
     if "ZoneControl:Thermostat" in epjson_data:
-        for _control_name, control_data in epjson_data["ZoneControl:Thermostat"].items():
+        for _control_name, control_data in epjson_data[
+            "ZoneControl:Thermostat"
+        ].items():
             control_type = control_data.get("control_1_object_type")
             setpoint_name = control_data.get("control_1_name")
 
@@ -106,4 +108,3 @@ def get_temperature_setpoints(epjson_data) -> list[tuple]:
 def add_setpoint_control(epjson_in: Derivation) -> Derivation:
     """Add controllable temperature setpoints."""
     return AddSetpointControl(epjson_in)
-

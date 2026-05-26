@@ -15,4 +15,3 @@ def link_in_schedule(epjson_file: Path, csv_file: Path):
 
     with open(dst, "w") as f:
         json.dump(epjson, f, indent=4)
-

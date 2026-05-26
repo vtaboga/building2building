@@ -82,7 +82,9 @@ def prepare_building(
     current = add_hvac_meters(current)
     current = add_outdoor_air_meters(current)
     current = modify_timestep(current, timesteps_per_hour=timesteps_per_hour)
-    current = modify_run_period(current, begin_day_of_month=1, begin_month=1, end_day_of_month=31, end_month=12)
+    current = modify_run_period(
+        current, begin_day_of_month=1, begin_month=1, end_day_of_month=31, end_month=12
+    )
     current = Rename("building.epjson", current)
     return current
 
@@ -109,7 +111,9 @@ def create_complete_pipeline(
         Expression resolving to (epjson_path, actuator_descriptions)
     """
     epjson = prepare_building(
-        input_file, energyplus_path, src_version,
+        input_file,
+        energyplus_path,
+        src_version,
         timesteps_per_hour=timesteps_per_hour,
     )
     return make_controllable(epjson)

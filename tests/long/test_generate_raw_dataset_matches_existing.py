@@ -154,13 +154,13 @@ def test_generate_raw_dataset_smoke(tmp_path: Path) -> None:
     # Validate LHS parameter columns are present and finite.
     for bid, gen_row in generated.items():
         for pname in PARAMETER_NAMES:
-            assert pname in gen_row, (
-                f"building_id={bid}: parameter {pname!r} missing from metadata.csv"
-            )
+            assert (
+                pname in gen_row
+            ), f"building_id={bid}: parameter {pname!r} missing from metadata.csv"
             val = float(gen_row[pname])
-            assert np.isfinite(val), (
-                f"building_id={bid}: parameter {pname!r} = {val!r} is not finite"
-            )
+            assert np.isfinite(
+                val
+            ), f"building_id={bid}: parameter {pname!r} = {val!r} is not finite"
 
     # Validate that each epJSON file exists.
     for bid in generated:
@@ -237,9 +237,9 @@ def test_generate_raw_dataset_eplus_smoke(tmp_path: Path) -> None:
                         # weather_file is "weather/<filename>.epw"
                         weather_file = row["weather_file"]
                         break
-            assert weather_file is not None, (
-                f"building_id={building_id} not found in {csv_path}"
-            )
+            assert (
+                weather_file is not None
+            ), f"building_id={building_id} not found in {csv_path}"
             epw_path = output_dir / weather_file
 
             # 1-day E+ simulation.
@@ -250,6 +250,7 @@ def test_generate_raw_dataset_eplus_smoke(tmp_path: Path) -> None:
 
             # Patch RunPeriod to 1 day to keep the test fast.
             import copy
+
             with open(epjson_path) as f:
                 epjson = json.load(f)
             epjson_1day = copy.deepcopy(epjson)
@@ -284,7 +285,6 @@ def test_generate_raw_dataset_eplus_smoke(tmp_path: Path) -> None:
                     f"ret={ret} severe={severe_count} fatal={fatal_count}"
                 )
 
-    assert not failures, (
-        f"{len(failures)} E+ simulation(s) had errors:\n"
-        + "\n".join(failures)
+    assert not failures, f"{len(failures)} E+ simulation(s) had errors:\n" + "\n".join(
+        failures
     )

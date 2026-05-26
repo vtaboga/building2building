@@ -98,9 +98,7 @@ class CHSScoreStore:
         per_env_means: list[float] = []
         for env_id, entries in self._scores.items():
             pool = self.pool_for_env(env_id)
-            trial_scores = np.array(
-                [s for tid, s in entries if tid == trial_id]
-            )
+            trial_scores = np.array([s for tid, s in entries if tid == trial_id])
             if len(trial_scores) == 0:
                 continue
             normalized = cdf_normalize_batch(trial_scores, pool)
@@ -121,13 +119,9 @@ class CHSScoreStore:
                 best_id = tid
         return best_id
 
-    def trial_summary(
-        self, trial_ids: list[str]
-    ) -> list[tuple[str, float]]:
+    def trial_summary(self, trial_ids: list[str]) -> list[tuple[str, float]]:
         """Return ``(trial_id, mean_cdf_score)`` sorted descending."""
-        results = [
-            (tid, self.cdf_score_for_trial(tid)) for tid in trial_ids
-        ]
+        results = [(tid, self.cdf_score_for_trial(tid)) for tid in trial_ids]
         results.sort(key=lambda x: x[1], reverse=True)
         return results
 

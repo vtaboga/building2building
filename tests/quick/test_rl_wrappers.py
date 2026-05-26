@@ -33,12 +33,12 @@ def test_wrap_env_for_rl_observation_space_is_unit_interval() -> None:
     env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=False)
     obs_shape = env.observation_space.shape
     assert obs_shape is not None
-    assert (env.observation_space.low == 0.0).all(), (
-        f"observation_space.low should be 0, got: {env.observation_space.low}"
-    )
-    assert (env.observation_space.high == 1.0).all(), (
-        f"observation_space.high should be 1, got: {env.observation_space.high}"
-    )
+    assert (
+        env.observation_space.low == 0.0
+    ).all(), f"observation_space.low should be 0, got: {env.observation_space.low}"
+    assert (
+        env.observation_space.high == 1.0
+    ).all(), f"observation_space.high should be 1, got: {env.observation_space.high}"
     obs, _ = env.reset()
     assert obs.shape == obs_shape
     assert obs.dtype == np.float32 or obs.dtype == np.float64
@@ -56,12 +56,12 @@ def test_wrap_env_for_rl_action_in_minus_one_one() -> None:
         task="task_occ_wmed",
         rescale_action=True,
     )
-    assert (env.action_space.low == -1.0).all(), (
-        f"action_space.low != -1: {env.action_space.low}"
-    )
-    assert (env.action_space.high == 1.0).all(), (
-        f"action_space.high != 1: {env.action_space.high}"
-    )
+    assert (
+        env.action_space.low == -1.0
+    ).all(), f"action_space.low != -1: {env.action_space.low}"
+    assert (
+        env.action_space.high == 1.0
+    ).all(), f"action_space.high != 1: {env.action_space.high}"
     env.close()
 
 
@@ -71,12 +71,12 @@ def test_wrap_env_for_rl_action_default_off() -> None:
     import building2building as b2b
 
     env = b2b.new_make_env("OfficeSmall", index=0, task="task_occ_wmed")
-    assert (env.action_space.low > -10.0).all(), (
-        "Expected engineering-unit lower bounds > -10 °C"
-    )
-    assert (env.action_space.high < 100.0).all(), (
-        "Expected engineering-unit upper bounds < 100 °C"
-    )
+    assert (
+        env.action_space.low > -10.0
+    ).all(), "Expected engineering-unit lower bounds > -10 °C"
+    assert (
+        env.action_space.high < 100.0
+    ).all(), "Expected engineering-unit upper bounds < 100 °C"
     env.close()
 
 
@@ -88,12 +88,10 @@ def test_wrap_env_for_rl_flags_are_independent() -> None:
     env = b2b.new_make_env("OfficeSmall", index=0, task="task_occ_wmed")
     raw_action_space = env.action_space
 
-    env_only_obs = b2b.wrap_env_for_rl(
-        env, normalize_obs=True, rescale_action=False
-    )
-    assert env_only_obs.action_space == raw_action_space, (
-        "normalize_obs=True should not alter the action space"
-    )
+    env_only_obs = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=False)
+    assert (
+        env_only_obs.action_space == raw_action_space
+    ), "normalize_obs=True should not alter the action space"
     env.close()
 
 

@@ -819,6 +819,45 @@ OSS-readiness deliverables:
 
 ---
 
+## D10 — pyright status (2026-05-26)
+
+Running `pyright building2building baselines` (after black pass) reports
+**242 errors** (all pre-existing, none introduced by D10). Fixing them all
+is out-of-scope for the OSS release; they are catalogued here so a
+contributor can triage later.
+
+**Root causes (by frequency):**
+
+1. **`matplotlib`/`torch` private-import stubs** (~80 errors): pyright
+   treats `matplotlib.pyplot.Figure`, `matplotlib.pyplot.Axes`,
+   `torch.cat`, `torch.tensor`, `torch.Size`, etc. as private.  Fix:
+   import from the canonical locations (`from matplotlib.figure import
+   Figure`; `import torch; torch.cat(...)` is fine, but type annotations
+   should use `torch.Tensor` etc.).
+
+2. **`str` coerced to `BuildingType` Literal in baselines** (~40 errors):
+   Hydra deserialises config fields as plain `str`; baselines then pass
+   these directly to typed API calls expecting
+   `Literal['SingleFamilyHouse', ...]`.  Fix: add explicit casts or
+   validate with `BuildingType(value)`.
+
+3. **`PPO` not assignable to `PolicyLike`** (~5 errors): The
+   `PolicyLike` protocol does not cover SB3 `PPO` models; needs a union
+   or a shim.
+
+4. **Pipeline / sources / store type gaps** (~120 errors): scattered
+   issues in `pipeline/actuators.py`, `simulator/wrappers.py`,
+   `sources/*.py`, `store.py`.  Many are consequence of `cattrs`
+   returning `Unknown` types or untyped third-party objects entering
+   the pipeline.  Lower priority; would require per-file triage.
+
+**Decision 2026-05-26:** leave as-is for the OSS release.  The public
+API surface (`building2building/__init__.py.__all__`) is clean; most
+errors are in pipeline internals and baselines scripts.  Track remaining
+issues under future Phase T / Phase F follow-ups.
+
+---
+
 ## Repository hygiene snapshot (2026-05-12)
 
 Audit done before purging the working tree. None of the items below

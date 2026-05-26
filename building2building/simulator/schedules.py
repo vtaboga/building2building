@@ -18,7 +18,6 @@ import numpy as np
 
 from building2building.types import SeasonName
 
-
 # ---------------------------------------------------------------------------
 # Season resolver
 # ---------------------------------------------------------------------------
@@ -73,13 +72,9 @@ class DailySchedule:
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.arrival_h < 24.0:
-            raise ValueError(
-                f"arrival_h must be in [0, 24), got {self.arrival_h}"
-            )
+            raise ValueError(f"arrival_h must be in [0, 24), got {self.arrival_h}")
         if not 0.0 < self.departure_h <= 24.0:
-            raise ValueError(
-                f"departure_h must be in (0, 24], got {self.departure_h}"
-            )
+            raise ValueError(f"departure_h must be in (0, 24], got {self.departure_h}")
         if self.arrival_h >= self.departure_h:
             raise ValueError(
                 "arrival_h must be strictly less than departure_h, "
@@ -109,9 +104,7 @@ class TruncatedNormal:
         if self.std <= 0.0:
             raise ValueError(f"std must be > 0, got {self.std}")
         if self.low >= self.high:
-            raise ValueError(
-                f"low must be < high, got low={self.low} high={self.high}"
-            )
+            raise ValueError(f"low must be < high, got low={self.low} high={self.high}")
 
     def sample(self, rng: np.random.Generator) -> float:
         for _ in range(10):
@@ -151,26 +144,18 @@ class BuildingTypeScheduleDistribution:
                 f"{self.occupied_c_low} vs {self.occupied_c_high}"
             )
         if self.unoccupied_offset_low > self.unoccupied_offset_high:
-            raise ValueError(
-                "unoccupied_offset_low must be <= unoccupied_offset_high"
-            )
+            raise ValueError("unoccupied_offset_low must be <= unoccupied_offset_high")
         if self.unoccupied_c_min >= self.unoccupied_c_max:
-            raise ValueError(
-                "unoccupied_c_min must be < unoccupied_c_max"
-            )
+            raise ValueError("unoccupied_c_min must be < unoccupied_c_max")
 
-    def sample(
-        self, rng: np.random.Generator, season: SeasonName
-    ) -> DailySchedule:
+    def sample(self, rng: np.random.Generator, season: SeasonName) -> DailySchedule:
         """Draw a full :class:`DailySchedule` for a given *season*."""
         arrival_h = self.arrival.sample(rng)
         departure_h = self.departure.sample(rng)
         if departure_h <= arrival_h:
             # Enforce positive occupied window with a safety margin.
             departure_h = min(24.0, arrival_h + 1.0)
-        occupied_c = float(
-            rng.uniform(self.occupied_c_low, self.occupied_c_high)
-        )
+        occupied_c = float(rng.uniform(self.occupied_c_low, self.occupied_c_high))
         season_bias = _season_offset_bias(season)
         low, high = _apply_season_bias(
             self.unoccupied_offset_low,

@@ -42,7 +42,9 @@ from baselines.controllers.unitary_hvac import UnitaryHvacConfig, UnitaryHvacPol
 
 logger = logging.getLogger(__name__)
 
-TUNED_CONFIGS_DIR = Path(__file__).resolve().parent.parent / "configs" / "tuned_controllers"
+TUNED_CONFIGS_DIR = (
+    Path(__file__).resolve().parent.parent / "configs" / "tuned_controllers"
+)
 
 TARGET_C = 21.0
 DEADBAND_C = 1.0
@@ -181,8 +183,10 @@ def run_rollout(
         [[step[z] for z in controlled_zones] for step in temps_hist],
         dtype=np.float32,
     )
-    actions_arr = np.stack(action_hist).astype(np.float32) if action_hist else np.zeros(
-        (0, len(action_names)), dtype=np.float32
+    actions_arr = (
+        np.stack(action_hist).astype(np.float32)
+        if action_hist
+        else np.zeros((0, len(action_names)), dtype=np.float32)
     )
     summary = {
         "building_id": building_id,
@@ -276,9 +280,7 @@ def analyze_one(
     }
 
     fan_idx = [i for i, n in enumerate(action_names) if "Fan Air Mass Flow Rate" in n]
-    sat_idx = [
-        i for i, n in enumerate(action_names) if "Schedule Value" in n
-    ]
+    sat_idx = [i for i, n in enumerate(action_names) if "Schedule Value" in n]
     action_stats = {
         "n_steps": int(actions.shape[0]),
         "fan_actuators": [
@@ -314,16 +316,16 @@ def analyze_one(
         "sum_energy_term": float(energy_term.sum()),
         "mean_temp_term_per_step": float(temp_term.mean()),
         "mean_energy_term_per_step": float(energy_term.mean()),
-        "share_of_penalty_from_temp": float(
-            temp_term.sum() / (temp_term.sum() + energy_term.sum())
-        )
-        if (temp_term.sum() + energy_term.sum()) > 0
-        else float("nan"),
-        "share_of_penalty_from_energy": float(
-            energy_term.sum() / (temp_term.sum() + energy_term.sum())
-        )
-        if (temp_term.sum() + energy_term.sum()) > 0
-        else float("nan"),
+        "share_of_penalty_from_temp": (
+            float(temp_term.sum() / (temp_term.sum() + energy_term.sum()))
+            if (temp_term.sum() + energy_term.sum()) > 0
+            else float("nan")
+        ),
+        "share_of_penalty_from_energy": (
+            float(energy_term.sum() / (temp_term.sum() + energy_term.sum()))
+            if (temp_term.sum() + energy_term.sum()) > 0
+            else float("nan")
+        ),
         "outdoor_temperature_c": {
             "mean": float(outdoor.mean()),
             "min": float(outdoor.min()),
@@ -345,13 +347,20 @@ def analyze_one(
     ax.set_ylabel("Temperature (°C)")
     ax.set_xlabel("Hour of year")
     ax.legend(fontsize=7, ncol=2, loc="upper right")
-    ax.set_title(f"{meta['building_id']} (cz={meta['climate_zone']}) — zone temperatures")
+    ax.set_title(
+        f"{meta['building_id']} (cz={meta['climate_zone']}) — zone temperatures"
+    )
 
     ax = axes[1]
     bins = np.linspace(-12, 12, 97)
     for i, z in enumerate(zones):
         ax.hist(
-            dev[:, i], bins=bins, alpha=0.35, label=z, density=True, histtype="stepfilled"
+            dev[:, i],
+            bins=bins,
+            alpha=0.35,
+            label=z,
+            density=True,
+            histtype="stepfilled",
         )
     ax.axvspan(-dT, dT, color="green", alpha=0.08, label=f"deadband (±{dT}°C)")
     ax.axvline(0, color="k", lw=0.8)

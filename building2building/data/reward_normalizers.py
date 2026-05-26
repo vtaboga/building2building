@@ -208,7 +208,9 @@ def _parse_source(raw: Any) -> RewardNormalizerSource:
         run_period=run_period_str,
         split=str(raw["split"]),
         aggregation=str(raw["aggregation"]),
-        b2b_version=str(raw["b2b_version"]) if raw.get("b2b_version") is not None else None,
+        b2b_version=(
+            str(raw["b2b_version"]) if raw.get("b2b_version") is not None else None
+        ),
         git_sha=str(raw["git_sha"]) if raw.get("git_sha") is not None else None,
     )
 
@@ -219,8 +221,12 @@ def _parse_floor(raw: Any) -> RewardNormalizerFloor:
     if not isinstance(raw, dict):
         raise TypeError("reward_normalizers.yaml: 'floor' must be a mapping")
     return RewardNormalizerFloor(
-        epsilon_abs=_coerce_float(raw.get("epsilon_abs", 1e-6), key="floor.epsilon_abs"),
-        epsilon_rel=_coerce_float(raw.get("epsilon_rel", 0.05), key="floor.epsilon_rel"),
+        epsilon_abs=_coerce_float(
+            raw.get("epsilon_abs", 1e-6), key="floor.epsilon_abs"
+        ),
+        epsilon_rel=_coerce_float(
+            raw.get("epsilon_rel", 0.05), key="floor.epsilon_rel"
+        ),
     )
 
 
@@ -232,9 +238,15 @@ def _parse_bucket(raw: Any, *, location: str) -> dict[str, float | int]:
     return {
         "tau_T": _coerce_float(raw.get("tau_T"), key=f"{location}.tau_T"),
         "tau_E": _coerce_float(raw.get("tau_E"), key=f"{location}.tau_E"),
-        "tau_T_iqr": _coerce_float(raw.get("tau_T_iqr", 0.0), key=f"{location}.tau_T_iqr"),
-        "tau_E_iqr": _coerce_float(raw.get("tau_E_iqr", 0.0), key=f"{location}.tau_E_iqr"),
-        "n_buildings": _coerce_int(raw.get("n_buildings", 0), key=f"{location}.n_buildings"),
+        "tau_T_iqr": _coerce_float(
+            raw.get("tau_T_iqr", 0.0), key=f"{location}.tau_T_iqr"
+        ),
+        "tau_E_iqr": _coerce_float(
+            raw.get("tau_E_iqr", 0.0), key=f"{location}.tau_E_iqr"
+        ),
+        "n_buildings": _coerce_int(
+            raw.get("n_buildings", 0), key=f"{location}.n_buildings"
+        ),
     }
 
 

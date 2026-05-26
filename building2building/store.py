@@ -42,9 +42,9 @@ class Derivation:
     builder: Callable[[list[Any]], None]
 
     def __post_init__(self):
-        assert Path(self.name).name == self.name, (
-            "name of derivation can't contain a slash"
-        )
+        assert (
+            Path(self.name).name == self.name
+        ), "name of derivation can't contain a slash"
 
 
 Result = TypeVar("Result")
@@ -228,9 +228,9 @@ def _capture_dependencies_and_builder(func: Callable[..., Any], *args, **kwargs)
     return dependencies, builder
 
 
-def expression() -> Callable[
-    [Callable[..., Result]], Callable[..., Expression[Result]]
-]:
+def expression() -> (
+    Callable[[Callable[..., Result]], Callable[..., Expression[Result]]]
+):
     """Decorator: calling the wrapped function returns an Expression node."""
 
     def decorator(func) -> Callable:

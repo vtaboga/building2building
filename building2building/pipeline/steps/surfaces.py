@@ -31,4 +31,3 @@ def GlueSurfaces(
 def glue_surfaces(epjson_in: Derivation) -> Derivation:
     """Glue together overlapping surfaces."""
     return GlueSurfaces(epjson_in)
-

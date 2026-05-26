@@ -31,11 +31,6 @@ from .transform_utils import (
 logger = logging.getLogger(__name__)
 
 
-# Stub type for compatibility with reward functions
-# TODO: Remove when rewards are refactored to not use thermostat setpoints
-ThermostatSetpoint = Any
-
-
 def hvac_actuators_transform(
     hvac_actuators: Sequence[ActuatorDescription],
 ) -> Transform[list, Box]:
@@ -72,7 +67,7 @@ def hvac_actuators_transform(
 
 
 # ---------------------------------------------------------------------------
-# Split action space: fixed cooling setpoints 
+# Split action space: fixed cooling setpoints
 # ---------------------------------------------------------------------------
 
 FIXED_CLG_SP_VALUE = 40.0
@@ -106,7 +101,9 @@ class HvacActionSpace:
     fixed_indices: list[int]
     fixed_values: list[float]
 
-    def assemble_full_action(self, agent_action: np.ndarray | Sequence[float]) -> list[float]:
+    def assemble_full_action(
+        self, agent_action: np.ndarray | Sequence[float]
+    ) -> list[float]:
         """Expand an agent action vector into the full EnergyPlus actuator vector.
 
         Args:
