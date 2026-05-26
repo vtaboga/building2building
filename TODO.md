@@ -132,7 +132,20 @@ See `notes.md` § "Reward — calibration regime and impl map" and
 
 ---
 
-## Phase M — OfficeMedium OA-mixer action-space fix
+## Phase M — OfficeMedium OA-mixer action-space fix ≈
+
+**Status (2026-05-25).** Code-side complete on branch
+`phase/m-officemedium-action-space` (not yet pushed). Each item below
+has a committed code/docs landing; the artefact updates that require
+Slurm runs are tracked as outstanding follow-up commits.
+
+| Item | Code commit | Outstanding follow-up |
+| --- | --- | --- |
+| M0 — design note | `3c84984` | — |
+| M1 — pipeline change | `5a9772d` | — |
+| M2 — HF dataset regen | `28f2e0a` | user runs `sbatch building2building/pipeline/scripts/regen_officemedium.sh` and `huggingface-cli upload` (see `REPRODUCING.md` § "Dataset regeneration") |
+| M3 — RBC pins OA + retune | `0141961` | user runs `sbatch baselines/scripts/tune_controller.sh`, then commits the 8 new `air_loop_officemedium_cz{1..8}.yaml` |
+| M4 — reward normalizers | `e9da856` | user runs the cache-invalidation + `sbatch --array=9-16 .../launch_compute_random_policy_reward_normalizers.sh` + `--mode aggregate`, then commits the resulting `reward_normalizers.yaml` diff |
 
 **This phase blocks every other downstream artefact.** Run first.
 
