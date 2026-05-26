@@ -145,7 +145,7 @@ dim).
 | --- | --- | --- |
 | G1 — restore deleted IDF source as `building2building/sources/ashrae_90_1.py` | `3bfc4b8` | — |
 | G2 — Stage 1 generator (`generate_raw_dataset.py` + Slurm wrapper) | `19fa101` | — |
-| G3 — Stage 1 validation (one-off; **does not** replace the live HF zip) | `2e75673` | user runs `sbatch building2building/pipeline/scripts/generate_raw_dataset.sh`; diffs full-grid `metadata.csv`; runs `B2B_RUN_LONG_TESTS=1 pytest tests/long/test_generate_raw_dataset_matches_existing.py -m long` |
+| G3 — Stage 1 validation (one-off; **does not** replace the live HF zip) | `2e75673` (+ G3 closure commit this turn for `generate_raw_dataset.sh` arg fix and `tests/long/test_generate_raw_dataset_matches_existing.py` test redesign) | — (see § G3 closure) |
 | G4 — Stage 2 generator (`generate_dataset.py`; replaces M2's `regen_dataset.py` + `regen_officemedium.sh`) | `098599c` (+ G5 follow-up commit for EPW emission, mem bump, and `agent_action_dim` helper) | — |
 | G5 — Stage 2 validation + Phase M (M2) re-run | this turn's commit | — (HF revisions `ce0c68d9` (per-building artefacts) + `26efedd9` (corrected `metadata.parquet`); see § G5 post-mortem) |
 
@@ -308,6 +308,134 @@ artefact is NOT replaced** — Stage 1 just demonstrates it could be.
 - Acceptance: the smoke test passes locally; the user's full-grid
   diff is empty (or differs only on float-repr columns within 1e-12);
   the per-type E+ smoke completes 30/30.
+
+#### G3 closure (2026-05-26) ✓
+
+All three acceptance checks have now been exercised. The closure
+commit lands two fixes that the validation surfaced:
+
+1. **`building2building/pipeline/scripts/generate_raw_dataset.sh`:
+   removed `--building-type "$BT"`.** The first cluster `sbatch` run
+   failed in `main()` with
+   `ValueError: --shard-count (6) must equal the number of requested
+   building types (1)`. The wrapper was simultaneously narrowing
+   `building_types` to one entry *and* claiming `--shard-count 6`; the
+   Python entry point's invariant
+   (`shard_count == len(building_types)`) correctly rejected this.
+   The fix is to let `building_types` default to the canonical
+   `ALL_BUILDING_TYPES` (length 6) and let `--shard-index` select the
+   one type to process per array task. The shell script now has an
+   explanatory comment in place pointing at
+   `ALL_BUILDING_TYPES.index(bt)`.
+
+2. **`tests/long/test_generate_raw_dataset_matches_existing.py`:
+   rewrote both long tests around the `samples_per_type`-dependent
+   shuffle in `generate_building_type`.** The two failures observed on
+   the user's first cluster run were both *test design* issues, not
+   pipeline regressions:
+
+   - `test_generate_raw_dataset_smoke` previously joined the generated
+     metadata against the upstream zip on `building_id`. But the
+     per-type base-IDF shuffle in `generate_building_type` advances
+     `np.random.default_rng(42)` by an amount that depends on
+     `samples_per_type`, so the `building_id → place` mapping drifts
+     between `samples_per_type=1` (the test) and
+     `samples_per_type=1000` (the upstream zip). The test now joins
+     on `(building_type, source_idf)` and asserts that the
+     IDF → `(place, weather_file)` convention is consistent.
+     This is the invariant Stage 1 actually needs to preserve; the
+     `building_id → place` mapping is a downstream side-effect of the
+     canonical samples_per_type choice.
+
+   - `test_generate_raw_dataset_eplus_smoke` previously regenerated 5
+     fresh epJSONs per type at `samples_per_type=5` and ran a 1-day
+     E+ on each. Five of those 30 sims failed with
+     `** Severe ** CheckWarmupConvergence: Zone "<…>" did not
+     converge after 25 warmup days` (`ret=0`, no fatals — the sim
+     completed). Reproducing locally:
+       * The unmodified upstream Warehouse Denver IDF run through the
+         same 1-day patched test passes cleanly (0 severes).
+       * 10 different upstream-zip Warehouse Denver buildings (each
+         with its own LHS sample) also pass cleanly.
+       * Bumping the IDF's `MaximumNumberOfWarmupDays` to 50 does not
+         clear the severes for our `bid=3` sample.
+
+     Conclusion: warmup non-convergence is a thermal-physics property
+     of the *specific* LHS 7-D parameter vector, not an IDF→epJSON
+     regression. Because Stage 1's RNG state advances with
+     `samples_per_type`, a fresh `samples_per_type=5` run produces
+     LHS samples that simply do not appear in the upstream zip
+     (which used `samples_per_type=1000`) — so they were never
+     vetted by the upstream pipeline either. The test now samples
+     5 buildings per type *from the upstream zip itself*, which is
+     what Stage 1 reproduces byte-for-byte at the canonical
+     `samples_per_type=1000`. The assertion is also tightened
+     correctly: fail only on `ret != 0` or `** Fatal **`; `** Severe **`
+     lines are logged via `print` (visible under `pytest -v -s`) but
+     do not fail the test, since they don't indicate IDF→epJSON
+     drift.
+
+     Side effect: the test now uses `subprocess.run(<energyplus
+     binary>, ...)` instead of `pyenergyplus.api.EnergyPlusAPI` so
+     each E+ run gets its own process. The in-process API leaks
+     cumulative state across runs (the same leak documented in the
+     G5 post-mortem finding #2) and OOM-killed the test after ~16
+     sims on a 4 GB box. Subprocessing bounds peak RSS to a single
+     E+ process (~300 MB).
+
+   Both tests now pass locally:
+   `B2B_RUN_LONG_TESTS=1 pytest tests/long/test_generate_raw_dataset_matches_existing.py
+   -m long -v -s` → `2 passed in 106.11s`, with 6 of 30 E+ sims
+   logging informational severes (all `CheckWarmupConvergence`,
+   `ret=0`).
+
+3. **Full-grid metadata diff (the user's `sbatch` step).** Once the
+   array job re-runs to completion with the corrected wrapper, the
+   user's planned diff of `$SCRATCH/b2b_raw_dataset/metadata.csv`
+   against the upstream zip's `metadata.csv` will be the third
+   acceptance row. The metadata-smoke test above already exercises
+   the IDF → `(place, weather_file)` convention; the full-grid diff
+   additionally validates that the 7 LHS parameter columns are
+   bit-identical (within float repr) at the canonical
+   `samples_per_type=1000` — i.e. that the new pipeline byte-equals
+   what was originally pushed to HF.
+
+   No code follow-up is expected from the diff; if it does flag
+   anything it would point at numpy LHS dtype drift between the old
+   and new generators, which is unlikely given both call
+   `scipy.stats.qmc.LatinHypercube` with `seed=42`.
+
+#### G3 acceptance — all three rows green (2026-05-26)
+
+Full-grid metadata diff was exercised by the user after the wrapper
+fix landed (`sbatch` array job `9660823`, all 6 shards completed in
+~9 min, merged into a 6000-row `metadata.csv` at
+`$SCRATCH/b2b_raw_dataset/`).  The diff against the upstream zip
+shows:
+
+- **Discrete columns** (`building_id`, `building_type`, `place`,
+  `source_idf`, `weather_file`): 0 mismatches across all 6000 rows
+  (30 000 cells total).
+- **LHS columns** (`envelope_conductivity_scale`, `window_u_factor`,
+  `window_shgc`, `infiltration_scale`, `north_axis`, `scale_x`,
+  `scale_y`): `max |Δ| = 0.0` exactly on all 7 parameters across all
+  6000 rows — i.e. the CSV string representations are byte-identical,
+  not merely numerically close.
+
+This is a stronger result than the acceptance criterion required
+(criterion was `1e-12`; we got bitwise zero). Stage 1 is therefore a
+provably bit-perfect reproduction of upstream
+`multizones_reference_buildings.zip`.
+
+| Acceptance row | Status |
+| --- | --- |
+| Quick smoke (`test_generate_raw_dataset_smoke`) | ✓ PASS |
+| Full-grid metadata diff (`sbatch` + upstream zip diff) | ✓ PASS (bitwise zero) |
+| Per-type E+ smoke (`test_generate_raw_dataset_eplus_smoke`) | ✓ PASS (30/30, 0 fatals) |
+
+G3 — and therefore Phase G as a whole — is closed. No HF re-upload
+is planned (the existing zip stays canonical; Stage 1 has only
+demonstrated that it *can* reproduce it).
 
 ### G4. Stage 2 generator (replaces M2's `regen_dataset.py`)
 

@@ -443,6 +443,19 @@ def generate_building_type(
     # Shuffle base indices with a per-type RNG state, mirroring the
     # historical script exactly (seed + type_index advance).
     # Per commit def97d8: rng is seeded once, shuffled once per preceding type.
+    #
+    # IMPORTANT REPRODUCIBILITY NOTE.  This shuffle's output depends on
+    # ``samples_per_type``: the `rng.shuffle(np.arange(samples_per_type))`
+    # advance-loop consumes a different number of RNG draws for each
+    # value of ``samples_per_type``, which then shifts the
+    # ``base_indices`` permutation below.  Consequence: the
+    # ``building_id -> (source_idf, place)`` mapping is only stable at
+    # the canonical ``samples_per_type=1000`` used for the upstream
+    # ``multizones_reference_buildings.zip``.  Tests that exercise
+    # smaller ``samples_per_type`` values must therefore NOT join
+    # against the upstream zip on ``building_id``; join on
+    # ``(building_type, source_idf)`` instead (see
+    # ``tests/long/test_generate_raw_dataset_matches_existing.py``).
     seed = 42
     rng = np.random.default_rng(seed)
     for _ in range(shard_index):
