@@ -222,6 +222,19 @@ def generate_one_building(
     net_conditioned_area = float(meta.net_conditioned_area)
     warmup_phases = int(meta.warmup_phases)
 
+    # Copy the EPW into the per-building directory so it round-trips through
+    # ``factory.py``/``api/__init__.py`` which locate it as
+    # ``info.building_dir / info.weather_file`` (see
+    # building2building/envs/factory.py:55 and building2building/api/__init__.py:294).
+    # ``realize`` returns the store path ``<derivation_hash>-<basename>``
+    # (see building2building/store.py:73), and the existing HF
+    # ``metadata.parquet`` ``weather_file`` column (preserved unchanged by
+    # ``rebuild_metadata_parquet``) carries exactly that same name from the
+    # original Stage-2 run.  Copying with the store basename preserves the
+    # filename contract end-to-end.
+    epw_path = realize(STORE_PATH.get(), epw_derivation)
+    shutil.copy(epw_path, target_dir / epw_path.name)
+
     place = str(df_meta.iloc[0].get("place", ""))
 
     new_meta = {
@@ -274,10 +287,14 @@ def generate_building_type(
     t0 = time.monotonic()
     for k, pid in enumerate(my_ids, 1):
         target_dir = out_root / building_type / pid
-        if not force and (
+        # A complete per-building dir holds the 3 JSON/epJSON artefacts plus
+        # the canonical-name EPW (``<sha256>-<basename>.epw``).  Any of these
+        # missing means the previous run was partial and we must regenerate.
+        if not force and target_dir.is_dir() and (
             (target_dir / "building.epjson").exists()
             and (target_dir / "equipment.json").exists()
             and (target_dir / "metadata.json").exists()
+            and any(target_dir.glob("*.epw"))
         ):
             logger.debug("[%d/%d] %s already exists, skipping.", k, len(my_ids), pid)
             continue
@@ -310,9 +327,19 @@ def rebuild_metadata_parquet(
     """Rewrite ``metadata.parquet`` with updated ``action_dim`` for the
     regenerated building types.
 
-    Counts actuators directly via
-    ``sum(len(e.actuator_descriptions()) for e in equipment_list)``
-    by reading and re-counting from the written ``equipment.json`` files.
+    ``action_dim`` is the **agent-facing** action-space dimension — i.e.
+    ``env.action_space.shape[0]`` for the env constructed by
+    :func:`building2building.api.new_make_env`.  We compute it by routing
+    the equipment list through
+    :func:`building2building.simulator.action_spaces.agent_action_dim`,
+    which applies the same fixed-actuator filter
+    (:func:`hvac_action_space`) used by the simulator at runtime so that
+    :data:`BuildingInfo.action_dim` matches the gym action space by
+    construction.  Phase G4 originally specified counting raw
+    ``actuator_descriptions()``, but that produced the *full*
+    EnergyPlus actuator vector (51 for OfficeMedium) instead of the
+    agent-facing dim (36).  See TODO.md § G5 follow-up.
+
     Rows for non-regenerated building types are preserved bit-identically
     from the existing HF ``metadata.parquet``.
 
@@ -323,13 +350,8 @@ def rebuild_metadata_parquet(
     df = pd.read_parquet(src_parquet)
 
     from cattrs import structure
-    from building2building.pipeline.actuators import (
-        VAVSystem,
-        UnitarySystem,
-        HeatingOnlyZone,
-    )
-
-    equipment_types = (VAVSystem, UnitarySystem, HeatingOnlyZone)
+    from building2building.pipeline.actuators import AnyEquipment
+    from building2building.simulator.action_spaces import agent_action_dim
 
     for bt in building_types_regenerated:
         mask = df["building_type"] == bt
@@ -348,25 +370,10 @@ def rebuild_metadata_parquet(
                 raise FileNotFoundError(
                     f"equipment.json missing at {eq_path}."
                 )
-            raw_eq = json.loads(eq_path.read_text())
-            # Structure each entry using cattrs and count actuators from
-            # actuator_descriptions(), consistent with equipment_list usage.
-            n_actuators = 0
-            for entry in raw_eq:
-                et = entry.get("equipment_type", "")
-                if et == "vavsystem":
-                    eq_obj = structure(entry, VAVSystem)
-                elif et == "unitarysystem":
-                    eq_obj = structure(entry, UnitarySystem)
-                elif et == "heatingonlyzone":
-                    eq_obj = structure(entry, HeatingOnlyZone)
-                else:
-                    raise ValueError(
-                        f"Unknown equipment_type {et!r} in {eq_path}. "
-                        f"Add a handler for new equipment types."
-                    )
-                n_actuators += len(eq_obj.actuator_descriptions())
-            df.at[idx, "action_dim"] = int(n_actuators)
+            equipment_list = structure(
+                json.loads(eq_path.read_text()), list[AnyEquipment]
+            )
+            df.at[idx, "action_dim"] = int(agent_action_dim(equipment_list))
 
     out_parquet = out_root / "metadata.parquet"
     df.to_parquet(out_parquet, index=False)

@@ -16,7 +16,7 @@ from building2building.data.download import BuildingType
 DYNAMICS_ADAPTATION_PRESETS: dict[str, dict[str, object]] = {
     "easy": {"building_type": "SingleFamilyHouse", "action_dim": 2},
     "medium": {"building_type": "OfficeSmall", "action_dim": 10},
-    "hard": {"building_type": "OfficeMedium", "action_dim": 33},
+    "hard": {"building_type": "OfficeMedium", "action_dim": 36},
 }
 
 

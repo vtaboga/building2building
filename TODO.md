@@ -132,19 +132,22 @@ See `notes.md` § "Reward — calibration regime and impl map" and
 
 ---
 
-## Phase G — Reproducible dataset generation pipeline ≈
+## Phase G — Reproducible dataset generation pipeline ✓
 
-**Status (2026-05-26).** Code-side complete on branch
-`phase/g-dataset-generation`. G1–G4 are committed; G5 is the
-outstanding user Slurm follow-up.
+**Status (2026-05-26).** Complete. G1–G5 are committed and the new
+OfficeMedium HF revision is live (`vtaboga/building2building_dataset`
+at `26efedd9`, parent `ce0c68d9`). G5 follow-up commits this turn fixed
+two latent bugs in G4 (missing per-building EPW emission;
+`action_dim` counted the full E+ vector instead of the agent-facing
+dim).
 
 | Item | Code commit | Outstanding follow-up |
 | --- | --- | --- |
 | G1 — restore deleted IDF source as `building2building/sources/ashrae_90_1.py` | `3bfc4b8` | — |
 | G2 — Stage 1 generator (`generate_raw_dataset.py` + Slurm wrapper) | `19fa101` | — |
 | G3 — Stage 1 validation (one-off; **does not** replace the live HF zip) | `2e75673` | user runs `sbatch building2building/pipeline/scripts/generate_raw_dataset.sh`; diffs full-grid `metadata.csv`; runs `B2B_RUN_LONG_TESTS=1 pytest tests/long/test_generate_raw_dataset_matches_existing.py -m long` |
-| G4 — Stage 2 generator (`generate_dataset.py`; replaces M2's `regen_dataset.py` + `regen_officemedium.sh`) | `098599c` | — |
-| G5 — Stage 2 validation + Phase M (M2) re-run | pending | **user action:** `sbatch building2building/pipeline/scripts/generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium`, then `huggingface-cli upload vtaboga/building2building_dataset . . --repo-type dataset --revision main` |
+| G4 — Stage 2 generator (`generate_dataset.py`; replaces M2's `regen_dataset.py` + `regen_officemedium.sh`) | `098599c` (+ G5 follow-up commit for EPW emission, mem bump, and `agent_action_dim` helper) | — |
+| G5 — Stage 2 validation + Phase M (M2) re-run | this turn's commit | — (HF revisions `ce0c68d9` (per-building artefacts) + `26efedd9` (corrected `metadata.parquet`); see § G5 post-mortem) |
 
 **Two-stage architecture (mirrored in the file layout):**
 
@@ -370,22 +373,101 @@ through the new entry point.
   `len(equipment_list[*].actuator_descriptions())`, and `splits.json`
   is bit-identical to the upstream copy.
 
-### G5. Stage 2 validation + M2 re-run
+### G5. Stage 2 validation + M2 re-run ✓
 
-The user runs the new Slurm wrapper for OfficeMedium and uploads
-the resulting staging dir to HF. This subsumes Phase M's M2.
+Done. The user re-ran the Slurm wrapper for OfficeMedium and uploaded
+the staging dir to HF. This subsumes Phase M's M2.
 
-- `sbatch building2building/pipeline/scripts/generate_dataset.sh
-  --building-type OfficeMedium`.
-- After all shards finish, push to HF per `REPRODUCING.md` § "Dataset
-  regeneration".
-- Update Phase M (M2) status: "subsumed by Phase G4 commit; user
-  Slurm follow-up redirects to G5".
+- HF revisions:
+  - `ce0c68d9` — per-building artefacts re-derived through the
+    post-M1 pipeline (replaces legacy `OfficeMedium.zip`; drops the
+    broken flat `OfficeMedium/` tree pushed in interim `8768bd82`).
+  - `26efedd9` — `metadata.parquet` corrected so `action_dim` is the
+    agent-facing dim (36 for OfficeMedium), not the full E+ dim
+    (51); other 5 building types unchanged from the upstream parquet.
+- Slurm runs:
+  - `sbatch ... generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium`
+    @ job `9655412` (20 shards × 16 GB; 5–8 min per shard).
+  - Followed by a local `--shard-count 1 --write-metadata-parquet`
+    invocation (~3 s) to rewrite `metadata.parquet` with the
+    `agent_action_dim` helper landed in this turn.
+- Push command (canonical, replaces the deprecated
+  `huggingface-cli`):
+  - `hf upload vtaboga/building2building_dataset . . --repo-type
+    dataset --revision main --include 'OfficeMedium.zip' --delete
+    'OfficeMedium/**'` for `ce0c68d9`.
+  - `hf upload vtaboga/building2building_dataset metadata.parquet
+    metadata.parquet --repo-type dataset --revision main` for
+    `26efedd9`.
 
-- Acceptance: the new HF revision loads via `b2b.new_make_env(
-  "OfficeMedium", split="train", index=k)` for `k` in
-  `splits["train"]["OfficeMedium"]`; `env.action_space.shape[0]`
-  reflects the post-M1 actuator count (36 = 33 + 3 OA mixers).
+- Acceptance (verified this turn): for `k=0` in `splits["train"]`
+  of all 6 building types,
+  `b2b.new_make_env(bt, split="train", index=k).action_space.shape[0]`
+  equals `registry.get_building_by_id(...).action_dim`:
+
+      OfficeMedium       36 (= 51 raw − 15 fixed cooling SP)
+      OfficeSmall        10
+      Warehouse           5
+      RetailStandalone    9
+      RestaurantFastFood  4
+      SingleFamilyHouse   2
+
+- Phase M (M2) status updated to "completed via G5 in HF revisions
+  `ce0c68d9` + `26efedd9`".
+
+#### G5 post-mortem (2026-05-26)
+
+G4's first end-to-end run surfaced four latent bugs in
+`generate_dataset.py` and `generate_dataset.sh`, all fixed in this
+turn's commit:
+
+1. **Missing per-building EPW emission.** `generate_one_building`
+   wrote `building.epjson` + `equipment.json` + `metadata.json` but
+   not the EPW, even though `factory.py:55` and `api/__init__.py:294`
+   both resolve `weather_path = info.building_dir / info.weather_file`.
+   The legacy zip layout (preserved by the post-G5 fix) carries the
+   EPW under `<store-hash>-<basename>.epw` per
+   `store.py::realize` (line 73). Fix: `shutil.copy(epw_path,
+   target_dir / epw_path.name)` after `realize(STORE_PATH.get(),
+   epw_derivation)`. The skip-existing check in
+   `generate_building_type` was extended to also require `*.epw`.
+2. **`--mem=8G` is too tight for the per-shard loop.** OOM-killed
+   shards 18 and 19 at item 46/50 after ~8 minutes wall-clock.
+   Symptom is a slow per-building memory leak in
+   `_build_control_derivation`/`realize` (the store grows
+   monotonically; 50 buildings × ~150 MB of intermediate artefacts).
+   Bumping to 16 GB unblocked the run; the leak itself remains
+   uninvestigated (filed as a TODO comment in `generate_dataset.sh`).
+3. **`action_dim` counted the full E+ vector, not the agent-facing
+   dim.** G4's design (line 339-345) specified
+   `sum(len(e.actuator_descriptions()) for e in equipment_list)`,
+   which yields 51 for OfficeMedium (3 SAT + 45 terminal + 3 OA).
+   But the simulator filters 15 cooling-setpoint actuators via
+   `_is_fixed_actuator` and pins them at 40 °C, so the agent-facing
+   `env.action_space.shape[0]` is 36. Downstream consumers that
+   trust `BuildingInfo.action_dim` (e.g.
+   `benchmarks/dynamics_adaptation.py`, future policy-network sizing
+   from the parquet) would have allocated 15 dead slots. Fix: new
+   public helper `building2building.simulator.action_spaces.\
+   agent_action_dim` reuses the same `hvac_action_space` filter the
+   simulator uses at runtime; `rebuild_metadata_parquet` routes
+   through it. This turn's commit also updates
+   `benchmarks/dynamics_adaptation.py:19` (`"hard": 33` → `36`).
+4. **`huggingface-cli` is deprecated in `huggingface_hub ≥ 1.14`.**
+   `REPRODUCING.md` § "Dataset regeneration" still pinned the old
+   command; the user hit a hard "deprecated and no longer works"
+   error. Replaced with `hf upload` in both `REPRODUCING.md` and
+   above.
+
+A latent cleanup spotted in `rebuild_metadata_parquet` while fixing
+(3): the pre-fix code dispatched cattrs structuring per
+`equipment_type` and checked `et == "heatingonlyzone"`, but the
+actual literal is `"heating_only"` (`actuators.py:646`). This would
+have raised `ValueError: Unknown equipment_type 'heating_only'` on
+any building with a heating-only zone (OfficeMedium has none, so
+this never fired in G5). The new code structures via the
+`AnyEquipment` discriminated union and drops the per-type
+dispatch.
 
 ---
 
@@ -400,7 +482,7 @@ Slurm runs are tracked as outstanding follow-up commits.
 | --- | --- | --- |
 | M0 — design note | `3c84984` | — |
 | M1 — pipeline change | `5a9772d` | — |
-| M2 — HF dataset regen | `28f2e0a` (interim — superseded by Phase G4 `098599c`) | **superseded by G5.** `regen_dataset.py` + `regen_officemedium.sh` are deleted. M2's Slurm follow-up is now G5: `sbatch building2building/pipeline/scripts/generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium`. |
+| M2 — HF dataset regen | `28f2e0a` (interim — superseded by Phase G4 `098599c`) | **completed via G5** (HF revisions `ce0c68d9` + `26efedd9`). `regen_dataset.py` + `regen_officemedium.sh` are deleted; the canonical entry point is `sbatch building2building/pipeline/scripts/generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium`. See § G5 post-mortem for the four bugs that surfaced and were fixed during validation. |
 | M3 — RBC pins OA + retune | `0141961` | user runs `sbatch baselines/scripts/tune_controller.sh`, then commits the 8 new `air_loop_officemedium_cz{1..8}.yaml` |
 | M4 — reward normalizers | `e9da856` | user runs the cache-invalidation + `sbatch --array=9-16 .../launch_compute_random_policy_reward_normalizers.sh` + `--mode aggregate`, then commits the resulting `reward_normalizers.yaml` diff |
 

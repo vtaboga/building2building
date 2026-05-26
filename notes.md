@@ -697,6 +697,84 @@ expected to load against the new dataset.**
     update lands as the follow-up commit after the user runs the
     Slurm array and the aggregate step.
 
+### G5 / M2 post-mortem (2026-05-26)
+
+The end-to-end validation of Phase G5 (which also closes Phase M2)
+surfaced four bugs in the G4 pipeline that were fixed in the same
+commit that closes G5.  HF revisions: `ce0c68d9` (per-building
+artefacts) + `26efedd9` (corrected `metadata.parquet`).
+
+1. **Missing per-building EPW in `generate_one_building`.**  The
+   function wrote `building.epjson` + `equipment.json` +
+   `metadata.json` but never copied the EPW, even though
+   `factory.py:55` and `api/__init__.py:294` both look for
+   `info.building_dir / info.weather_file`.  Caught by the env
+   construction acceptance check — without the fix every
+   `b2b.new_make_env("OfficeMedium", ...)` would have raised
+   `FileNotFoundError` on `path_to_weather`.  Fix: copy the EPW
+   under its canonical store name
+   `<derivation_hash>-<basename>.epw` (which is what
+   `metadata.parquet`'s `weather_file` column already carries,
+   so the contract is self-consistent end-to-end).  The
+   skip-existing check now also requires `*.epw`.
+2. **`#SBATCH --mem=8G` too tight.**  Per-shard wall clock was
+   ~8 minutes for 50 buildings; shards landing on slower nodes
+   crossed 8 GB at item 46/50 and got OOM-killed.  Root cause is
+   a slow per-building memory leak somewhere in
+   `_build_control_derivation`/`realize` (store grows
+   monotonically with each iteration).  Workaround: bump to
+   16 GB (committed with a TODO comment to profile the leak).
+   The leak is irrelevant for single-machine runs (Python
+   process exits between buildings in practice) but bites the
+   50-buildings-per-shard pattern.
+3. **`metadata.parquet["action_dim"]` counted the full E+
+   actuator vector (51), not the agent-facing dim (36).**  G4's
+   design (TODO.md § G4) specified
+   `sum(len(e.actuator_descriptions()) for e in equipment_list)`,
+   producing 51 for OfficeMedium.  But the simulator's
+   `hvac_action_space` filters out 15 cooling-setpoint actuators
+   via `_is_fixed_actuator` and pins them at 40 °C — so
+   `env.action_space.shape[0] == 36`.  The 51 in the parquet
+   would silently size policy heads with 15 dead slots and
+   contradict the agent-facing number reported everywhere else
+   (`BuildingInfo.action_dim`, `dynamics_adaptation.py:19`, the
+   M1 commit's own "33 → 36" claim).  Fix: new public helper
+   `building2building.simulator.action_spaces.agent_action_dim`
+   reuses the same `hvac_action_space` filter, and
+   `rebuild_metadata_parquet` routes through it.  Single source
+   of truth between simulator and parquet.  This turn also
+   updated `benchmarks/dynamics_adaptation.py:19` from
+   `"hard": 33` to `36` (stale since M1).
+4. **`huggingface-cli` is deprecated in `huggingface_hub ≥ 1.14`.**
+   `REPRODUCING.md` § "Dataset regeneration" was rewritten to
+   use `hf upload` (and to document the per-type-zip-replacement
+   pattern, since the current HF layout is the legacy `.zip`-per-
+   building-type layout, not the flat per-building layout that
+   Phase G's design diagram in TODO.md § G shows — that's a
+   future migration, not blocking G5).
+
+Latent cleanup spotted in `rebuild_metadata_parquet` while
+fixing (3): the pre-fix code dispatched cattrs structuring per
+`equipment_type` and looked for `"heatingonlyzone"`, but the
+actual literal is `"heating_only"` (`actuators.py:646`).  That
+would have raised `ValueError: Unknown equipment_type 'heating_only'`
+for any building with a heating-only zone (OfficeMedium has none,
+so this never fired in G5).  The new code structures via the
+existing `AnyEquipment` discriminated union and drops the
+per-type dispatch.
+
+Acceptance verified for all 6 building types — for `k=0` in
+`splits["train"]`, `b2b.new_make_env(bt, split="train",
+index=k).action_space.shape[0]` equals
+`registry.get_building_by_id(...).action_dim`:
+
+    OfficeMedium       36   (51 raw - 15 fixed cooling SP, +3 OA from M1)
+    OfficeSmall        10
+    Warehouse           5
+    RetailStandalone    9
+    RestaurantFastFood  4
+    SingleFamilyHouse   2
+
 ---
 
 ## Status snapshot (2026-05-25)

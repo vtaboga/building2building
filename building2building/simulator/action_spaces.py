@@ -5,6 +5,7 @@ Translates :class:`~b2b.types.ActuatorDescription` lists into Gymnasium
 setpoints) from agent-controlled ones.
 """
 
+import itertools
 import logging
 import urllib.parse
 from dataclasses import dataclass
@@ -209,3 +210,67 @@ def hvac_action_space(
         fixed_indices=fixed_indices,
         fixed_values=fixed_values,
     )
+
+
+def agent_action_dim(
+    hvac_equipment: Sequence[Any],
+    *,
+    expose_heating_only_zones: bool = True,
+    additional_fixed: dict[str, float] | None = None,
+) -> int:
+    """Return the agent-facing action dimension for a list of equipment.
+
+    Single source of truth for the size of ``env.action_space`` constructed
+    by :func:`building2building.simulator.create_simulator`.  Reuses the
+    same :func:`hvac_action_space` filter so that
+    :data:`BuildingInfo.action_dim` (sourced from ``metadata.parquet``)
+    matches ``env.action_space.shape[0]`` by construction.
+
+    Filters applied (in order):
+
+    1. VAV cooling-setpoint actuators (``"b2b vav clg setpoint"`` in
+       :attr:`ActuatorDescription.component_name`) are always pinned to
+       :data:`FIXED_CLG_SP_VALUE` (40 °C) and removed from the agent space.
+    2. If ``expose_heating_only_zones`` is ``False``, actuators on
+       ``equipment_type == "heating_only"`` zones are pinned to
+       :data:`FIXED_HEATING_ONLY_VALUE` (18 °C) and removed.
+       Default ``True`` matches :class:`BuildingConfig` and
+       :class:`EnvBuildConfig`.
+    3. Any actuator whose ``component_name`` appears in
+       ``additional_fixed`` is pinned and removed.
+
+    Args:
+        hvac_equipment: Sequence of equipment objects (e.g. ``VAVSystem``,
+            ``UnitarySystem``, ``HeatingOnlyZone``) with an
+            ``actuator_descriptions()`` method.
+        expose_heating_only_zones: Match the corresponding flag on
+            :class:`BuildingConfig`.  Defaults to ``True``.
+        additional_fixed: Mapping of ``component_name -> pinned value`` for
+            extra actuators removed from the agent space (used by the
+            action-space transfer benchmark).
+
+    Returns:
+        ``len(HvacActionSpace.agent_actuators)`` for the equipment list.
+    """
+    actuators = list(
+        itertools.chain.from_iterable(
+            eq.actuator_descriptions() for eq in hvac_equipment
+        )
+    )
+
+    if not expose_heating_only_zones:
+        fixed_heating_only_names = frozenset(
+            a.component_name
+            for eq in hvac_equipment
+            if getattr(eq, "equipment_type", None) == "heating_only"
+            for a in eq.actuator_descriptions()
+        )
+    else:
+        fixed_heating_only_names = frozenset()
+
+    action_space_info = hvac_action_space(
+        actuators,
+        fixed_heating_only_names=fixed_heating_only_names,
+        additional_fixed=additional_fixed,
+    )
+    return len(action_space_info.agent_actuators)

@@ -522,15 +522,32 @@ sbatch building2building/pipeline/scripts/generate_dataset.sh \
 
 After all shards finish, the staging directory holds the per-building
 artefacts plus the rewritten `metadata.parquet` and `splits.json`.
-Push to HuggingFace:
+The current HF revision still uses the legacy per-type-zip layout
+(`<BuildingType>.zip` at the repo root), so the upload step zips
+the staging dir's `<BuildingType>/` tree and replaces the legacy zip:
 
 ```bash
-cd "$SCRATCH/b2b_gen_dataset_OfficeMedium"
-huggingface-cli upload \
+cd "$SCRATCH/b2b_gen_dataset_<BuildingType>"
+
+# Build the per-building-type zip from the staging tree.  Internal
+# layout matches the legacy zip: top-level entries are
+# <BuildingType>-NNNN/ (containing building.epjson, equipment.json,
+# metadata.json, and the per-building EPW).
+rm -f <BuildingType>.zip
+(cd <BuildingType> && zip -rq ../<BuildingType>.zip .)
+
+# Replace the legacy zip and refresh the unified metadata.parquet in
+# a single commit.  Note: `huggingface-cli upload` is deprecated in
+# huggingface_hub >= 1.14; use `hf upload` instead.
+hf upload \
     vtaboga/building2building_dataset \
     . . \
     --repo-type dataset \
-    --revision main
+    --revision main \
+    --include '<BuildingType>.zip' \
+    --include 'metadata.parquet' \
+    --include 'splits.json' \
+    --commit-message "Regenerate <BuildingType> with post-M1 action space"
 ```
 
 The package's pinned `REVISION = "main"` in

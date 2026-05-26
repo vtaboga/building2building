@@ -3,7 +3,10 @@
 #SBATCH --output=logs/gen_dataset_%A_%a.out
 #SBATCH --error=logs/gen_dataset_%A_%a.err
 #SBATCH --time=04:00:00
-#SBATCH --mem=8G
+# 16G empirically required: 8G OOM-killed shards 18,19 of the first run after
+# ~46/50 buildings (slow per-building leak in _build_control_derivation/realize;
+# see TODO.md Phase G post-mortem).  TODO: profile the leak and revert to 8G.
+#SBATCH --mem=16G
 #SBATCH --cpus-per-task=2
 #SBATCH --partition=long
 #SBATCH --array=0-19
