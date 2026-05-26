@@ -102,7 +102,7 @@ class TestRolloutEndToEnd:
     def test_small_rollout_captures_expected_shapes(self, tmp_path: Path) -> None:
         env = b2b.new_make_env(
             "OfficeSmall",
-            task="task1",
+            task="task_const_e0",
             run_period="winter",
             max_episode_steps=5,
         )

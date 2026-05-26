@@ -32,6 +32,5 @@ class TestTopLevelImports:
     def test_reward_configs_exposed(self) -> None:
         import building2building
 
-        assert hasattr(building2building, "DeadbandRewardConfig")
-        assert hasattr(building2building, "BarrierRewardConfig")
-        assert hasattr(building2building, "BaseRewardConfig")
+        assert hasattr(building2building, "NormalizedDeadbandRewardConfig")
+        assert hasattr(building2building, "RewardConfig")

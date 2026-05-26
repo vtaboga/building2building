@@ -14,7 +14,6 @@ from building2building.config import (
     EnvBuildConfig,
     parse_benchmark_config,
 )
-from building2building.types import BaseRewardConfig
 
 pytestmark = pytest.mark.quick
 
@@ -59,11 +58,11 @@ def test_parse_benchmark_config_single_type() -> None:
             "building_type": "OfficeSmall",
             "train": {
                 "selection": {"mode": "indices", "indices": [1, 2]},
-                "config": {"reward": {"reward_type": "DeadbandRewardConfig"}},
+                "config": {"reward": {"reward_type": "NormalizedDeadbandRewardConfig"}},
             },
             "test": {
                 "selection": {"mode": "random", "n": 2},
-                "config": {"reward": {"reward_type": "DeadbandRewardConfig"}},
+                "config": {"reward": {"reward_type": "NormalizedDeadbandRewardConfig"}},
             },
         }
     )
@@ -80,7 +79,7 @@ def test_env_build_config_parsing() -> None:
                 "split_index": 0,
             },
             "task": {"run_period": "winter"},
-            "reward": {"reward_type": "BarrierRewardConfig"},
+            "reward": {"reward_type": "NormalizedDeadbandRewardConfig"},
         }
     )
     assert cfg.task.run_period.name == "winter"

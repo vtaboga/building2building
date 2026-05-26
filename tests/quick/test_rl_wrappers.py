@@ -29,7 +29,7 @@ def test_wrap_env_for_rl_observation_space_is_unit_interval() -> None:
     import numpy as np
     import building2building as b2b
 
-    env = b2b.new_make_env("OfficeSmall", index=0, task="task_occ_wmed")
+    env = b2b.new_make_env("OfficeSmall", index=0, task="task_occ_emed")
     env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=False)
     obs_shape = env.observation_space.shape
     assert obs_shape is not None
@@ -53,7 +53,7 @@ def test_wrap_env_for_rl_action_in_minus_one_one() -> None:
     env = b2b.new_make_env(
         "OfficeSmall",
         index=0,
-        task="task_occ_wmed",
+        task="task_occ_emed",
         rescale_action=True,
     )
     assert (
@@ -70,7 +70,7 @@ def test_wrap_env_for_rl_action_default_off() -> None:
     """Without rescale_action, action_space is the raw engineering Box."""
     import building2building as b2b
 
-    env = b2b.new_make_env("OfficeSmall", index=0, task="task_occ_wmed")
+    env = b2b.new_make_env("OfficeSmall", index=0, task="task_occ_emed")
     assert (
         env.action_space.low > -10.0
     ).all(), "Expected engineering-unit lower bounds > -10 °C"
@@ -85,7 +85,7 @@ def test_wrap_env_for_rl_flags_are_independent() -> None:
     """Each flag can be flipped independently; False is a no-op."""
     import building2building as b2b
 
-    env = b2b.new_make_env("OfficeSmall", index=0, task="task_occ_wmed")
+    env = b2b.new_make_env("OfficeSmall", index=0, task="task_occ_emed")
     raw_action_space = env.action_space
 
     env_only_obs = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=False)
@@ -104,7 +104,7 @@ def test_get_reward_params_walks_through_wrappers() -> None:
     env = b2b.new_make_env(
         "OfficeSmall",
         index=0,
-        task="task_occ_wmed",
+        task="task_occ_emed",
         rescale_action=True,
     )
     env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=False)
@@ -126,7 +126,7 @@ def test_make_rl_env_fn_returns_monitor_wrapped_env() -> None:
     factory = make_rl_env_fn(
         building_type="OfficeSmall",
         building_id=building_id,
-        task="task_occ_wmed",
+        task="task_occ_emed",
         normalize_obs=True,
         rescale_action=True,
         monitor=True,

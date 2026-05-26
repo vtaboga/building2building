@@ -5,9 +5,7 @@ from __future__ import annotations
 import pytest
 
 from building2building.types import (
-    BarrierRewardConfig,
-    BaseRewardConfig,
-    DeadbandRewardConfig,
+    NormalizedDeadbandRewardConfig,
     RandomScheduleConfig,
     RunPeriodConfig,
     TaskConfig,
@@ -203,53 +201,31 @@ class TestZoneTargetTemperatureConfigExtended:
 
 @pytest.mark.quick
 class TestRewardConfigs:
-    def test_deadband_reward_config(self) -> None:
-        cfg = DeadbandRewardConfig(energy_weight=0.01, dT=1.0)
+    def test_normalized_deadband_reward_config(self) -> None:
+        cfg = NormalizedDeadbandRewardConfig(energy_weight=0.01, dT=1.0)
         assert cfg.energy_weight == 0.01
         assert cfg.dT == 1.0
+        assert not cfg.is_filled
 
-    def test_barrier_reward_config_defaults(self) -> None:
-        cfg = BarrierRewardConfig(energy_weight=0.5)
-        assert cfg.dT == 0.5
-        assert cfg.violation_penalty == 100.0
-
-    def test_base_reward_config(self) -> None:
-        cfg = BaseRewardConfig(energy_weight=0.0)
-        assert cfg.energy_weight == 0.0
+    def test_normalized_deadband_reward_config_filled(self) -> None:
+        cfg = NormalizedDeadbandRewardConfig(
+            energy_weight=1.0, dT=1.0, tau_T=0.4, tau_E=0.7
+        )
+        assert cfg.is_filled
 
 
 @pytest.mark.quick
 class TestRewardConfigFromDict:
-    def test_deadband(self) -> None:
+    def test_normalized_deadband(self) -> None:
         cfg = reward_config_from_dict(
             {
-                "reward_type": "DeadbandRewardConfig",
-                "energy_weight": 0.05,
-                "dT": 2.0,
-            }
-        )
-        assert isinstance(cfg, DeadbandRewardConfig)
-        assert cfg.dT == 2.0
-
-    def test_barrier(self) -> None:
-        cfg = reward_config_from_dict(
-            {
-                "reward_type": "BarrierRewardConfig",
+                "reward_type": "NormalizedDeadbandRewardConfig",
                 "energy_weight": 1.0,
-                "violation_penalty": 50.0,
+                "dT": 1.0,
             }
         )
-        assert isinstance(cfg, BarrierRewardConfig)
-        assert cfg.violation_penalty == 50.0
-
-    def test_base(self) -> None:
-        cfg = reward_config_from_dict(
-            {
-                "reward_type": "BaseRewardConfig",
-                "energy_weight": 0.1,
-            }
-        )
-        assert isinstance(cfg, BaseRewardConfig)
+        assert isinstance(cfg, NormalizedDeadbandRewardConfig)
+        assert cfg.energy_weight == 1.0
 
     def test_missing_reward_type_raises(self) -> None:
         with pytest.raises(ValueError, match="reward_type is required"):
