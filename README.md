@@ -197,10 +197,13 @@ B2B_RUN_LONG_TESTS=1 pytest              # Full suite
 
 ### Other Limitations
 
-- `eval_dynamics_adaptation.py` hard-codes `PadObservation(env, target_size=20)`
-  which may not match the value computed during training.
 - No tests exist for `baselines/` code (controllers, training, evaluation).
-- License is not yet selected.
+
+---
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
 
 ---
 

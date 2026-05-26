@@ -8,6 +8,7 @@ name = "building2building"
 version = "0.1.0"
 description = "A framework for energyplus building simulation for RL."
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.10"
 
 dependencies = [
