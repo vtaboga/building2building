@@ -466,34 +466,66 @@ B2B_RUN_LONG_TESTS=1 pytest -m long
 
 ## Dataset regeneration
 
-Whenever the pipeline emission (`building2building.pipeline.actuators`)
-changes — adding or removing actuator types, changing schedules
-written into the epJSON, etc. — every downstream HF artefact for the
-affected building types must be re-derived.  The canonical entry
-point is `building2building/pipeline/regen_dataset.py`.
+The dataset has two stages; each has its own entry point.
+
+### Stage 1 — raw epJSON archive (run once per dataset version)
+
+Applies Latin Hypercube Sampling over 7 envelope/geometry parameters to
+the 16 ASHRAE 90.1-2022 prototype IDFs, producing the
+`vtaboga/multizones_reference_buildings.zip` layout (6000 epJSONs +
+`metadata.csv` + 16 EPWs).
+
+**Single machine (all 6 types, 1000 samples each):**
+
+```bash
+python -m building2building.pipeline.generate_raw_dataset \
+    --output-dir "$SCRATCH/b2b_raw_dataset" \
+    --merge-metadata
+```
+
+**Slurm array (one task per building type, last task merges metadata):**
+
+```bash
+sbatch building2building/pipeline/scripts/generate_raw_dataset.sh
+```
+
+Stage 1 only needs to run if the LHS sampling, prototype IDFs, or
+parameter ranges change.  For pipeline changes (actuator inventory,
+schedules, HVAC control), run Stage 2 instead.
+
+### Stage 2 — processed HF dataset (run whenever pipeline code changes)
+
+Re-derives the controllable artefacts (`building.epjson`,
+`equipment.json`, `metadata.json`) for the affected building types and
+rewrites `metadata.parquet`.
 
 **Single machine (slow but reproducible):**
 
 ```bash
-python -m building2building.pipeline.regen_dataset \
+python -m building2building.pipeline.generate_dataset \
     --building-type OfficeMedium \
-    --output-dir "$SCRATCH/b2b_regen_officemedium" \
+    --output-dir "$SCRATCH/b2b_gen_dataset_OfficeMedium" \
     --write-metadata-parquet
 ```
 
-**Slurm array (recommended for the full 1000-building OfficeMedium
-loop — 20 shards of 50 buildings each):**
+**Slurm array (recommended — 20 shards × 50 buildings each):**
 
 ```bash
-sbatch building2building/pipeline/scripts/regen_officemedium.sh
+sbatch building2building/pipeline/scripts/generate_dataset.sh \
+    --export=BUILDING_TYPE=OfficeMedium
 ```
+
+> **Other building types.** Pass `--building-type` as a repeatable flag
+> to regenerate `Warehouse`, `RetailStandalone`, `RestaurantFastFood`,
+> and `OfficeSmall`.  `SingleFamilyHouse` has a different upstream source
+> and is out of scope.
 
 After all shards finish, the staging directory holds the per-building
 artefacts plus the rewritten `metadata.parquet` and `splits.json`.
 Push to HuggingFace:
 
 ```bash
-cd "$SCRATCH/b2b_regen_officemedium"
+cd "$SCRATCH/b2b_gen_dataset_OfficeMedium"
 huggingface-cli upload \
     vtaboga/building2building_dataset \
     . . \
@@ -510,13 +542,6 @@ field — clearing
 fetches the new copy.  See `notes.md` § "OfficeMedium OA-mixer fix"
 Q5 for the rationale.
 
-> **Other building types.** `regen_dataset.py` accepts
-> `--building-type` as a repeatable flag, so the same entry point
-> regenerates `Warehouse`, `RetailStandalone`,
-> `RestaurantFastFood`, and `OfficeSmall` without code changes.
-> `SingleFamilyHouse` has a different upstream source and is out
-> of scope for this script.
-
 ---
 
 ## Cheat sheet
@@ -531,7 +556,7 @@ Q5 for the rationale.
 | Reward normalizers | `python -m analysis.task_study.compute_random_policy_reward_normalizers --mode aggregate` |
 | SAC B2 ablation | `sbatch --array=0-89 analysis/task_study/sac_diagnostic/submit_ablation.sh` |
 | Reactive controller tuning | `sbatch baselines/scripts/tune_controller.sh` |
-| HF dataset regen (OfficeMedium) | `sbatch building2building/pipeline/scripts/regen_officemedium.sh` |
+| HF dataset regen (Stage 2, OfficeMedium) | `sbatch building2building/pipeline/scripts/generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium` |
 
 ---
 
