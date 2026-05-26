@@ -134,24 +134,17 @@ See `notes.md` § "Reward — calibration regime and impl map" and
 
 ## Phase G — Reproducible dataset generation pipeline ≈
 
-**Status (2026-05-26).** Started on branch
-`phase/g-dataset-generation`. Phase G fills a structural gap: the
-HuggingFace dataset `vtaboga/building2building_dataset` was historically
-populated by an ad-hoc, never-committed script. M2's `regen_dataset.py`
-filled half the gap (Stage 2 — pipeline processing), but the LHS step
-(Stage 1 — IDF -> raw epJSON dataset) had no committed entry point at
-all (`scripts/generate_dataset.py` was deleted in commit `1f57775`,
-April 2026). Phase G separates the two stages cleanly, restores both
-entry points, and validates Stage 1 reproducibility against the existing
-`vtaboga/multizones_reference_buildings.zip`.
+**Status (2026-05-26).** Code-side complete on branch
+`phase/g-dataset-generation`. G1–G4 are committed; G5 is the
+outstanding user Slurm follow-up.
 
 | Item | Code commit | Outstanding follow-up |
 | --- | --- | --- |
-| G1 — restore deleted IDF source as `building2building/sources/ashrae_90_1.py` | this commit | — |
-| G2 — Stage 1 generator (`generate_raw_dataset.py` + Slurm wrapper) | pending | — |
-| G3 — Stage 1 validation (one-off; **does not** replace the live HF zip) | pending | user runs `sbatch ...generate_raw_dataset.sh`; agent runs the metadata.csv byte-diff + per-type 5-sample E+ smoke locally |
-| G4 — Stage 2 generator (`generate_dataset.py`; replaces M2's `regen_dataset.py` + `regen_officemedium.sh`) | pending | — |
-| G5 — Stage 2 validation + Phase M (M2) re-run | pending | user runs `sbatch ...generate_dataset.sh --building-type OfficeMedium` and `huggingface-cli upload` |
+| G1 — restore deleted IDF source as `building2building/sources/ashrae_90_1.py` | `3bfc4b8` | — |
+| G2 — Stage 1 generator (`generate_raw_dataset.py` + Slurm wrapper) | `19fa101` | — |
+| G3 — Stage 1 validation (one-off; **does not** replace the live HF zip) | `2e75673` | user runs `sbatch building2building/pipeline/scripts/generate_raw_dataset.sh`; diffs full-grid `metadata.csv`; runs `B2B_RUN_LONG_TESTS=1 pytest tests/long/test_generate_raw_dataset_matches_existing.py -m long` |
+| G4 — Stage 2 generator (`generate_dataset.py`; replaces M2's `regen_dataset.py` + `regen_officemedium.sh`) | `098599c` | — |
+| G5 — Stage 2 validation + Phase M (M2) re-run | pending | **user action:** `sbatch building2building/pipeline/scripts/generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium`, then `huggingface-cli upload vtaboga/building2building_dataset . . --repo-type dataset --revision main` |
 
 **Two-stage architecture (mirrored in the file layout):**
 
@@ -407,7 +400,7 @@ Slurm runs are tracked as outstanding follow-up commits.
 | --- | --- | --- |
 | M0 — design note | `3c84984` | — |
 | M1 — pipeline change | `5a9772d` | — |
-| M2 — HF dataset regen | `28f2e0a` (interim — superseded by Phase G4) | **superseded by Phase G4.** Once G4 lands, M2's Slurm follow-up redirects to G5 (`sbatch building2building/pipeline/scripts/generate_dataset.sh --building-type OfficeMedium`). The interim `regen_dataset.py` + `regen_officemedium.sh` files are deleted in G4. |
+| M2 — HF dataset regen | `28f2e0a` (interim — superseded by Phase G4 `098599c`) | **superseded by G5.** `regen_dataset.py` + `regen_officemedium.sh` are deleted. M2's Slurm follow-up is now G5: `sbatch building2building/pipeline/scripts/generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium`. |
 | M3 — RBC pins OA + retune | `0141961` | user runs `sbatch baselines/scripts/tune_controller.sh`, then commits the 8 new `air_loop_officemedium_cz{1..8}.yaml` |
 | M4 — reward normalizers | `e9da856` | user runs the cache-invalidation + `sbatch --array=9-16 .../launch_compute_random_policy_reward_normalizers.sh` + `--mode aggregate`, then commits the resulting `reward_normalizers.yaml` diff |
 
