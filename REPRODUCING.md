@@ -430,6 +430,61 @@ B2B_RUN_LONG_TESTS=1 pytest -m long
 
 ---
 
+## Dataset regeneration
+
+Whenever the pipeline emission (`building2building.pipeline.actuators`)
+changes — adding or removing actuator types, changing schedules
+written into the epJSON, etc. — every downstream HF artefact for the
+affected building types must be re-derived.  The canonical entry
+point is `building2building/pipeline/regen_dataset.py`.
+
+**Single machine (slow but reproducible):**
+
+```bash
+python -m building2building.pipeline.regen_dataset \
+    --building-type OfficeMedium \
+    --output-dir "$SCRATCH/b2b_regen_officemedium" \
+    --write-metadata-parquet
+```
+
+**Slurm array (recommended for the full 1000-building OfficeMedium
+loop — 20 shards of 50 buildings each):**
+
+```bash
+sbatch building2building/pipeline/scripts/regen_officemedium.sh
+```
+
+After all shards finish, the staging directory holds the per-building
+artefacts plus the rewritten `metadata.parquet` and `splits.json`.
+Push to HuggingFace:
+
+```bash
+cd "$SCRATCH/b2b_regen_officemedium"
+huggingface-cli upload \
+    vtaboga/building2building_dataset \
+    . . \
+    --repo-type dataset \
+    --revision main
+```
+
+The package's pinned `REVISION = "main"` in
+`building2building/data/download.py` then resolves to the new dataset
+on first cache miss.  Users with a stale local cache will see a
+loud `cattrs.ClassValidationError` on the missing `oa_mass_flow`
+field — clearing
+`~/.cache/huggingface/hub/datasets--vtaboga--building2building_dataset/`
+fetches the new copy.  See `notes.md` § "OfficeMedium OA-mixer fix"
+Q5 for the rationale.
+
+> **Other building types.** `regen_dataset.py` accepts
+> `--building-type` as a repeatable flag, so the same entry point
+> regenerates `Warehouse`, `RetailStandalone`,
+> `RestaurantFastFood`, and `OfficeSmall` without code changes.
+> `SingleFamilyHouse` has a different upstream source and is out
+> of scope for this script.
+
+---
+
 ## Cheat sheet
 
 | Artefact | Command (single line, drop into a shell) |
@@ -442,6 +497,7 @@ B2B_RUN_LONG_TESTS=1 pytest -m long
 | Reward normalizers | `python -m analysis.task_study.compute_random_policy_reward_normalizers --mode aggregate` |
 | SAC B2 ablation | `sbatch --array=0-89 analysis/task_study/sac_diagnostic/submit_ablation.sh` |
 | Reactive controller tuning | `sbatch baselines/scripts/tune_controller.sh` |
+| HF dataset regen (OfficeMedium) | `sbatch building2building/pipeline/scripts/regen_officemedium.sh` |
 
 ---
 
