@@ -7,6 +7,30 @@ Evaluate whether a policy trained on one building type can transfer to a
 the agent must handle completely different HVAC topologies, zone counts, and
 thermal dynamics.
 
+| Axis | Train | Test |
+|---|---|---|
+| Building type | Type A | Type B (different) |
+| Reward | Fixed | Fixed |
+| Action space | Fixed (by type) | Fixed (by type) |
+
+## Metric
+
+```python
+import building2building as b2b
+
+bench = b2b.benchmarks.CrossDomainGeneralization(difficulty="easy", task="task_const_e0")
+scores = []
+for env in bench.make_test_envs():
+    traj = b2b.rollout(env, controller=my_policy)
+    scores.append(b2b.compute_normalized_score(traj))
+mean_score = sum(scores) / len(scores)
+```
+
+A score of 0.0 matches the reactive-controller baseline on each test building;
+1.0 is perfect.  Cross-domain transfer is harder than dynamics adaptation
+because the agent must generalise across HVAC topology (different action
+dimension and observation structure).
+
 ## Difficulty Levels
 
 | Difficulty | Train Type | Test Type |

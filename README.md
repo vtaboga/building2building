@@ -181,6 +181,9 @@ mkdocs serve          # http://localhost:8000
 To reproduce every figure and table from the paper, see
 [`REPRODUCING.md`](REPRODUCING.md).
 
+The four benchmark problems are documented at
+[`docs/benchmarks/`](docs/benchmarks/overview.md).
+
 ---
 
 ## Tests
