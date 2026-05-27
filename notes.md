@@ -674,28 +674,48 @@ expected to load against the new dataset.**
     regenerated (8 files overwritten in place — no `_v2`).
 - **M4 (recalibrate normalizers):**
   - `building2building/data/reward_normalizers.yaml`: rewrite
-    the OfficeMedium `cz{1..8}` rows under all three seasons;
-    leave the other building types untouched.
-  - Path migration of
-    `analysis/task_study/compute_random_policy_reward_normalizers`
+    **every row** (all building types, all CZs, all three
+    seasons).  The original M4 intent was to recompute only the
+    OfficeMedium rows, but auditing the calibration scripts in
+    response to this turn revealed that they still hard-coded
+    the legacy preset name `task3` (deleted in D2) and recovered
+    `temp_penalty` by inverting the un-normalized deadband-reward
+    formula (`temp_penalty = -reward - w_E * power_penalty`),
+    which is invalid against the only surviving reward,
+    `NormalizedDeadbandReward`.  Both
+    `analysis/task_study/compute_random_policy_reward_normalizers.py`
+    and its tuned-RBC twin `compute_reward_normalizers.py` now
+    pass `task_occ_emed` (the post-D2 semantic successor to
+    `task3`: same occupancy + seasonal-unoccupied schedule, same
+    `dT = 1.0`; the `energy_weight` is irrelevant because the
+    scalar reward is no longer inspected) and recompute the
+    `(temp_penalty, power_penalty)` decomposition directly from
+    `info["raw_observation"]` via
+    `building2building.simulator.rewards._deadband_components`,
+    using the comfort zones, target schedule and `dT` from the
+    live `env.unwrapped.reward_fn` so the recomputed components
+    match exactly what training/eval will see.
+  - **Cache invalidation:** the per-building rollout cache under
+    `$SCRATCH/b2b_reward_normalizers_random/data/<run_period>/<bt>/<bid>.json`
+    is keyed by `(run_period, bt, bid)` only -- no schema marker
+    -- so every cached JSON predating this commit is stale.
+    `REPRODUCING.md` § B/A documents the one-time full-cache wipe
+    + full 48-task `sbatch` + login-node `--mode aggregate`
+    sequence.
+  - **Outcome:** the `git diff` on `reward_normalizers.yaml`
+    will touch every row, not just OfficeMedium's.  This is the
+    correct behaviour; the previous numbers for all 6 building
+    types were computed via the now-known-buggy reward-arithmetic
+    recovery and should not be carried forward as cached
+    technical debt.
+  - Path migration of `compute_random_policy_reward_normalizers`
     → `baselines/compute_reward_normalizers` is **F2 / D15
     territory**; M4 uses whichever path is current at the time.
     If F2 has not yet moved it, M4 runs the analysis-path
     invocation and files no migration sub-commit.
-  - The existing script already supports the partial regen via
-    `--building-types OfficeMedium`, and the per-building cache is
-    keyed by `(run_period, building_type, building_id)` only.
-    **Operational caveat:** the cache has no content hash, so stale
-    OfficeMedium JSON caches under
-    `$SCRATCH/b2b_reward_normalizers_random/data/*/OfficeMedium/`
-    must be deleted before re-rollout. `REPRODUCING.md` § B/A now
-    documents the exact `rm` + `sbatch --array=9-16` + `--mode
-    aggregate` sequence.  Other building types' cached samples are
-    bit-identical pre-/post-M, so their YAML rows come out
-    bit-identical; only OfficeMedium rows shift.
-  - This commit ships only the documentation update; the YAML
-    update lands as the follow-up commit after the user runs the
-    Slurm array and the aggregate step.
+  - This commit ships the code + docs update; the YAML update
+    lands as the follow-up commit after the user runs the Slurm
+    array and the aggregate step.
 
 ### G5 / M2 post-mortem (2026-05-26)
 

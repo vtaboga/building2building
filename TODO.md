@@ -612,7 +612,7 @@ Slurm runs are tracked as outstanding follow-up commits.
 | M1 — pipeline change | `5a9772d` | — |
 | M2 — HF dataset regen | `28f2e0a` (interim — superseded by Phase G4 `098599c`) | **completed via G5** (HF revisions `ce0c68d9` + `26efedd9`). `regen_dataset.py` + `regen_officemedium.sh` are deleted; the canonical entry point is `sbatch building2building/pipeline/scripts/generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium`. See § G5 post-mortem for the four bugs that surfaced and were fixed during validation. |
 | M3 — RBC pins OA + retune | `0141961` | user runs `sbatch baselines/scripts/tune_controller.sh`, then commits the 8 new `air_loop_officemedium_cz{1..8}.yaml` |
-| M4 — reward normalizers | `e9da856` | user runs the cache-invalidation + `sbatch --array=9-16 .../launch_compute_random_policy_reward_normalizers.sh` + `--mode aggregate`, then commits the resulting `reward_normalizers.yaml` diff |
+| M4 — reward normalizers | `e9da856` (docs-only, OfficeMedium-partial-regen plan) + this turn's commit (calibration-script fix: drop `task3` reference and the reward-arithmetic `temp_penalty` recovery — both invalid post-D2 — and read components directly from `info["raw_observation"]` via `_deadband_components`; consequence: full regen, not just OfficeMedium) | user runs `rm -rf $SCRATCH/b2b_reward_normalizers_random/data/` + `sbatch .../launch_compute_random_policy_reward_normalizers.sh` (full 1-48 array) + `--mode aggregate`, then commits the resulting `reward_normalizers.yaml` diff (touches every row) |
 
 **This phase blocks every other downstream artefact.** Run first.
 
@@ -791,7 +791,7 @@ were tuned against the **old** action space and are now stale.
   duplication"); `REPRODUCING.md` § "Reactive-controller tuning"
   unchanged (it already cites the Python entry point).
 
-### M4. Re-run reward-normalizer calibration for OfficeMedium
+### M4. Re-run reward-normalizer calibration (all building types)
 
 The `(τ_T, τ_E)` constants for OfficeMedium in
 `building2building/data/reward_normalizers.yaml` were computed
@@ -799,6 +799,23 @@ under the old action space. The temperature term shouldn't shift
 much (zones are the same) but the power term will — the OA mixer
 materially changes the energy use under any non-trivial control
 policy. Recompute to keep the per-bucket calibration honest.
+
+**Scope upgrade (2026-05-26):** auditing the calibration scripts
+during M4 prep revealed that both
+`analysis/task_study/compute_random_policy_reward_normalizers.py`
+and `compute_reward_normalizers.py` hard-coded the legacy preset
+`task3` (deleted in D2) and recovered `temp_penalty` by inverting
+the un-normalized deadband formula
+(`temp_penalty = -reward - w_E * power_penalty`), which is
+invalid against the only surviving reward
+`NormalizedDeadbandReward`. The scripts now pass
+`task_occ_emed` (semantic successor) and recompute components
+directly from `info["raw_observation"]` via
+`_deadband_components`, using the comfort zones / target schedule
+/ `dT` from the live `env.unwrapped.reward_fn`. Consequence: M4
+is a **full regen** of every row, not just OfficeMedium —
+non-OfficeMedium rows in the committed YAML were also computed
+via the now-known-buggy path and should not be carried forward.
 
 - Release entry point: the calibration is run via the existing
   `analysis/task_study/compute_random_policy_reward_normalizers`

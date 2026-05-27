@@ -1,6 +1,5 @@
 defaults:
   - policy: ppo
-  - reward: task1
   - training: default
   - wandb: default
   - experiment: ???

@@ -328,7 +328,7 @@ Computes the per-`(building_type, climate_zone)` `(τ_T, τ_E)`
 constants under the SAC-warmup uniform-random reference controller.
 
 ```bash
-python -m analysis.task_study.compute_random_policy_reward_normalizers \
+python -m baselines.compute_random_policy_reward_normalizers \
     --mode aggregate
 ```
 
@@ -336,39 +336,37 @@ python -m analysis.task_study.compute_random_policy_reward_normalizers \
 (committed). Sanity plot lives under `analysis/` (gitignored;
 location documented in `notes.md` § "Calibration sanity plot").
 
-#### Partial regeneration (single building type)
+#### Full regeneration (M4: post-D2 calibration-script fix)
 
-When the pipeline changes the action space of one building type (e.g.
-Phase M's OfficeMedium OA-mixer fix), only that type's
-`(τ_T, τ_E)` rows need to be recalibrated.  The per-building rollout
-cache under
-`$SCRATCH/b2b_reward_normalizers_random/data/<run_period>/<bt>/`
+The per-building rollout cache under
+`$SCRATCH/b2b_reward_normalizers_random/data/<run_period>/<bt>/<bid>.json`
 is keyed by `(run_period, building_type, building_id)` only -- no
-content hash -- so stale OfficeMedium caches would silently shadow
-the new action space.  Invalidate and re-run:
+content hash and no schema marker.  As part of Phase M (M4) the
+calibration scripts were rewritten to read the
+`(temp_penalty, power_penalty)` decomposition directly from
+`info["raw_observation"]` (the pre-D2 path back-extracted
+`temp_penalty` from the un-normalized `task3` reward, which no
+longer exists), so **every cached JSON predating that fix is stale
+regardless of building type**.  Wipe the entire cache once and
+re-roll the full 48-bucket array:
 
 ```bash
-# 1. Drop stale OfficeMedium caches.
-rm -rf $SCRATCH/b2b_reward_normalizers_random/data/*/OfficeMedium/
+# 1. One-time full-cache wipe (semantics of the cached JSON changed).
+rm -rf $SCRATCH/b2b_reward_normalizers_random/data/
 
-# 2. Re-roll OfficeMedium across all 8 climate zones.  The launcher's
-#    array indices 9..16 are the (OfficeMedium, CZ 1..8) buckets
-#    (see analysis/task_study/scripts/launch_compute_random_policy_reward_normalizers.sh,
-#    bucket index = type_index * 8 + (cz - 1), OfficeMedium is type_index 1).
-sbatch --array=9-16 \
-    analysis/task_study/scripts/launch_compute_random_policy_reward_normalizers.sh
+# 2. Full re-roll: 5 commercial types x 8 CZ + 8 SFH shards = 48 tasks.
+sbatch \
+    baselines/scripts/launch_compute_random_policy_reward_normalizers.sh
 
-# 3. After the array finishes, aggregate over ALL building types.
-#    Non-OfficeMedium caches are unchanged, so their rows in the YAML
-#    come out bit-identical to the pre-regen version; only the
-#    OfficeMedium rows shift.
-python -m analysis.task_study.compute_random_policy_reward_normalizers \
+# 3. After the array finishes, aggregate.
+python -m baselines.compute_random_policy_reward_normalizers \
     --mode aggregate
 ```
 
-Then commit the resulting `building2building/data/reward_normalizers.yaml`
-diff (which `git diff` shows touches only the OfficeMedium `cz{1..8}`
-rows across the three seasons).
+Then commit the resulting `building2building/data/reward_normalizers.yaml`.
+The diff touches every row (all building types, all climate zones,
+all three run periods); this is expected -- it is the first regen
+under the post-D2 calibration semantics.
 
 ### B2. SAC diagnostic ablation
 
@@ -570,7 +568,7 @@ Q5 for the rationale.
 | SAC specialist (Fig 4) | `python -m baselines.train_sac experiment=train_sac_task_study --multirun seed=0,1,2` |
 | Dynamics adaptation (Fig 5a/b) | `for d in easy medium hard; do for ap in specialist baseline parameterized; do python -m baselines.train_dynamics_adaptation experiment=train_dynamics_${ap} difficulty=${d}; done; done` |
 | Cross-domain (Fig 7) | `python -m baselines.train_cross_domain experiment=train_cross_domain` |
-| Reward normalizers | `python -m analysis.task_study.compute_random_policy_reward_normalizers --mode aggregate` |
+| Reward normalizers | `sbatch baselines/scripts/launch_compute_random_policy_reward_normalizers.sh` then `python -m baselines.compute_random_policy_reward_normalizers --mode aggregate` |
 | SAC B2 ablation | `sbatch --array=0-89 analysis/task_study/sac_diagnostic/submit_ablation.sh` |
 | Reactive controller tuning | `sbatch baselines/scripts/tune_controller.sh` |
 | HF dataset regen (Stage 2, OfficeMedium) | `sbatch building2building/pipeline/scripts/generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium` |

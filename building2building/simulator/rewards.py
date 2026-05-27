@@ -33,16 +33,8 @@ def _deadband_components(
     task_config: TaskConfig,
     dT: float,
 ) -> tuple[float, float]:
-    """Compute the deadband ``(temp_penalty, power_penalty)`` decomposition.
-
-    ``temp_penalty`` is the per-zone-averaged deadband distance:
-    quadratic for ``|T - target| <= dT`` and linear (in ``|T - target|``)
-    beyond.  ``power_penalty`` is electricity + natural-gas energy in
-    Wh/m².  Both are *non-negative*; the reward sign flip happens in
-    the callers.
-
-    Used by :class:`NormalizedDeadbandReward`.
-    """
+    """Compute the deadband ``(temp_penalty, power_penalty)`` decomposition."""
+    
     energy_penalty = obs["energy"]["electricity"] + obs["energy"]["natural_gas"]
 
     temp_error = 0.0

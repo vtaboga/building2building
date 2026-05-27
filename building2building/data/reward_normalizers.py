@@ -20,7 +20,7 @@ of each ``(building_type, climate_zone)`` bucket under the calibration
 random policy.
 
 The YAML file is *committed to git* (small) and produced by
-:mod:`analysis.task_study.compute_random_policy_reward_normalizers`
+:mod:`baselines.compute_random_policy_reward_normalizers`
 (``--mode aggregate``).
 
 Numerical floor
