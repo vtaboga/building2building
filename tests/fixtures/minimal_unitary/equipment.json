@@ -13,7 +13,7 @@
             {
                 "component_type": "Schedule:Constant",
                 "control_type": "Schedule Value",
-                "component_name": "B2B unitaryhvac temp setpoint schedule (5)",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (66)",
                 "units": "Temperature",
                 "lower_bound": 5.0,
                 "upper_bound": 60.0
@@ -35,7 +35,7 @@
             {
                 "component_type": "Schedule:Constant",
                 "control_type": "Schedule Value",
-                "component_name": "B2B unitaryhvac temp setpoint schedule (10)",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (70)",
                 "units": "Temperature",
                 "lower_bound": 5.0,
                 "upper_bound": 60.0
@@ -57,7 +57,7 @@
             {
                 "component_type": "Schedule:Constant",
                 "control_type": "Schedule Value",
-                "component_name": "B2B unitaryhvac temp setpoint schedule (15)",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (74)",
                 "units": "Temperature",
                 "lower_bound": 5.0,
                 "upper_bound": 60.0
@@ -79,7 +79,7 @@
             {
                 "component_type": "Schedule:Constant",
                 "control_type": "Schedule Value",
-                "component_name": "B2B unitaryhvac temp setpoint schedule (20)",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (78)",
                 "units": "Temperature",
                 "lower_bound": 5.0,
                 "upper_bound": 60.0
@@ -101,7 +101,7 @@
             {
                 "component_type": "Schedule:Constant",
                 "control_type": "Schedule Value",
-                "component_name": "B2B unitaryhvac temp setpoint schedule (25)",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (82)",
                 "units": "Temperature",
                 "lower_bound": 5.0,
                 "upper_bound": 60.0

@@ -855,7 +855,7 @@ Applied:
 
 Acceptance snapshot at close: `uv run pytest -m quick` green.
 
-### T5. Pipeline: end-to-end `prepare_building` on a fixture IDF
+### T5. Pipeline: end-to-end `prepare_building` on a fixture IDF ✅
 
 The pipeline (`building2building/pipeline/`) is the project's biggest
 untested surface and the highest blast radius — pipeline bugs
@@ -888,7 +888,7 @@ pipeline). Without SFH in T5's matrix, the SFH-specific paths in
 - Acceptance: `pytest tests/quick/test_pipeline_prepare_building.py`
   green; both VAV and SFH cases run.
 
-### T6. Pipeline: `make_controllable` per HVAC system type
+### T6. Pipeline: `make_controllable` per HVAC system type ✅
 
 `make_controllable` can run against a pre-converted epJSON, so this
 is `quick` — no IDF → epJSON step required at test time.
@@ -905,7 +905,7 @@ is `quick` — no IDF → epJSON step required at test time.
   (today, only VAV + Unitary are exercised, and only indirectly
   via the benchmarks tests).
 
-### T7. Pipeline: `extract_discovery_metadata`
+### T7. Pipeline: `extract_discovery_metadata` ✅
 
 - Files: new `tests/quick/test_pipeline_discovery.py`. Parametrize
   over the three T0a fixtures; for each, run discovery and
@@ -920,7 +920,7 @@ is `quick` — no IDF → epJSON step required at test time.
   silently shifts a returned value fails this test for at least
   one HVAC type.
 
-### T8. API: `_patch_epjson_run_period` schedule-file rewriting + RunPeriod patching
+### T8. API: `_patch_epjson_run_period` schedule-file rewriting + RunPeriod patching ✅
 
 The `Schedule:File` relative-path rewriting in
 `building2building/api/__init__.py::_patch_epjson_run_period` is a
@@ -947,7 +947,7 @@ Pure in-memory test; no EnergyPlus.
 - Acceptance: quick test; protects the SFH segfault fix and the
   full-year-default fabrication branch.
 
-### T9. Pipeline: `equipment.json` schema round-trip per HVAC type
+### T9. Pipeline: `equipment.json` schema round-trip per HVAC type ✅
 
 T0a already commits one `equipment.json` per HVAC type inside each
 fixture directory
@@ -962,7 +962,7 @@ T9 reuses those — no new fixture files.
 - Acceptance: schema drift in `pipeline/actuators.py` is caught by
   a quick test instead of by every `new_make_env` call dying.
 
-### T10. API: `new_make_env` against the minimal fixture matrix
+### T10. API: `new_make_env` against the minimal fixture matrix ✅
 
 - Files: new `tests/quick/test_new_make_env_minimal.py`. Use the
   T0b `fixture_registry`, parametrized over HVAC type (defaults
@@ -982,6 +982,9 @@ T9 reuses those — no new fixture files.
   one knob-coverage case parametrizes over HVAC type to keep all
   three fixtures exercised through the full env-build path (not
   just the per-pipeline tests in T5/T6/T7).
+
+Acceptance snapshot at close:
+`uv run pytest tests/quick/test_pipeline_prepare_building.py tests/quick/test_pipeline_make_controllable.py tests/quick/test_pipeline_discovery.py tests/quick/test_patch_epjson_run_period.py tests/quick/test_equipment_schema.py tests/quick/test_new_make_env_minimal.py` green.
 
 ### T11. API: `new_make_env` cleanup contract for the epjson staging dir
 

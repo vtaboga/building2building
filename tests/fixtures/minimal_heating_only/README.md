@@ -5,3 +5,7 @@ Bootstrap fixture directory used to start T0 migration work.
 - HVAC type: `HeatingOnly`
 - This is an initial scaffold to unblock registry-fixture migration.
 - Final fixture provenance, run-period checks, and schedule-file coverage are pending.
+- Discovery pins:
+  - `area_m2`: `5652.29`
+  - `warmup_phases`: `3`
+  - `hvac_actuators`: `5`
