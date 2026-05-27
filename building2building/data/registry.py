@@ -32,6 +32,19 @@ logger = logging.getLogger(__name__)
 SplitName = Literal["train", "test", "test_small"]
 
 
+def _validate_metadata(df: pd.DataFrame) -> None:
+    """Fail fast if metadata is missing required columns."""
+    if "climate_zone" not in df.columns:
+        raise RuntimeError(
+            "metadata.parquet is missing the 'climate_zone' column. "
+            "Your HuggingFace cache is from the old dataset revision; "
+            "clear ~/.cache/huggingface/hub/datasets--vtaboga--"
+            "building2building_dataset/ (or re-download via "
+            "huggingface_hub.snapshot_download(..., force_download=True)) "
+            "and retry."
+        )
+
+
 @dataclass(frozen=True)
 class BuildingInfo:
     """Resolved metadata for a single building."""
@@ -65,15 +78,7 @@ class BuildingRegistry:
         if self._metadata is None:
             meta_path = download_metadata()
             self._metadata = pd.read_parquet(meta_path)
-            if "climate_zone" not in self._metadata.columns:
-                raise RuntimeError(
-                    "metadata.parquet is missing the 'climate_zone' column. "
-                    "Your HuggingFace cache is from the old dataset revision; "
-                    "clear ~/.cache/huggingface/hub/datasets--vtaboga--"
-                    "building2building_dataset/ (or re-download via "
-                    "huggingface_hub.snapshot_download(..., force_download=True)) "
-                    "and retry."
-                )
+            _validate_metadata(self._metadata)
         if self._splits is None:
             splits_path = download_splits()
             raw = json.loads(splits_path.read_text())

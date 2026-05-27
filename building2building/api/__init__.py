@@ -35,13 +35,89 @@ from building2building.data.download import ALL_BUILDING_TYPES, BuildingType
 from building2building.envs import make_env_from_config
 from building2building.types import (
     NormalizedDeadbandRewardConfig,
+    RandomScheduleConfig,
     RewardConfig,
     RunPeriodConfig,
     TaskConfig,
+    ZoneTargetTemperatureConfig,
     reward_config_from_dict,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_task_config(
+    *,
+    preset: TaskPreset,
+    run_period_cfg: RunPeriodConfig,
+    timesteps_per_hour: int,
+    target_temperature_mode: str | None,
+    random_schedule_seed: int | None,
+    building_type: BuildingType,
+) -> TaskConfig:
+    """Build the effective TaskConfig used for environment creation."""
+    effective_mode: str = (
+        target_temperature_mode
+        if target_temperature_mode is not None
+        else preset.target_temperature_mode
+    )
+
+    default_zone_target = ZoneTargetTemperatureConfig(
+        occupied_c=preset.target_temperature_occupied,
+        unoccupied_c=preset.target_temperature_unoccupied,
+        unoccupied_policy=preset.unoccupied_policy,
+        seasonal_unoccupied_c=(
+            dict(preset.seasonal_unoccupied_c)
+            if preset.seasonal_unoccupied_c is not None
+            else None
+        ),
+    )
+
+    random_schedule_cfg: RandomScheduleConfig | None = None
+    if effective_mode == "random_schedule":
+        random_schedule_cfg = RandomScheduleConfig(
+            building_type=building_type,
+            seed=int(random_schedule_seed) if random_schedule_seed is not None else 0,
+        )
+
+    return TaskConfig(
+        run_period=run_period_cfg,
+        target_temperature_mode=effective_mode,  # type: ignore[arg-type]
+        default_zone_target_temperature=default_zone_target,
+        timesteps_per_hour=timesteps_per_hour,
+        random_schedule_config=random_schedule_cfg,
+    )
+
+
+def _resolve_effective_reward(
+    *,
+    preset: TaskPreset,
+    reward_override: RewardConfig | None,
+    building_type: BuildingType,
+    building_id: str,
+    run_period: str,
+    normalizer_path: Path | None,
+) -> RewardConfig:
+    """Resolve reward config, auto-filling normalized reward constants."""
+    effective_reward: RewardConfig = (
+        reward_override if reward_override is not None else preset.reward
+    )
+
+    if (
+        isinstance(effective_reward, NormalizedDeadbandRewardConfig)
+        and not effective_reward.is_filled
+    ):
+        from building2building.data.reward_normalizers import resolve_reward_normalizer
+
+        normalizer = resolve_reward_normalizer(
+            building_type,
+            building_id,
+            run_period=run_period,
+            path=normalizer_path,
+        )
+        return effective_reward.filled(normalizer.tau_T, normalizer.tau_E)
+
+    return effective_reward
 
 
 def list_building_types() -> list[str]:
@@ -246,18 +322,12 @@ def new_make_env(
     import tempfile
 
     from building2building.data.registry import get_registry
-    from building2building.types import (
-        BuildingConfig,
-        RandomScheduleConfig,
-        ZoneTargetTemperatureConfig,
-    )
+    from building2building.types import BuildingConfig
 
     if isinstance(task, str):
         preset = resolve_task_preset(task)
     else:
         preset = task
-
-    effective_reward = reward if reward is not None else preset.reward
 
     registry = get_registry()
     if building_id is not None:
@@ -265,26 +335,14 @@ def new_make_env(
     else:
         info = registry.get_building_by_index(building_type, split, index)
 
-    # Auto-fill unfilled NormalizedDeadbandRewardConfig sentinels using
-    # the per-(building_type, climate_zone) constants in
-    # reward_normalizers.yaml.  This is what makes
-    # ``new_make_env(task="task_occ_emed", building_id=...)``
-    # "just work" — the preset stores ``tau_T = tau_E = None``, and
-    # we resolve them once we know which building we're building.
-    if (
-        isinstance(effective_reward, NormalizedDeadbandRewardConfig)
-        and not effective_reward.is_filled
-    ):
-        from building2building.data.reward_normalizers import resolve_reward_normalizer
-
-        info_bid = getattr(info, "building_id", None) or building_id or ""
-        normalizer = resolve_reward_normalizer(
-            building_type,
-            info_bid,
-            run_period=run_period,
-            path=normalizer_path,
-        )
-        effective_reward = effective_reward.filled(normalizer.tau_T, normalizer.tau_E)
+    effective_reward = _resolve_effective_reward(
+        preset=preset,
+        reward_override=reward,
+        building_type=building_type,
+        building_id=getattr(info, "building_id", None) or building_id or "",
+        run_period=run_period,
+        normalizer_path=normalizer_path,
+    )
 
     if eplus_output_dir is None:
         eplus_output_dir = Path(tempfile.mkdtemp(prefix="b2b_eplus_"))
@@ -322,36 +380,13 @@ def new_make_env(
             patched_epjson_path,
         )
 
-    effective_mode: str = (
-        target_temperature_mode
-        if target_temperature_mode is not None
-        else preset.target_temperature_mode
-    )
-
-    default_zone_target = ZoneTargetTemperatureConfig(
-        occupied_c=preset.target_temperature_occupied,
-        unoccupied_c=preset.target_temperature_unoccupied,
-        unoccupied_policy=preset.unoccupied_policy,
-        seasonal_unoccupied_c=(
-            dict(preset.seasonal_unoccupied_c)
-            if preset.seasonal_unoccupied_c is not None
-            else None
-        ),
-    )
-
-    random_schedule_cfg: RandomScheduleConfig | None = None
-    if effective_mode == "random_schedule":
-        random_schedule_cfg = RandomScheduleConfig(
-            building_type=building_type,
-            seed=int(random_schedule_seed) if random_schedule_seed is not None else 0,
-        )
-
-    task_cfg = TaskConfig(
-        run_period=run_period_cfg,
-        target_temperature_mode=effective_mode,  # type: ignore[arg-type]
-        default_zone_target_temperature=default_zone_target,
+    task_cfg = _resolve_task_config(
+        preset=preset,
+        run_period_cfg=run_period_cfg,
         timesteps_per_hour=timesteps_per_hour,
-        random_schedule_config=random_schedule_cfg,
+        target_temperature_mode=target_temperature_mode,
+        random_schedule_seed=random_schedule_seed,
+        building_type=building_type,
     )
 
     from cattrs import structure

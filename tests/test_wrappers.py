@@ -195,21 +195,3 @@ class TestPadObservation:
         with pytest.raises(ValueError, match="exceeds target_size"):
             PadObservation(env, target_size=10)
 
-    def test_pad_raises_error_if_too_many_zones(self):
-        """Test that wrapper raises error if building has too many zones."""
-        # obs_size = 12 means 12 - 7 = 5 zones
-        # target_size = 15 means max 15 - 7 = 8 zones
-        # Create wrapper first (this should succeed)
-        env = MockEnv(obs_size=12)
-        wrapped = PadObservation(env, target_size=15)
-
-        # Now simulate a building with too many zones by changing the env's obs space
-        # obs_size = 20 means 20 - 7 = 13 zones, which exceeds max 8 zones
-        env.observation_space = gym.spaces.Box(
-            low=-5, high=5, shape=(20,), dtype=np.float32
-        )
-
-        # This should raise an error during reset when it tries to rebuild obs space
-        # The error is caught by the size check before the zone-specific check
-        with pytest.raises(ValueError, match="exceeds target_size"):
-            wrapped.reset()

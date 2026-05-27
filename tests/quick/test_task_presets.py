@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import textwrap
+
 import pytest
 
 from building2building.config.tasks import (
@@ -110,18 +114,13 @@ class TestMakeNormalizedDeadbandTaskFactory:
     """
 
     def test_factory_lazy_imports_loader(self) -> None:
-        # The import statement inside the factory body is intentional;
-        # checking it's not a top-level import keeps test_task_presets
-        # cheap (no metadata.parquet download at import time).
-        import building2building.config.tasks as tasks_mod
-
-        src = tasks_mod.__file__
-        assert src is not None
-        with open(src, "r", encoding="utf-8") as f:
-            content = f.read()
-        # The loader import must live inside make_normalized_deadband_task
-        # rather than at module top-level.
-        assert "from building2building.data.reward_normalizers import" in content
-        # Specifically, the import is *not* at file scope.
-        head = content.split("def make_normalized_deadband_task", 1)[0]
-        assert "from building2building.data.reward_normalizers" not in head
+        code = textwrap.dedent(
+            """
+            import sys
+            import building2building.config.tasks  # noqa: F401
+            assert (
+                "building2building.data.reward_normalizers" not in sys.modules
+            ), sorted(m for m in sys.modules if m.startswith("building2building"))
+            """
+        )
+        subprocess.run([sys.executable, "-c", code], check=True)

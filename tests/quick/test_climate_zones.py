@@ -96,33 +96,12 @@ class TestBuildingInfoClimateZone:
 
 @pytest.mark.quick
 class TestMetadataColumnGuard:
-    def test_missing_column_raises(
-        self, fake_metadata: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        reg = BuildingRegistry()
-        # Simulate an old-revision parquet without the climate_zone column by
-        # dropping it and forcing _ensure_loaded to re-read via our mock path.
+    def test_missing_column_raises(self, fake_metadata: pd.DataFrame) -> None:
         stripped = fake_metadata.drop(columns=["climate_zone"])
-        reg._metadata = None
+        from building2building.data.registry import _validate_metadata
 
-        def _fake_download() -> Path:
-            # unused; _ensure_loaded branches on self._metadata being None.
-            raise AssertionError("should not be called")
-
-        # Simulate by pre-populating metadata to the stripped frame *after*
-        # clearing it, then directly exercising the guard.
-        reg._metadata = stripped
-        # Re-force the check by clearing and monkey-patching download_metadata.
-        reg._metadata = None
-        import building2building.data.registry as registry_mod
-
-        def fake_read_parquet(_path):  # noqa: ARG001
-            return stripped
-
-        monkeypatch.setattr(registry_mod.pd, "read_parquet", fake_read_parquet)
-        monkeypatch.setattr(registry_mod, "download_metadata", lambda: Path("/dev/null"))
         with pytest.raises(RuntimeError, match="climate_zone"):
-            reg._ensure_loaded()
+            _validate_metadata(stripped)
 
 
 @pytest.mark.quick

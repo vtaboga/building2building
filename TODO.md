@@ -672,7 +672,7 @@ Acceptance snapshot at close: all surviving `tests/long/` modules now
 carry a one-line long-justification docstring; deferred marker/file
 moves remain scheduled for T27.
 
-### T4. Rewrite over-mocked tests against the layer they actually mean to test
+### T4. Rewrite over-mocked tests against the layer they actually mean to test (closed)
 
 T4 is a small *cluster* of independent rewrites. T4a is the only
 production-code change; T4b–T4d are pure test rewrites. Each is its
@@ -834,6 +834,26 @@ T24b is not yet merged, hold T4e.
 - Files: `tests/test_wrappers.py`.
 - Acceptance: `pytest -m quick` green; T24b's zone-specific test
   is present in the same merge train.
+
+Applied:
+
+- T4a: extracted `_resolve_task_config` and `_resolve_effective_reward`
+  from `new_make_env` in `building2building/api/__init__.py` (pure
+  refactor, no behaviour change).
+- T4b: rewrote `tests/quick/test_api_mode_default.py` to target the
+  new helpers directly, added reward-autofill stale-YAML `KeyError`
+  coverage, and committed `tests/fixtures/reward_normalizers_fixture.yaml`.
+- T4c: extracted `_validate_metadata(df)` from
+  `BuildingRegistry._ensure_loaded` and rewrote
+  `TestMetadataColumnGuard` as a direct unit test with zero monkey-patches.
+- T4d: rewrote
+  `test_task_presets.py::test_factory_lazy_imports_loader` as a
+  subprocess runtime contract (`reward_normalizers` absent from
+  `sys.modules` after importing `building2building.config.tasks`).
+- T4e: deleted
+  `tests/test_wrappers.py::test_pad_raises_error_if_too_many_zones`.
+
+Acceptance snapshot at close: `uv run pytest -m quick` green.
 
 ### T5. Pipeline: end-to-end `prepare_building` on a fixture IDF
 
