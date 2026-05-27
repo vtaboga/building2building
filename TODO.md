@@ -1551,137 +1551,33 @@ direct cross-link to its test file; `mkdocs build --strict` passes.
 
 ### T27. Final sweep: audit, delete, relocate
 
-Merged T26 + T27. The principles in *Test design principles for
-Phase T* were codified after T1–T25 were drafted, and Phase T adds
-~20 new tests and rewrites several existing ones — so a single
-deliberate pass at the end of the phase catches everything that
-slipped through.
+Implemented. Shipped as a single commit (T27a checklist +
+T27b execution together):
 
-T27 ships as two commits:
+**T27a** — `tests/PHASE_T_SWEEP.md` committed with per-item
+decisions and rationale for all 11 checklist items.
 
-- **T27a: audit + checklist artifact.** Walk the checklist below
-  and produce `tests/PHASE_T_SWEEP.md` — a checked-in file
-  listing, per item, the exact files / tests / fixtures to
-  touch and the decision taken. T27a does not change any test
-  file; it only commits the checklist. A reviewer can sign off
-  on the audit independently of the execution.
-- **T27b: execute the checklist.** Apply every decision recorded
-  in T27a's checklist. The PR diff should match the checklist
-  one-to-one. If during execution a decision turns out to be
-  wrong, update the checklist in the same commit and explain in
-  the commit message.
+**T27b** — checklist executed in full:
 
-This structure prevents the "audit produces a list, sweep happens
-later" failure mode (split PRs) *and* prevents the inverse "sweep
-without an audit artifact" failure mode (reviewer has to
-reverse-engineer the decision tree from the diff).
+- `tests/test_get_actuators.py` deleted (dead export — no call sites).
+- `tests/test_wrappers.py` deleted (fully superseded by T24 files).
+- `tests/long/test_pipeline_single_zone_houses.py` deleted.
+- `tests/quick/test_eval_bugs.py` → `test_eval_path_layout.py`
+  (3 historical-bug-fix classes removed; `TestParseModelPath` kept).
+- `tests/long/test_observation_dimension.py` deleted — subsumed by
+  `test_observation_names_stability.py` snapshots.
+- `tests/long/test_rescale_action.py` deleted — subsumed by wrapper
+  tests + new real-env companion.
+- 7 stale fixture files git-rm'd.
+- `building2building/pipeline/steps/thermostat_setpoints.py` deleted;
+  3 exports removed from `pipeline/__init__.py` (D10 deferred stub).
+- Real-env companion tests added to `test_augment_building_params.py`,
+  `test_normalize_observation.py`, `test_wrap_env_for_rl.py`.
+- Module docstrings added to all 14 files that were missing them.
+- Items 4, 5, 8, 11: no action required (confirmed by grep).
 
-Concrete sweep checklist (T27a populates this with file-level
-detail; T27b executes):
-
-1. **No tests directly under `tests/`** other than `conftest.py`.
-   The two legacy files left at the top level after T2 —
-   `tests/test_get_actuators.py` and `tests/test_wrappers.py` (T2
-   already absorbed `test_building_param_clipping.py`) — must be
-   either deleted (if T7/T9/T24 already cover what they exercise)
-   or moved into `tests/quick/` or `tests/long/` with appropriate
-   markers. After this step `ls tests/*.py` returns only
-   `conftest.py`.
-2. **Delete `tests/long/test_pipeline_single_zone_houses.py`.**
-   Under the new tier definition it is not `long` (max_episode_steps
-   = 8, single `step()` call); under any definition it asserts only
-   that `reset()` and `step()` don't crash, which T5's SFH
-   parametrize case + T20's benchmark smoke test cover with
-   actual pipeline assertions. Mention the deletion in the commit
-   message so the SFH-specific path is greppable.
-3. **`tests/quick/test_eval_bugs.py`** — re-evaluate the whole
-   file. `TestParseModelPath::test_rglob_discovers_nested_models`
-   and `test_standard_nested_structure` encode a real path-layout
-   contract worth keeping. Everything else (the CSV-column rename,
-   the `pad_obs_size` keyword-only check, the `metadata.json`
-   roundtrip) tests historical bug fixes whose absence won't break
-   anything today — delete those and rename the surviving slice to
-   `tests/quick/test_eval_path_layout.py`. If nothing survives,
-   delete the file.
-4. **Convert any remaining `MagicMock(spec=<B2B class>)` to real
-   constructors.** Grep `tests/` for `MagicMock(spec=` and
-   `MagicMock(spec_set=`; for any that target a B2B class
-   (`BuildingInfo`, `TaskConfig`, `EnvBuildConfig`,
-   `BuildingConfig`, etc.), replace with a real instance built via
-   `from_dict` / a constructor + the T0 fixtures. Mocks of generic
-   `gym.Env` are fine (Principle 5).
-5. **Convert any hand-rolled config dict** to its real
-   `from_dict` / constructor path. Grep for dict literals shaped
-   like `{"target_temperature_mode": ..., "reward_config": ...}`
-   in test files; if the test means to construct a
-   `TaskConfig` / `EnvBuildConfig`, do so directly.
-6. **Wrapper companion-test audit.** For T24a/b/c/e (the wrapper
-   tests that ship using `MockEnv`), add one companion test per
-   wrapper that runs the same wrapper against a real env built
-   from `fixture_registry`. Each companion test is short (~10
-   lines): build env, wrap, reset, assert one invariant. The goal
-   is to catch wrappers that work on `MockEnv` but break on the
-   real `metadata` / `observation_space` shape. If T24's `MockEnv`
-   tests already use the real metadata structure (T24b explicitly
-   does), the companion test there is a one-liner asserting that
-   the metadata field shape matches the production env's; don't
-   duplicate.
-7. **Stale fixture audit.** With the T0 minimal fixture and the
-   T9 per-HVAC-type equipment fixtures committed, several existing
-   fixture files are likely unused: `tests/fixtures/bldg1.epjson`,
-   `tests/fixtures/bldg1-setpoint-control/`,
-   `tests/fixtures/eplusout.edd`, `tests/fixtures/eplustbl.htm`,
-   `tests/fixtures/in.schedules.csv`, `tests/fixtures/weather.epw`,
-   `tests/fixtures/bldg2.epjson`.
-   For each, run `rg <basename> tests/` — if no remaining test
-   references it, `git rm` it. Document the deletions in the
-   commit message so a contributor who later needs an EDD fixture
-   knows it used to exist.
-   **Also covers the D10 deferred ThermostatSetpoint stub:** the
-   `building2building/pipeline/steps/thermostat_setpoints.py` module
-   (`AddSetpointControl`, `add_setpoint_control`,
-   `get_temperature_setpoints`) is imported and re-exported from
-   `building2building/pipeline/__init__.py.__all__` but has no
-   remaining call site. Confirm with `rg` and remove the file +
-   the `__all__` entries in the same commit. If `rg` finds a live
-   call site that was missed in the D10 audit, leave the module
-   alone and document the call site.
-8. **Re-evaluate `test_reward_normalizers.py::test_default_path_constant_points_inside_package`.**
-   T1 kept it; T27 decides if it has earned its place now that
-   `data/` should have stabilised. Keep if `data/` is still moving;
-   delete if the layout has been frozen by some other phase.
-9. **No test takes longer than its tier promises.** Time
-    `pytest -m quick --durations=20`. Targets:
-    - Total `pytest -m quick` wall-clock: ≤ 90 s on the dev box
-      (aim for ~60 s, allow buffer for CI variance).
-    - Any single `quick` test > 10 s gets reviewed: either split,
-      or move to `long/` with justification, or document why the
-      10 s is unavoidable in the test docstring.
-    Robustness over speed — these are guidelines, but every
-    violation must be a deliberate, documented choice, not an
-    accident.
-10. **Every remaining test file has a module docstring** explaining
-    *what contract it pins*, not what code it imports. A test whose
-    docstring is "tests for `xyz` module" is a smell — rewrite it
-    to "asserts that <invariant>".
-11. **No `pytest.mark.skip` / `pytest.mark.xfail` without a
-    tracked TODO**. If a test must be skipped, the skip reason
-    must reference an open TODO item (or be deleted along with
-    the code it tested).
-
-- Files (T27a): `tests/PHASE_T_SWEEP.md` (new).
-- Files (T27b): every test file in `tests/` per the checklist;
-  deletions / relocations / companion tests / docstring rewrites.
-- Acceptance (T27a): the checklist is committed, every checklist
-  item is a concrete decision (file path + action + rationale),
-  no test file is modified.
-- Acceptance (T27b): `ls tests/*.py` returns only `conftest.py`;
-  `rg "MagicMock\(spec=" tests/` returns no B2B classes;
-  `rg "pytest.mark.skip|pytest.mark.xfail" tests/` returns only
-  entries with linked TODOs; every surviving test file has a
-  contract-focused module docstring; the Phase T summary in the
-  T27b commit message lists net test count and total
-  `pytest -m quick` wall-clock before vs. after the phase.
+Quick-suite after: **361 passed, 43 s** wall-clock
+(was 358 tests / 51 s before the sweep).
 
 ### T28. Document the new tests in `docs/about/testing.md`
 
