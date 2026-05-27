@@ -25,7 +25,10 @@ import pytest
 
 import building2building.api as api_mod
 from building2building.config.tasks import TASK_PRESETS, TaskPreset
-from building2building.types import TaskConfig
+from building2building.types import RewardConfig, TaskConfig
+
+
+_FILLED_REWARD = RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0)
 
 
 class _StubInfo:
@@ -103,7 +106,7 @@ class TestNewMakeEnvModeDefault:
     ) -> None:
         _patch_env(monkeypatch, tmp_path)
         with pytest.raises(_CapturedConfig) as excinfo:
-            api_mod.new_make_env("OfficeSmall", task=task_name)
+            api_mod.new_make_env("OfficeSmall", task=task_name, reward=_FILLED_REWARD)
         assert excinfo.value.task.target_temperature_mode == expected_mode
 
     def test_explicit_mode_overrides_preset(
@@ -115,6 +118,7 @@ class TestNewMakeEnvModeDefault:
                 "OfficeSmall",
                 task="task_occ_emed",
                 target_temperature_mode="constant",
+                reward=_FILLED_REWARD,
             )
         assert excinfo.value.task.target_temperature_mode == "constant"
 
@@ -123,7 +127,7 @@ class TestNewMakeEnvModeDefault:
     ) -> None:
         _patch_env(monkeypatch, tmp_path)
         with pytest.raises(_CapturedConfig) as excinfo:
-            api_mod.new_make_env("OfficeSmall", task="task_occ_emed")
+            api_mod.new_make_env("OfficeSmall", task="task_occ_emed", reward=_FILLED_REWARD)
         zone_target = excinfo.value.task.default_zone_target_temperature
         assert zone_target.unoccupied_policy == "seasonal"
         assert zone_target.seasonal_unoccupied_c is not None
@@ -135,7 +139,10 @@ class TestNewMakeEnvModeDefault:
         _patch_env(monkeypatch, tmp_path)
         with pytest.raises(_CapturedConfig) as excinfo:
             api_mod.new_make_env(
-                "OfficeSmall", task="task_rand_emed", random_schedule_seed=42
+                "OfficeSmall",
+                task="task_rand_emed",
+                random_schedule_seed=42,
+                reward=_FILLED_REWARD,
             )
         rs = excinfo.value.task.random_schedule_config
         assert rs is not None
@@ -147,7 +154,7 @@ class TestNewMakeEnvModeDefault:
     ) -> None:
         _patch_env(monkeypatch, tmp_path)
         with pytest.raises(_CapturedConfig) as excinfo:
-            api_mod.new_make_env("OfficeSmall", task="task_const_e0")
+            api_mod.new_make_env("OfficeSmall", task="task_const_e0", reward=_FILLED_REWARD)
         assert excinfo.value.task.random_schedule_config is None
 
     def test_preset_used_intact(self) -> None:
