@@ -1,4 +1,6 @@
-"""Verify that the observation dimension changes depending on
+"""Audit note: temporary long marker; scheduled for T27 move to `quick/`.
+
+Verify that the observation dimension changes depending on
 ``target_temperature_mode``.
 
 In ``"constant"`` mode, occupancy and target temperature are *not* part of

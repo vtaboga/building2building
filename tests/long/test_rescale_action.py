@@ -1,4 +1,6 @@
-"""Verify that ``gymnasium.wrappers.RescaleAction`` correctly rescales the
+"""Audit note: temporary long marker; scheduled for T27 move to `quick/`.
+
+Verify that ``gymnasium.wrappers.RescaleAction`` correctly rescales the
 action space to [-1, 1] while preserving environment functionality.
 
 Tests both a single-zone house and a multizones OfficeSmall building,

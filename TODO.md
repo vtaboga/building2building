@@ -647,33 +647,30 @@ Applied:
 
 Acceptance snapshot at close: `uv run pytest -m quick` green.
 
-### T3. Audit `tests/long/` against the new rollout-length definition
+### T3. Audit `tests/long/` against the new rollout-length definition (closed)
 
-Under the new tier definition, `long` means *multi-day rollout*, not
-*needs EnergyPlus*. Walk every file in `tests/long/` and confirm it
-actually justifies the marker. Inverse of the old T3 — we no longer
-move `quick/` tests out, we audit `long/` tests in.
+Applied:
 
-Concrete cases to verify:
-
-- `tests/long/test_pipeline_single_zone_houses.py` runs a single
-  `reset()` + one `step()` (max_episode_steps=8). It is **not**
-  long under the new definition. Marked for deletion in T27 (its
-  contract is fully covered by T5's SFH pipeline matrix and T20's
-  benchmark smoke test).
-- `tests/long/test_rescale_action.py`, `test_observation_dimension.py`
-  — verify whether they truly need multi-day rollouts or just an
-  env build + a handful of steps. If the latter, move to `quick/`
-  in T27.
-- `tests/long/test_env_leak.py`, `test_env_lifecycle.py`,
+- Audited every module in `tests/long/` against the updated criterion
+  ("multi-day rollout or many envs/sims", not merely "needs
+  EnergyPlus").
+- Marked for T27 follow-up (not long by the new definition):
+  `tests/long/test_pipeline_single_zone_houses.py` (delete),
+  `tests/long/test_rescale_action.py` (move to `quick/`),
+  `tests/long/test_observation_dimension.py` (move to `quick/`).
+- Kept in `long` (multi-day rollout or many envs/sims):
+  `test_env_leak.py`, `test_env_lifecycle.py`,
   `test_seasonal_unoccupied.py`, `test_occupancy_observation.py`,
   `test_random_schedule_rollout.py`,
-  `test_all_buildings_env_smoke.py` — these genuinely need many
-  steps or many envs. Keep `long`.
-- Acceptance: every surviving `tests/long/` file has a one-line
-  module docstring justifying *why* it needs to be long. Any file
-  that can't justify the marker either moves to `quick/` or gets
-  deleted in T27.
+  `test_all_buildings_env_smoke.py`,
+  `test_generate_dataset.py`,
+  `test_generate_raw_dataset_matches_existing.py`.
+- Added/normalized one-line module docstrings in surviving `long`
+  modules to state why they remain long.
+
+Acceptance snapshot at close: all surviving `tests/long/` modules now
+carry a one-line long-justification docstring; deferred marker/file
+moves remain scheduled for T27.
 
 ### T4. Rewrite over-mocked tests against the layer they actually mean to test
 

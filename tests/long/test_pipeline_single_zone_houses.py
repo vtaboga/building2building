@@ -1,3 +1,5 @@
+"""Audit note: temporary long marker; scheduled for T27 deletion."""
+
 from __future__ import annotations
 
 import os
