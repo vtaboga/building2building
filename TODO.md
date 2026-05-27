@@ -1155,7 +1155,7 @@ Prerequisite for T14, T15, T16.
 - Acceptance: missing rows surface at release time instead of at
   eval time.
 
-### T17. Observation contract: zone-aware padding on real buildings
+### T17. Observation contract: zone-aware padding on real buildings ✅
 
 The "non-zone features at consistent indices" invariant is what
 makes multi-building generalization work. Currently tested *once*,
@@ -1176,7 +1176,7 @@ new fixture is needed for T17.
 - Acceptance: catches any future change that puts non-zone features
   at building-dependent indices.
 
-### T18. Observation contract: `observation_names` ordering stability
+### T18. Observation contract: `observation_names` ordering stability ✅
 
 Every plotting script and reactive controller depends on
 `obs_names = env.metadata["observation_names"]`. The ordering is
@@ -1195,7 +1195,7 @@ never asserted.
   expand to the other HVAC types then.
 - Acceptance: relies on T0.
 
-### T19. Observation contract: `action_space` ↔ `controlled_zones` consistency
+### T19. Observation contract: `action_space` ↔ `controlled_zones` consistency ✅
 
 - Files: extend the new minimal-building test (T10) with:
   `assert env.action_space.shape[0] == n_agent_actuators`, derived
@@ -1205,7 +1205,7 @@ never asserted.
 - Acceptance: catches the case where the action space and the
   declared controlled zones diverge.
 
-### T20. Benchmark behaviour: `make_train_envs` actually returns working envs
+### T20. Benchmark behaviour: `make_train_envs` actually returns working envs ✅
 
 The four benchmark classes are tested for their config but not for
 behaviour. **T20 stays `long`.** The new tier definition would
@@ -1230,7 +1230,7 @@ is not the contract).
 - Acceptance: catches behavioural regressions in the benchmark
   factories that the existing config tests cannot see.
 
-### T21. HVAC coverage: `HeatingOnly` system type
+### T21. HVAC coverage: `HeatingOnly` system type ✅
 
 `HeatingOnly` is one of the three advertised HVAC types but has no
 unit tests. `Unitary` and `VAV` are covered by the
@@ -1243,7 +1243,7 @@ unit tests. `Unitary` and `VAV` are covered by the
 - Acceptance: every advertised HVAC type has at least one
   action-space unit test.
 
-### T22. Leak coverage: multi-zone building
+### T22. Leak coverage: multi-zone building ✅
 
 `tests/long/test_env_leak.py` only exercises `SingleFamilyHouse`.
 Leak risk is highest on multi-zone buildings.
@@ -1258,6 +1258,9 @@ Time one `OfficeMedium` create/reset/close cycle on the local
 interactive node (no commit; record in the T22b commit message
 and in the test's module docstring). OfficeMedium per-step cost
 can be 3–5× SFH, so this is essential.
+
+Measured (2026-05-27): OfficeMedium create/reset/close cycle is ~4.75s
+(`create=1.95s`, `reset=2.68s`, `close=0.12s`) on the interactive node.
 
 #### T22b. Parametrize
 
@@ -1280,6 +1283,9 @@ Based on T22a's measurement:
   with `_N ≥ 5` and total runtime under 5 minutes, or the
   parallelization refactor is committed and a follow-up T22c is
   filed. Do not commit a measurement-free `_N` value.
+
+Implemented: parametrized `tests/long/test_env_leak.py` over
+`SingleFamilyHouse (N=20)` and `OfficeMedium (N=10)`.
 
 ### T24. Wrapper data-processing correctness
 

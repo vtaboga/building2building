@@ -169,7 +169,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
 
     ont = Ontology.from_object(epjson)
 
-    controlled_zones = list(
+    controlled_zones = sorted(
         set(itertools.chain(*(item.zones() for item in building_config.hvac_equipment)))
     )
 

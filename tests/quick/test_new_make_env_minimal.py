@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import itertools
 from typing import Any
 
 import numpy as np
 import pytest
 
 import building2building.api as api_mod
+from building2building.simulator.action_spaces import hvac_action_space
 from building2building.types import RewardConfig
 
 
@@ -56,6 +58,17 @@ def test_new_make_env_knobs_and_hvac_matrix(
         assert metadata["controlled_zones"]
         assert metadata["task_config"].run_period.name == run_period
         assert metadata["task_config"].target_temperature_mode == target_temperature_mode
+        controlled_zones = set(metadata["controlled_zones"])
+        equipment = metadata["hvac_equipment"]
+        controlled_actuators = list(
+            itertools.chain.from_iterable(
+                eq.actuator_descriptions()
+                for eq in equipment
+                if controlled_zones.intersection(eq.zones())
+            )
+        )
+        n_agent_actuators = len(hvac_action_space(controlled_actuators).agent_actuators)
+        assert env.action_space.shape[0] == n_agent_actuators
 
         assert env._max_episode_steps == 20  # TimeLimit wrapper contract
     finally:

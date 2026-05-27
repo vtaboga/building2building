@@ -386,12 +386,12 @@ def flat_observation_info(
 
     template = {
         "temperature": {
-            z.toPython(): (
-                f"ZONE AIR TEMPERATURE {z.toPython()}",
-                VariableHole("ZONE AIR TEMPERATURE", z.toPython()),
+            zone_name: (
+                f"ZONE AIR TEMPERATURE {zone_name}",
+                VariableHole("ZONE AIR TEMPERATURE", zone_name),
                 (10.0, 45.0),
             )
-            for z in ont.zones()
+            for zone_name in sorted(z.toPython() for z in ont.zones())
         },
         "zone_occupancy": occupancy_template,
         "target_temperature": target_template,
@@ -485,12 +485,12 @@ def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
         {
             "temperature": TransformDictSpace(
                 {
-                    z.toPython(): TransformScalarToArray(
-                        VariableHole("ZONE AIR TEMPERATURE", z.toPython()),
+                    zone_name: TransformScalarToArray(
+                        VariableHole("ZONE AIR TEMPERATURE", zone_name),
                         10.0,
                         45.0,
                     )
-                    for z in ont.zones()
+                    for zone_name in sorted(z.toPython() for z in ont.zones())
                 }
             ),
             "time": TransformDictSpace(
