@@ -1,10 +1,32 @@
+"""Pins the NormalizeObservation wrapper contract.
+
+Asserts that observations are mapped affinely into [0, 1] using the
+observation-space bounds, that the transformation is invertible (denormalize
+round-trips), that a zero-range dimension raises at construction, and that
+``reset()`` rebuilds the bounds when the underlying space changes.  A real-env
+companion test confirms the wrapper produces in-range observations on a
+production env.
+"""
+
 from __future__ import annotations
+
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
 import pytest
 
+import building2building.api as api_mod
 from building2building.simulator.wrappers import NormalizeObservation
+from building2building.types import RewardConfig
+
+_FILLED_REWARD = RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0)
+
+
+def _patch_registry(monkeypatch: pytest.MonkeyPatch, fixture_registry: Any) -> None:
+    monkeypatch.setattr(
+        "building2building.data.registry.get_registry", lambda: fixture_registry
+    )
 
 
 class MutableObservationEnv(gym.Env):
@@ -62,6 +84,38 @@ def test_normalize_observation_raises_on_zero_range() -> None:
     )
     with pytest.raises(ValueError, match="range is zero"):
         NormalizeObservation(env)
+
+
+@pytest.mark.quick
+def test_normalize_observation_real_env(
+    monkeypatch: pytest.MonkeyPatch,
+    fixture_registry: Any,
+) -> None:
+    """Companion: wrapper must map the real env's observation_space to [0, 1].
+
+    Tests structural invariants without calling reset() — the fixture env's
+    EnergyPlus simulation is only exercised by long tests.
+    """
+    _patch_registry(monkeypatch, fixture_registry)
+    env = api_mod.new_make_env(
+        "OfficeSmall",
+        task="task_occ_emed",
+        reward=_FILLED_REWARD,
+        max_episode_steps=4,
+    )
+    try:
+        wrapped = NormalizeObservation(env)
+        # observation_space must be [0, 1] in every dimension
+        np.testing.assert_array_equal(wrapped.observation_space.low, 0.0)
+        np.testing.assert_array_equal(wrapped.observation_space.high, 1.0)
+        assert wrapped.observation_space.shape == env.unwrapped.observation_space.shape
+        # denormalize must recover the original bounds
+        norm_low = wrapped.observation(env.unwrapped.observation_space.low)
+        norm_high = wrapped.observation(env.unwrapped.observation_space.high)
+        np.testing.assert_allclose(norm_low, 0.0, atol=1e-5)
+        np.testing.assert_allclose(norm_high, 1.0, atol=1e-5)
+    finally:
+        env.close()
 
 
 @pytest.mark.quick

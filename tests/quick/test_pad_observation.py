@@ -1,3 +1,12 @@
+"""Pins the PadObservation zone-split and padding contract.
+
+Asserts that zone features are split from non-zone features using the
+``observation_names`` metadata, that zone-padding zeros are inserted between
+zone slots and the non-zone tail, that non-zone features always appear at the
+end of the padded vector, and that the wrapper rebuilds its layout after
+``reset()`` when the underlying env changes shape.
+"""
+
 from __future__ import annotations
 
 import gymnasium as gym

@@ -1,3 +1,11 @@
+"""Pins the ``patch_epjson_run_period`` contract.
+
+Asserts that patching an epJSON file rewrites both the ``RunPeriod`` dates and
+the ``Schedule:File`` paths to point at the correct seasonal CSV, and that
+missing ``RunPeriod`` objects and the ``"summer"`` period alias are handled
+correctly.
+"""
+
 from __future__ import annotations
 
 import json

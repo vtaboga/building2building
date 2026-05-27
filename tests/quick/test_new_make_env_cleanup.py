@@ -1,3 +1,10 @@
+"""Pins the staging-directory cleanup contract for ``new_make_env``.
+
+Asserts that seasonal run periods register a cleanup callback for the
+EnergyPlus staging directory on ``env.close()``, and that full-year periods
+skip the cleanup (the staging dir is reused across episodes).
+"""
+
 from __future__ import annotations
 
 import shutil

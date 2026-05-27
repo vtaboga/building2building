@@ -1,3 +1,12 @@
+"""Pins the ``new_make_env`` knobs-and-HVAC-matrix contract.
+
+Asserts that every combination of run period, target-temperature mode, and HVAC
+type (VAV / Unitary / HeatingOnly) produces an env whose ``reset()`` returns an
+observation of the correct dtype and whose ``action_space`` has the expected
+shape.  A second test verifies that ``rescale_action=True`` and
+``max_episode_steps`` are honoured.
+"""
+
 from __future__ import annotations
 
 import itertools

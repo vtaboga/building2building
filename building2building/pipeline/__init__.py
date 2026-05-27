@@ -47,11 +47,6 @@ from building2building.pipeline.steps.outputs import (
 )
 from building2building.pipeline.steps.schedule_files import link_in_schedule
 from building2building.pipeline.steps.surfaces import GlueSurfaces, glue_surfaces
-from building2building.pipeline.steps.thermostat_setpoints import (
-    AddSetpointControl,
-    add_setpoint_control,
-    get_temperature_setpoints,
-)
 from building2building.store import Derivation, Expression, Realizable, Rename
 
 
@@ -153,9 +148,6 @@ __all__ = [
     "eiofile",
     "link_in_schedule",
     # Generic building edits
-    "AddSetpointControl",
-    "add_setpoint_control",
-    "get_temperature_setpoints",
     "GlueSurfaces",
     "glue_surfaces",
     # Parsers / utilities

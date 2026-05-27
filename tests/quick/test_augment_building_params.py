@@ -1,13 +1,35 @@
+"""Pins the AugmentObservationWithBuildingParams wrapper contract.
+
+Asserts that building parameters are extracted from env metadata, normalized to
+[-1, 1], and appended to the observation vector.  Also verifies that missing
+metadata raises by default (fail-loud), that ``allow_defaults`` falls back
+gracefully, that ``reset()`` re-reads metadata when the underlying env changes,
+and that denormalization inverts normalization exactly.  A real-env companion
+test confirms the wrapper works against production metadata shapes.
+"""
+
 from __future__ import annotations
+
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
 import pytest
 
+import building2building.api as api_mod
 from building2building.simulator.wrappers import (
     AugmentObservationWithBuildingParams,
     NormalizeObservation,
 )
+from building2building.types import RewardConfig
+
+_FILLED_REWARD = RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0)
+
+
+def _patch_registry(monkeypatch: pytest.MonkeyPatch, fixture_registry: Any) -> None:
+    monkeypatch.setattr(
+        "building2building.data.registry.get_registry", lambda: fixture_registry
+    )
 
 
 class MutableMetadataEnv(gym.Env):
@@ -118,6 +140,36 @@ def test_augment_building_params_reset_reextracts_metadata_and_rebuilds_space() 
     assert obs2.shape == (8,)
     assert wrapped.building_params["area"] == 210.0
     assert wrapped.observation_space.shape == (8,)
+
+
+@pytest.mark.quick
+def test_augment_building_params_real_env(
+    monkeypatch: pytest.MonkeyPatch,
+    fixture_registry: Any,
+) -> None:
+    """Companion: wrapper must augment the real env's observation_space correctly.
+
+    Tests structural invariants without calling reset() — the fixture env's
+    EnergyPlus simulation is only exercised by long tests.
+    """
+    _patch_registry(monkeypatch, fixture_registry)
+    env = api_mod.new_make_env(
+        "OfficeSmall",
+        task="task_occ_emed",
+        reward=_FILLED_REWARD,
+        max_episode_steps=4,
+    )
+    try:
+        inner_dim = env.observation_space.shape[0]
+        # allow_defaults because hvac_actuators is populated during reset(), not before
+        wrapped = AugmentObservationWithBuildingParams(env, allow_defaults=True)
+        n_params = len(wrapped.building_params)
+        assert n_params > 0
+        assert wrapped.observation_space.shape[0] == inner_dim + n_params
+        assert np.all(wrapped.normalized_params >= -1.0)
+        assert np.all(wrapped.normalized_params <= 1.0)
+    finally:
+        env.close()
 
 
 @pytest.mark.quick

@@ -1,3 +1,10 @@
+"""Pins the ``make_controllable`` actuator-emission contract per HVAC type.
+
+Asserts that ``make_controllable`` produces the expected set of
+``ActuatorDescription`` objects for each minimal fixture (VAV, Unitary,
+HeatingOnly) and that every emitted actuator appears in the resulting epJSON.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

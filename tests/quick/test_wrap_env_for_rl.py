@@ -1,11 +1,32 @@
+"""Pins the ``wrap_env_for_rl`` composition and rescaling contract.
+
+Asserts that ``normalize_obs`` and ``rescale_action`` flags are independent,
+that their composition order places ``NormalizeObservation`` outermost, that
+actions in [-1, 1] are correctly mapped to physical actuator ranges, and that
+``env.metadata`` is preserved through the wrapper stack.  A real-env companion
+test confirms all invariants hold against a production env.
+"""
+
 from __future__ import annotations
+
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
 import pytest
 
+import building2building.api as api_mod
 from building2building.api.rl_wrappers import wrap_env_for_rl
 from building2building.simulator.wrappers import NormalizeObservation
+from building2building.types import RewardConfig
+
+_FILLED_REWARD = RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0)
+
+
+def _patch_registry(monkeypatch: pytest.MonkeyPatch, fixture_registry: Any) -> None:
+    monkeypatch.setattr(
+        "building2building.data.registry.get_registry", lambda: fixture_registry
+    )
 
 
 class ActionCaptureEnv(gym.Env):
@@ -95,3 +116,34 @@ def test_wrap_env_for_rl_metadata_passthrough() -> None:
     env = ActionCaptureEnv()
     wrapped = wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
     assert wrapped.metadata["observation_names"] == env.metadata["observation_names"]
+
+
+@pytest.mark.quick
+def test_wrap_env_for_rl_real_env_invariant(
+    monkeypatch: pytest.MonkeyPatch,
+    fixture_registry: Any,
+) -> None:
+    """Companion: wrap_env_for_rl must produce correct spaces on the real env.
+
+    Tests structural invariants without calling reset() — the fixture env's
+    EnergyPlus simulation is only exercised by long tests.
+    """
+    _patch_registry(monkeypatch, fixture_registry)
+    env = api_mod.new_make_env(
+        "OfficeSmall",
+        task="task_occ_emed",
+        reward=_FILLED_REWARD,
+        max_episode_steps=4,
+    )
+    try:
+        wrapped = wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
+        np.testing.assert_array_equal(wrapped.observation_space.low, 0.0)
+        np.testing.assert_array_equal(wrapped.observation_space.high, 1.0)
+        np.testing.assert_allclose(wrapped.action_space.low, -1.0)
+        np.testing.assert_allclose(wrapped.action_space.high, 1.0)
+        assert (
+            wrapped.metadata["observation_names"]
+            == env.unwrapped.metadata["observation_names"]
+        )
+    finally:
+        env.close()

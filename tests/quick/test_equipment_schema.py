@@ -1,3 +1,10 @@
+"""Pins the equipment-schema round-trip contract per HVAC type.
+
+Asserts that the equipment detected from each minimal fixture building
+(VAV, Unitary, HeatingOnly) matches the expected schema class and that the
+actuator descriptions round-trip without loss.
+"""
+
 from __future__ import annotations
 
 import json

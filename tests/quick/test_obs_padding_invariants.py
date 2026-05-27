@@ -1,3 +1,12 @@
+"""Pins the PadObservation zone-alignment invariant on real environments.
+
+Serves as the companion test for ``PadObservation`` (T24 wrapper audit): asserts
+that after padding, the non-zone tail features appear at the same fixed indices
+regardless of the number of zones in the building.  Uses a real env built from
+``fixture_registry`` so the metadata and observation-space shape match
+production.
+"""
+
 from __future__ import annotations
 
 from typing import Any

@@ -1,3 +1,10 @@
+"""Pins the ``prepare_building`` end-to-end pipeline contract.
+
+Asserts that ``prepare_building`` converts a raw IDF/epJSON fixture through the
+full pipeline (upgrade → convert → add outputs → make controllable) and
+produces a valid epJSON with the expected actuator set and output variables.
+"""
+
 from __future__ import annotations
 
 import json

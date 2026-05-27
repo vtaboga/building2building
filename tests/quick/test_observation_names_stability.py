@@ -1,3 +1,12 @@
+"""Pins the observation-name layout for each target-temperature mode.
+
+Asserts that the list of observation names returned by the minimal-vav fixture
+env exactly matches the committed snapshot for ``constant``, ``occupancy``, and
+``random_schedule`` modes.  This catches any change to the observation vector
+structure (added/removed/reordered features) before it silently breaks trained
+models.
+"""
+
 from __future__ import annotations
 
 import json

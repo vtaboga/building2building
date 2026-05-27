@@ -1,3 +1,12 @@
+"""Pins the ResampleBuildingWrapper contract.
+
+Asserts that the wrapper raises on empty index lists, that a single-index list
+yields a stable env on every reset, that a multi-index list swaps the
+underlying env on reset, that episode counters reset correctly across swaps, and
+that index-out-of-bounds errors are warned about and deferred to the next reset
+rather than crashing immediately.
+"""
+
 from __future__ import annotations
 
 import random

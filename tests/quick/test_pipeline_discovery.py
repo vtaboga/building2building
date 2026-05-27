@@ -1,3 +1,11 @@
+"""Pins the pipeline discovery-metadata contract for each HVAC fixture.
+
+Asserts that ``extract_discovery_metadata`` returns ``net_conditioned_area``,
+``warmup_phases``, and HVAC actuator count that match the pinned values in each
+fixture's ``README.md``, and that ``make_controllable`` emits the expected
+actuator count.
+"""
+
 from __future__ import annotations
 
 import re
