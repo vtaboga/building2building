@@ -1287,7 +1287,7 @@ Based on T22a's measurement:
 Implemented: parametrized `tests/long/test_env_leak.py` over
 `SingleFamilyHouse (N=20)` and `OfficeMedium (N=10)`.
 
-### T24. Wrapper data-processing correctness
+### T24. Wrapper data-processing correctness ✅
 
 The five wrappers in `building2building/simulator/wrappers.py` and
 `building2building/api/rl_wrappers.py` are unevenly tested: existing
@@ -1532,7 +1532,7 @@ can do this properly against the minimal fixture or a stub.
   `RescaleAction`, fails. Removes the need for the (currently
   mis-marked) `test_rl_wrappers.py` in `tests/quick/`.
 
-### T25. Document wrapper expectations in `docs/guide/wrappers.md`
+### T25. Document wrapper expectations in `docs/guide/wrappers.md` ✅
 
 After T24a–T24e land, the wrappers' contracts are pinned by tests.
 The user-facing wrapper guide should cite those contracts so
@@ -1542,6 +1542,12 @@ contributors know what is enforced (vs. what is convention).
   section per wrapper).
 - Acceptance: `mkdocs build --strict` passes; each wrapper section
   in the guide cross-links to its test file.
+
+Implemented: `docs/guide/wrappers.md` now includes a "Tested
+invariants" subsection for `NormalizeObservation`,
+`PadObservation`, `AugmentObservationWithBuildingParams`,
+`ResampleBuildingOnResetWrapper`, and `wrap_env_for_rl`, each with a
+direct cross-link to its test file; `mkdocs build --strict` passes.
 
 ### T27. Final sweep: audit, delete, relocate
 

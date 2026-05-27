@@ -105,7 +105,7 @@ def test_resample_wrapper_episode_counters_reset() -> None:
 def test_resample_wrapper_index_error_warns_and_defers_resample_to_next_reset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    sequence = iter([0, 1])
+    sequence = iter([0, 0, 1])
     monkeypatch.setattr(random, "choice", lambda _: next(sequence))
 
     calls: list[int] = []
