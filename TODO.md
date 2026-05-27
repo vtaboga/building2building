@@ -583,184 +583,69 @@ Closed in `3c66a06` + `9ab1044`.
 - Quick-suite hardening for wrapper/api tests was included in the same
   patch so `pytest -m quick` is green from a fresh checkout.
 
-### T0. Minimal-building fixture matrix + shared registry helper
+### T0. Minimal-building fixture matrix + shared registry helper (closed)
 
-The single biggest unlock. Today, almost every "real" test either
-mocks too much (and tests nothing useful) or hits the HuggingFace
-dataset. A committed minimal fixture matrix plus a shared
-registry-bypass fixture removes that dilemma without expanding
-`new_make_env`'s public signature.
+Closed in `c0499bf`.
 
-**HVAC coverage rule:** every advertised HVAC system type
-(`VAV`, `Unitary`, `HeatingOnly`) gets its own committed minimal
-building. This is the only way the quick suite ever exercises the
-`make_controllable` / equipment-dispatch path for all three types
-without depending on the real registry.
+Delivered:
 
-T0 fans out into three commits, each independently reviewable:
+- Added committed fixture dirs:
+  `tests/fixtures/minimal_vav/`,
+  `tests/fixtures/minimal_unitary/`,
+  `tests/fixtures/minimal_heating_only/` with
+  `building.epjson`, `equipment.json`, `weather.epw`, `README.md`.
+- Added shared fixtures in `tests/conftest.py`:
+  `minimal_building_dir` and `fixture_registry`.
+- Migrated `tests/quick/test_api_mode_default.py` off local `_Stub*`
+  registry classes to the shared fixture helper.
+- Kept `new_make_env` public signature unchanged (no `building_dir=`
+  test hook).
 
-#### T0a. Fixture files and provenance
+Carry-forward notes for future `T*` items:
 
-Commit one fixture directory per HVAC type under
-`tests/fixtures/`:
+- The "heating" fixture currently uses a real
+  `heating_only+unitarysystem` building (dataset-native); future tasks
+  should treat this as the heating-path fixture unless a pure
+  heating-only artifact is later introduced.
+- T7/T10/T17 should reuse this fixture matrix directly; do not
+  reintroduce ad-hoc local stub registries in test files.
 
-- `minimal_vav/`        — smallest multi-zone building with VAV HVAC
-  (2 zones, 2 actuators). Also serves as the multi-zone variant
-  used by T17 (no second 2-zone fixture is needed).
-- `minimal_unitary/`    — smallest single-zone Unitary building.
-- `minimal_heating_only/` — smallest single-zone HeatingOnly
-  building, with at least one `Schedule:File` reference (to
-  exercise T8's relative-path rewriting on the SFH-style code
-  path).
+### T1. Delete tautological tests (closed)
 
-Each directory contains `building.epjson`, `equipment.json`,
-`weather.epw`, and a `README.md`. The `building.epjson` is a
-post-conversion artifact, *not* an IDF — T5 owns the IDF → epJSON
-path.
+Closed in `c0499bf`.
 
-Each `README.md` documents: which real dataset building it was
-carved from, what was deleted (zones, equipment, schedules),
-pinned values for `area` / `warmup_phases` / `hvac_actuators`
-count (T7 asserts against these), and the **measured per-cycle
-cost** of `new_make_env().reset().close()` against this fixture on
-the dev box (so future contributors know whether a slow CI is
-because of the fixture or because of their change).
+Applied:
 
-**Run period:** target one-week (Jan 1 – Jan 7) baked into each
-`building.epjson`. EnergyPlus's warmup is independent of the
-reported run period, so one week is fine in principle, but **T0a's
-first step is to verify experimentally** that each fixture
-produces ≥10 reported timesteps at `timesteps_per_hour=4`. If any
-fixture fails that, fall back to one month *for that fixture
-only* and document the reason in its README. Do not pre-emptively
-bake one month into all three.
+- Deleted `tests/quick/test_new_api.py`.
+- Collapsed gym import-side-effect coverage into
+  `test_gym_registration.py::test_all_building_types_registered`.
+- Deleted the two JSON roundtrip-only tests in
+  `TestDynamicsAdaptationMetadataRoundTrip`.
+- Deleted
+  `TestEvalPpoCsvRewardMeanColumn::test_csv_fieldnames_contain_reward_mean`.
+- Preserved
+  `TestDynamicsAdaptationMetadataRoundTrip::test_metadata_missing_raises_without_cli_flag`
+  for later rewrite/move in T27 step 3.
 
-Total committed size budget: ~1.5 MB across three epJSONs. If any
-single fixture exceeds 800 KB, carve more aggressively before
-committing.
+Acceptance snapshot at close: `pytest -m quick` green.
 
-- Files: `tests/fixtures/{minimal_vav,minimal_unitary,minimal_heating_only}/*` (new).
-- Acceptance: each fixture round-trips through `new_make_env`
-  against `fixture_registry` (added in T0b) and reaches `reset()`
-  in under 5 s on the dev box; the README's measured cost matches
-  within 50 %.
+### T2. Consolidate duplicates (closed)
 
-#### T0b. Shared registry helper
+Applied:
 
-- `fixture_registry` fixture in `tests/conftest.py`, parametrized
-  by HVAC type (default: `minimal_vav`). Returns a stub registry
-  whose `get_building_by_index` / `get_building_by_id` return a
-  real `BuildingInfo` built from the requested fixture (not a
-  `MagicMock`). Tests use it via `monkeypatch.setattr(
-  building2building.data.registry, "get_registry",
-  lambda: fixture_registry)`. The pattern is established by the
-  existing `_StubRegistry` in
-  `tests/quick/test_api_mode_default.py` — promote that to a
-  shared fixture and extend it for HVAC-type parametrization.
-- `minimal_building_dir(hvac_type)` fixture in `tests/conftest.py`
-  returning the `Path` to the requested fixture directory.
+- Merged clipping-invariant coverage from
+  `tests/test_building_param_clipping.py` into
+  `tests/test_wrappers.py::TestAugmentObservationWithBuildingParams::test_normalized_params_clipped_when_out_of_range`,
+  then deleted `tests/test_building_param_clipping.py`.
+- Deleted only
+  `tests/quick/test_types.py::TestZoneTargetTemperatureConfigExtended::test_from_dict_seasonal_roundtrip`.
+  Kept `test_from_dict_unknown_policy_raises` and
+  `test_from_dict_seasonal_unknown_season_key_raises`.
+- Verified the legacy task-preset assertions called out for T2 are
+  already covered in `tests/quick/test_task_presets.py`
+  (`unoccupied_policy` and `reward.dT` contracts remain pinned).
 
-Rationale for not extending `new_make_env`: `new_make_env` is the
-public, paper-cited entry point. Adding a `building_dir=` knob just
-to make tests easier expands the public surface for a test
-convenience and invites users to skip the registry. The monkeypatch
-pattern is ~3 lines per call site and touches no production code.
-
-- Files: `tests/conftest.py`.
-- Acceptance: `pytest tests/conftest.py --collect-only` lists both
-  fixtures; a smoke test (added in T10) parametrizes over all
-  three HVAC types and passes. No `building_dir=` kwarg on
-  `new_make_env`.
-
-#### T0c. Migrate the existing stub in `test_api_mode_default.py`
-
-T0a + T0b leave `tests/quick/test_api_mode_default.py` still using
-its own `_StubInfo` / `_StubRegistry` / `_CapturedConfig` machinery.
-Replace those with the shared `fixture_registry`. This commit is
-small (~30 LOC delete, ~5 LOC change) and **must land before T4b**
-otherwise T4b is doing this migration plus the helper rewrite in
-one go.
-
-- Files: `tests/quick/test_api_mode_default.py`.
-- Acceptance: file loses the `_Stub*` classes; existing assertions
-  still pass.
-
-### T1. Delete tautological tests
-
-Goal: shrink the suite, but **no contract is silently dropped**.
-Each deletion below either has no contract attached, or names the
-test that absorbs the contract.
-
-- **Delete** `tests/quick/test_new_api.py`. Only asserts re-export
-  existence; covered transitively by every test that imports
-  `building2building.<symbol>` and uses it.
-- **Collapse**
-  `test_gym_registration.py::test_registration_on_import` into
-  `test_all_building_types_registered` (one assertion suffices for
-  "import has the side-effect").
-- **Delete**
-  `test_eval_bugs.py::TestDynamicsAdaptationMetadataRoundTrip::{test_train_writes_metadata_json, test_eval_reads_pad_obs_size_from_metadata}`
-  — these only round-trip a dict through `json`. No B2B contract.
-- **Preserve the contract**
-  `test_eval_bugs.py::TestDynamicsAdaptationMetadataRoundTrip::test_metadata_missing_raises_without_cli_flag`
-  exists in a clumsy form (raises and catches `FileNotFoundError`
-  in the same line). The contract — "eval fails loudly when
-  metadata.json is missing" — is real. Rewrite it in T27 step 3
-  against the actual `eval_dynamics_adaptation` entry point and
-  move into `tests/quick/test_eval_path_layout.py`. **Do not
-  delete it in T1.**
-- **Delete**
-  `test_eval_bugs.py::TestEvalPpoCsvRewardMeanColumn::test_csv_fieldnames_contain_reward_mean`.
-  The contract ("eval_ppo writes `reward_mean`, not `reward`") is
-  preserved by the sibling `test_eval_result_has_reward_mean_not_reward`
-  in the same class (which T1 keeps).
-- **Keep**
-  `test_reward_normalizers.py::test_default_path_constant_points_inside_package`
-  — it pins that the shipped YAML lives at the expected package
-  path, which silently breaks if `building2building/data/` is
-  reorganized. Cost: one line. T27 step 8 re-evaluates after
-  `data/` stabilises post-release.
-- Acceptance: `pytest -m quick` still green; line count down;
-  every deleted test is either contract-free or its contract has
-  a named survivor.
-
-### T2. Consolidate duplicates
-
-For each duplicate, name the winner explicitly **and** name every
-assertion in the loser that the winner doesn't already cover (those
-get merged into the winner before deletion).
-
-- **`tests/test_building_param_clipping.py` → `tests/test_wrappers.py`.**
-  Both test the same `AugmentObservationWithBuildingParams`
-  clipping invariant on a `MockEnv`. Move the one assertion into
-  `TestAugmentObservationWithBuildingParams` as
-  `test_normalized_params_clipped_when_out_of_range`. T24c rewrites
-  the surrounding test class anyway, so this just keeps the
-  invariant alive in the meantime.
-- **Seasonal `from_dict` roundtrip:** keep
-  `tests/quick/test_seasonal_target.py::TestZoneTargetTemperatureConfigSeasonal::test_from_dict_seasonal`
-  (it lives with the runtime tests for the same policy, which is
-  the more useful neighbour). In
-  `tests/quick/test_types.py::TestZoneTargetTemperatureConfigExtended`,
-  delete **only** `test_from_dict_seasonal_roundtrip`. **Keep**
-  `test_from_dict_unknown_policy_raises` and
-  `test_from_dict_seasonal_unknown_season_key_raises` — both
-  encode unique error-path contracts (unknown policy string,
-  unknown season key) that are not duplicated elsewhere.
-- **`test_task_presets.py::test_legacy_task1_unchanged` vs.
-  `test_task1_deadband_low_energy_weight`:** keep
-  `test_legacy_task1_unchanged` (its docstring spells out the
-  reproducibility contract — "existing PPO results /
-  baseline_returns rows remain reproducible"). Before deleting
-  `test_task1_deadband_low_energy_weight`, **merge its missing
-  assertion** (`assert p.unoccupied_policy == "fixed"`) into the
-  survivor, and conversely keep `test_legacy_task1_unchanged`'s
-  unique assertion (`assert p.reward.dT == 1.0`). Net effect: one
-  surviving test, no assertions lost.
-- Acceptance: each surviving test is reachable from exactly one
-  file; every assertion present before T2 is still reachable
-  after T2 (run `pytest -m quick` and grep the diff for `assert`
-  before merging); `pytest -m quick` green.
+Acceptance snapshot at close: `uv run pytest -m quick` green.
 
 ### T3. Audit `tests/long/` against the new rollout-length definition
 

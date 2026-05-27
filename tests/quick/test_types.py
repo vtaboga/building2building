@@ -159,23 +159,6 @@ class TestTaskConfig:
 
 @pytest.mark.quick
 class TestZoneTargetTemperatureConfigExtended:
-    def test_from_dict_seasonal_roundtrip(self) -> None:
-        cfg = ZoneTargetTemperatureConfig.from_dict(
-            {
-                "occupied_c": 21.0,
-                "unoccupied_c": 18.0,
-                "unoccupied_policy": "seasonal",
-                "seasonal_unoccupied_c": {
-                    "winter": 17.0,
-                    "shoulder": 21.0,
-                    "summer": 26.0,
-                },
-            },
-            fallback_temperature_c=21.0,
-        )
-        assert cfg.unoccupied_policy == "seasonal"
-        assert cfg.unoccupied_for_season("summer") == 26.0
-
     def test_from_dict_unknown_policy_raises(self) -> None:
         with pytest.raises(ValueError, match="unoccupied_policy"):
             ZoneTargetTemperatureConfig.from_dict(

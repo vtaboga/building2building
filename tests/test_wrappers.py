@@ -62,6 +62,19 @@ class TestAugmentObservationWithBuildingParams:
         assert np.all(wrapped.normalized_params >= -1.0)
         assert np.all(wrapped.normalized_params <= 1.0)
 
+    def test_normalized_params_clipped_when_out_of_range(self):
+        """Test that out-of-range metadata values are clipped to [-1, 1]."""
+        metadata = {
+            "area": 1000.0,  # Deliberately outside nominal range.
+            "warmup_phases": 3,
+            "hvac_actuators": ["a1"],
+        }
+        env = MockEnv(metadata=metadata)
+        wrapped = AugmentObservationWithBuildingParams(env)
+
+        assert np.all(wrapped.normalized_params >= -1.0)
+        assert np.all(wrapped.normalized_params <= 1.0)
+
     def test_augment_appends_to_observation(self):
         """Test that wrapper appends params to observations."""
         metadata = {
