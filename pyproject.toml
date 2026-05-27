@@ -71,8 +71,10 @@ target-version = ["py310"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not release'"
 markers = [
     "quick: fast tests that do not require EnergyPlus simulation",
     "long: slower tests that rely on simulation or heavy data processing",
+    "release: release-candidate integrity tests against real published artifacts",
     "api_contract: pins the public API surface; a failing test here means a breaking API change; requires a CHANGELOG.md entry",
 ]

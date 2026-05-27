@@ -986,7 +986,7 @@ T9 reuses those — no new fixture files.
 Acceptance snapshot at close:
 `uv run pytest tests/quick/test_pipeline_prepare_building.py tests/quick/test_pipeline_make_controllable.py tests/quick/test_pipeline_discovery.py tests/quick/test_patch_epjson_run_period.py tests/quick/test_equipment_schema.py tests/quick/test_new_make_env_minimal.py` green.
 
-### T11. API: `new_make_env` cleanup contract for the epjson staging dir
+### T11. API: `new_make_env` cleanup contract for the epjson staging dir ✅
 
 `weakref.finalize(env, _shutil.rmtree, _epjson_staging_dir, True)`
 in `new_make_env` is critical when `run_period != "full_year"`.
@@ -1058,7 +1058,7 @@ hasattr(api_mod, "weakref")` to catch that breakage explicitly.)
   callback is wrong (not `shutil.rmtree`), or its args are wrong
   (not the staging dir).
 
-### T12. API: `Trajectory.from_npz` round-trip with real nested types
+### T12. API: `Trajectory.from_npz` round-trip with real nested types ✅
 
 - Files: extend
   `tests/quick/test_rollout.py::TestTrajectoryRoundTrip` with one
@@ -1071,7 +1071,7 @@ hasattr(api_mod, "weakref")` to catch that breakage explicitly.)
   `None`, so the serialization path for these nested dataclasses is
   currently untested.
 
-### T13. Scoring: real CSV loader
+### T13. Scoring: real CSV loader ✅
 
 The scoring CSV has two failure modes worth pinning: schema drift
 (column rename) and dataset drift (a `(building_type, task)` row
@@ -1098,7 +1098,7 @@ errors deep inside `b2b.compute_normalized_score(...)`.
   test time with messages that point at the specific column or
   tuple, not at line numbers inside `scoring.py`.
 
-### T14. Data integrity: splits ⊆ metadata, no train/test overlap
+### T14. Data integrity: splits ⊆ metadata, no train/test overlap ✅
 
 T14, T15, T16 are **dataset validation**, not code tests. They live
 under `tests/release/` (new tier — see T15.0), not `tests/long/`.
@@ -1116,25 +1116,25 @@ HuggingFace download when they run `B2B_RUN_LONG_TESTS=1`.
   mistakes that would otherwise distort every paper number by a
   small, unattributable amount.
 
-### T15.0. Register the `release` marker + scaffold `tests/release/`
+### T15.0. Register the `release` marker + scaffold `tests/release/` ✅
 
 Prerequisite for T14, T15, T16.
 
 - Files: `pyproject.toml` (register the marker under
-  `[tool.pytest.ini_options].markers`); `tests/release/__init__.py`
-  (empty); `tests/release/README.md` (new — explains the tier,
-  lists the tests, and links to deferred item **TZ1** for the CI
-  automation); `tests/conftest.py` (no change — the auto-tagger
-  only touches `quick` / `long`; `release` tests must opt in
-  explicitly with `@pytest.mark.release`); `docs/about/testing.md`
-  (T28 will pick up the documentation pass; T15.0 only needs the
-  marker registered).
+  `[tool.pytest.ini_options].markers` and exclude `release` from
+  default runs); `tests/release/__init__.py` (empty);
+  `tests/release/README.md` (new — explains the tier, lists the
+  tests, and links to deferred item **TZ1** for the CI automation);
+  `tests/conftest.py` (tiny change — keep `release` tests out of
+  the auto-`quick` tagger so they remain opt-in via
+  `@pytest.mark.release`); `docs/about/testing.md` (T28 will pick up
+  the documentation pass; T15.0 only needs the marker registered).
 - Acceptance: `pytest --markers | grep release` lists the marker;
   `pytest -m release` collects zero tests until T14 lands; running
   `pytest` without `-m release` does **not** collect the release
   tests (verify with a placeholder test in the directory).
 
-### T15. Data integrity: `reward_normalizers.yaml` covers the metadata
+### T15. Data integrity: `reward_normalizers.yaml` covers the metadata ✅
 
 - Files: new `tests/release/test_reward_normalizers_coverage.py`.
   For every `(building_type, climate_zone)` pair present in
@@ -1146,7 +1146,7 @@ Prerequisite for T14, T15, T16.
   `new_make_env(task="task_occ_wmed", building_id=...)` →
   `KeyError` failure mode at eval time.
 
-### T16. Data integrity: `baseline_returns` covers the paper grid
+### T16. Data integrity: `baseline_returns` covers the paper grid ✅
 
 - Files: new `tests/release/test_baseline_returns_coverage.py`.
   For the `(building_type, task, run_period, building_id)` tuples

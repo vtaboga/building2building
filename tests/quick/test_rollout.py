@@ -8,12 +8,16 @@ marked ``long`` and requires the dataset + EnergyPlus runtime.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 
 import building2building as b2b
+import building2building.api as api_mod
 from building2building.api.rollout import Trajectory, callable_controller
+from building2building.config.tasks import TASK_PRESETS
+from building2building.types import RunPeriodConfig
 
 
 def _make_fake_trajectory(t: int = 5) -> Trajectory:
@@ -74,6 +78,31 @@ class TestTrajectoryRoundTrip:
         assert loaded.raw_observations == traj.raw_observations
         assert loaded.controlled_zones == traj.controlled_zones
         assert loaded.observation_names == traj.observation_names
+
+    def test_to_from_npz_preserves_real_nested_dataclasses(
+        self,
+        tmp_path: Path,
+        fixture_registry: Any,
+    ) -> None:
+        building_info = fixture_registry.get_building_by_id("OfficeSmall", "fixture-0001")
+        task_config = api_mod._resolve_task_config(
+            preset=TASK_PRESETS["task_occ_emed"],
+            run_period_cfg=RunPeriodConfig.from_name("winter"),
+            timesteps_per_hour=12,
+            target_temperature_mode=None,
+            random_schedule_seed=123,
+            building_type="OfficeSmall",
+        )
+        traj = _make_fake_trajectory(t=3)
+        traj.building_info = building_info
+        traj.task_config = task_config
+
+        path = tmp_path / "traj_with_dataclasses.npz"
+        traj.to_npz(path)
+        loaded = Trajectory.from_npz(path)
+
+        assert loaded.building_info == building_info
+        assert loaded.task_config == task_config
 
 
 @pytest.mark.quick

@@ -34,6 +34,19 @@ def _load() -> dict[tuple[str, str, str, str], float]:
     out: dict[tuple[str, str, str, str], float] = {}
     with CSV_PATH.open(newline="") as f:
         reader = csv.DictReader(f)
+        required_columns = {
+            "building_type",
+            "task",
+            "run_period",
+            "building_id",
+            "reward_mean",
+        }
+        fieldnames = set(reader.fieldnames or [])
+        missing_columns = sorted(required_columns - fieldnames)
+        if missing_columns:
+            raise KeyError(
+                f"Baseline CSV at {CSV_PATH} is missing required columns: {missing_columns}"
+            )
         for row in reader:
             key = (
                 row["building_type"],

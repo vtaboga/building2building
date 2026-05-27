@@ -53,7 +53,11 @@ def pytest_collection_modifyitems(items: List[pytest.Item]) -> None:
     for item in items:
         if Path(item.fspath).name in _API_CONTRACT_GLOBS:
             item.add_marker(api_contract_marker)
-        if "quick" in item.keywords or "long" in item.keywords:
+        if (
+            "quick" in item.keywords
+            or "long" in item.keywords
+            or "release" in item.keywords
+        ):
             continue
         item.add_marker(pytest.mark.quick)
 
