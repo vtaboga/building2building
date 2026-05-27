@@ -18,7 +18,6 @@ require the HuggingFace registry or EnergyPlus.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -31,44 +30,19 @@ from building2building.types import RewardConfig, TaskConfig
 _FILLED_REWARD = RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0)
 
 
-class _StubInfo:
-    def __init__(self, tmp_path: Path) -> None:
-        self.building_dir = tmp_path
-        self.weather_file = "weather.epw"
-        self.warmup_phases = 0
-        self.net_conditioned_area_m2 = 100.0
-        self.climate_zone = 5
-
-
-class _StubRegistry:
-    def __init__(self, info: _StubInfo) -> None:
-        self._info = info
-
-    def get_building_by_index(self, *_args: Any, **_kwargs: Any) -> _StubInfo:
-        return self._info
-
-    def get_building_by_id(self, *_args: Any, **_kwargs: Any) -> _StubInfo:
-        return self._info
-
-
 class _CapturedConfig(Exception):
     """Used to bail out of new_make_env once we have the TaskConfig."""
 
-    def __init__(self, task: TaskConfig, preset: TaskPreset) -> None:
+    def __init__(self, task: TaskConfig, preset: TaskPreset | None = None) -> None:
         super().__init__("captured")
         self.task = task
         self.preset = preset
 
 
-def _patch_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    info = _StubInfo(tmp_path)
-    (tmp_path / "building.epjson").write_text("{}")
-    (tmp_path / "equipment.json").write_text("[]")
-    (tmp_path / "weather.epw").write_text("")
-
+def _patch_env(monkeypatch: pytest.MonkeyPatch, fixture_registry: Any) -> None:
     from building2building.data import registry as registry_mod
 
-    monkeypatch.setattr(registry_mod, "get_registry", lambda: _StubRegistry(info))
+    monkeypatch.setattr(registry_mod, "get_registry", lambda: fixture_registry)
 
     def _raise(building_config: Any) -> Any:
         # building_config.task_config is the TaskConfig we want to inspect.
@@ -102,17 +76,17 @@ class TestNewMakeEnvModeDefault:
         task_name: str,
         expected_mode: str,
         monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path,
+        fixture_registry: Any,
     ) -> None:
-        _patch_env(monkeypatch, tmp_path)
+        _patch_env(monkeypatch, fixture_registry)
         with pytest.raises(_CapturedConfig) as excinfo:
             api_mod.new_make_env("OfficeSmall", task=task_name, reward=_FILLED_REWARD)
         assert excinfo.value.task.target_temperature_mode == expected_mode
 
     def test_explicit_mode_overrides_preset(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, monkeypatch: pytest.MonkeyPatch, fixture_registry: Any
     ) -> None:
-        _patch_env(monkeypatch, tmp_path)
+        _patch_env(monkeypatch, fixture_registry)
         with pytest.raises(_CapturedConfig) as excinfo:
             api_mod.new_make_env(
                 "OfficeSmall",
@@ -123,9 +97,9 @@ class TestNewMakeEnvModeDefault:
         assert excinfo.value.task.target_temperature_mode == "constant"
 
     def test_occ_task_carries_seasonal_unoccupied(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, monkeypatch: pytest.MonkeyPatch, fixture_registry: Any
     ) -> None:
-        _patch_env(monkeypatch, tmp_path)
+        _patch_env(monkeypatch, fixture_registry)
         with pytest.raises(_CapturedConfig) as excinfo:
             api_mod.new_make_env("OfficeSmall", task="task_occ_emed", reward=_FILLED_REWARD)
         zone_target = excinfo.value.task.default_zone_target_temperature
@@ -134,9 +108,9 @@ class TestNewMakeEnvModeDefault:
         assert zone_target.seasonal_unoccupied_c["summer"] == 26.0
 
     def test_rand_task_populates_random_schedule_config(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, monkeypatch: pytest.MonkeyPatch, fixture_registry: Any
     ) -> None:
-        _patch_env(monkeypatch, tmp_path)
+        _patch_env(monkeypatch, fixture_registry)
         with pytest.raises(_CapturedConfig) as excinfo:
             api_mod.new_make_env(
                 "OfficeSmall",
@@ -150,9 +124,9 @@ class TestNewMakeEnvModeDefault:
         assert rs.seed == 42
 
     def test_const_task_has_no_random_schedule(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, monkeypatch: pytest.MonkeyPatch, fixture_registry: Any
     ) -> None:
-        _patch_env(monkeypatch, tmp_path)
+        _patch_env(monkeypatch, fixture_registry)
         with pytest.raises(_CapturedConfig) as excinfo:
             api_mod.new_make_env("OfficeSmall", task="task_const_e0", reward=_FILLED_REWARD)
         assert excinfo.value.task.random_schedule_config is None

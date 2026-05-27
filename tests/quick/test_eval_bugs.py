@@ -5,15 +5,13 @@ Covers:
 - eval_ppo: CSV output uses ``reward_mean`` column (not ``reward``)
 - eval_dynamics_adaptation: ``evaluate_multi_building`` accepts ``pad_obs_size``
   parameter instead of hardcoding 20
-- train/eval metadata round-trip: ``pad_obs_size`` written by training and read
-  by evaluation
+- eval_dynamics_adaptation: missing ``metadata.json`` raises when no
+  ``--pad-obs-size`` override is provided
 """
 
 from __future__ import annotations
 
-import csv
 import inspect
-import json
 from pathlib import Path
 
 import pytest
@@ -85,50 +83,6 @@ class TestEvalPpoCsvRewardMeanColumn:
         assert r.reward_mean == -1234.5
         assert not hasattr(r, "reward"), "Legacy 'reward' field must not exist"
 
-    def test_csv_fieldnames_contain_reward_mean(self, tmp_path: Path) -> None:
-        from baselines.eval_ppo import EvalResult
-
-        r = EvalResult(
-            building_type="OfficeSmall",
-            building_id="OfficeSmall-0001",
-            task="task1",
-            reward_mean=-500.0,
-            episode_length=8760,
-            normalized_score=1.1,
-        )
-        out = tmp_path / "results.csv"
-        fieldnames = [
-            "building_type",
-            "building_id",
-            "task",
-            "reward_mean",
-            "episode_length",
-            "normalized_score",
-        ]
-        with out.open("w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerow(
-                {
-                    "building_type": r.building_type,
-                    "building_id": r.building_id,
-                    "task": r.task,
-                    "reward_mean": f"{r.reward_mean:.1f}",
-                    "episode_length": r.episode_length,
-                    "normalized_score": f"{r.normalized_score:.4f}",
-                }
-            )
-
-        with out.open() as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-
-        assert len(rows) == 1
-        assert "reward_mean" in rows[0]
-        assert "reward" not in rows[0]
-        assert rows[0]["reward_mean"] == "-500.0"
-
-
 @pytest.mark.quick
 class TestEvaluateMultiBuildingSignature:
     def test_pad_obs_size_parameter_exists(self) -> None:
@@ -150,23 +104,6 @@ class TestEvaluateMultiBuildingSignature:
 
 @pytest.mark.quick
 class TestDynamicsAdaptationMetadataRoundTrip:
-    def test_train_writes_metadata_json(self, tmp_path: Path) -> None:
-        """Simulate what train_multi_building does: write metadata.json."""
-        pad_obs_to = 37
-        (tmp_path / "metadata.json").write_text(
-            json.dumps({"pad_obs_size": pad_obs_to})
-        )
-        loaded = json.loads((tmp_path / "metadata.json").read_text())
-        assert loaded["pad_obs_size"] == pad_obs_to
-
-    def test_eval_reads_pad_obs_size_from_metadata(self, tmp_path: Path) -> None:
-        """eval_dynamics_adaptation loads pad_obs_size from metadata.json."""
-        model_dir = tmp_path / "models"
-        model_dir.mkdir()
-        (model_dir / "metadata.json").write_text(json.dumps({"pad_obs_size": 42}))
-        metadata = json.loads((model_dir / "metadata.json").read_text())
-        assert int(metadata["pad_obs_size"]) == 42
-
     def test_metadata_missing_raises_without_cli_flag(self, tmp_path: Path) -> None:
         """When metadata.json is absent and --pad-obs-size not given, eval must raise."""
         # We test the logic directly rather than going through argparse.
