@@ -150,8 +150,8 @@ surviving rationale.
 | D4 — drop `baselines/requirements.txt` | `f6ec020` | Install: `pip install -e ".[training]"` |
 | D5 — write `REPRODUCING.md` | `45799f3` | Kept in lock-step per Cross-phase principle 2; D16 is the final parity sweep |
 | D6 — `baselines/` smoke tests | `89d7f34` (partial) | PPO + reactive-control smoke; deferred bits absorbed by Phase T |
-| D6.5 — quick-tier test triage | `e1c7a3c` (partial) | `tests/quick/` collection cleared; long-tier + ordering leak deferred to T-pre |
-| D7 — GitHub Actions CI | `3017b5c` | Red on `main` until T-pre lands |
+| D6.5 — quick-tier test triage | `e1c7a3c` (partial) + T-pre closure `3c66a06`/`9ab1044` | `tests/quick/` collection cleared in D6.5; deferred long-tier/import + ordering leak closed in T-pre |
+| D7 — GitHub Actions CI | `3017b5c` + T-pre closure `3c66a06`/`9ab1044` | Workflow introduced in D7; red-state unblock completed in T-pre |
 | D9 — docs migration off legacy presets | `f7fa693` | D-lite: thin prose `.md` + links to runnable `.py` tutorials |
 | D10 — black pass + pyright triage | `1abfc42` (partial) | Remaining pyright errors in `notes.md` § "D10 — pyright status (2026-05-26)"; ThermostatSetpoint stub removal deferred to T27 step 7 |
 | D11 — delete `summaries/` | `d0767a2` | — |
@@ -569,54 +569,19 @@ false reassurance.
 These are guidelines, not absolute rules — the goal is fewer
 sources of false positives, not maximum integration-test purity.
 
-### T-pre. Unblock CI (deferred from Phase D D6.5 / D7)
+### T-pre. Unblock CI (closed)
 
-**Land first in Phase T.** D7 shipped a GitHub Actions workflow
-that runs `pytest -m quick -q`, but two pre-existing issues —
-both partially addressed in D6.5 and explicitly deferred — keep
-CI red on every push:
+Closed in `3c66a06` + `9ab1044`.
 
-1. **`tests/long/` import errors.** Five files
-   (`test_observation_dimension.py`, `test_occupancy_observation.py`,
-   `test_random_schedule_rollout.py`, `test_rescale_action.py`,
-   `test_seasonal_unoccupied.py`) still
-   `from building2building.types import BaseRewardConfig`, a
-   symbol deleted in D2. `pytest -m quick` collects then filters,
-   so the collection errors abort the run before any test executes.
-   Fix: same sweep D6.5 ran against `tests/quick/` —
-   replace deleted-symbol imports with `NormalizedDeadbandRewardConfig`
-   / `RewardConfig` and adapt the construction call sites. Some of
-   these files are slated for relocation or deletion under T3 /
-   T27 anyway; the unblocking patch only needs to keep collection
-   green, not preserve every assertion.
-2. **`tests/quick/test_rl_wrappers.py` ordering leak.** Six tests
-   (`test_wrap_env_for_rl_observation_space_is_unit_interval`,
-   `test_wrap_env_for_rl_action_in_minus_one_one`,
-   `test_wrap_env_for_rl_action_default_off`,
-   `test_wrap_env_for_rl_flags_are_independent`,
-   `test_get_reward_params_walks_through_wrappers`,
-   `test_make_rl_env_fn_returns_monitor_wrapped_env`) pass when
-   the file runs in isolation but fail when the full quick suite
-   runs first. A leak from an earlier test is mutating shared
-   state (likely a gymnasium registry side-effect, env-var,
-   working directory, or singleton in
-   `building2building.simulator`). Find the offender via
-   `pytest tests/quick -q --maxfail=1 -x` bisection. Fix at the
-   source — either reset state in a fixture (`autouse=True`,
-   `monkeypatch`-style), or rewrite the leaking test to not
-   mutate shared state. **Do not paper over with
-   `pytest-randomly`-style ordering pins**; the leak is real and
-   blocks T24's wrapper rewrites.
-
-The fix should land as two commits (one per root cause) so each
-is bisectable. After T-pre, `pytest -m quick` exits 0 from a
-fresh checkout with `pip install -e ".[test]"` and the D7 CI
-workflow turns green.
-
-- Files: `tests/long/test_*.py` (5 files for import sweep);
-  whichever file is leaking state for the ordering fix.
-- Acceptance: `pytest -m quick` green on a fresh checkout under
-  Python 3.10 and 3.11; the GitHub Actions matrix from D7 passes.
+- Import-sweep fix landed for the five `tests/long/` files that still
+  referenced deleted `BaseRewardConfig`, restoring clean collection
+  under `pytest -m quick`.
+- Ordering leak root cause was fixed in
+  `tests/quick/test_climate_zones.py`: a direct module monkeypatch of
+  `download_metadata` was persisting across tests. It now uses
+  `monkeypatch.setattr(...)` so state restores automatically.
+- Quick-suite hardening for wrapper/api tests was included in the same
+  patch so `pytest -m quick` is green from a fresh checkout.
 
 ### T0. Minimal-building fixture matrix + shared registry helper
 
