@@ -18,7 +18,7 @@ import pytest
 
 from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
 from building2building.envs.factory import make_env_from_config
-from building2building.types import BaseRewardConfig, RandomScheduleConfig, TaskConfig
+from building2building.types import RandomScheduleConfig, RewardConfig, TaskConfig
 
 pytestmark = pytest.mark.long
 
@@ -59,7 +59,7 @@ def _make_env(
             split_index=0,
         ),
         task=task,
-        reward=BaseRewardConfig(energy_weight=0.0),
+        reward=RewardConfig(energy_weight=0.0),
         env_max_steps=N_STEPS,
     )
     env = make_env_from_config(

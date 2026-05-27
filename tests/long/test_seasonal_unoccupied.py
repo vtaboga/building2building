@@ -15,7 +15,7 @@ import pytest
 from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
 from building2building.envs.factory import make_env_from_config
 from building2building.types import (
-    BaseRewardConfig,
+    RewardConfig,
     RunPeriodConfig,
     TaskConfig,
     ZoneTargetTemperatureConfig,
@@ -56,7 +56,7 @@ def _make_seasonal_env(
             split_index=0,
         ),
         task=task,
-        reward=BaseRewardConfig(energy_weight=0.0),
+        reward=RewardConfig(energy_weight=0.0),
         env_max_steps=max_steps,
     )
     return make_env_from_config(

@@ -15,8 +15,8 @@ import pytest
 from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
 from building2building.envs.factory import make_env_from_config
 from building2building.types import (
-    BaseRewardConfig,
     RandomScheduleConfig,
+    RewardConfig,
     TaskConfig,
 )
 
@@ -55,7 +55,7 @@ def _make_env(tmp_path: Path, seed: int, *, suffix: str = "") -> "object":
             split_index=0,
         ),
         task=task,
-        reward=BaseRewardConfig(energy_weight=0.0),
+        reward=RewardConfig(energy_weight=0.0),
         env_max_steps=N_STEPS,
     )
     return make_env_from_config(

@@ -15,7 +15,7 @@ import pytest
 
 from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
 from building2building.envs.factory import make_env_from_config
-from building2building.types import BaseRewardConfig, TaskConfig
+from building2building.types import RewardConfig, TaskConfig
 
 pytestmark = pytest.mark.long
 
@@ -48,7 +48,7 @@ def _make_office_small_env(tmp_path: Path) -> tuple:
             split_index=0,
         ),
         task=task,
-        reward=BaseRewardConfig(energy_weight=0.0),
+        reward=RewardConfig(energy_weight=0.0),
         env_max_steps=N_STEPS,
     )
     env = make_env_from_config(config, eplus_output_dir=tmp_path / "eplus")

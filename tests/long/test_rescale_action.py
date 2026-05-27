@@ -19,7 +19,7 @@ import pytest
 
 from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
 from building2building.envs.factory import make_env_from_config
-from building2building.types import BaseRewardConfig, TaskConfig
+from building2building.types import RewardConfig, TaskConfig
 
 pytestmark = pytest.mark.long
 
@@ -40,7 +40,7 @@ def _make_office_env(tmp_path: Path, suffix: str = "") -> gym.Env:
             split_index=0,
         ),
         task=TaskConfig.from_dict({"run_period": "winter"}),
-        reward=BaseRewardConfig(energy_weight=0.0),
+        reward=RewardConfig(energy_weight=0.0),
         env_max_steps=N_STEPS,
     )
     return make_env_from_config(
@@ -57,7 +57,7 @@ def _make_single_zone_env(tmp_path: Path, suffix: str = "") -> gym.Env:
             split_index=0,
         ),
         task=TaskConfig.from_dict({"run_period": "winter"}),
-        reward=BaseRewardConfig(energy_weight=0.0),
+        reward=RewardConfig(energy_weight=0.0),
         env_max_steps=N_STEPS,
     )
     return make_env_from_config(
