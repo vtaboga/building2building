@@ -286,12 +286,21 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
     - num_units: Number of units in the building
     """
 
-    def __init__(self, env: gym.Env, building_params: dict[str, float] | None = None):
+    def __init__(
+        self,
+        env: gym.Env,
+        building_params: dict[str, float] | None = None,
+        *,
+        allow_defaults: bool = False,
+    ):
         """
         Args:
             env: The environment to wrap
             building_params: Dictionary of building parameters to append.
                            If None, will try to extract from env metadata.
+            allow_defaults: If True and metadata is missing, keep the legacy
+                           default-filling behavior. If False (default),
+                           missing required keys raise KeyError.
         """
         super().__init__(env)
 
@@ -304,9 +313,12 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
 
         # Extract or use provided building parameters
         if building_params is None:
-            building_params = self._extract_building_params(env)
+            building_params = self._extract_building_params(
+                env, allow_defaults=allow_defaults
+            )
 
         self.building_params = building_params
+        self._allow_defaults = allow_defaults
 
         # Normalize building parameters for better learning
         self.normalized_params = self._normalize_params(building_params)
@@ -336,7 +348,9 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
             list(building_params.keys()),
         )
 
-    def _extract_building_params(self, env: gym.Env) -> dict[str, float]:
+    def _extract_building_params(
+        self, env: gym.Env, *, allow_defaults: bool
+    ) -> dict[str, float]:
         """Extract building parameters from environment metadata."""
         params: dict[str, float] = {}
 
@@ -386,6 +400,8 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         }
         for key, default_val in defaults.items():
             if key not in params:
+                if not allow_defaults:
+                    raise KeyError(key)
                 logger.warning(
                     "Could not extract %r from env metadata, using default",
                     key,
@@ -452,7 +468,9 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         obs, info = self.env.reset(**kwargs)
 
         # Re-extract in case the inner env was swapped (e.g. by ResampleBuildingOnResetWrapper)
-        self.building_params = self._extract_building_params(self.env)
+        self.building_params = self._extract_building_params(
+            self.env, allow_defaults=self._allow_defaults
+        )
         self.normalized_params = self._normalize_params(self.building_params)
 
         # Rebuild observation space in case inner env's obs shape changed

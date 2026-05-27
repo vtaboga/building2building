@@ -56,7 +56,7 @@ class TestAugmentObservationWithBuildingParams:
             "hvac_actuators": ["a1", "a2"],
         }
         env = MockEnv(metadata=metadata)
-        wrapped = AugmentObservationWithBuildingParams(env)
+        wrapped = AugmentObservationWithBuildingParams(env, allow_defaults=True)
 
         # All normalized params should be in [-1, 1]
         assert np.all(wrapped.normalized_params >= -1.0)
@@ -70,7 +70,7 @@ class TestAugmentObservationWithBuildingParams:
             "hvac_actuators": ["a1"],
         }
         env = MockEnv(metadata=metadata)
-        wrapped = AugmentObservationWithBuildingParams(env)
+        wrapped = AugmentObservationWithBuildingParams(env, allow_defaults=True)
 
         assert np.all(wrapped.normalized_params >= -1.0)
         assert np.all(wrapped.normalized_params <= 1.0)
@@ -83,7 +83,7 @@ class TestAugmentObservationWithBuildingParams:
             "hvac_actuators": ["a1", "a2"],
         }
         env = MockEnv(obs_size=10, metadata=metadata)
-        wrapped = AugmentObservationWithBuildingParams(env)
+        wrapped = AugmentObservationWithBuildingParams(env, allow_defaults=True)
 
         obs, _ = wrapped.reset()
 

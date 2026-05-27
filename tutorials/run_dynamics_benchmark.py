@@ -37,7 +37,7 @@ def main() -> None:
             run_period=RUN_PERIOD,
         )
         env = b2b.PadObservation(env, target_size=PAD_SIZE)
-        env = b2b.AugmentObservationWithBuildingParams(env)
+        env = b2b.AugmentObservationWithBuildingParams(env, allow_defaults=True)
         env = b2b.NormalizeObservation(env)
         return env
 
@@ -65,7 +65,9 @@ def main() -> None:
             run_period=RUN_PERIOD,
         )
         eval_env = b2b.PadObservation(eval_env, target_size=PAD_SIZE)
-        eval_env = b2b.AugmentObservationWithBuildingParams(eval_env)
+        eval_env = b2b.AugmentObservationWithBuildingParams(
+            eval_env, allow_defaults=True
+        )
         eval_env = b2b.NormalizeObservation(eval_env)
 
         obs, _ = eval_env.reset()
