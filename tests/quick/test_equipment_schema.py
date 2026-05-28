@@ -1,8 +1,8 @@
 """Pins the equipment-schema round-trip contract per HVAC type.
 
-Asserts that the equipment detected from each minimal fixture building
-(VAV, Unitary, HeatingOnly) matches the expected schema class and that the
-actuator descriptions round-trip without loss.
+Asserts that the equipment detected from each minimal building-type fixture
+(whose HVAC archetype is VAV, Unitary, or HeatingOnly) matches the expected
+schema class and that the actuator descriptions round-trip without loss.
 """
 
 from __future__ import annotations
@@ -22,9 +22,12 @@ FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 @pytest.mark.parametrize(
     ("fixture_name", "required_types"),
     [
-        ("minimal_vav", (VAVSystem,)),
-        ("minimal_unitary", (UnitarySystem,)),
-        ("minimal_heating_only", (UnitarySystem, HeatingOnlyZone)),
+        ("minimal_officemedium", (VAVSystem,)),
+        ("minimal_officesmall", (UnitarySystem,)),
+        ("minimal_restaurantfastfood", (UnitarySystem,)),
+        ("minimal_singlefamilyhouse", (UnitarySystem,)),
+        ("minimal_retailstandalone", (UnitarySystem, HeatingOnlyZone)),
+        ("minimal_warehouse", (UnitarySystem, HeatingOnlyZone)),
     ],
 )
 def test_equipment_schema_round_trip_by_hvac_type(

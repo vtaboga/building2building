@@ -1,8 +1,9 @@
 """Pins the ``make_controllable`` actuator-emission contract per HVAC type.
 
 Asserts that ``make_controllable`` produces the expected set of
-``ActuatorDescription`` objects for each minimal fixture (VAV, Unitary,
-HeatingOnly) and that every emitted actuator appears in the resulting epJSON.
+``ActuatorDescription`` objects for each minimal building-type fixture (whose
+HVAC archetype is VAV, Unitary, or HeatingOnly) and that every emitted actuator
+appears in the resulting epJSON.
 """
 
 from __future__ import annotations
@@ -18,22 +19,20 @@ from building2building.store import realize
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
 
+_VAV_PAIRS = {("Schedule:Constant", "Schedule Value"), ("Outdoor Air Controller", "Air Mass Flow Rate")}
+_UNITARY_PAIRS = {("Fan", "Fan Air Mass Flow Rate"), ("Schedule:Constant", "Schedule Value")}
+
+
 @pytest.mark.quick
 @pytest.mark.parametrize(
     ("fixture_name", "required_pairs"),
     [
-        (
-            "minimal_vav",
-            {("Schedule:Constant", "Schedule Value"), ("Outdoor Air Controller", "Air Mass Flow Rate")},
-        ),
-        (
-            "minimal_unitary",
-            {("Fan", "Fan Air Mass Flow Rate"), ("Schedule:Constant", "Schedule Value")},
-        ),
-        (
-            "minimal_heating_only",
-            {("Fan", "Fan Air Mass Flow Rate"), ("Schedule:Constant", "Schedule Value")},
-        ),
+        ("minimal_officemedium", _VAV_PAIRS),
+        ("minimal_officesmall", _UNITARY_PAIRS),
+        ("minimal_restaurantfastfood", _UNITARY_PAIRS),
+        ("minimal_singlefamilyhouse", _UNITARY_PAIRS),
+        ("minimal_retailstandalone", _UNITARY_PAIRS),
+        ("minimal_warehouse", _UNITARY_PAIRS),
     ],
 )
 def test_make_controllable_by_hvac_type(

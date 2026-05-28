@@ -391,9 +391,12 @@ class TestHvacActionSpaceFixtureCoverage:
     @pytest.mark.parametrize(
         ("fixture_name", "expected_action_dim"),
         [
-            ("minimal_unitary", 10),
-            ("minimal_vav", 36),
-            ("minimal_heating_only", 5),
+            ("minimal_officemedium", 36),
+            ("minimal_officesmall", 10),
+            ("minimal_restaurantfastfood", 4),
+            ("minimal_retailstandalone", 9),
+            ("minimal_warehouse", 5),
+            ("minimal_singlefamilyhouse", 2),
         ],
     )
     def test_hvac_action_space_supports_all_advertised_hvac_types(

@@ -19,16 +19,26 @@ from building2building.data.registry import BuildingInfo
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 FAKE_DATASET_DIR = FIXTURES_DIR / "fake_dataset"
+
+# The committed minimal building fixtures (one per building type) are described
+# by a manifest written by ``tests/fixtures/regenerate_minimal_fixtures.py``.
+# Reading it here keeps a single source of truth for fixture provenance,
+# climate zone, and the per-HVAC-type archetype label.
+_MANIFEST_PATH = FIXTURES_DIR / "minimal_fixtures.json"
+_MANIFEST: dict[str, dict] = json.loads(_MANIFEST_PATH.read_text())["fixtures"]
+
 _MINIMAL_FIXTURE_DIRS: dict[str, Path] = {
-    "minimal_vav": FIXTURES_DIR / "minimal_vav",
-    "minimal_unitary": FIXTURES_DIR / "minimal_unitary",
-    "minimal_heating_only": FIXTURES_DIR / "minimal_heating_only",
+    name: FIXTURES_DIR / name for name in _MANIFEST
 }
 _HVAC_LABELS: dict[str, str] = {
-    "minimal_vav": "VAV",
-    "minimal_unitary": "Unitary",
-    "minimal_heating_only": "HeatingOnly",
+    name: entry["hvac_label"] for name, entry in _MANIFEST.items()
 }
+
+# Representative fixture per HVAC archetype, so tests can ask for "the VAV
+# fixture" without pinning a specific building type.
+_HVAC_ARCHETYPE_DIR: dict[str, str] = {}
+for _name, _entry in _MANIFEST.items():
+    _HVAC_ARCHETYPE_DIR.setdefault(_entry["hvac_label"], _name)
 
 
 try:
@@ -89,22 +99,22 @@ def baseline_csv_path() -> Path:
 @dataclass(frozen=True)
 class _FixtureRegistry:
     fixture_dir: Path
-    hvac_type: str
+    entry: dict
 
     def _make_info(self, building_type: BuildingType, building_id: str) -> BuildingInfo:
         return BuildingInfo(
             building_id=building_id,
             building_type=building_type,
             source="tests-fixture",
-            num_zones=1,
-            action_dim=0,
-            observation_dim=1,
-            net_conditioned_area_m2=100.0,
-            warmup_phases=1,
-            weather_file="weather.epw",
-            hvac_type=self.hvac_type,
+            num_zones=int(self.entry["num_zones"]),
+            action_dim=int(self.entry["action_dim"]),
+            observation_dim=int(self.entry["observation_dim"]),
+            net_conditioned_area_m2=float(self.entry["net_conditioned_area_m2"]),
+            warmup_phases=int(self.entry["warmup_phases"]),
+            weather_file=str(self.entry["weather_file"]),
+            hvac_type=str(self.entry["hvac_type"]),
             building_dir=self.fixture_dir,
-            climate_zone=5,
+            climate_zone=self.entry["climate_zone"],
         )
 
     def get_building_by_index(
@@ -119,22 +129,32 @@ class _FixtureRegistry:
 
 
 def _resolve_hvac_fixture_key(raw: str) -> str:
-    aliases = {
-        "vav": "minimal_vav",
-        "unitary": "minimal_unitary",
-        "heating_only": "minimal_heating_only",
+    """Resolve a fixture selector to a committed fixture directory name.
+
+    Accepts a fixture directory name (``minimal_officemedium``), an HVAC
+    archetype alias (``vav`` / ``unitary`` / ``heating_only``), or a building
+    type (``OfficeMedium``).
+    """
+    if raw in _MINIMAL_FIXTURE_DIRS:
+        return raw
+    archetype_aliases = {
+        "vav": "VAV",
+        "unitary": "Unitary",
+        "heating_only": "HeatingOnly",
     }
-    key = aliases.get(raw, raw)
-    if key not in _MINIMAL_FIXTURE_DIRS:
-        valid = ", ".join(sorted(_MINIMAL_FIXTURE_DIRS))
-        raise ValueError(f"Unknown hvac fixture key {raw!r}. Expected one of: {valid}.")
-    return key
+    if raw in archetype_aliases:
+        return _HVAC_ARCHETYPE_DIR[archetype_aliases[raw]]
+    for name, entry in _MANIFEST.items():
+        if entry["building_type"] == raw:
+            return name
+    valid = ", ".join(sorted(_MINIMAL_FIXTURE_DIRS))
+    raise ValueError(f"Unknown fixture selector {raw!r}. Expected one of: {valid}.")
 
 
 @pytest.fixture()
 def minimal_building_dir(request: pytest.FixtureRequest) -> Path:
     """Return path to a minimal building fixture directory for an HVAC variant."""
-    raw_key = cast(str, getattr(request, "param", "minimal_vav"))
+    raw_key = cast(str, getattr(request, "param", "minimal_officemedium"))
     key = _resolve_hvac_fixture_key(raw_key)
     path = _MINIMAL_FIXTURE_DIRS[key]
     if not path.exists():
@@ -146,7 +166,7 @@ def minimal_building_dir(request: pytest.FixtureRequest) -> Path:
 def fixture_registry(minimal_building_dir: Path) -> _FixtureRegistry:
     """Return a registry stub backed by a real fixture directory."""
     key = minimal_building_dir.name
-    hvac_type = _HVAC_LABELS.get(key)
-    if hvac_type is None:
+    entry = _MANIFEST.get(key)
+    if entry is None:
         raise ValueError(f"Unsupported minimal fixture directory name: {key!r}")
-    return _FixtureRegistry(fixture_dir=minimal_building_dir, hvac_type=hvac_type)
+    return _FixtureRegistry(fixture_dir=minimal_building_dir, entry=entry)

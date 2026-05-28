@@ -1,10 +1,10 @@
 """Pins the observation-name layout for each target-temperature mode.
 
-Asserts that the list of observation names returned by the minimal-vav fixture
-env exactly matches the committed snapshot for ``constant``, ``occupancy``, and
-``random_schedule`` modes.  This catches any change to the observation vector
-structure (added/removed/reordered features) before it silently breaks trained
-models.
+Asserts that the list of observation names returned by the minimal OfficeMedium
+(VAV) fixture env exactly matches the committed snapshot for ``constant``,
+``occupancy``, and ``random_schedule`` modes.  This catches any change to the
+observation vector structure (added/removed/reordered features) before it
+silently breaks trained models.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import pytest
 import building2building.api as api_mod
 from building2building.types import RewardConfig
 
-_FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "minimal_vav"
+_FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "minimal_officemedium"
 _FILLED_REWARD = RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0)
 
 
@@ -30,7 +30,7 @@ def _patch_registry(monkeypatch: pytest.MonkeyPatch, fixture_registry: Any) -> N
 
 @pytest.mark.quick
 @pytest.mark.parametrize("target_temperature_mode", ["constant", "occupancy", "random_schedule"])
-def test_observation_names_snapshot_minimal_vav(
+def test_observation_names_snapshot_minimal_officemedium(
     monkeypatch: pytest.MonkeyPatch,
     fixture_registry: Any,
     target_temperature_mode: str,

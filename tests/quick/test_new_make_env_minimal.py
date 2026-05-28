@@ -1,10 +1,10 @@
 """Pins the ``new_make_env`` knobs-and-HVAC-matrix contract.
 
-Asserts that every combination of run period, target-temperature mode, and HVAC
-type (VAV / Unitary / HeatingOnly) produces an env whose ``reset()`` returns an
-observation of the correct dtype and whose ``action_space`` has the expected
-shape.  A second test verifies that ``rescale_action=True`` and
-``max_episode_steps`` are honoured.
+Asserts that every combination of run period, target-temperature mode, and
+building type (one fixture per type, spanning the VAV / Unitary / HeatingOnly
+archetypes) produces an env whose ``action_space`` has the expected shape and
+whose metadata is well formed.  A second test verifies that
+``rescale_action=True`` and ``max_episode_steps`` are honoured.
 """
 
 from __future__ import annotations
@@ -30,11 +30,14 @@ def _patch_registry(monkeypatch: pytest.MonkeyPatch, fixture_registry: Any) -> N
 @pytest.mark.parametrize(
     ("minimal_building_dir", "run_period", "target_temperature_mode", "random_schedule_seed"),
     [
-        ("minimal_vav", "full_year", "occupancy", None),
-        ("minimal_vav", "winter", "constant", None),
-        ("minimal_vav", "summer", "random_schedule", 123),
-        ("minimal_unitary", "full_year", "occupancy", None),
-        ("minimal_heating_only", "full_year", "occupancy", None),
+        ("minimal_officemedium", "full_year", "occupancy", None),
+        ("minimal_officemedium", "winter", "constant", None),
+        ("minimal_officemedium", "summer", "random_schedule", 123),
+        ("minimal_officesmall", "full_year", "occupancy", None),
+        ("minimal_restaurantfastfood", "full_year", "occupancy", None),
+        ("minimal_retailstandalone", "full_year", "occupancy", None),
+        ("minimal_warehouse", "full_year", "occupancy", None),
+        ("minimal_singlefamilyhouse", "full_year", "occupancy", None),
     ],
     indirect=["minimal_building_dir"],
 )

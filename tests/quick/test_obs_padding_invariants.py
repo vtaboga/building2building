@@ -40,7 +40,9 @@ def _patch_registry(monkeypatch: pytest.MonkeyPatch, fixture_registry: Any) -> N
 
 @pytest.mark.quick
 @pytest.mark.parametrize(
-    "minimal_building_dir", ["minimal_unitary", "minimal_vav"], indirect=True
+    "minimal_building_dir",
+    ["minimal_officesmall", "minimal_officemedium"],
+    indirect=True,
 )
 def test_pad_observation_keeps_non_zone_tail_at_stable_indices(
     monkeypatch: pytest.MonkeyPatch,

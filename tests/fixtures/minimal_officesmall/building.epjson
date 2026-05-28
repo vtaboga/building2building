@@ -600,7 +600,7 @@
             "loads_convergence_tolerance_value": 0.04,
             "maximum_number_of_warmup_days": 25,
             "minimum_number_of_warmup_days": 6,
-            "north_axis": 312.80609615476044,
+            "north_axis": 268.62205277808266,
             "solar_distribution": "FullInteriorAndExterior",
             "temperature_convergence_tolerance_value": 0.2,
             "terrain": "City"
@@ -616,23 +616,23 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -649,22 +649,22 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 3.05
                 }
@@ -683,22 +683,22 @@
             "vertices": [
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -720,17 +720,17 @@
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 3.05
                 }
@@ -748,13 +748,13 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
@@ -764,7 +764,7 @@
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -780,18 +780,18 @@
             "surface_type": "Roof",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 35.691215714937755,
-                    "vertex_y_coordinate": -0.5559546529430446,
+                    "vertex_x_coordinate": 28.36623217131907,
+                    "vertex_y_coordinate": -0.525236117884759,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 35.691215714937755,
-                    "vertex_y_coordinate": 17.66082614182405,
+                    "vertex_x_coordinate": 28.36623217131907,
+                    "vertex_y_coordinate": 16.685000678139176,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 23.28949600911103,
-                    "vertex_y_coordinate": 8.552435744440503,
+                    "vertex_x_coordinate": 18.509743580153767,
+                    "vertex_y_coordinate": 8.07988228012721,
                     "vertex_z_coordinate": 6.33
                 }
             ],
@@ -807,23 +807,23 @@
             "surface_type": "Roof",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 35.691215714937755,
-                    "vertex_y_coordinate": 17.66082614182405,
+                    "vertex_x_coordinate": 28.36623217131907,
+                    "vertex_y_coordinate": 16.685000678139176,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": -0.7569717012712144,
-                    "vertex_y_coordinate": 17.66082614182405,
+                    "vertex_x_coordinate": -0.6016168010884214,
+                    "vertex_y_coordinate": 16.685000678139176,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 11.644748004555515,
-                    "vertex_y_coordinate": 8.552435744440503,
+                    "vertex_x_coordinate": 9.254871790076884,
+                    "vertex_y_coordinate": 8.07988228012721,
                     "vertex_z_coordinate": 6.33
                 },
                 {
-                    "vertex_x_coordinate": 23.28949600911103,
-                    "vertex_y_coordinate": 8.552435744440503,
+                    "vertex_x_coordinate": 18.509743580153767,
+                    "vertex_y_coordinate": 8.07988228012721,
                     "vertex_z_coordinate": 6.33
                 }
             ],
@@ -839,23 +839,23 @@
             "surface_type": "Roof",
             "vertices": [
                 {
-                    "vertex_x_coordinate": -0.7569717012712144,
-                    "vertex_y_coordinate": -0.5559546529430446,
+                    "vertex_x_coordinate": -0.6016168010884214,
+                    "vertex_y_coordinate": -0.525236117884759,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 35.691215714937755,
-                    "vertex_y_coordinate": -0.5559546529430446,
+                    "vertex_x_coordinate": 28.36623217131907,
+                    "vertex_y_coordinate": -0.525236117884759,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 23.28949600911103,
-                    "vertex_y_coordinate": 8.552435744440503,
+                    "vertex_x_coordinate": 18.509743580153767,
+                    "vertex_y_coordinate": 8.07988228012721,
                     "vertex_z_coordinate": 6.33
                 },
                 {
-                    "vertex_x_coordinate": 11.644748004555515,
-                    "vertex_y_coordinate": 8.552435744440503,
+                    "vertex_x_coordinate": 9.254871790076884,
+                    "vertex_y_coordinate": 8.07988228012721,
                     "vertex_z_coordinate": 6.33
                 }
             ],
@@ -871,18 +871,18 @@
             "surface_type": "Roof",
             "vertices": [
                 {
-                    "vertex_x_coordinate": -0.7569717012712144,
-                    "vertex_y_coordinate": 17.66082614182405,
+                    "vertex_x_coordinate": -0.6016168010884214,
+                    "vertex_y_coordinate": 16.685000678139176,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": -0.7569717012712144,
-                    "vertex_y_coordinate": -0.5559546529430446,
+                    "vertex_x_coordinate": -0.6016168010884214,
+                    "vertex_y_coordinate": -0.525236117884759,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 11.644748004555515,
-                    "vertex_y_coordinate": 8.552435744440503,
+                    "vertex_x_coordinate": 9.254871790076884,
+                    "vertex_y_coordinate": 8.07988228012721,
                     "vertex_z_coordinate": 6.33
                 }
             ],
@@ -898,23 +898,23 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 35.691215714937755,
-                    "vertex_y_coordinate": 17.66082614182405,
+                    "vertex_x_coordinate": 28.36623217131907,
+                    "vertex_y_coordinate": 16.685000678139176,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 35.691215714937755,
-                    "vertex_y_coordinate": -0.5559546529430446,
+                    "vertex_x_coordinate": 28.36623217131907,
+                    "vertex_y_coordinate": -0.525236117884759,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -930,23 +930,23 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": -0.7569717012712144,
-                    "vertex_y_coordinate": 17.66082614182405,
+                    "vertex_x_coordinate": -0.6016168010884214,
+                    "vertex_y_coordinate": 16.685000678139176,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 35.691215714937755,
-                    "vertex_y_coordinate": 17.66082614182405,
+                    "vertex_x_coordinate": 28.36623217131907,
+                    "vertex_y_coordinate": 16.685000678139176,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -967,18 +967,18 @@
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 35.691215714937755,
-                    "vertex_y_coordinate": -0.5559546529430446,
+                    "vertex_x_coordinate": 28.36623217131907,
+                    "vertex_y_coordinate": -0.525236117884759,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": -0.7569717012712144,
-                    "vertex_y_coordinate": -0.5559546529430446,
+                    "vertex_x_coordinate": -0.6016168010884214,
+                    "vertex_y_coordinate": -0.525236117884759,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -994,13 +994,13 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": -0.7569717012712144,
-                    "vertex_y_coordinate": 17.66082614182405,
+                    "vertex_x_coordinate": -0.6016168010884214,
+                    "vertex_y_coordinate": 16.685000678139176,
                     "vertex_z_coordinate": 3.05
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
@@ -1009,8 +1009,8 @@
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": -0.7569717012712144,
-                    "vertex_y_coordinate": -0.5559546529430446,
+                    "vertex_x_coordinate": -0.6016168010884214,
+                    "vertex_y_coordinate": -0.525236117884759,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1027,23 +1027,23 @@
             "surface_type": "Ceiling",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1059,23 +1059,23 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 }
             ],
@@ -1092,23 +1092,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1125,23 +1125,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1158,23 +1158,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1191,23 +1191,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1229,18 +1229,18 @@
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1256,7 +1256,7 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 0.0
                 },
@@ -1266,13 +1266,13 @@
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 }
             ],
@@ -1289,23 +1289,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1322,23 +1322,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1364,12 +1364,12 @@
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 3.05
                 }
@@ -1387,13 +1387,13 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
@@ -1420,22 +1420,22 @@
             "surface_type": "Ceiling",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 3.05
                 }
@@ -1452,23 +1452,23 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 }
             ],
@@ -1484,23 +1484,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1517,23 +1517,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1550,22 +1550,22 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
+                    "vertex_x_coordinate": 27.764615370230647,
                     "vertex_y_coordinate": 0.0,
                     "vertex_z_coordinate": 3.05
                 }
@@ -1583,23 +1583,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1617,22 +1617,22 @@
             "vertices": [
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1648,23 +1648,23 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 }
             ],
@@ -1681,23 +1681,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1713,23 +1713,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 34.93424401366654,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_x_coordinate": 27.764615370230647,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1746,23 +1746,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 28.626146503073095,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 22.751142027827136,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1780,22 +1780,22 @@
             "vertices": [
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1817,18 +1817,18 @@
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1844,8 +1844,8 @@
             "surface_type": "Floor",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
@@ -1855,12 +1855,12 @@
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 }
             ],
@@ -1877,23 +1877,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1910,23 +1910,23 @@
             "surface_type": "Wall",
             "vertices": [
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 3.05
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 12.471916047688968,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 11.78279691121476,
                     "vertex_z_coordinate": 0.0
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1953,13 +1953,13 @@
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 0.0
                 },
                 {
-                    "vertex_x_coordinate": 6.308097510593454,
-                    "vertex_y_coordinate": 4.632955441192038,
+                    "vertex_x_coordinate": 5.013473342403511,
+                    "vertex_y_coordinate": 4.376967649039658,
                     "vertex_z_coordinate": 3.05
                 }
             ],
@@ -1976,12 +1976,12 @@
             "vertices": [
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 3.05
                 },
                 {
                     "vertex_x_coordinate": 0.0,
-                    "vertex_y_coordinate": 17.104871488881006,
+                    "vertex_y_coordinate": 16.15976456025442,
                     "vertex_z_coordinate": 0.0
                 },
                 {
@@ -2089,7 +2089,7 @@
             "energy_input_ratio_function_of_flow_fraction_curve_name": "HPACHeatEIRFF",
             "energy_input_ratio_function_of_temperature_curve_name": "HPACHeatEIRFT",
             "gross_rated_heating_capacity": "Autosize",
-            "gross_rated_heating_cop": 3.52716,
+            "gross_rated_heating_cop": 3.3592,
             "heating_capacity_function_of_flow_fraction_curve_name": "HPACHeatCapFF",
             "heating_capacity_function_of_temperature_curve_name": "HPACHeatCapFT",
             "maximum_outdoor_dry_bulb_temperature_for_crankcase_heater_operation": 4.4,
@@ -2110,7 +2110,7 @@
             "energy_input_ratio_function_of_flow_fraction_curve_name": "HPACHeatEIRFF",
             "energy_input_ratio_function_of_temperature_curve_name": "HPACHeatEIRFT",
             "gross_rated_heating_capacity": "Autosize",
-            "gross_rated_heating_cop": 3.52716,
+            "gross_rated_heating_cop": 3.3592,
             "heating_capacity_function_of_flow_fraction_curve_name": "HPACHeatCapFF",
             "heating_capacity_function_of_temperature_curve_name": "HPACHeatCapFT",
             "maximum_outdoor_dry_bulb_temperature_for_crankcase_heater_operation": 4.4,
@@ -2131,7 +2131,7 @@
             "energy_input_ratio_function_of_flow_fraction_curve_name": "HPACHeatEIRFF",
             "energy_input_ratio_function_of_temperature_curve_name": "HPACHeatEIRFT",
             "gross_rated_heating_capacity": "Autosize",
-            "gross_rated_heating_cop": 3.52716,
+            "gross_rated_heating_cop": 3.3592,
             "heating_capacity_function_of_flow_fraction_curve_name": "HPACHeatCapFF",
             "heating_capacity_function_of_temperature_curve_name": "HPACHeatCapFT",
             "maximum_outdoor_dry_bulb_temperature_for_crankcase_heater_operation": 4.4,
@@ -2152,7 +2152,7 @@
             "energy_input_ratio_function_of_flow_fraction_curve_name": "HPACHeatEIRFF",
             "energy_input_ratio_function_of_temperature_curve_name": "HPACHeatEIRFT",
             "gross_rated_heating_capacity": "Autosize",
-            "gross_rated_heating_cop": 3.52716,
+            "gross_rated_heating_cop": 3.3592,
             "heating_capacity_function_of_flow_fraction_curve_name": "HPACHeatCapFF",
             "heating_capacity_function_of_temperature_curve_name": "HPACHeatCapFT",
             "maximum_outdoor_dry_bulb_temperature_for_crankcase_heater_operation": 4.4,
@@ -2173,7 +2173,7 @@
             "energy_input_ratio_function_of_flow_fraction_curve_name": "HPACHeatEIRFF",
             "energy_input_ratio_function_of_temperature_curve_name": "HPACHeatEIRFT",
             "gross_rated_heating_capacity": "Autosize",
-            "gross_rated_heating_cop": 3.52716,
+            "gross_rated_heating_cop": 3.3592,
             "heating_capacity_function_of_flow_fraction_curve_name": "HPACHeatCapFF",
             "heating_capacity_function_of_temperature_curve_name": "HPACHeatCapFT",
             "maximum_outdoor_dry_bulb_temperature_for_crankcase_heater_operation": 4.4,
@@ -2189,7 +2189,7 @@
             "air_inlet_node_name": "PSZ-AC:1 Heating Coil Outlet",
             "air_outlet_node_name": "PSZ-AC:1 Supply Equipment Outlet Node",
             "availability_schedule_name": "Always_On",
-            "burner_efficiency": 0.84,
+            "burner_efficiency": 0.8,
             "fuel_type": "NaturalGas",
             "nominal_capacity": "Autosize"
         },
@@ -2197,7 +2197,7 @@
             "air_inlet_node_name": "PSZ-AC:2 Heating Coil Outlet",
             "air_outlet_node_name": "PSZ-AC:2 Supply Equipment Outlet Node",
             "availability_schedule_name": "Always_On",
-            "burner_efficiency": 0.84,
+            "burner_efficiency": 0.8,
             "fuel_type": "NaturalGas",
             "nominal_capacity": "Autosize"
         },
@@ -2205,7 +2205,7 @@
             "air_inlet_node_name": "PSZ-AC:3 Heating Coil Outlet",
             "air_outlet_node_name": "PSZ-AC:3 Supply Equipment Outlet Node",
             "availability_schedule_name": "Always_On",
-            "burner_efficiency": 0.84,
+            "burner_efficiency": 0.8,
             "fuel_type": "NaturalGas",
             "nominal_capacity": "Autosize"
         },
@@ -2213,7 +2213,7 @@
             "air_inlet_node_name": "PSZ-AC:4 Heating Coil Outlet",
             "air_outlet_node_name": "PSZ-AC:4 Supply Equipment Outlet Node",
             "availability_schedule_name": "Always_On",
-            "burner_efficiency": 0.84,
+            "burner_efficiency": 0.8,
             "fuel_type": "NaturalGas",
             "nominal_capacity": "Autosize"
         },
@@ -2221,7 +2221,7 @@
             "air_inlet_node_name": "PSZ-AC:5 Heating Coil Outlet",
             "air_outlet_node_name": "PSZ-AC:5 Supply Equipment Outlet Node",
             "availability_schedule_name": "Always_On",
-            "burner_efficiency": 0.84,
+            "burner_efficiency": 0.8,
             "fuel_type": "NaturalGas",
             "nominal_capacity": "Autosize"
         }
@@ -2308,16 +2308,16 @@
         "Swinging Door_con": {
             "outside_layer": "Opaque Door panel_con"
         },
-        "Window_U_0.363_SHGC_East_0.359": {
+        "Window_U_0.424_SHGC_East_0.249": {
             "outside_layer": "Glazing Layer East"
         },
-        "Window_U_0.363_SHGC_North_0.359": {
+        "Window_U_0.424_SHGC_North_0.249": {
             "outside_layer": "Glazing Layer North"
         },
-        "Window_U_0.363_SHGC_South_0.359": {
+        "Window_U_0.424_SHGC_South_0.249": {
             "outside_layer": "Glazing Layer South"
         },
-        "Window_U_0.363_SHGC_West_0.359": {
+        "Window_U_0.424_SHGC_West_0.249": {
             "outside_layer": "Glazing Layer West"
         },
         "basement_wall": {
@@ -2469,33 +2469,33 @@
     "Construction:FfactorGroundFloor": {
         "Core_ZN_floor_Ffactor": {
             "area": 149.65740000000005,
-            "f_factor": 0.90012,
+            "f_factor": 1.26363,
             "perimeterexposed": 0
         },
         "Perimeter_ZN_1_floor_Ffactor": {
             "area": 113.45000000000002,
-            "f_factor": 0.90012,
+            "f_factor": 1.26363,
             "perimeterexposed": 27.69
         },
         "Perimeter_ZN_2_floor_Ffactor": {
             "area": 67.29999999999995,
-            "f_factor": 0.90012,
+            "f_factor": 1.26363,
             "perimeterexposed": 18.46
         },
         "Perimeter_ZN_3_floor_Ffactor": {
             "area": 113.44999999999999,
-            "f_factor": 0.90012,
+            "f_factor": 1.26363,
             "perimeterexposed": 27.69
         },
         "Perimeter_ZN_4_floor_Ffactor": {
             "area": 67.30000000000001,
-            "f_factor": 0.90012,
+            "f_factor": 1.26363,
             "perimeterexposed": 18.46
         }
     },
     "Controller:MechanicalVentilation": {
         "Core_ZN_DCV": {
-            "availability_schedule_name": "MinOA_MotorizedDamper_Sched",
+            "availability_schedule_name": "MinOA_Sched",
             "demand_controlled_ventilation": "No",
             "system_outdoor_air_method": "ZoneSum",
             "zone_specifications": [
@@ -2507,7 +2507,7 @@
             ]
         },
         "Perimeter_ZN_1_DCV": {
-            "availability_schedule_name": "MinOA_MotorizedDamper_Sched",
+            "availability_schedule_name": "MinOA_Sched",
             "demand_controlled_ventilation": "No",
             "system_outdoor_air_method": "ZoneSum",
             "zone_specifications": [
@@ -2519,7 +2519,7 @@
             ]
         },
         "Perimeter_ZN_2_DCV": {
-            "availability_schedule_name": "MinOA_MotorizedDamper_Sched",
+            "availability_schedule_name": "MinOA_Sched",
             "demand_controlled_ventilation": "No",
             "system_outdoor_air_method": "ZoneSum",
             "zone_specifications": [
@@ -2531,7 +2531,7 @@
             ]
         },
         "Perimeter_ZN_3_DCV": {
-            "availability_schedule_name": "MinOA_MotorizedDamper_Sched",
+            "availability_schedule_name": "MinOA_Sched",
             "demand_controlled_ventilation": "No",
             "system_outdoor_air_method": "ZoneSum",
             "zone_specifications": [
@@ -2543,7 +2543,7 @@
             ]
         },
         "Perimeter_ZN_4_DCV": {
-            "availability_schedule_name": "MinOA_MotorizedDamper_Sched",
+            "availability_schedule_name": "MinOA_Sched",
             "demand_controlled_ventilation": "No",
             "system_outdoor_air_method": "ZoneSum",
             "zone_specifications": [
@@ -2566,7 +2566,7 @@
             "maximum_outdoor_air_flow_rate": "Autosize",
             "minimum_limit_type": "FixedMinimum",
             "minimum_outdoor_air_flow_rate": "Autosize",
-            "minimum_outdoor_air_schedule_name": "MinOA_MotorizedDamper_Sched",
+            "minimum_outdoor_air_schedule_name": "MinOA_Sched",
             "mixed_air_node_name": "PSZ-AC:1 Mixed Air Outlet",
             "relief_air_outlet_node_name": "PSZ-AC:1 OARelief Node",
             "return_air_node_name": "PSZ-AC:1 Supply Equipment Inlet Node"
@@ -2581,7 +2581,7 @@
             "maximum_outdoor_air_flow_rate": "Autosize",
             "minimum_limit_type": "FixedMinimum",
             "minimum_outdoor_air_flow_rate": "Autosize",
-            "minimum_outdoor_air_schedule_name": "MinOA_MotorizedDamper_Sched",
+            "minimum_outdoor_air_schedule_name": "MinOA_Sched",
             "mixed_air_node_name": "PSZ-AC:2 Mixed Air Outlet",
             "relief_air_outlet_node_name": "PSZ-AC:2 OARelief Node",
             "return_air_node_name": "PSZ-AC:2 Supply Equipment Inlet Node"
@@ -2596,7 +2596,7 @@
             "maximum_outdoor_air_flow_rate": "Autosize",
             "minimum_limit_type": "FixedMinimum",
             "minimum_outdoor_air_flow_rate": "Autosize",
-            "minimum_outdoor_air_schedule_name": "MinOA_MotorizedDamper_Sched",
+            "minimum_outdoor_air_schedule_name": "MinOA_Sched",
             "mixed_air_node_name": "PSZ-AC:3 Mixed Air Outlet",
             "relief_air_outlet_node_name": "PSZ-AC:3 OARelief Node",
             "return_air_node_name": "PSZ-AC:3 Supply Equipment Inlet Node"
@@ -2611,7 +2611,7 @@
             "maximum_outdoor_air_flow_rate": "Autosize",
             "minimum_limit_type": "FixedMinimum",
             "minimum_outdoor_air_flow_rate": "Autosize",
-            "minimum_outdoor_air_schedule_name": "MinOA_MotorizedDamper_Sched",
+            "minimum_outdoor_air_schedule_name": "MinOA_Sched",
             "mixed_air_node_name": "PSZ-AC:4 Mixed Air Outlet",
             "relief_air_outlet_node_name": "PSZ-AC:4 OARelief Node",
             "return_air_node_name": "PSZ-AC:4 Supply Equipment Inlet Node"
@@ -2626,7 +2626,7 @@
             "maximum_outdoor_air_flow_rate": "Autosize",
             "minimum_limit_type": "FixedMinimum",
             "minimum_outdoor_air_flow_rate": "Autosize",
-            "minimum_outdoor_air_schedule_name": "MinOA_MotorizedDamper_Sched",
+            "minimum_outdoor_air_schedule_name": "MinOA_Sched",
             "mixed_air_node_name": "PSZ-AC:5 Mixed Air Outlet",
             "relief_air_outlet_node_name": "PSZ-AC:5 OARelief Node",
             "return_air_node_name": "PSZ-AC:5 Supply Equipment Inlet Node"
@@ -3323,221 +3323,221 @@
     "FenestrationSurface:Detailed": {
         "Perimeter_ZN_1_wall_south_Window_1": {
             "building_surface_name": "Perimeter_ZN_1_wall_south",
-            "construction_name": "Window_U_0.363_SHGC_South_0.359",
+            "construction_name": "Window_U_0.424_SHGC_South_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 1.75365110794498,
+            "vertex_1_x_coordinate": 1.393745589188176,
             "vertex_1_y_coordinate": 0.0,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 1.75365110794498,
+            "vertex_2_x_coordinate": 1.393745589188176,
             "vertex_2_y_coordinate": 0.0,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 4.062414796822185,
+            "vertex_3_x_coordinate": 3.228676832507862,
             "vertex_3_y_coordinate": 0.0,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 4.062414796822185,
+            "vertex_4_x_coordinate": 3.228676832507862,
             "vertex_4_y_coordinate": 0.0,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_1_wall_south_Window_2": {
             "building_surface_name": "Perimeter_ZN_1_wall_south",
-            "construction_name": "Window_U_0.363_SHGC_South_0.359",
+            "construction_name": "Window_U_0.424_SHGC_South_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 7.58233320773333,
+            "vertex_1_x_coordinate": 6.026194957569021,
             "vertex_1_y_coordinate": 0.0,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 7.58233320773333,
+            "vertex_2_x_coordinate": 6.026194957569021,
             "vertex_2_y_coordinate": 0.0,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 9.891096896610534,
+            "vertex_3_x_coordinate": 7.861126200888706,
             "vertex_3_y_coordinate": 0.0,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 9.891096896610534,
+            "vertex_4_x_coordinate": 7.861126200888706,
             "vertex_4_y_coordinate": 0.0,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_1_wall_south_Window_3": {
             "building_surface_name": "Perimeter_ZN_1_wall_south",
-            "construction_name": "Window_U_0.363_SHGC_South_0.359",
+            "construction_name": "Window_U_0.424_SHGC_South_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 13.398399112500494,
+            "vertex_1_x_coordinate": 10.648617379265058,
             "vertex_1_y_coordinate": 0.0,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 13.398399112500494,
+            "vertex_2_x_coordinate": 10.648617379265058,
             "vertex_2_y_coordinate": 0.0,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 15.707162801377699,
+            "vertex_3_x_coordinate": 12.483548622584744,
             "vertex_3_y_coordinate": 0.0,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 15.707162801377699,
+            "vertex_4_x_coordinate": 12.483548622584744,
             "vertex_4_y_coordinate": 0.0,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_1_wall_south_Window_4": {
             "building_surface_name": "Perimeter_ZN_1_wall_south",
-            "construction_name": "Window_U_0.363_SHGC_South_0.359",
+            "construction_name": "Window_U_0.424_SHGC_South_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 19.227081212288844,
+            "vertex_1_x_coordinate": 15.281066747645903,
             "vertex_1_y_coordinate": 0.0,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 19.227081212288844,
+            "vertex_2_x_coordinate": 15.281066747645903,
             "vertex_2_y_coordinate": 0.0,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 21.53584490116605,
+            "vertex_3_x_coordinate": 17.11599799096559,
             "vertex_3_y_coordinate": 0.0,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 21.53584490116605,
+            "vertex_4_x_coordinate": 17.11599799096559,
             "vertex_4_y_coordinate": 0.0,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_1_wall_south_Window_5": {
             "building_surface_name": "Perimeter_ZN_1_wall_south",
-            "construction_name": "Window_U_0.363_SHGC_South_0.359",
+            "construction_name": "Window_U_0.424_SHGC_South_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 25.043147117056012,
+            "vertex_1_x_coordinate": 19.903489169341942,
             "vertex_1_y_coordinate": 0.0,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 25.043147117056012,
+            "vertex_2_x_coordinate": 19.903489169341942,
             "vertex_2_y_coordinate": 0.0,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 27.351910805933212,
+            "vertex_3_x_coordinate": 21.738420412661625,
             "vertex_3_y_coordinate": 0.0,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 27.351910805933212,
+            "vertex_4_x_coordinate": 21.738420412661625,
             "vertex_4_y_coordinate": 0.0,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_1_wall_south_Window_6": {
             "building_surface_name": "Perimeter_ZN_1_wall_south",
-            "construction_name": "Window_U_0.363_SHGC_South_0.359",
+            "construction_name": "Window_U_0.424_SHGC_South_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 30.871829216844358,
+            "vertex_1_x_coordinate": 24.535938537722785,
             "vertex_1_y_coordinate": 0.0,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 30.871829216844358,
+            "vertex_2_x_coordinate": 24.535938537722785,
             "vertex_2_y_coordinate": 0.0,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 33.18059290572157,
+            "vertex_3_x_coordinate": 26.370869781042472,
             "vertex_3_y_coordinate": 0.0,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 33.18059290572157,
+            "vertex_4_x_coordinate": 26.370869781042472,
             "vertex_4_y_coordinate": 0.0,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_1_wall_south_door": {
             "building_surface_name": "Perimeter_ZN_1_wall_south",
-            "construction_name": "Window_U_0.363_SHGC_South_0.359",
+            "construction_name": "Window_U_0.424_SHGC_South_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "GlassDoor",
-            "vertex_1_x_coordinate": 16.31274016239467,
+            "vertex_1_x_coordinate": 12.96484206345548,
             "vertex_1_y_coordinate": 0.0,
             "vertex_1_z_coordinate": 2.134,
-            "vertex_2_x_coordinate": 16.31274016239467,
+            "vertex_2_x_coordinate": 12.96484206345548,
             "vertex_2_y_coordinate": 0.0,
             "vertex_2_z_coordinate": 0.0,
-            "vertex_3_x_coordinate": 18.621503851271875,
+            "vertex_3_x_coordinate": 14.799773306775165,
             "vertex_3_y_coordinate": 0.0,
             "vertex_3_z_coordinate": 0.0,
-            "vertex_4_x_coordinate": 18.621503851271875,
+            "vertex_4_x_coordinate": 14.799773306775165,
             "vertex_4_y_coordinate": 0.0,
             "vertex_4_z_coordinate": 2.134,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_2_wall_east_Window_1": {
             "building_surface_name": "Perimeter_ZN_2_wall_east",
-            "construction_name": "Window_U_0.363_SHGC_East_0.359",
+            "construction_name": "Window_U_0.424_SHGC_East_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 34.93424401366654,
-            "vertex_1_y_coordinate": 1.2879616126513864,
+            "vertex_1_x_coordinate": 27.764615370230647,
+            "vertex_1_y_coordinate": 1.216797006433025,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 34.93424401366654,
-            "vertex_2_y_coordinate": 1.2879616126513864,
+            "vertex_2_x_coordinate": 27.764615370230647,
+            "vertex_2_y_coordinate": 1.216797006433025,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 34.93424401366654,
-            "vertex_3_y_coordinate": 2.983623304127673,
+            "vertex_3_x_coordinate": 27.764615370230647,
+            "vertex_3_y_coordinate": 2.81876716598154,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 34.93424401366654,
-            "vertex_4_y_coordinate": 2.983623304127673,
+            "vertex_4_x_coordinate": 27.764615370230647,
+            "vertex_4_y_coordinate": 2.81876716598154,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_2_wall_east_Window_2": {
             "building_surface_name": "Perimeter_ZN_2_wall_east",
-            "construction_name": "Window_U_0.363_SHGC_East_0.359",
+            "construction_name": "Window_U_0.424_SHGC_East_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 34.93424401366654,
-            "vertex_1_y_coordinate": 5.56881244031283,
+            "vertex_1_x_coordinate": 27.764615370230647,
+            "vertex_1_y_coordinate": 5.261115114145669,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 34.93424401366654,
-            "vertex_2_y_coordinate": 5.56881244031283,
+            "vertex_2_x_coordinate": 27.764615370230647,
+            "vertex_2_y_coordinate": 5.261115114145669,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 34.93424401366654,
-            "vertex_3_y_coordinate": 7.2644741317891155,
+            "vertex_3_x_coordinate": 27.764615370230647,
+            "vertex_3_y_coordinate": 6.863085273694184,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 34.93424401366654,
-            "vertex_4_y_coordinate": 7.2644741317891155,
+            "vertex_4_x_coordinate": 27.764615370230647,
+            "vertex_4_y_coordinate": 6.863085273694184,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_2_wall_east_Window_3": {
             "building_surface_name": "Perimeter_ZN_2_wall_east",
-            "construction_name": "Window_U_0.363_SHGC_East_0.359",
+            "construction_name": "Window_U_0.424_SHGC_East_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 34.93424401366654,
-            "vertex_1_y_coordinate": 9.840397357091888,
+            "vertex_1_x_coordinate": 27.764615370230647,
+            "vertex_1_y_coordinate": 9.296679286560233,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 34.93424401366654,
-            "vertex_2_y_coordinate": 9.840397357091888,
+            "vertex_2_x_coordinate": 27.764615370230647,
+            "vertex_2_y_coordinate": 9.296679286560233,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 34.93424401366654,
-            "vertex_3_y_coordinate": 11.536059048568175,
+            "vertex_3_x_coordinate": 27.764615370230647,
+            "vertex_3_y_coordinate": 10.898649446108747,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 34.93424401366654,
-            "vertex_4_y_coordinate": 11.536059048568175,
+            "vertex_4_x_coordinate": 27.764615370230647,
+            "vertex_4_y_coordinate": 10.898649446108747,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_2_wall_east_Window_4": {
             "building_surface_name": "Perimeter_ZN_2_wall_east",
-            "construction_name": "Window_U_0.363_SHGC_East_0.359",
+            "construction_name": "Window_U_0.424_SHGC_East_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 34.93424401366654,
-            "vertex_1_y_coordinate": 14.121248184753332,
+            "vertex_1_x_coordinate": 27.764615370230647,
+            "vertex_1_y_coordinate": 13.340997394272877,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 34.93424401366654,
-            "vertex_2_y_coordinate": 14.121248184753332,
+            "vertex_2_x_coordinate": 27.764615370230647,
+            "vertex_2_y_coordinate": 13.340997394272877,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 34.93424401366654,
-            "vertex_3_y_coordinate": 15.81690987622962,
+            "vertex_3_x_coordinate": 27.764615370230647,
+            "vertex_3_y_coordinate": 14.942967553821394,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 34.93424401366654,
-            "vertex_4_y_coordinate": 15.81690987622962,
+            "vertex_4_x_coordinate": 27.764615370230647,
+            "vertex_4_y_coordinate": 14.942967553821394,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
@@ -3547,17 +3547,17 @@
             "multiplier": 1,
             "number_of_vertices": 4,
             "surface_type": "Door",
-            "vertex_1_x_coordinate": 18.81301804458613,
-            "vertex_1_y_coordinate": 17.104871488881006,
+            "vertex_1_x_coordinate": 14.951982637918274,
+            "vertex_1_y_coordinate": 16.15976456025442,
             "vertex_1_z_coordinate": 2.1336,
-            "vertex_2_x_coordinate": 18.81301804458613,
-            "vertex_2_y_coordinate": 17.104871488881006,
+            "vertex_2_x_coordinate": 14.951982637918274,
+            "vertex_2_y_coordinate": 16.15976456025442,
             "vertex_2_z_coordinate": 0.0,
-            "vertex_3_x_coordinate": 17.659393171848798,
-            "vertex_3_y_coordinate": 17.104871488881006,
+            "vertex_3_x_coordinate": 14.03511863305952,
+            "vertex_3_y_coordinate": 16.15976456025442,
             "vertex_3_z_coordinate": 0.0,
-            "vertex_4_x_coordinate": 17.659393171848798,
-            "vertex_4_y_coordinate": 17.104871488881006,
+            "vertex_4_x_coordinate": 14.03511863305952,
+            "vertex_4_y_coordinate": 16.15976456025442,
             "vertex_4_z_coordinate": 2.1336,
             "view_factor_to_ground": "Autocalculate"
         },
@@ -3567,217 +3567,217 @@
             "multiplier": 1,
             "number_of_vertices": 4,
             "surface_type": "Door",
-            "vertex_1_x_coordinate": 24.13720357267206,
-            "vertex_1_y_coordinate": 17.104871488881006,
+            "vertex_1_x_coordinate": 19.183474330975216,
+            "vertex_1_y_coordinate": 16.15976456025442,
             "vertex_1_z_coordinate": 2.1336,
-            "vertex_2_x_coordinate": 24.13720357267206,
-            "vertex_2_y_coordinate": 17.104871488881006,
+            "vertex_2_x_coordinate": 19.183474330975216,
+            "vertex_2_y_coordinate": 16.15976456025442,
             "vertex_2_z_coordinate": 0.0,
-            "vertex_3_x_coordinate": 22.983578699934732,
-            "vertex_3_y_coordinate": 17.104871488881006,
+            "vertex_3_x_coordinate": 18.266610326116464,
+            "vertex_3_y_coordinate": 16.15976456025442,
             "vertex_3_z_coordinate": 0.0,
-            "vertex_4_x_coordinate": 22.983578699934732,
-            "vertex_4_y_coordinate": 17.104871488881006,
+            "vertex_4_x_coordinate": 18.266610326116464,
+            "vertex_4_y_coordinate": 16.15976456025442,
             "vertex_4_z_coordinate": 2.1336,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_3_wall_north_Window_1": {
             "building_surface_name": "Perimeter_ZN_3_wall_north",
-            "construction_name": "Window_U_0.363_SHGC_North_0.359",
+            "construction_name": "Window_U_0.424_SHGC_North_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 33.18059290572157,
-            "vertex_1_y_coordinate": 17.104871488881006,
+            "vertex_1_x_coordinate": 26.370869781042472,
+            "vertex_1_y_coordinate": 16.15976456025442,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 33.18059290572157,
-            "vertex_2_y_coordinate": 17.104871488881006,
+            "vertex_2_x_coordinate": 26.370869781042472,
+            "vertex_2_y_coordinate": 16.15976456025442,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 30.871829216844358,
-            "vertex_3_y_coordinate": 17.104871488881006,
+            "vertex_3_x_coordinate": 24.535938537722785,
+            "vertex_3_y_coordinate": 16.15976456025442,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 30.871829216844358,
-            "vertex_4_y_coordinate": 17.104871488881006,
+            "vertex_4_x_coordinate": 24.535938537722785,
+            "vertex_4_y_coordinate": 16.15976456025442,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_3_wall_north_Window_2": {
             "building_surface_name": "Perimeter_ZN_3_wall_north",
-            "construction_name": "Window_U_0.363_SHGC_North_0.359",
+            "construction_name": "Window_U_0.424_SHGC_North_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 27.351910805933212,
-            "vertex_1_y_coordinate": 17.104871488881006,
+            "vertex_1_x_coordinate": 21.738420412661625,
+            "vertex_1_y_coordinate": 16.15976456025442,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 27.351910805933212,
-            "vertex_2_y_coordinate": 17.104871488881006,
+            "vertex_2_x_coordinate": 21.738420412661625,
+            "vertex_2_y_coordinate": 16.15976456025442,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 25.043147117056012,
-            "vertex_3_y_coordinate": 17.104871488881006,
+            "vertex_3_x_coordinate": 19.903489169341942,
+            "vertex_3_y_coordinate": 16.15976456025442,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 25.043147117056012,
-            "vertex_4_y_coordinate": 17.104871488881006,
+            "vertex_4_x_coordinate": 19.903489169341942,
+            "vertex_4_y_coordinate": 16.15976456025442,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_3_wall_north_Window_3": {
             "building_surface_name": "Perimeter_ZN_3_wall_north",
-            "construction_name": "Window_U_0.363_SHGC_North_0.359",
+            "construction_name": "Window_U_0.424_SHGC_North_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 21.53584490116605,
-            "vertex_1_y_coordinate": 17.104871488881006,
+            "vertex_1_x_coordinate": 17.11599799096559,
+            "vertex_1_y_coordinate": 16.15976456025442,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 21.53584490116605,
-            "vertex_2_y_coordinate": 17.104871488881006,
+            "vertex_2_x_coordinate": 17.11599799096559,
+            "vertex_2_y_coordinate": 16.15976456025442,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 19.227081212288844,
-            "vertex_3_y_coordinate": 17.104871488881006,
+            "vertex_3_x_coordinate": 15.281066747645903,
+            "vertex_3_y_coordinate": 16.15976456025442,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 19.227081212288844,
-            "vertex_4_y_coordinate": 17.104871488881006,
+            "vertex_4_x_coordinate": 15.281066747645903,
+            "vertex_4_y_coordinate": 16.15976456025442,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_3_wall_north_Window_4": {
             "building_surface_name": "Perimeter_ZN_3_wall_north",
-            "construction_name": "Window_U_0.363_SHGC_North_0.359",
+            "construction_name": "Window_U_0.424_SHGC_North_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 15.707162801377699,
-            "vertex_1_y_coordinate": 17.104871488881006,
+            "vertex_1_x_coordinate": 12.483548622584744,
+            "vertex_1_y_coordinate": 16.15976456025442,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 15.707162801377699,
-            "vertex_2_y_coordinate": 17.104871488881006,
+            "vertex_2_x_coordinate": 12.483548622584744,
+            "vertex_2_y_coordinate": 16.15976456025442,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 13.398399112500494,
-            "vertex_3_y_coordinate": 17.104871488881006,
+            "vertex_3_x_coordinate": 10.648617379265058,
+            "vertex_3_y_coordinate": 16.15976456025442,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 13.398399112500494,
-            "vertex_4_y_coordinate": 17.104871488881006,
+            "vertex_4_x_coordinate": 10.648617379265058,
+            "vertex_4_y_coordinate": 16.15976456025442,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_3_wall_north_Window_5": {
             "building_surface_name": "Perimeter_ZN_3_wall_north",
-            "construction_name": "Window_U_0.363_SHGC_North_0.359",
+            "construction_name": "Window_U_0.424_SHGC_North_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 9.891096896610534,
-            "vertex_1_y_coordinate": 17.104871488881006,
+            "vertex_1_x_coordinate": 7.861126200888706,
+            "vertex_1_y_coordinate": 16.15976456025442,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 9.891096896610534,
-            "vertex_2_y_coordinate": 17.104871488881006,
+            "vertex_2_x_coordinate": 7.861126200888706,
+            "vertex_2_y_coordinate": 16.15976456025442,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 7.58233320773333,
-            "vertex_3_y_coordinate": 17.104871488881006,
+            "vertex_3_x_coordinate": 6.026194957569021,
+            "vertex_3_y_coordinate": 16.15976456025442,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 7.58233320773333,
-            "vertex_4_y_coordinate": 17.104871488881006,
+            "vertex_4_x_coordinate": 6.026194957569021,
+            "vertex_4_y_coordinate": 16.15976456025442,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_3_wall_north_Window_6": {
             "building_surface_name": "Perimeter_ZN_3_wall_north",
-            "construction_name": "Window_U_0.363_SHGC_North_0.359",
+            "construction_name": "Window_U_0.424_SHGC_North_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
-            "vertex_1_x_coordinate": 4.062414796822185,
-            "vertex_1_y_coordinate": 17.104871488881006,
+            "vertex_1_x_coordinate": 3.228676832507862,
+            "vertex_1_y_coordinate": 16.15976456025442,
             "vertex_1_z_coordinate": 2.424,
-            "vertex_2_x_coordinate": 4.062414796822185,
-            "vertex_2_y_coordinate": 17.104871488881006,
+            "vertex_2_x_coordinate": 3.228676832507862,
+            "vertex_2_y_coordinate": 16.15976456025442,
             "vertex_2_z_coordinate": 0.9008164,
-            "vertex_3_x_coordinate": 1.75365110794498,
-            "vertex_3_y_coordinate": 17.104871488881006,
+            "vertex_3_x_coordinate": 1.393745589188176,
+            "vertex_3_y_coordinate": 16.15976456025442,
             "vertex_3_z_coordinate": 0.9008164,
-            "vertex_4_x_coordinate": 1.75365110794498,
-            "vertex_4_y_coordinate": 17.104871488881006,
+            "vertex_4_x_coordinate": 1.393745589188176,
+            "vertex_4_y_coordinate": 16.15976456025442,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_4_wall_west_Window_1": {
             "building_surface_name": "Perimeter_ZN_4_wall_west",
-            "construction_name": "Window_U_0.363_SHGC_West_0.359",
+            "construction_name": "Window_U_0.424_SHGC_West_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
             "vertex_1_x_coordinate": 0.0,
-            "vertex_1_y_coordinate": 15.81690987622962,
+            "vertex_1_y_coordinate": 14.942967553821394,
             "vertex_1_z_coordinate": 2.424,
             "vertex_2_x_coordinate": 0.0,
-            "vertex_2_y_coordinate": 15.81690987622962,
+            "vertex_2_y_coordinate": 14.942967553821394,
             "vertex_2_z_coordinate": 0.9008164,
             "vertex_3_x_coordinate": 0.0,
-            "vertex_3_y_coordinate": 14.121248184753332,
+            "vertex_3_y_coordinate": 13.340997394272877,
             "vertex_3_z_coordinate": 0.9008164,
             "vertex_4_x_coordinate": 0.0,
-            "vertex_4_y_coordinate": 14.121248184753332,
+            "vertex_4_y_coordinate": 13.340997394272877,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_4_wall_west_Window_2": {
             "building_surface_name": "Perimeter_ZN_4_wall_west",
-            "construction_name": "Window_U_0.363_SHGC_West_0.359",
+            "construction_name": "Window_U_0.424_SHGC_West_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
             "vertex_1_x_coordinate": 0.0,
-            "vertex_1_y_coordinate": 11.536059048568175,
+            "vertex_1_y_coordinate": 10.898649446108747,
             "vertex_1_z_coordinate": 2.424,
             "vertex_2_x_coordinate": 0.0,
-            "vertex_2_y_coordinate": 11.536059048568175,
+            "vertex_2_y_coordinate": 10.898649446108747,
             "vertex_2_z_coordinate": 0.9008164,
             "vertex_3_x_coordinate": 0.0,
-            "vertex_3_y_coordinate": 9.840397357091888,
+            "vertex_3_y_coordinate": 9.296679286560233,
             "vertex_3_z_coordinate": 0.9008164,
             "vertex_4_x_coordinate": 0.0,
-            "vertex_4_y_coordinate": 9.840397357091888,
+            "vertex_4_y_coordinate": 9.296679286560233,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_4_wall_west_Window_3": {
             "building_surface_name": "Perimeter_ZN_4_wall_west",
-            "construction_name": "Window_U_0.363_SHGC_West_0.359",
+            "construction_name": "Window_U_0.424_SHGC_West_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
             "vertex_1_x_coordinate": 0.0,
-            "vertex_1_y_coordinate": 7.2644741317891155,
+            "vertex_1_y_coordinate": 6.863085273694184,
             "vertex_1_z_coordinate": 2.424,
             "vertex_2_x_coordinate": 0.0,
-            "vertex_2_y_coordinate": 7.2644741317891155,
+            "vertex_2_y_coordinate": 6.863085273694184,
             "vertex_2_z_coordinate": 0.9008164,
             "vertex_3_x_coordinate": 0.0,
-            "vertex_3_y_coordinate": 5.56881244031283,
+            "vertex_3_y_coordinate": 5.261115114145669,
             "vertex_3_z_coordinate": 0.9008164,
             "vertex_4_x_coordinate": 0.0,
-            "vertex_4_y_coordinate": 5.56881244031283,
+            "vertex_4_y_coordinate": 5.261115114145669,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         },
         "Perimeter_ZN_4_wall_west_Window_4": {
             "building_surface_name": "Perimeter_ZN_4_wall_west",
-            "construction_name": "Window_U_0.363_SHGC_West_0.359",
+            "construction_name": "Window_U_0.424_SHGC_West_0.249",
             "multiplier": 1.0,
             "number_of_vertices": 4,
             "surface_type": "Window",
             "vertex_1_x_coordinate": 0.0,
-            "vertex_1_y_coordinate": 2.983623304127673,
+            "vertex_1_y_coordinate": 2.81876716598154,
             "vertex_1_z_coordinate": 2.424,
             "vertex_2_x_coordinate": 0.0,
-            "vertex_2_y_coordinate": 2.983623304127673,
+            "vertex_2_y_coordinate": 2.81876716598154,
             "vertex_2_z_coordinate": 0.9008164,
             "vertex_3_x_coordinate": 0.0,
-            "vertex_3_y_coordinate": 1.2879616126513864,
+            "vertex_3_y_coordinate": 1.216797006433025,
             "vertex_3_z_coordinate": 0.9008164,
             "vertex_4_x_coordinate": 0.0,
-            "vertex_4_y_coordinate": 1.2879616126513864,
+            "vertex_4_y_coordinate": 1.216797006433025,
             "vertex_4_z_coordinate": 2.424,
             "view_factor_to_ground": "Autocalculate"
         }
@@ -3811,27 +3811,27 @@
     "InternalMass": {
         "Core_ZN_InternalMass_1": {
             "construction_name": "InteriorFurnishings",
-            "surface_area": 349.90061373183266,
+            "surface_area": 262.72429158655444,
             "zone_or_zonelist_name": "Core_ZN"
         },
         "Perimeter_ZN_1_InternalMass_1": {
             "construction_name": "InteriorFurnishings",
-            "surface_area": 265.2473224035458,
+            "surface_area": 199.1620252690118,
             "zone_or_zonelist_name": "Perimeter_ZN_1"
         },
         "Perimeter_ZN_2_InternalMass_1": {
             "construction_name": "InteriorFurnishings",
-            "surface_area": 157.34812514551462,
+            "surface_area": 118.14547642665926,
             "zone_or_zonelist_name": "Perimeter_ZN_2"
         },
         "Perimeter_ZN_3_InternalMass_1": {
             "construction_name": "InteriorFurnishings",
-            "surface_area": 265.2473224035458,
+            "surface_area": 199.1620252690118,
             "zone_or_zonelist_name": "Perimeter_ZN_3"
         },
         "Perimeter_ZN_4_InternalMass_1": {
             "construction_name": "InteriorFurnishings",
-            "surface_area": 157.34812514551462,
+            "surface_area": 118.14547642665926,
             "zone_or_zonelist_name": "Perimeter_ZN_4"
         }
     },
@@ -3899,42 +3899,42 @@
     },
     "Material": {
         "100mm Normalweight concrete floor": {
-            "conductivity": 1.2953746699328086,
+            "conductivity": 2.4431830191949255,
             "density": 2322,
             "roughness": "MediumRough",
             "specific_heat": 832,
             "thickness": 0.1016
         },
         "100mm Normalweight concrete wall": {
-            "conductivity": 1.2953746699328086,
+            "conductivity": 2.4431830191949255,
             "density": 2322,
             "roughness": "MediumRough",
             "specific_heat": 832,
             "thickness": 0.1016
         },
         "150mm Normalweight concrete floor": {
-            "conductivity": 1.2953746699328086,
+            "conductivity": 2.4431830191949255,
             "density": 2322,
             "roughness": "MediumRough",
             "specific_heat": 832,
             "thickness": 0.1524
         },
         "200mm Normalweight concrete floor": {
-            "conductivity": 1.2953746699328086,
+            "conductivity": 2.4431830191949255,
             "density": 2322,
             "roughness": "MediumRough",
             "specific_heat": 832,
             "thickness": 0.2032
         },
         "200mm Normalweight concrete wall": {
-            "conductivity": 1.2953746699328086,
+            "conductivity": 2.4431830191949255,
             "density": 2322,
             "roughness": "MediumRough",
             "specific_heat": 832,
             "thickness": 0.2032
         },
         "AC02 Acoustic Ceiling": {
-            "conductivity": 0.03196379055678359,
+            "conductivity": 0.06028633423987479,
             "density": 288.0,
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
@@ -3944,7 +3944,7 @@
             "visible_absorptance": 0.2
         },
         "F07 25mm stucco": {
-            "conductivity": 0.4037531438751611,
+            "conductivity": 0.7615115903984184,
             "density": 1856,
             "roughness": "Smooth",
             "solar_absorptance": 0.7,
@@ -3954,7 +3954,7 @@
             "visible_absorptance": 0.7
         },
         "F08 Metal roof surface": {
-            "conductivity": 25.391586603704578,
+            "conductivity": 47.890617796167206,
             "density": 7824,
             "roughness": "Smooth",
             "solar_absorptance": 0.7,
@@ -3963,14 +3963,14 @@
             "thickness": 0.0008
         },
         "F08 Metal surface": {
-            "conductivity": 25.391586603704578,
+            "conductivity": 47.890617796167206,
             "density": 7824,
             "roughness": "Smooth",
             "specific_heat": 500,
             "thickness": 0.0008
         },
         "F12 Asphalt shingles": {
-            "conductivity": 0.02243073021528673,
+            "conductivity": 0.0423061994665788,
             "density": 1120,
             "roughness": "VeryRough",
             "solar_absorptance": 0.7,
@@ -3979,7 +3979,7 @@
             "thickness": 0.0032
         },
         "F13 Built-up roofing": {
-            "conductivity": 0.08972292086114692,
+            "conductivity": 0.1692247978663152,
             "density": 1120,
             "roughness": "Rough",
             "solar_absorptance": 0.7,
@@ -3988,7 +3988,7 @@
             "thickness": 0.0095
         },
         "G01 13mm gypsum board": {
-            "conductivity": 0.08972292086114692,
+            "conductivity": 0.1692247978663152,
             "density": 800.0,
             "roughness": "Smooth",
             "solar_absorptance": 0.7,
@@ -3998,42 +3998,42 @@
             "visible_absorptance": 0.5
         },
         "G01 16mm gypsum board": {
-            "conductivity": 0.08972292086114692,
+            "conductivity": 0.1692247978663152,
             "density": 800,
             "roughness": "MediumSmooth",
             "specific_heat": 1090,
             "thickness": 0.0159
         },
         "G02 16mm plywood": {
-            "conductivity": 0.06729219064586019,
+            "conductivity": 0.1269185983997364,
             "density": 544,
             "roughness": "Smooth",
             "specific_heat": 1210,
             "thickness": 0.0159
         },
         "M10 200mm concrete block basement wall": {
-            "conductivity": 0.7435787066367551,
+            "conductivity": 1.4024505123170874,
             "density": 1842,
             "roughness": "MediumRough",
             "specific_heat": 912,
             "thickness": 0.2032
         },
         "M10 200mm concrete block wall": {
-            "conductivity": 0.4037531438751611,
+            "conductivity": 0.7615115903984184,
             "density": 800,
             "roughness": "MediumRough",
             "specific_heat": 832,
             "thickness": 0.2032
         },
         "M14 150mm heavyweight concrete roof": {
-            "conductivity": 1.2953746699328086,
+            "conductivity": 2.4431830191949255,
             "density": 2322,
             "roughness": "MediumRough",
             "specific_heat": 832,
             "thickness": 0.1524
         },
         "Std Wood 6inch": {
-            "conductivity": 0.06729219064586019,
+            "conductivity": 0.1269185983997364,
             "density": 540.0,
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
@@ -4061,35 +4061,35 @@
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
             "thermal_absorptance": 0.9,
-            "thermal_resistance": 1.64658266125891,
+            "thermal_resistance": 1.06783369996193,
             "visible_absorptance": 0.7
         },
         "Nonres_Exterior_Wall_Insulation_mid": {
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
             "thermal_absorptance": 0.9,
-            "thermal_resistance": 2.36800034244138,
+            "thermal_resistance": 1.59504478476111,
             "visible_absorptance": 0.7
         },
         "Nonres_Exterior_Wall_Insulation_top": {
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
             "thermal_absorptance": 0.9,
-            "thermal_resistance": 2.36800034244138,
+            "thermal_resistance": 1.59504478476111,
             "visible_absorptance": 0.7
         },
         "Nonres_Floor_Insulation": {
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
             "thermal_absorptance": 0.9,
-            "thermal_resistance": 4.13066404430099,
+            "thermal_resistance": 2.88291975297193,
             "visible_absorptance": 0.7
         },
         "Nonres_Roof_Insulation": {
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
             "thermal_absorptance": 0.9,
-            "thermal_resistance": 8.0983868188956,
+            "thermal_resistance": 6.23478687961654,
             "visible_absorptance": 0.7
         },
         "Opaque Door panel_con": {
@@ -4103,7 +4103,7 @@
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
             "thermal_absorptance": 0.9,
-            "thermal_resistance": 1.64658266125891,
+            "thermal_resistance": 1.44456673282738,
             "visible_absorptance": 0.7
         },
         "Res_Exterior_Wall_Insulation_mid": {
@@ -4131,14 +4131,14 @@
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
             "thermal_absorptance": 0.9,
-            "thermal_resistance": 8.0983868188956,
+            "thermal_resistance": 6.23478687961654,
             "visible_absorptance": 0.7
         },
         "Semiheated_Exterior_Wall_Insulation_grd": {
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
             "thermal_absorptance": 0.9,
-            "thermal_resistance": 1.19233851419257,
+            "thermal_resistance": 1.06783369996193,
             "visible_absorptance": 0.7
         },
         "Semiheated_Exterior_Wall_Insulation_mid": {
@@ -4166,7 +4166,7 @@
             "roughness": "MediumSmooth",
             "solar_absorptance": 0.7,
             "thermal_absorptance": 0.9,
-            "thermal_resistance": 4.89189868807721,
+            "thermal_resistance": 3.03502094613738,
             "visible_absorptance": 0.7
         },
         "Std Opaque Door Panel": {
@@ -4342,7 +4342,7 @@
         }
     },
     "Output:Table:Monthly": {
-        "NameHolderMonthlySummary ClimateZone 4C": {
+        "NameHolderMonthlySummary ClimateZone 3B": {
             "digits_after_decimal": 3,
             "variable_details": [
                 {
@@ -4387,7 +4387,7 @@
                 }
             ]
         },
-        "NameHolderMonthlySummary RepresentCity USA_WA_Seattle": {
+        "NameHolderMonthlySummary RepresentCity USA_TX_ElPaso": {
             "digits_after_decimal": 3,
             "variable_details": [
                 {
@@ -9222,7 +9222,7 @@
                     "field": "Until: 07:00"
                 },
                 {
-                    "field": 0.131
+                    "field": 0.144
                 },
                 {
                     "field": "Until: 08:00"
@@ -9234,7 +9234,7 @@
                     "field": "Until: 12:00"
                 },
                 {
-                    "field": 0.131
+                    "field": 0.144
                 },
                 {
                     "field": "Until: 13:00"
@@ -9246,7 +9246,7 @@
                     "field": "Until: 17:00"
                 },
                 {
-                    "field": 0.131
+                    "field": 0.144
                 },
                 {
                     "field": "Until: 18:00"
@@ -9258,7 +9258,7 @@
                     "field": "Until: 19:00"
                 },
                 {
-                    "field": 0.131
+                    "field": 0.144
                 },
                 {
                     "field": "Until: 24:00"
@@ -9617,67 +9617,67 @@
                     "field": "Until: 5:00"
                 },
                 {
-                    "field": 0.1141323175375
+                    "field": 0.11487325
                 },
                 {
                     "field": "Until: 7:00"
                 },
                 {
-                    "field": 0.145834697228125
+                    "field": 0.1467814375
                 },
                 {
                     "field": "Until: 8:00"
                 },
                 {
-                    "field": 0.266305615378125
+                    "field": 0.2680344375
                 },
                 {
                     "field": "Until: 12:00"
                 },
                 {
-                    "field": 0.570652211059375
+                    "field": 0.5743568125
                 },
                 {
                     "field": "Until: 13:00"
                 },
                 {
-                    "field": 0.507247451678125
+                    "field": 0.5105404375
                 },
                 {
                     "field": "Until: 17:00"
                 },
                 {
-                    "field": 0.570652211059375
+                    "field": 0.5743568125
                 },
                 {
                     "field": "Until: 18:00"
                 },
                 {
-                    "field": 0.386776533528125
+                    "field": 0.3892874375
                 },
                 {
                     "field": "Until: 20:00"
                 },
                 {
-                    "field": 0.266305615378125
+                    "field": 0.2680344375
                 },
                 {
                     "field": "Until: 22:00"
                 },
                 {
-                    "field": 0.202900855996875
+                    "field": 0.2042180625
                 },
                 {
                     "field": "Until: 23:00"
                 },
                 {
-                    "field": 0.145834697228125
+                    "field": 0.1467814375
                 },
                 {
                     "field": "Until: 24:00"
                 },
                 {
-                    "field": 0.1141323175375
+                    "field": 0.11487325
                 },
                 {
                     "field": "For: Saturday"
@@ -9686,7 +9686,7 @@
                     "field": "Until: 24:00"
                 },
                 {
-                    "field": 0.1141323175375
+                    "field": 0.11487325
                 },
                 {
                     "field": "For: AllOtherDays"
@@ -9695,7 +9695,7 @@
                     "field": "Until: 24:00"
                 },
                 {
-                    "field": 0.1141323175375
+                    "field": 0.11487325
                 }
             ],
             "schedule_type_limits_name": "Fraction"
@@ -9939,33 +9939,33 @@
     },
     "Site:GroundTemperature:FCfactorMethod": {
         "Site:GroundTemperature:FCfactorMethod 1": {
-            "april_ground_temperature": 4.5,
-            "august_ground_temperature": 13.0,
-            "december_ground_temperature": 15.1,
-            "february_ground_temperature": 8.1,
-            "january_ground_temperature": 11.4,
-            "july_ground_temperature": 10.9,
-            "june_ground_temperature": 8.3,
-            "march_ground_temperature": 5.4,
-            "may_ground_temperature": 5.8,
-            "november_ground_temperature": 18.8,
-            "october_ground_temperature": 17.7,
-            "september_ground_temperature": 15.6
+            "april_ground_temperature": 8.1,
+            "august_ground_temperature": 23.8,
+            "december_ground_temperature": 23.4,
+            "february_ground_temperature": 11.2,
+            "january_ground_temperature": 18.3,
+            "july_ground_temperature": 19.2,
+            "june_ground_temperature": 12.5,
+            "march_ground_temperature": 6.8,
+            "may_ground_temperature": 10.3,
+            "november_ground_temperature": 26.3,
+            "october_ground_temperature": 27.5,
+            "september_ground_temperature": 27.9
         }
     },
     "Site:Location": {
-        "Seattle Seattle Tacoma Intl A_WA_USA Design_Conditions": {
-            "elevation": 122.0,
-            "latitude": 47.47,
-            "longitude": -122.32,
-            "time_zone": -8.0
+        "El Paso International Ap  Ut_TX_USA Design_Conditions": {
+            "elevation": 1186.0,
+            "latitude": 31.77,
+            "longitude": -106.5,
+            "time_zone": -7.0
         }
     },
     "Site:WaterMainsTemperature": {
         "Site:WaterMainsTemperature 1": {
-            "annual_average_outdoor_air_temperature": 11.2166666666667,
+            "annual_average_outdoor_air_temperature": 17.9416666666667,
             "calculation_method": "Correlation",
-            "maximum_difference_in_monthly_average_outdoor_air_temperatures": 14.3
+            "maximum_difference_in_monthly_average_outdoor_air_temperatures": 21.1
         }
     },
     "Sizing:Parameters": {
@@ -10228,42 +10228,42 @@
         }
     },
     "SizingPeriod:DesignDay": {
-        "Seattle Seattle Tacoma Intl A Ann Clg .4% Condns DB=>MWB": {
-            "ashrae_clear_sky_optical_depth_for_beam_irradiance_taub_": 0.352,
-            "ashrae_clear_sky_optical_depth_for_diffuse_irradiance_taud_": 2.561,
-            "barometric_pressure": 99868.0,
-            "daily_dry_bulb_temperature_range": 10.4,
+        "El Paso International Ap  Ut Ann Clg .4% Condns DB=>MWB": {
+            "ashrae_clear_sky_optical_depth_for_beam_irradiance_taub_": 0.605,
+            "ashrae_clear_sky_optical_depth_for_diffuse_irradiance_taud_": 1.547,
+            "barometric_pressure": 87865.0,
+            "daily_dry_bulb_temperature_range": 13,
             "day_of_month": 21,
             "day_type": "SummerDesignDay",
             "daylight_saving_time_indicator": "No",
             "dry_bulb_temperature_range_modifier_type": "DefaultMultipliers",
             "humidity_condition_type": "WetBulb",
-            "maximum_dry_bulb_temperature": 29.4,
-            "month": 8,
+            "maximum_dry_bulb_temperature": 38.1,
+            "month": 7,
             "rain_indicator": "No",
             "snow_indicator": "No",
             "solar_model_indicator": "ASHRAETau",
-            "wetbulb_or_dewpoint_at_maximum_dry_bulb": 18.3,
-            "wind_direction": 350,
-            "wind_speed": 4.2
+            "wetbulb_or_dewpoint_at_maximum_dry_bulb": 18.1,
+            "wind_direction": 280,
+            "wind_speed": 3.9
         },
-        "Seattle Seattle Tacoma Intl A Ann Htg 99.6% Condns DB": {
-            "barometric_pressure": 99868.0,
+        "El Paso International Ap  Ut Ann Htg 99.6% Condns DB": {
+            "barometric_pressure": 87865.0,
             "daily_dry_bulb_temperature_range": 0.0,
             "day_of_month": 21,
             "day_type": "WinterDesignDay",
             "daylight_saving_time_indicator": "No",
             "dry_bulb_temperature_range_modifier_type": "DefaultMultipliers",
             "humidity_condition_type": "WetBulb",
-            "maximum_dry_bulb_temperature": -4.2,
+            "maximum_dry_bulb_temperature": -5.2,
             "month": 12,
             "rain_indicator": "No",
             "sky_clearness": 0.0,
             "snow_indicator": "No",
             "solar_model_indicator": "ASHRAEClearSky",
-            "wetbulb_or_dewpoint_at_maximum_dry_bulb": -4.2,
+            "wetbulb_or_dewpoint_at_maximum_dry_bulb": -5.2,
             "wind_direction": 20,
-            "wind_speed": 4.3
+            "wind_speed": 2.2
         }
     },
     "SurfaceConvectionAlgorithm:Inside": {
@@ -10356,24 +10356,24 @@
     },
     "WindowMaterial:SimpleGlazingSystem": {
         "Glazing Layer East": {
-            "solar_heat_gain_coefficient": 0.27466383464482746,
-            "u_factor": 0.3232010018808446,
-            "visible_transmittance": 0.3949
+            "solar_heat_gain_coefficient": 0.3146890830425968,
+            "u_factor": 0.49303227986842524,
+            "visible_transmittance": 0.2739
         },
         "Glazing Layer North": {
-            "solar_heat_gain_coefficient": 0.27466383464482746,
-            "u_factor": 0.3232010018808446,
-            "visible_transmittance": 0.3949
+            "solar_heat_gain_coefficient": 0.3146890830425968,
+            "u_factor": 0.49303227986842524,
+            "visible_transmittance": 0.2739
         },
         "Glazing Layer South": {
-            "solar_heat_gain_coefficient": 0.27466383464482746,
-            "u_factor": 0.3232010018808446,
-            "visible_transmittance": 0.3949
+            "solar_heat_gain_coefficient": 0.3146890830425968,
+            "u_factor": 0.49303227986842524,
+            "visible_transmittance": 0.2739
         },
         "Glazing Layer West": {
-            "solar_heat_gain_coefficient": 0.27466383464482746,
-            "u_factor": 0.3232010018808446,
-            "visible_transmittance": 0.3949
+            "solar_heat_gain_coefficient": 0.3146890830425968,
+            "u_factor": 0.49303227986842524,
+            "visible_transmittance": 0.2739
         }
     },
     "Zone": {
@@ -10606,7 +10606,7 @@
     "ZoneInfiltration:DesignFlowRate": {
         "Attic_Infiltration": {
             "constant_term_coefficient": 1.0,
-            "design_flow_rate": 0.13933015665738524,
+            "design_flow_rate": 0.3869742452505804,
             "design_flow_rate_calculation_method": "Flow/Zone",
             "schedule_name": "ALWAYS_ON",
             "temperature_term_coefficient": 0.0,
@@ -10616,7 +10616,7 @@
         },
         "Perimeter_ZN_1_Door_Infiltration": {
             "constant_term_coefficient": 1,
-            "design_flow_rate": 0.053236105996627904,
+            "design_flow_rate": 0.25099258812544134,
             "design_flow_rate_calculation_method": "Flow/Zone",
             "schedule_name": "INFIL_Door_Opening_SCH",
             "temperature_term_coefficient": 0.0,
