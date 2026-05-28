@@ -13,17 +13,11 @@ to debug when they break silently:
 - and the **data registry** that maps building IDs from the HuggingFace
   dataset to on-disk files.
 
-If you change those subsystems you should expect to add or update tests; for
-research scripts under `analysis/` and exploratory code, tests are optional.
+If you change those subsystems you should expect to add or update tests.
 
 ---
 
 ## Test design principles
-
-> **Note:** the canonical version of this section lives in `TODO.md` under
-> "Phase T — Test suite cleanup and core coverage" for as long as Phase T is
-> in flight. The snapshot below was taken from that block; update `TODO.md`
-> first and then re-copy here.
 
 These principles govern every test PR in this project. They exist because a
 test that lives in its own parallel universe — hand-rolled mocks, fake config
@@ -41,7 +35,7 @@ passing, and the test becomes false reassurance.
 2. **Mock only at external I/O boundaries.** The HuggingFace
    network call is the only legitimate mock target — and even then,
    the preferred pattern is to point the registry at the committed
-   minimal fixture via the shared `fixture_registry` helper (T0),
+   minimal fixture via the shared `fixture_registry` helper,
    not to monkeypatch ad-hoc. EnergyPlus itself is not mocked.
 3. **Minimal, shared, real fixtures.** Prefer the committed
    minimal-building matrix (one fixture per HVAC type) +
