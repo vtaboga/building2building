@@ -21,9 +21,9 @@ run_periods: [full_year]
 max_buildings_per_type: 8
 tasks: [task_const_e0, task_const_emed, task_const_ehigh, task_occ_e0, task_occ_emed, task_occ_ehigh, task_rand_e0, task_rand_emed, task_rand_ehigh]
 n_runs: 1
-output_csv: baseline_returns_task_study.csv
+output_csv: ${base_dir}/b2b/baseline_returns/baseline_returns_task_study.csv
 
 save_trajectories: true
 plot_trajectories: false
-trajectory_dir: trajectories/task_study
-plot_dir: plots/task_study
+trajectory_dir: ${base_dir}/b2b/baseline_returns/trajectories/task_study
+plot_dir: ${base_dir}/b2b/baseline_returns/plots/task_study

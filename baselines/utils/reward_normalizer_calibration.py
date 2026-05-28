@@ -92,11 +92,11 @@ class BuildingStats:
         )
 
 
-def default_data_dir(cache_basename: str) -> Path:
-    """Return ``$SCRATCH/<cache_basename>/data`` or a ``/tmp`` fallback."""
+def default_data_dir() -> Path:
+    """Return ``$SCRATCH/b2b/reward_normalizers/data`` or a ``/tmp`` fallback."""
     scratch = os.environ.get("SCRATCH")
     root = Path(scratch) if scratch else Path("/tmp")
-    return root / cache_basename / "data"
+    return root / "b2b" / "reward_normalizers" / "data"
 
 
 def cz_key_for(building_type: str, building_id: str) -> str:

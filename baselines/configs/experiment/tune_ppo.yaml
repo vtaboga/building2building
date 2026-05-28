@@ -43,9 +43,9 @@ ntune_seeds: 3                # seeds per (building, trial) — 3 × 10 building
 n_tune_buildings: 2           # buildings per type from the test split (2 × 5 types = 10 total)
 algorithm: tpe
 
-# Paths (use SCRATCH for shared DB on Mila cluster)
-orion_db_dir: ${oc.env:SCRATCH,outputs}/orion_dbs
-results_dir: ${oc.env:SCRATCH,outputs}/chs_results/all_${task}
+# Paths — both rooted under ${base_dir}/b2b/tune_ppo/
+orion_db_dir: ${base_dir}/b2b/tune_ppo/orion_dbs
+results_dir: ${base_dir}/b2b/tune_ppo/results/all_${task}
 
 # Must match --time in launch_chs_sweep.sh.  Workers check remaining wall time
 # before each suggest() call and exit cleanly if a full trial would not fit,

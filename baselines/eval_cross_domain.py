@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import csv
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -55,13 +56,26 @@ def main() -> None:
     parser.add_argument("--embed-dim", type=int, default=64)
     parser.add_argument("--n-heads", type=int, default=4)
     parser.add_argument("--n-layers", type=int, default=2)
-    parser.add_argument("--output", type=str, default="results_cross_domain.csv")
+    parser.add_argument(
+        "--base-dir",
+        type=Path,
+        default=Path(os.environ.get("SCRATCH", "outputs")),
+        help="Root directory; results go under <base_dir>/b2b/eval/",
+    )
+    parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s: %(message)s",
     )
+
+    out_path = (
+        args.output
+        if args.output is not None
+        else args.base_dir / "b2b" / "eval" / "cross_domain_results.csv"
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     ref_env = b2b.new_make_env(
         args.test_building_types[0], split="test", index=0, task=args.task
@@ -111,7 +125,6 @@ def main() -> None:
             except Exception:
                 logger.exception("Failed: %s[%d]", bt, i)
 
-    out_path = Path(args.output)
     fieldnames = [
         "building_type",
         "building_index",

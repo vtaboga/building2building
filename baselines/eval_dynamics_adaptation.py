@@ -21,6 +21,7 @@ import argparse
 import csv
 import json
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -193,7 +194,13 @@ def main() -> None:
     )
     parser.add_argument("--task", type=str, default="task1")
     parser.add_argument("--n-episodes", type=int, default=1)
-    parser.add_argument("--output", type=str, default="results_dynamics.csv")
+    parser.add_argument(
+        "--base-dir",
+        type=Path,
+        default=Path(os.environ.get("SCRATCH", "outputs")),
+        help="Root directory; results go under <base_dir>/b2b/eval/",
+    )
+    parser.add_argument("--output", type=Path, default=None)
     parser.add_argument(
         "--pad-obs-size",
         type=int,
@@ -209,6 +216,13 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s: %(message)s",
     )
+
+    out_path = (
+        args.output
+        if args.output is not None
+        else args.base_dir / "b2b" / "eval" / "dynamics_results.csv"
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     bench = b2b.benchmarks.DynamicsAdaptation(
         difficulty=args.difficulty, task=args.task
@@ -246,7 +260,7 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown approach: {args.approach!r}")
 
-    write_csv(results, Path(args.output))
+    write_csv(results, out_path)
 
     if results:
         scores = [r.normalized_score for r in results if r.normalized_score is not None]
