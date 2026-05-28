@@ -1,8 +1,9 @@
 """Pins the ``prepare_building`` end-to-end pipeline contract.
 
-Asserts that ``prepare_building`` converts a raw IDF/epJSON fixture through the
-full pipeline (upgrade → convert → add outputs → make controllable) and
-produces a valid epJSON with the expected actuator set and output variables.
+Asserts that ``prepare_building`` converts a raw IDF fixture through the full
+pipeline (upgrade → convert → add HVAC meters → add outdoor-air variables →
+set timestep → set run period) and produces a valid epJSON with the expected
+output variables, timestep, and run-period dates.
 """
 
 from __future__ import annotations
