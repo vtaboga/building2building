@@ -70,7 +70,7 @@ sources of false positives, not maximum integration-test purity.
 ```text
 tests/
 ├── conftest.py                  # shared fixtures + EnergyPlus path setup
-├── fixtures/                    # static test data (epJSON, equipment.json, fake dataset)
+├── fixtures/                    # minimal-building matrix (+ manifest), fake dataset, baselines
 ├── quick/                       # short rollouts (≤ ~20 steps); EnergyPlus allowed
 ├── long/                        # multi-day rollouts; gated on B2B_RUN_LONG_TESTS=1
 └── release/                     # dataset / artifact integrity against published HF data
@@ -104,15 +104,48 @@ pytest -k "deadband and not legacy"            # keyword filter
 
 ### Shared fixtures
 
-`tests/conftest.py` exposes three fixtures backed by `tests/fixtures/`:
+`tests/conftest.py` exposes the following fixtures backed by `tests/fixtures/`:
 
-| Fixture             | What it provides                                                                                         |
-| ------------------- | -------------------------------------------------------------------------------------------------------- |
-| `fake_dataset_dir`  | Path to a minimal stand-in for the HuggingFace dataset (one parquet + one `splits.json`).               |
-| `fake_metadata`     | The fake metadata parquet loaded as a `pandas.DataFrame`.                                               |
-| `fake_splits`       | The fake `splits.json` loaded as a nested `dict`.                                                       |
-| `baseline_csv_path` | Path to a small `baseline_returns_fixture.csv` used by scoring tests.                                   |
-| `fixture_registry`  | A `BuildingRegistry` stub pointed at the committed minimal-building fixtures (one per building type), driven by `minimal_fixtures.json`. |
+| Fixture               | What it provides                                                                                         |
+| --------------------- | -------------------------------------------------------------------------------------------------------- |
+| `fake_dataset_dir`    | Path to a minimal stand-in for the HuggingFace dataset (one parquet + one `splits.json`).               |
+| `fake_metadata`       | The fake metadata parquet loaded as a `pandas.DataFrame`.                                               |
+| `fake_splits`         | The fake `splits.json` loaded as a nested `dict`.                                                       |
+| `baseline_csv_path`   | Path to a small `baseline_returns_fixture.csv` used by scoring tests.                                   |
+| `minimal_building_dir`| Path to one minimal-building fixture dir, selectable by `indirect` param (fixture name, HVAC archetype alias, or building type). Defaults to `minimal_officemedium`. |
+| `fixture_registry`    | A `BuildingRegistry` stub pointed at the `minimal_building_dir` fixture, driven by `minimal_fixtures.json`, so `new_make_env` resolves to a real committed building without a HuggingFace download. |
+
+#### The minimal-building fixture matrix
+
+`tests/fixtures/minimal_<buildingtype>/` holds one fixture per building type —
+a byte-faithful copy of a single real building from
+`vtaboga/building2building_dataset`. Together they span the three HVAC
+archetypes and five climate zones:
+
+| Fixture                       | Building type        | HVAC archetype | Climate zone |
+| ----------------------------- | -------------------- | -------------- | ------------ |
+| `minimal_officemedium`        | OfficeMedium         | VAV            | 5            |
+| `minimal_officesmall`         | OfficeSmall          | Unitary        | 3            |
+| `minimal_restaurantfastfood`  | RestaurantFastFood   | Unitary        | 1            |
+| `minimal_retailstandalone`    | RetailStandalone     | HeatingOnly    | 7            |
+| `minimal_warehouse`           | Warehouse            | HeatingOnly    | 4            |
+| `minimal_singlefamilyhouse`   | SingleFamilyHouse    | Unitary        | — (residential) |
+
+Each dir ships a self-consistent `building.epjson` / `equipment.json` /
+`metadata.json` pipeline output plus the building's TMY3 `weather.epw`
+(`minimal_singlefamilyhouse` also ships `in.schedules.csv`). Provenance,
+climate zone, and discovery pins are recorded in each dir's `README.md` and in
+the shared `tests/fixtures/minimal_fixtures.json` manifest that `conftest.py`
+reads. Regenerate the whole matrix with:
+
+```bash
+python tests/fixtures/regenerate_minimal_fixtures.py
+```
+
+The residential `minimal_singlefamilyhouse` fixture references its schedules
+through a relative `Schedule:File`, so it cannot be used by tests that relocate
+the epJSON before running EnergyPlus (e.g. `test_pipeline_discovery.py`); it is
+still covered by the static schema / actuator / env-construction tests.
 
 In addition, `conftest.py` calls `building2building.env.setup_energyplus_path()`
 once at collection time (guarded by `ModuleNotFoundError`), so any test that
@@ -213,12 +246,19 @@ before pushing.
 
 - **`test_pipeline_prepare_building.py`** — End-to-end check that
   `prepare_building` converts raw IDF fixtures through the full pipeline
-  (upgrade → convert → add outputs → make controllable) for both a VAV
-  multi-zone building and an SFH with `Schedule:File` rewriting.
+  (upgrade → convert → add HVAC meters → add outdoor-air variables →
+  set timestep → set run period) for both a VAV multi-zone building and
+  an SFH with `Schedule:File` rewriting. Pins HVAC/gas meters, outdoor-air
+  output variables, timestep value, and full-year run-period dates.
 - **`test_pipeline_make_controllable.py`** — Pins the actuator-emission
   contract for `make_controllable` across all six building-type fixtures
-  (covering the VAV, Unitary, and HeatingOnly archetypes): asserts that each
-  required `(object-type, actuator-type)` pair is present in the output.
+  (covering the VAV, Unitary, and HeatingOnly archetypes). Asserts that each
+  required `(component-type, control-type)` pair is present, that no
+  actuator description contains `"autosized"`, and — critically — that every
+  emitted `Schedule:Constant` and `Outdoor Air Controller` actuator's
+  `component_name` is an actual key in the corresponding epJSON section.
+  This last check closes the silent-mismatch hole where an actuator handle
+  can reference a name that does not exist in the output file.
 - **`test_pipeline_discovery.py`** — Pins `extract_discovery_metadata`
   (net conditioned area, warmup phases, HVAC actuator count) against values
   committed in each minimal fixture's `README.md`. Runs on the five commercial
@@ -230,9 +270,10 @@ before pushing.
   `"summer"` period alias.
 - **`test_equipment_schema.py`** — Pins the equipment-schema round-trip
   (cattrs `structure` / `unstructure`) for all six building-type fixtures
-  (covering the VAV, Unitary, and HeatingOnly archetypes). Asserts the
-  expected schema class and that actuator descriptions survive the
-  round-trip.
+  (covering the VAV, Unitary, and HeatingOnly archetypes). Asserts that every
+  required equipment type is actually present (not merely permitted), and that
+  actuator descriptions survive the `structure → unstructure → structure`
+  round-trip element-by-element without loss.
 - **`test_officemedium_actuator_set.py`** — Regression test for the
   OfficeMedium OA-mixer actuator. Pins that
   `make_vav_system_controllable` emits exactly one
