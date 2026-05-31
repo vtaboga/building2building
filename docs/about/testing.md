@@ -395,7 +395,7 @@ B2B_RUN_LONG_TESTS=1 pytest tests/long -s
   `SingleFamilyHouse / task_const_e0 / winter` env: `reset` returns
   `(np.ndarray, dict)`, `step` returns a 5-tuple, `observation_space.contains(obs)`,
   and a 10-step episode runs without crashing.
-- **`test_env_leak.py`** — Acceptance criteria for TODO B0 (env leak fix):
+- **`test_env_leak.py`** — Acceptance criteria:
 
   1. `env.close()` leaves no leftover EnergyPlus output directory.
   2. `threading.active_count()` returns to its baseline after every
@@ -444,12 +444,12 @@ B2B_RUN_LONG_TESTS=1 pytest tests/long -s
   from each of `DynamicsAdaptation`, `GoalAdaptation`,
   `CrossDomainGeneralization`, and `ActionSpaceTransfer` to confirm the
   factory plumbing works end-to-end.
-- **`test_generate_raw_dataset_matches_existing.py`** — Stage 1 validation
-  (Phase G item G3): regenerates IDF fixtures and asserts that the resulting
+- **`test_generate_raw_dataset_matches_existing.py`** — regenerates IDF 
+  fixtures and asserts that the resulting
   epJSON metadata rows match the upstream HuggingFace reference for
   `(building_type, place, source_idf, weather_file)` columns and LHS
   parameter values.
-- **`test_generate_dataset.py`** — Stage 2 smoke test (Phase G item G4):
+- **`test_generate_dataset.py`** — Stage 2 smoke test:
   regenerates one `OfficeMedium` building via `generate_dataset.py` and
   validates the written artifacts: `equipment.json` round-trips through
   cattrs, `action_dim` in the metadata parquet matches the actuator count,
@@ -461,8 +461,8 @@ B2B_RUN_LONG_TESTS=1 pytest tests/long -s
 
 These tests check the integrity of the published dataset and baseline
 artifacts against the live `vtaboga/building2building_dataset` on
-HuggingFace. They are **not** run on every push; CI automation is deferred
-item TZ1. Run them manually before a release:
+HuggingFace. They are **not** run on every push; Run them manually before
+a release:
 
 ```bash
 pytest -m release

@@ -5,59 +5,65 @@ source:
   run_period: full_year
   split: train
   aggregation: median
+  SingleFamilyHouse_source: house_selection_rollout_cache_1000_buildings
 floor:
   epsilon_abs: 1.0e-6
   epsilon_rel: 0.05
 constants:
   SingleFamilyHouse:
-    cz0: &default_bucket
+    cz0:
+      tau_T: 23.6972
+      tau_E: 0.892784
+      tau_T_iqr: 30.5459
+      tau_E_iqr: 0.693279
+      n_buildings: 1000
+  Warehouse:
+    cz1: &placeholder_bucket
       tau_T: 1.0
       tau_E: 1.0
       tau_T_iqr: 0.0
       tau_E_iqr: 0.0
       n_buildings: 1
-  Warehouse:
-    cz1: *default_bucket
-    cz2: *default_bucket
-    cz3: *default_bucket
-    cz4: *default_bucket
-    cz5: *default_bucket
-    cz6: *default_bucket
-    cz7: *default_bucket
-    cz8: *default_bucket
+    cz2: *placeholder_bucket
+    cz3: *placeholder_bucket
+    cz4: *placeholder_bucket
+    cz5: *placeholder_bucket
+    cz6: *placeholder_bucket
+    cz7: *placeholder_bucket
+    cz8: *placeholder_bucket
   RetailStandalone:
-    cz1: *default_bucket
-    cz2: *default_bucket
-    cz3: *default_bucket
-    cz4: *default_bucket
-    cz5: *default_bucket
-    cz6: *default_bucket
-    cz7: *default_bucket
-    cz8: *default_bucket
+    cz1: *placeholder_bucket
+    cz2: *placeholder_bucket
+    cz3: *placeholder_bucket
+    cz4: *placeholder_bucket
+    cz5: *placeholder_bucket
+    cz6: *placeholder_bucket
+    cz7: *placeholder_bucket
+    cz8: *placeholder_bucket
   RestaurantFastFood:
-    cz1: *default_bucket
-    cz2: *default_bucket
-    cz3: *default_bucket
-    cz4: *default_bucket
-    cz5: *default_bucket
-    cz6: *default_bucket
-    cz7: *default_bucket
-    cz8: *default_bucket
+    cz1: *placeholder_bucket
+    cz2: *placeholder_bucket
+    cz3: *placeholder_bucket
+    cz4: *placeholder_bucket
+    cz5: *placeholder_bucket
+    cz6: *placeholder_bucket
+    cz7: *placeholder_bucket
+    cz8: *placeholder_bucket
   OfficeMedium:
-    cz1: *default_bucket
-    cz2: *default_bucket
-    cz3: *default_bucket
-    cz4: *default_bucket
-    cz5: *default_bucket
-    cz6: *default_bucket
-    cz7: *default_bucket
-    cz8: *default_bucket
+    cz1: *placeholder_bucket
+    cz2: *placeholder_bucket
+    cz3: *placeholder_bucket
+    cz4: *placeholder_bucket
+    cz5: *placeholder_bucket
+    cz6: *placeholder_bucket
+    cz7: *placeholder_bucket
+    cz8: *placeholder_bucket
   OfficeSmall:
-    cz1: *default_bucket
-    cz2: *default_bucket
-    cz3: *default_bucket
-    cz4: *default_bucket
-    cz5: *default_bucket
-    cz6: *default_bucket
-    cz7: *default_bucket
-    cz8: *default_bucket
+    cz1: *placeholder_bucket
+    cz2: *placeholder_bucket
+    cz3: *placeholder_bucket
+    cz4: *placeholder_bucket
+    cz5: *placeholder_bucket
+    cz6: *placeholder_bucket
+    cz7: *placeholder_bucket
+    cz8: *placeholder_bucket

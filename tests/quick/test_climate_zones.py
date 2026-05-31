@@ -127,8 +127,7 @@ class TestPublicApi:
 class TestRealDatasetClimateZones:
     """End-to-end check against the published ``vtaboga/building2building_dataset``.
 
-    Requires network access and that Phase A's re-published parquet (with the
-    ``climate_zone`` column and ``San.Diego`` rename) is available.
+    Requires network access
     """
 
     def test_all_multizone_rows_have_climate_zone(self) -> None:
