@@ -12,7 +12,7 @@ source:
   action_space: rl_wrapped_rescaled_box
   seed: sha256(building_type/building_id) first 32 bits
   aggregation: median_over_buildings
-  git_sha: ec068cb290df6b980f6763f158f16143624cb1f1
+  git_sha: 2a689a6ad1cf58c019674f87a9721ce5a0c23656
   b2b_version: '0.1.0'
 floor:
   epsilon_abs: 1.0e-6
@@ -56,7 +56,7 @@ constants:
       cz7: { tau_T: 64.7918, tau_E: 4.5557, tau_T_iqr: 10.7775, tau_E_iqr: 0.834845, n_buildings: 57 }
       cz8: { tau_T: 71.6193, tau_E: 4.51624, tau_T_iqr: 10.2916, tau_E_iqr: 0.906051, n_buildings: 57 }
     SingleFamilyHouse:
-      cz0: { tau_T: 22.2461, tau_E: 1.44929, tau_T_iqr: 47.9527, tau_E_iqr: 1.1545, n_buildings: 893 }
+      cz0: { tau_T: 16.5083, tau_E: 1.16534, tau_T_iqr: 18.8502, tau_E_iqr: 0.71986, n_buildings: 894 }
     Warehouse:
       cz1: { tau_T: 119.555, tau_E: 1.23786, tau_T_iqr: 11.0669, tau_E_iqr: 0.236846, n_buildings: 55 }
       cz2: { tau_T: 73.0413, tau_E: 1.64546, tau_T_iqr: 5.6607, tau_E_iqr: 0.279063, n_buildings: 112 }
@@ -104,7 +104,7 @@ constants:
       cz7: { tau_T: 54.2841, tau_E: 4.29457, tau_T_iqr: 7.08973, tau_E_iqr: 1.34438, n_buildings: 57 }
       cz8: { tau_T: 52.1976, tau_E: 4.05339, tau_T_iqr: 7.08506, tau_E_iqr: 1.37784, n_buildings: 57 }
     SingleFamilyHouse:
-      cz0: { tau_T: 25.2607, tau_E: 1.21114, tau_T_iqr: 85.2003, tau_E_iqr: 1.66523, n_buildings: 893 }
+      cz0: { tau_T: 12.277, tau_E: 0.876562, tau_T_iqr: 13.1606, tau_E_iqr: 0.966718, n_buildings: 900 }
     Warehouse:
       cz1: { tau_T: 98.0451, tau_E: 0.837994, tau_T_iqr: 21.3551, tau_E_iqr: 0.200914, n_buildings: 55 }
       cz2: { tau_T: 73.9842, tau_E: 0.990137, tau_T_iqr: 16.2441, tau_E_iqr: 0.217653, n_buildings: 112 }
@@ -152,7 +152,7 @@ constants:
       cz7: { tau_T: 80.0885, tau_E: 3.97168, tau_T_iqr: 10.0211, tau_E_iqr: 0.716088, n_buildings: 57 }
       cz8: { tau_T: 77.9797, tau_E: 4.1615, tau_T_iqr: 11.9745, tau_E_iqr: 0.823456, n_buildings: 57 }
     SingleFamilyHouse:
-      cz0: { tau_T: 53.0043, tau_E: 1.13884, tau_T_iqr: 144.182, tau_E_iqr: 1.24382, n_buildings: 893 }
+      cz0: { tau_T: 23.7821, tau_E: 0.897059, tau_T_iqr: 30.1621, tau_E_iqr: 0.701092, n_buildings: 900 }
     Warehouse:
       cz1: { tau_T: 109.402, tau_E: 1.27044, tau_T_iqr: 8.09128, tau_E_iqr: 0.226775, n_buildings: 55 }
       cz2: { tau_T: 74.9797, tau_E: 1.56777, tau_T_iqr: 5.40749, tau_E_iqr: 0.282514, n_buildings: 112 }

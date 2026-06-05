@@ -603,9 +603,9 @@ def main(cfg: DictConfig) -> None:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     if is_vav:
-        fname = f"air_loop_{building_type.lower()}_{task}_cz{climate_zone}.yaml"
+        fname = f"air_loop_{building_type.lower()}_cz{climate_zone}.yaml"
     else:
-        fname = f"unitary_hvac_{building_type.lower()}_{task}_cz{climate_zone}.yaml"
+        fname = f"unitary_hvac_{building_type.lower()}_cz{climate_zone}.yaml"
 
     out_path = output_dir / fname
     cfg_dict = _config_to_dict(best_cfg)
