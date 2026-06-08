@@ -49,7 +49,6 @@ from baselines.utils.reward_normalizer_calibration import (
 
 logger = logging.getLogger(__name__)
 
-CACHE_BASENAME = "b2b_reward_normalizers_random"
 GENERATOR_MODULE = "baselines.compute_random_policy_reward_normalizers"
 
 # Placeholder normalizers for env construction only.  Rollouts recompute
@@ -198,9 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    data_dir = args.data_dir if args.data_dir is not None else default_data_dir(
-        CACHE_BASENAME
-    )
+    data_dir = args.data_dir if args.data_dir is not None else default_data_dir()
     if args.data_dir is None and "SCRATCH" not in os.environ:
         logger.warning(
             "$SCRATCH is not set; using %s for per-building cache.",

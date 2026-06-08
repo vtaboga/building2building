@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -598,7 +599,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--run-period", default="full_year", choices=["full_year", "winter", "summer"]
     )
-    p.add_argument("--output-dir", required=True, type=Path)
+    p.add_argument(
+        "--base-dir",
+        type=Path,
+        default=Path(os.environ.get("SCRATCH", "outputs")),
+        help="Root directory; results go under <base_dir>/b2b/analysis/tuned_controllers/",
+    )
+    p.add_argument("--output-dir", required=False, default=None, type=Path)
     p.add_argument(
         "--deadband-c",
         type=float,
@@ -613,6 +620,12 @@ def main(argv: list[str] | None = None) -> None:
         level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s: %(message)s"
     )
     args = parse_args(argv)
+
+    output_dir = (
+        args.output_dir
+        if args.output_dir is not None
+        else args.base_dir / "b2b" / "analysis" / "tuned_controllers"
+    )
 
     if args.building_id is not None:
         building_ids = [args.building_id]
@@ -644,7 +657,7 @@ def main(argv: list[str] | None = None) -> None:
                 args.task,
                 run_period=args.run_period,
             )
-            save_artifacts(art, args.output_dir, deadband_c=args.deadband_c)
+            save_artifacts(art, output_dir, deadband_c=args.deadband_c)
         except Exception:
             logger.exception(
                 "Rollout failed: %s / %s cz=%d",
