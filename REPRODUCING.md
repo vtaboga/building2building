@@ -328,13 +328,45 @@ Computes the per-`(building_type, climate_zone)` `(τ_T, τ_E)`
 constants under the SAC-warmup uniform-random reference controller.
 
 ```bash
-python -m analysis.task_study.compute_random_policy_reward_normalizers \
+python -m baselines.compute_random_policy_reward_normalizers \
     --mode aggregate
 ```
 
 **Artefact:** `building2building/data/reward_normalizers.yaml`
 (committed). Sanity plot lives under `analysis/` (gitignored;
 location documented in `notes.md` § "Calibration sanity plot").
+
+#### Full regeneration (M4: post-D2 calibration-script fix)
+
+The per-building rollout cache under
+`$SCRATCH/b2b_reward_normalizers_random/data/<run_period>/<bt>/<bid>.json`
+is keyed by `(run_period, building_type, building_id)` only -- no
+content hash and no schema marker.  As part of Phase M (M4) the
+calibration scripts were rewritten to read the
+`(temp_penalty, power_penalty)` decomposition directly from
+`info["raw_observation"]` (the pre-D2 path back-extracted
+`temp_penalty` from the un-normalized `task3` reward, which no
+longer exists), so **every cached JSON predating that fix is stale
+regardless of building type**.  Wipe the entire cache once and
+re-roll the full 48-bucket array:
+
+```bash
+# 1. One-time full-cache wipe (semantics of the cached JSON changed).
+rm -rf $SCRATCH/b2b_reward_normalizers_random/data/
+
+# 2. Full re-roll: 5 commercial types x 8 CZ + 8 SFH shards = 48 tasks.
+sbatch \
+    baselines/scripts/launch_compute_random_policy_reward_normalizers.sh
+
+# 3. After the array finishes, aggregate.
+python -m baselines.compute_random_policy_reward_normalizers \
+    --mode aggregate
+```
+
+Then commit the resulting `building2building/data/reward_normalizers.yaml`.
+The diff touches every row (all building types, all climate zones,
+all three run periods); this is expected -- it is the first regen
+under the post-D2 calibration semantics.
 
 ### B2. SAC diagnostic ablation
 
@@ -430,6 +462,103 @@ B2B_RUN_LONG_TESTS=1 pytest -m long
 
 ---
 
+## Dataset regeneration
+
+The dataset has two stages; each has its own entry point.
+
+### Stage 1 — raw epJSON archive (run once per dataset version)
+
+Applies Latin Hypercube Sampling over 7 envelope/geometry parameters to
+the 16 ASHRAE 90.1-2022 prototype IDFs, producing the
+`vtaboga/multizones_reference_buildings.zip` layout (6000 epJSONs +
+`metadata.csv` + 16 EPWs).
+
+**Single machine (all 6 types, 1000 samples each):**
+
+```bash
+python -m building2building.pipeline.generate_raw_dataset \
+    --output-dir "$SCRATCH/b2b_raw_dataset" \
+    --merge-metadata
+```
+
+**Slurm array (one task per building type, last task merges metadata):**
+
+```bash
+sbatch building2building/pipeline/scripts/generate_raw_dataset.sh
+```
+
+Stage 1 only needs to run if the LHS sampling, prototype IDFs, or
+parameter ranges change.  For pipeline changes (actuator inventory,
+schedules, HVAC control), run Stage 2 instead.
+
+### Stage 2 — processed HF dataset (run whenever pipeline code changes)
+
+Re-derives the controllable artefacts (`building.epjson`,
+`equipment.json`, `metadata.json`) for the affected building types and
+rewrites `metadata.parquet`.
+
+**Single machine (slow but reproducible):**
+
+```bash
+python -m building2building.pipeline.generate_dataset \
+    --building-type OfficeMedium \
+    --output-dir "$SCRATCH/b2b_gen_dataset_OfficeMedium" \
+    --write-metadata-parquet
+```
+
+**Slurm array (recommended — 20 shards × 50 buildings each):**
+
+```bash
+sbatch building2building/pipeline/scripts/generate_dataset.sh \
+    --export=BUILDING_TYPE=OfficeMedium
+```
+
+> **Other building types.** Pass `--building-type` as a repeatable flag
+> to regenerate `Warehouse`, `RetailStandalone`, `RestaurantFastFood`,
+> and `OfficeSmall`.  `SingleFamilyHouse` has a different upstream source
+> and is out of scope.
+
+After all shards finish, the staging directory holds the per-building
+artefacts plus the rewritten `metadata.parquet` and `splits.json`.
+The current HF revision still uses the legacy per-type-zip layout
+(`<BuildingType>.zip` at the repo root), so the upload step zips
+the staging dir's `<BuildingType>/` tree and replaces the legacy zip:
+
+```bash
+cd "$SCRATCH/b2b_gen_dataset_<BuildingType>"
+
+# Build the per-building-type zip from the staging tree.  Internal
+# layout matches the legacy zip: top-level entries are
+# <BuildingType>-NNNN/ (containing building.epjson, equipment.json,
+# metadata.json, and the per-building EPW).
+rm -f <BuildingType>.zip
+(cd <BuildingType> && zip -rq ../<BuildingType>.zip .)
+
+# Replace the legacy zip and refresh the unified metadata.parquet in
+# a single commit.  Note: `huggingface-cli upload` is deprecated in
+# huggingface_hub >= 1.14; use `hf upload` instead.
+hf upload \
+    vtaboga/building2building_dataset \
+    . . \
+    --repo-type dataset \
+    --revision main \
+    --include '<BuildingType>.zip' \
+    --include 'metadata.parquet' \
+    --include 'splits.json' \
+    --commit-message "Regenerate <BuildingType> with post-M1 action space"
+```
+
+The package's pinned `REVISION = "main"` in
+`building2building/data/download.py` then resolves to the new dataset
+on first cache miss.  Users with a stale local cache will see a
+loud `cattrs.ClassValidationError` on the missing `oa_mass_flow`
+field — clearing
+`~/.cache/huggingface/hub/datasets--vtaboga--building2building_dataset/`
+fetches the new copy.  See `notes.md` § "OfficeMedium OA-mixer fix"
+Q5 for the rationale.
+
+---
+
 ## Cheat sheet
 
 | Artefact | Command (single line, drop into a shell) |
@@ -439,9 +568,10 @@ B2B_RUN_LONG_TESTS=1 pytest -m long
 | SAC specialist (Fig 4) | `python -m baselines.train_sac experiment=train_sac_task_study --multirun seed=0,1,2` |
 | Dynamics adaptation (Fig 5a/b) | `for d in easy medium hard; do for ap in specialist baseline parameterized; do python -m baselines.train_dynamics_adaptation experiment=train_dynamics_${ap} difficulty=${d}; done; done` |
 | Cross-domain (Fig 7) | `python -m baselines.train_cross_domain experiment=train_cross_domain` |
-| Reward normalizers | `python -m analysis.task_study.compute_random_policy_reward_normalizers --mode aggregate` |
+| Reward normalizers | `sbatch baselines/scripts/launch_compute_random_policy_reward_normalizers.sh` then `python -m baselines.compute_random_policy_reward_normalizers --mode aggregate` |
 | SAC B2 ablation | `sbatch --array=0-89 analysis/task_study/sac_diagnostic/submit_ablation.sh` |
 | Reactive controller tuning | `sbatch baselines/scripts/tune_controller.sh` |
+| HF dataset regen (Stage 2, OfficeMedium) | `sbatch building2building/pipeline/scripts/generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium` |
 
 ---
 

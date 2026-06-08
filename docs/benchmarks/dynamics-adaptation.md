@@ -7,6 +7,28 @@ buildings of the same type**. The reward and action space stay fixed; only the
 building dynamics (insulation, orientation, HVAC sizing, etc.) change between
 training and test.
 
+| Axis | Train | Test |
+|---|---|---|
+| Building dynamics | Seen (train split) | Unseen (test split) |
+| Reward | Fixed | Fixed |
+| Action space | Fixed | Fixed |
+
+## Metric
+
+Evaluate with `compute_normalized_score` per test building, then average:
+
+```python
+import building2building as b2b
+
+scores = []
+for env in bench.make_test_envs(n=4):
+    traj = b2b.rollout(env, controller=my_policy)
+    scores.append(b2b.compute_normalized_score(traj))
+mean_score = sum(scores) / len(scores)
+```
+
+A score of 0.0 matches the reactive-controller baseline; 1.0 is perfect.
+
 ## Difficulty Levels
 
 | Difficulty | Building Type | Action Dim | Description |

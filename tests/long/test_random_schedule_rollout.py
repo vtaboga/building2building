@@ -20,7 +20,6 @@ from building2building.types import (
     TaskConfig,
 )
 
-
 pytestmark = pytest.mark.long
 
 N_STEPS = 24 * 12 * 3  # 3 days at 5-min resolution

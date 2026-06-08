@@ -57,7 +57,14 @@ temp_stl_upper_bound = 50.0  # fallback; overridden per-system when possible
 
 STD_AIR_DENSITY = 1.2  # kg/m³ at ~20 °C, 101.325 kPa
 DEFAULT_FAN_MAX_KGS = 15.0  # fallback when design data is unavailable
-DEFAULT_SAT_MAX_C = 60.0  # fallback when maximum_supply_air_temperature is Autosize or missing
+DEFAULT_SAT_MAX_C = (
+    60.0  # fallback when maximum_supply_air_temperature is Autosize or missing
+)
+# Upper bound on the ``Controller:OutdoorAir × Air Mass Flow Rate`` EMS
+# actuator (kg/s). 5.0 kg/s exceeds the DOE OfficeMedium per-loop design
+# supply-air flow (~4-6 kg/s) while staying well below the unphysical
+# range; see notes.md § "OfficeMedium OA-mixer fix" Q2.
+OA_MASS_FLOW_MAX_KGS = 5.0
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +102,7 @@ def _set_dx_cooling_compressor_lockout(
             return
 
 
-def _read_fan_design_flow_kgs(
-    obj: dict[str, Any], fan_name: str
-) -> float | None:
+def _read_fan_design_flow_kgs(obj: dict[str, Any], fan_name: str) -> float | None:
     """Read the fan's design max air flow [m³/s] from the epJSON and convert to kg/s.
 
     EnergyPlus object names are case-insensitive, so we fall back to a
@@ -177,9 +182,7 @@ def _ensure_always_on_availability(
     avail_list_name = loop_obj.get("availability_manager_list_name")
     if not avail_list_name:
         return
-    avail_list = obj.get("AvailabilityManagerAssignmentList", {}).get(
-        avail_list_name
-    )
+    avail_list = obj.get("AvailabilityManagerAssignmentList", {}).get(avail_list_name)
     if avail_list is None:
         return
 
@@ -187,7 +190,10 @@ def _ensure_always_on_availability(
     scheduled_mgrs = obj.setdefault("AvailabilityManager:Scheduled", {})
 
     for mgr in avail_list.get("managers", []):
-        if mgr.get("availability_manager_object_type") != "AvailabilityManager:NightCycle":
+        if (
+            mgr.get("availability_manager_object_type")
+            != "AvailabilityManager:NightCycle"
+        ):
             continue
         old_name = mgr.get("availability_manager_name", "")
         night_cycle_mgrs.pop(old_name, None)
@@ -198,7 +204,10 @@ def _ensure_always_on_availability(
         mgr["availability_manager_name"] = new_name
         mgr["availability_manager_object_type"] = "AvailabilityManager:Scheduled"
 
-    if "AvailabilityManager:NightCycle" in obj and not obj["AvailabilityManager:NightCycle"]:
+    if (
+        "AvailabilityManager:NightCycle" in obj
+        and not obj["AvailabilityManager:NightCycle"]
+    ):
         del obj["AvailabilityManager:NightCycle"]
 
 
@@ -310,8 +319,7 @@ def make_unitary_controllable(
     # Step 1: zone -> terminal_inlet_node
     # Walk: EquipmentConnections -> EquipmentList -> ADU -> NoReheat terminal
     zone_to_terminal_inlet: dict[str, str] = {
-        str(row.zone): str(row.terminalInletNode)
-        for row in g.query("""
+        str(row.zone): str(row.terminalInletNode) for row in g.query("""
             SELECT ?zone ?terminalInletNode
             WHERE {
                 ?equipConn a "ZoneHVAC:EquipmentConnections" .
@@ -350,8 +358,7 @@ def make_unitary_controllable(
     # demand_side_inlet_node_names can be either a direct node literal (VAV
     # buildings) or a NodeList name (UnitarySystem buildings) — handle both.
     splitter_inlet_to_loop: dict[str, str] = {
-        str(row.demandInletNode): str(row.loop)
-        for row in g.query("""
+        str(row.demandInletNode): str(row.loop) for row in g.query("""
             SELECT ?loop ?demandInletNode
             WHERE {
                 ?loop a "AirLoopHVAC" .
@@ -401,8 +408,7 @@ def make_unitary_controllable(
     # Step 5: loop_name -> demand_side_inlet_node
     # Needed to clean up SingleZone SPMs that target the demand inlet.
     loop_to_demand_inlet: dict[str, str] = {
-        str(row.loop): str(row.demandInletNode)
-        for row in g.query("""
+        str(row.loop): str(row.demandInletNode) for row in g.query("""
             SELECT ?loop ?demandInletNode
             WHERE {
                 ?loop a "AirLoopHVAC" .
@@ -496,7 +502,9 @@ def make_unitary_controllable(
             )
             sat_max = DEFAULT_SAT_MAX_C
         temp_stl_name = create_temp_stl(
-            obj, temp_stl_lower_bound, sat_max,
+            obj,
+            temp_stl_lower_bound,
+            sat_max,
             name="unitaryhvac temperature setpoints stl",
         )
 
@@ -513,8 +521,7 @@ def make_unitary_controllable(
             to_delete = [
                 name
                 for name, spm in obj[spm_type].items()
-                if spm.get("setpoint_node_or_nodelist_name", "").upper()
-                == outlet_upper
+                if spm.get("setpoint_node_or_nodelist_name", "").upper() == outlet_upper
             ]
             for name in to_delete:
                 del obj[spm_type][name]
@@ -525,9 +532,7 @@ def make_unitary_controllable(
             22,
             name="unitaryhvac temp setpoint schedule",
         )
-        spm_label = (
-            f"B2B Unitary TEMP SPM for {outlet_node} ({gensym()})"
-        )
+        spm_label = f"B2B Unitary TEMP SPM for {outlet_node} ({gensym()})"
         setpoint_managers[spm_label] = {
             "control_variable": "Temperature",
             "schedule_name": sched_constant_name,
@@ -675,9 +680,7 @@ def make_heating_only_controllable(
     ont = Ontology.from_object(obj)
     g = ont.rdf
 
-    htg_stl_name = create_temp_stl(
-        obj, 10.0, 35.0, name="heating only setpoint stl"
-    )
+    htg_stl_name = create_temp_stl(obj, 10.0, 35.0, name="heating only setpoint stl")
 
     onoff_stl = create_onoff_availability_stl(obj, name="heating only availability")
     always_on_sched = create_schedule_constant(
@@ -704,17 +707,13 @@ def make_heating_only_controllable(
 
     for heating_type in HEATING_ONLY_EQUIPMENT_TYPES:
         type_literal = rdflib.Literal(heating_type)
-        for row in g.query(
-            equip_query, initBindings={"equipType": type_literal}
-        ):
+        for row in g.query(equip_query, initBindings={"equipType": type_literal}):
             zone = str(row.zone)
             equip_name = str(row.equipName)
 
             type_section = obj.get(heating_type, {})
             if equip_name in type_section:
-                type_section[equip_name]["availability_schedule_name"] = (
-                    always_on_sched
-                )
+                type_section[equip_name]["availability_schedule_name"] = always_on_sched
 
             if zone in zones_seen:
                 continue
@@ -779,6 +778,11 @@ class VAVTerminal:
 class VAVSystem:
     supply_temp_setpoint: ActuatorDescription
     terminals: list[VAVTerminal]
+    # Per-loop outdoor-air mixer actuator. Exposes the
+    # ``Controller:OutdoorAir × Air Mass Flow Rate`` EMS actuator (kg/s).
+    # Required for OfficeMedium so the agent can regulate the mixed-air
+    # fraction; see notes.md § "OfficeMedium OA-mixer fix".
+    oa_mass_flow: ActuatorDescription
     equipment_type: Literal["vavsystem"] = "vavsystem"
 
     def actuator_descriptions(self) -> list[ActuatorDescription]:
@@ -787,6 +791,7 @@ class VAVSystem:
             out.append(vav.flow_fraction)
             out.append(vav.heating_setpoint)
             out.append(vav.cooling_setpoint)
+        out.append(self.oa_mass_flow)
         return out
 
     def zones(self) -> list[str]:
@@ -822,9 +827,7 @@ def remove_thermostat_ems_overrides(obj: dict[str, Any]) -> None:
     ems_programs = obj.get("EnergyManagementSystem:Program", {})
     programs_to_remove: set[str] = set()
     for prog_name, prog in ems_programs.items():
-        lines = " ".join(
-            l.get("program_line", "") for l in prog.get("lines", [])
-        )
+        lines = " ".join(l.get("program_line", "") for l in prog.get("lines", []))
         if any(act_name in lines for act_name in target_actuator_names):
             programs_to_remove.add(prog_name)
 
@@ -833,9 +836,7 @@ def remove_thermostat_ems_overrides(obj: dict[str, Any]) -> None:
     ivar_names: set[str] = set()
     for prog_name in programs_to_remove:
         prog = ems_programs[prog_name]
-        lines = " ".join(
-            l.get("program_line", "") for l in prog.get("lines", [])
-        )
+        lines = " ".join(l.get("program_line", "") for l in prog.get("lines", []))
         for sname in obj.get("EnergyManagementSystem:Sensor", {}):
             if sname in lines:
                 sensor_names.add(sname)
@@ -844,9 +845,7 @@ def remove_thermostat_ems_overrides(obj: dict[str, Any]) -> None:
                 ivar_names.add(ivname)
 
     # 4. Delete calling managers that reference removed programs.
-    for pcm_name in list(
-        obj.get("EnergyManagementSystem:ProgramCallingManager", {})
-    ):
+    for pcm_name in list(obj.get("EnergyManagementSystem:ProgramCallingManager", {})):
         pcm = obj["EnergyManagementSystem:ProgramCallingManager"][pcm_name]
         progs = [p.get("program_name", "") for p in pcm.get("programs", [])]
         if any(p in programs_to_remove for p in progs):
@@ -1088,10 +1087,125 @@ def make_vav_system_controllable(
     # commands on the SAT or flow-fraction actuators, which mechanically
     # caps cooling control.  ``AvailabilityManager:NightCycle`` on the
     # air loop is also neutralized for the same reason.
-    vav_onoff_stl = create_onoff_availability_stl(obj, name="vav always on availability")
+    vav_onoff_stl = create_onoff_availability_stl(
+        obj, name="vav always on availability"
+    )
     vav_always_on_sched = create_schedule_constant(
         obj, vav_onoff_stl, 1, name="vav always on availability"
     )
+
+    def _find_oa_controllers_for_loop(loop_name: str) -> list[str]:
+        """Return the ``Controller:OutdoorAir`` names attached to *loop_name*.
+
+        Walks ``AirLoopHVAC`` → ``BranchList`` → ``Branch`` → components,
+        keeping only ``AirLoopHVAC:OutdoorAirSystem`` components on the
+        loop, then resolves their controller list to the
+        ``Controller:OutdoorAir`` entries.
+        """
+        oa_systems_on_loop: list[str] = []
+        query = """
+            SELECT ?loop ?compType ?compName
+            WHERE {
+                ?loop a "AirLoopHVAC" .
+                ?loop idf:branch_list_name ?branchListName .
+                ?branchListName a "BranchList" .
+                ?branchListName idf:branches ?branchListHead .
+                ?branchListHead rdf:rest*/rdf:first ?branchItem .
+                ?branchItem idf:branch_name ?branchName .
+                ?branchName a "Branch" .
+                ?branchName idf:components ?componentsHead .
+                ?componentsHead rdf:rest*/rdf:first ?comp .
+                ?comp idf:component_object_type ?compType .
+                ?comp idf:component_name ?compName .
+            }
+        """
+        for row in g.query(query):
+            if str(row.loop) != loop_name:
+                continue
+            if str(row.compType) != "AirLoopHVAC:OutdoorAirSystem":
+                continue
+            oa_systems_on_loop.append(str(row.compName))
+
+        oa_systems = obj.get("AirLoopHVAC:OutdoorAirSystem", {})
+        controller_lists = obj.get("AirLoopHVAC:ControllerList", {})
+        out: list[str] = []
+        for oa_system_name in oa_systems_on_loop:
+            oa_system = oa_systems.get(oa_system_name)
+            if oa_system is None:
+                raise KeyError(
+                    f"AirLoopHVAC:OutdoorAirSystem {oa_system_name!r} referenced "
+                    f"by loop {loop_name!r} not found in epJSON."
+                )
+            controller_list_name = oa_system.get("controller_list_name")
+            if not controller_list_name:
+                raise KeyError(
+                    f"AirLoopHVAC:OutdoorAirSystem {oa_system_name!r} has no "
+                    f"controller_list_name."
+                )
+            controller_list = controller_lists.get(controller_list_name)
+            if controller_list is None:
+                raise KeyError(
+                    f"AirLoopHVAC:ControllerList {controller_list_name!r} not "
+                    f"found in epJSON."
+                )
+            for key, value in controller_list.items():
+                # entries are named controller_<i>_object_type / controller_<i>_name
+                if not key.endswith("_object_type"):
+                    continue
+                if value != "Controller:OutdoorAir":
+                    continue
+                name_key = key.replace("_object_type", "_name")
+                controller_name = controller_list.get(name_key)
+                if not controller_name:
+                    raise KeyError(
+                        f"AirLoopHVAC:ControllerList {controller_list_name!r} "
+                        f"entry {key!r}=Controller:OutdoorAir is missing its "
+                        f"{name_key!r}."
+                    )
+                out.append(str(controller_name))
+        return out
+
+    def install_oa_mixer_actuator(
+        loop_name: str, controller_name: str
+    ) -> ActuatorDescription:
+        """Pin the ``Controller:OutdoorAir`` minimum-OA schedule to an
+        always-on constant and expose the ``Outdoor Air Controller × Air
+        Mass Flow Rate`` EMS actuator (kg/s).
+
+        EnergyPlus ignores EMS overrides on this actuator while the
+        ``minimum_outdoor_air_schedule_name`` field constrains the
+        minimum flow upwards or while a non-trivial maximum schedule
+        clamps it.  We rebind both fields to ``vav_always_on_sched`` so
+        the agent's EMS write is authoritative.  See notes.md
+        § "OfficeMedium OA-mixer fix" Q2.
+        """
+        controllers = obj.get("Controller:OutdoorAir", {})
+        controller = controllers.get(controller_name)
+        if controller is None:
+            raise KeyError(
+                f"Controller:OutdoorAir {controller_name!r} (loop "
+                f"{loop_name!r}) not found in epJSON."
+            )
+        # The minimum-OA schedule is a fraction (0-1) of the controller's
+        # minimum_outdoor_air_flow_rate.  Pinning it to the always-on
+        # availability schedule (value 1.0) means E+ will allow the EMS
+        # actuator to drive the OA flow without a schedule-imposed floor.
+        for sched_field in (
+            "minimum_outdoor_air_schedule_name",
+            "minimum_fraction_of_outdoor_air_schedule_name",
+            "maximum_fraction_of_outdoor_air_schedule_name",
+            "time_of_day_economizer_control_schedule_name",
+        ):
+            if sched_field in controller:
+                controller[sched_field] = vav_always_on_sched
+        return ActuatorDescription(
+            component_type="Outdoor Air Controller",
+            control_type="Air Mass Flow Rate",
+            component_name=controller_name,
+            units="[kg/s]",
+            lower_bound=0.0,
+            upper_bound=OA_MASS_FLOW_MAX_KGS,
+        )
 
     def _find_supply_fans_for_loop(loop_name: str) -> list[tuple[str, str]]:
         """Return ``[(fan_type, fan_name), ...]`` for the supply branches of
@@ -1143,6 +1257,22 @@ def make_vav_system_controllable(
             )
         _ensure_always_on_availability(obj, loop_name, vav_always_on_sched)
 
+        # Discover the OA mixer attached to this loop.  EnergyPlus VAV
+        # systems carry exactly one ``AirLoopHVAC:OutdoorAirSystem`` per
+        # supply branch, resolving to one ``Controller:OutdoorAir``.  We
+        # do not assume a fixed loop count across the building (Q1) but
+        # we do assume one OA controller per loop -- a VAV loop with
+        # zero or multiple OA controllers is malformed for OfficeMedium
+        # and we fail loudly per AGENTS.md.
+        oa_controllers = _find_oa_controllers_for_loop(loop_name)
+        if len(oa_controllers) != 1:
+            raise ValueError(
+                f"VAV loop {loop_name!r} resolved to {len(oa_controllers)} "
+                f"Controller:OutdoorAir objects (expected 1). "
+                f"Controllers found: {oa_controllers!r}."
+            )
+        oa_act = install_oa_mixer_actuator(loop_name, oa_controllers[0])
+
         terminals = []
         for zone, terminal_name in zone_terminals:
             flow_act = install_flow_fraction_actuator(terminal_name)
@@ -1159,6 +1289,7 @@ def make_vav_system_controllable(
             VAVSystem(
                 supply_temp_setpoint=install_supply_temp_actuator(supply_outlet),
                 terminals=terminals,
+                oa_mass_flow=oa_act,
             )
         )
 

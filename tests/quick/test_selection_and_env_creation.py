@@ -1,4 +1,8 @@
 """Tests for the unified dataset selection and environment creation pipeline."""
+# This file pins the public API contract.
+# Changes here = breaking API changes; requires a CHANGELOG.md entry.
+# Marker applied automatically by conftest.py (api_contract glob).
+
 
 from __future__ import annotations
 
@@ -9,9 +13,11 @@ import gymnasium as gym
 import numpy as np
 import pytest
 
-from building2building.config import DatasetSelectionConfig, EnvBuildConfig, parse_benchmark_config
-from building2building.types import BaseRewardConfig
-
+from building2building.config import (
+    DatasetSelectionConfig,
+    EnvBuildConfig,
+    parse_benchmark_config,
+)
 
 pytestmark = pytest.mark.quick
 
@@ -56,11 +62,11 @@ def test_parse_benchmark_config_single_type() -> None:
             "building_type": "OfficeSmall",
             "train": {
                 "selection": {"mode": "indices", "indices": [1, 2]},
-                "config": {"reward": {"reward_type": "DeadbandRewardConfig"}},
+                "config": {"reward": {"reward_type": "NormalizedDeadbandRewardConfig"}},
             },
             "test": {
                 "selection": {"mode": "random", "n": 2},
-                "config": {"reward": {"reward_type": "DeadbandRewardConfig"}},
+                "config": {"reward": {"reward_type": "NormalizedDeadbandRewardConfig"}},
             },
         }
     )
@@ -77,7 +83,7 @@ def test_env_build_config_parsing() -> None:
                 "split_index": 0,
             },
             "task": {"run_period": "winter"},
-            "reward": {"reward_type": "BarrierRewardConfig"},
+            "reward": {"reward_type": "NormalizedDeadbandRewardConfig"},
         }
     )
     assert cfg.task.run_period.name == "winter"

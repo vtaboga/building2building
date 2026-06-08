@@ -99,9 +99,7 @@ class ActionBuckets:
             sat=[int(x) for x in raw["sat"]],
             flow=[int(x) for x in raw["flow"]],
             reheat=[int(x) for x in raw["reheat"]],
-            cooling=[
-                None if c is None else int(c) for c in raw["cooling"]
-            ],
+            cooling=[None if c is None else int(c) for c in raw["cooling"]],
             zone_names=[str(z) for z in raw["zone_names"]],
         )
 
@@ -118,9 +116,7 @@ def _buckets_from_policy(policy: AirLoopPolicy) -> ActionBuckets:
         for z in loop.zones:
             flow_idx.append(int(z.flow_act_idx))
             reheat_idx.append(int(z.htg_act_idx))
-            cooling_idx.append(
-                None if z.clg_act_idx is None else int(z.clg_act_idx)
-            )
+            cooling_idx.append(None if z.clg_act_idx is None else int(z.clg_act_idx))
             zone_names.append(str(z.zone_name))
     return ActionBuckets(
         sat=sat_idx,
@@ -411,9 +407,7 @@ def _action_stats(
         )
         reheat_active_fracs.append(frac_above_min)
 
-    sat_stats = [
-        _actuator_stat(action_names[i], actions[:, i]) for i in buckets.sat
-    ]
+    sat_stats = [_actuator_stat(action_names[i], actions[:, i]) for i in buckets.sat]
 
     saturation_threshold = 0.5
     n_flow = len(buckets.flow)
@@ -440,9 +434,7 @@ def _action_stats(
         ),
         "frac_zones_saturated": frac_zones_saturated,
         "mean_frac_reheat_active": (
-            float(np.mean(reheat_active_fracs))
-            if reheat_active_fracs
-            else float("nan")
+            float(np.mean(reheat_active_fracs)) if reheat_active_fracs else float("nan")
         ),
     }
 
@@ -516,18 +508,12 @@ def _plot(
         p05 = np.percentile(temps, 5, axis=1)
         p50 = np.percentile(temps, 50, axis=1)
         p95 = np.percentile(temps, 95, axis=1)
-        ax.fill_between(
-            hours, p05, p95, alpha=0.2, label="p5-p95 across zones"
-        )
+        ax.fill_between(hours, p05, p95, alpha=0.2, label="p5-p95 across zones")
         ax.plot(hours, p50, lw=0.5, label="median zone")
     ax.axhline(target, color="k", lw=1, ls="--", label=f"setpoint={target}°C")
-    ax.axhline(
-        target + dT, color="grey", lw=0.6, ls=":", label=f"±{dT}°C deadband"
-    )
+    ax.axhline(target + dT, color="grey", lw=0.6, ls=":", label=f"±{dT}°C deadband")
     ax.axhline(target - dT, color="grey", lw=0.6, ls=":")
-    ax.plot(
-        hours, outdoor, lw=0.3, color="tab:brown", alpha=0.5, label="outdoor"
-    )
+    ax.plot(hours, outdoor, lw=0.3, color="tab:brown", alpha=0.5, label="outdoor")
     ax.set_ylabel("Temperature (°C)")
     ax.set_xlabel("Hour of year")
     ax.legend(fontsize=7, ncol=2, loc="upper right")
@@ -572,9 +558,7 @@ def _plot(
         ax.plot(actions[:, act_idx], lw=0.3, alpha=0.6, label=zone)
     ax.set_ylabel("Flow fraction / mass flow (raw actuator units)")
     ax.set_xlabel("Step")
-    ax.set_title(
-        f"Per-zone VAV flow actuators ({len(buckets.flow)} zones)"
-    )
+    ax.set_title(f"Per-zone VAV flow actuators ({len(buckets.flow)} zones)")
     if len(buckets.flow) <= ZONE_ENVELOPE_THRESHOLD:
         ax.legend(fontsize=7, ncol=2, loc="upper right")
 
@@ -595,9 +579,7 @@ def _plot(
             label=f"SAT {action_name_short(meta['action_names'][act_idx])}",
         )
     ax2.set_ylabel("SAT setpoint (°C)", color="tab:red")
-    ax.set_title(
-        f"Reheat setpoints (left) + loop SAT setpoint (right, dashed red)"
-    )
+    ax.set_title(f"Reheat setpoints (left) + loop SAT setpoint (right, dashed red)")
     if len(buckets.reheat) <= ZONE_ENVELOPE_THRESHOLD:
         ax.legend(fontsize=6, ncol=2, loc="upper left")
     ax2.legend(fontsize=7, loc="upper right")
@@ -697,8 +679,7 @@ def main() -> None:
         nargs="+",
         required=True,
         help=(
-            "List of <building_id>:<climate_zone> pairs, e.g. "
-            "OfficeMedium-5167:1"
+            "List of <building_id>:<climate_zone> pairs, e.g. " "OfficeMedium-5167:1"
         ),
     )
     parser.add_argument(

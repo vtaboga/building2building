@@ -8,6 +8,10 @@ behaviour when the ``climate_zone`` column is missing from the metadata.
 The tests use the fake-dataset fixture defined in ``tests/conftest.py``; they
 do not hit HuggingFace.
 """
+# This file pins the public API contract.
+# Changes here = breaking API changes; requires a CHANGELOG.md entry.
+# Marker applied automatically by conftest.py (api_contract glob).
+
 
 from __future__ import annotations
 
@@ -47,34 +51,22 @@ class TestClimateZoneModule:
 @pytest.mark.quick
 class TestListBuildingsByClimateZone:
     def test_returns_matching_ids(self, registry: BuildingRegistry) -> None:
-        ids = registry.list_buildings_by_climate_zone(
-            "OfficeSmall", 5, "train"
-        )
+        ids = registry.list_buildings_by_climate_zone("OfficeSmall", 5, "train")
         assert ids == ["OfficeSmall-0001"]
 
-    def test_returns_empty_when_no_match(
-        self, registry: BuildingRegistry
-    ) -> None:
-        ids = registry.list_buildings_by_climate_zone(
-            "OfficeSmall", 7, "train"
-        )
+    def test_returns_empty_when_no_match(self, registry: BuildingRegistry) -> None:
+        ids = registry.list_buildings_by_climate_zone("OfficeSmall", 7, "train")
         assert ids == []
 
     def test_respects_split(self, registry: BuildingRegistry) -> None:
-        train_ids = registry.list_buildings_by_climate_zone(
-            "OfficeSmall", 5, "train"
-        )
-        test_ids = registry.list_buildings_by_climate_zone(
-            "OfficeSmall", 3, "test"
-        )
+        train_ids = registry.list_buildings_by_climate_zone("OfficeSmall", 5, "train")
+        test_ids = registry.list_buildings_by_climate_zone("OfficeSmall", 3, "test")
         assert train_ids == ["OfficeSmall-0001"]
         assert test_ids == ["OfficeSmall-0002"]
 
     def test_raises_for_sfh(self, registry: BuildingRegistry) -> None:
         with pytest.raises(ClimateZoneUnavailableError):
-            registry.list_buildings_by_climate_zone(
-                "SingleFamilyHouse", 3, "train"
-            )
+            registry.list_buildings_by_climate_zone("SingleFamilyHouse", 3, "train")
 
 
 @pytest.mark.quick
@@ -104,27 +96,14 @@ class TestBuildingInfoClimateZone:
 
 @pytest.mark.quick
 class TestMetadataColumnGuard:
-    def test_missing_column_raises(
-        self, fake_metadata: pd.DataFrame
-    ) -> None:
+    def test_missing_column_raises(self, fake_metadata: pd.DataFrame) -> None:
         reg = BuildingRegistry()
-        # Simulate an old-revision parquet without the climate_zone column by
-        # dropping it and forcing _ensure_loaded to re-read via our mock path.
         stripped = fake_metadata.drop(columns=["climate_zone"])
-        reg._metadata = None
-
-        def _fake_download() -> Path:
-            # unused; _ensure_loaded branches on self._metadata being None.
-            raise AssertionError("should not be called")
-
-        # Simulate by pre-populating metadata to the stripped frame *after*
-        # clearing it, then directly exercising the guard.
-        reg._metadata = stripped
-        # Re-force the check by clearing and monkey-patching download_metadata.
         reg._metadata = None
         import building2building.data.registry as registry_mod
 
         orig_read_parquet = registry_mod.pd.read_parquet
+        orig_download_metadata = registry_mod.download_metadata
 
         def fake_read_parquet(_path):  # noqa: ARG001
             return stripped
@@ -136,6 +115,7 @@ class TestMetadataColumnGuard:
                 reg._ensure_loaded()
         finally:
             registry_mod.pd.read_parquet = orig_read_parquet  # type: ignore[assignment]
+            registry_mod.download_metadata = orig_download_metadata  # type: ignore[assignment]
 
 
 @pytest.mark.quick
@@ -170,9 +150,9 @@ class TestRealDatasetClimateZones:
 
         df = get_registry().metadata
         mz = df[~df["building_type"].isin(list(TYPES_WITHOUT_CLIMATE_ZONE))]
-        assert not mz["climate_zone"].isna().any(), (
-            "Every multizones row must have a climate_zone after migration"
-        )
+        assert (
+            not mz["climate_zone"].isna().any()
+        ), "Every multizones row must have a climate_zone after migration"
         assert mz["climate_zone"].astype(int).between(1, 8).all()
 
     def test_all_sfh_rows_have_null_climate_zone(self) -> None:

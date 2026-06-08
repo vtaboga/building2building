@@ -21,7 +21,11 @@ from building2building.api.rollout import (
     callable_controller,
     rollout,
 )
-from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig, parse_benchmark_config
+from building2building.config.models import (
+    DatasetSelectionConfig,
+    EnvBuildConfig,
+    parse_benchmark_config,
+)
 from building2building.config.tasks import TASK_PRESETS, TaskPreset, resolve_task_preset
 from building2building.data.climate_zones import (
     TYPES_WITHOUT_CLIMATE_ZONE,
@@ -275,13 +279,12 @@ def new_make_env(
 
         info_bid = getattr(info, "building_id", None) or building_id or ""
         normalizer = resolve_reward_normalizer(
-            building_type, info_bid,
+            building_type,
+            info_bid,
             run_period=run_period,
             path=normalizer_path,
         )
-        effective_reward = effective_reward.filled(
-            normalizer.tau_T, normalizer.tau_E
-        )
+        effective_reward = effective_reward.filled(normalizer.tau_T, normalizer.tau_E)
 
     if eplus_output_dir is None:
         eplus_output_dir = Path(tempfile.mkdtemp(prefix="b2b_eplus_"))
@@ -355,7 +358,9 @@ def new_make_env(
     from building2building.pipeline.actuators import AnyEquipment
     from building2building.simulator import create_simulator
 
-    equipment_data = structure(json.loads(equipment_path.read_text()), list[AnyEquipment])
+    equipment_data = structure(
+        json.loads(equipment_path.read_text()), list[AnyEquipment]
+    )
 
     building_config = BuildingConfig(
         path_to_building=epjson_path,
@@ -383,6 +388,7 @@ def new_make_env(
     # garbage-collection order.
     if _epjson_staging_dir is not None:
         import shutil as _shutil
+
         weakref.finalize(env, _shutil.rmtree, _epjson_staging_dir, True)
 
     if rescale_action:

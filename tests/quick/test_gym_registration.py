@@ -1,4 +1,8 @@
 """Tests for building2building.envs.registration — Gymnasium env registration."""
+# This file pins the public API contract.
+# Changes here = breaking API changes; requires a CHANGELOG.md entry.
+# Marker applied automatically by conftest.py (api_contract glob).
+
 
 from __future__ import annotations
 
@@ -21,11 +25,7 @@ class TestGymRegistration:
     def test_idempotent_registration(self) -> None:
         register_all()
         register_all()
-        count = sum(
-            1
-            for k in gym.envs.registration.registry
-            if k.startswith("b2b/")
-        )
+        count = sum(1 for k in gym.envs.registration.registry if k.startswith("b2b/"))
         assert count == len(ALL_BUILDING_TYPES)
 
     def test_registration_on_import(self) -> None:
@@ -37,4 +37,7 @@ class TestGymRegistration:
     def test_env_spec_entry_point(self) -> None:
         register_all()
         spec = gym.spec("b2b/OfficeSmall-v0")
-        assert spec.entry_point == "building2building.envs.registration:make_registered_env"
+        assert (
+            spec.entry_point
+            == "building2building.envs.registration:make_registered_env"
+        )

@@ -95,16 +95,22 @@ def main() -> None:
     print(f"Results ({args.n} cycles, building_type={args.building_type!r}):")
     print(f"  mean:       {mean_mb:+.1f} MB/cycle")
     print(f"  p95:        {p95_mb:+.1f} MB/cycle")
-    print(f"  recommended _RSS_PER_CYCLE_BYTES = {recommended_bytes}  "
-          f"  # {recommended_mb:.0f} MB/cycle (p95 + 25%)")
+    print(
+        f"  recommended _RSS_PER_CYCLE_BYTES = {recommended_bytes}  "
+        f"  # {recommended_mb:.0f} MB/cycle (p95 + 25%)"
+    )
     print()
     print("Update tests/long/test_env_leak.py:")
-    print(f"  _RSS_PER_CYCLE_BYTES = {recommended_bytes}"
-          f"  # {recommended_mb:.0f} MB/cycle (p95 + 25% margin, measured)")
+    print(
+        f"  _RSS_PER_CYCLE_BYTES = {recommended_bytes}"
+        f"  # {recommended_mb:.0f} MB/cycle (p95 + 25% margin, measured)"
+    )
     print()
     print("Update notes.md § 'Residual EnergyPlus-native RSS growth':")
-    print(f"  mean {mean_mb:.0f} MB/cycle, p95 {p95_mb:.0f} MB/cycle "
-          f"on SLURM CPU node ({args.building_type})")
+    print(
+        f"  mean {mean_mb:.0f} MB/cycle, p95 {p95_mb:.0f} MB/cycle "
+        f"on SLURM CPU node ({args.building_type})"
+    )
 
 
 if __name__ == "__main__":

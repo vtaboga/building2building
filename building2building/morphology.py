@@ -48,6 +48,7 @@ def _empty_array() -> np.ndarray:
     """
     return np.empty(0, dtype=np.float32)
 
+
 if TYPE_CHECKING:
     from building2building.geometry import ZoneGeometry
     from building2building.types import Equipment
@@ -268,7 +269,8 @@ class Morphology:
     edges: tuple[MorphologyEdge, ...]
     unassigned_obs_indices: tuple[int, ...] = ()
     common_attributes: np.ndarray = field(
-        default_factory=_empty_array, compare=False,
+        default_factory=_empty_array,
+        compare=False,
     )
 
     def node_ids(self) -> list[str]:
@@ -337,9 +339,7 @@ class Morphology:
             out[indices] = np.asarray(node_action, dtype=np.float32)
         return out
 
-    def adjacency_list(
-        self, edge_type: EdgeType | None = None
-    ) -> dict[str, list[str]]:
+    def adjacency_list(self, edge_type: EdgeType | None = None) -> dict[str, list[str]]:
         """Return adjacency list, optionally filtered by edge type."""
         adj: dict[str, list[str]] = {n.node_id: [] for n in self.nodes}
         for e in self.edges:
@@ -386,9 +386,7 @@ def _find_action_index_for_actuator(
     component_name: str,
 ) -> int | None:
     """Find the action index matching an actuator description triplet."""
-    target = (
-        f"{component_type}::{control_type}::{component_name}".lower().strip()
-    )
+    target = f"{component_type}::{control_type}::{component_name}".lower().strip()
     for i, name in enumerate(action_names):
         if name.strip().lower() == target:
             return i
@@ -456,9 +454,7 @@ def build_morphology(
         if idx is not None:
             weather_obs.append(idx)
     if weather_obs:
-        nodes.append(
-            MorphologyNode("weather", WEATHER, tuple(weather_obs), ())
-        )
+        nodes.append(MorphologyNode("weather", WEATHER, tuple(weather_obs), ()))
         assigned_obs.update(weather_obs)
 
     calendar_obs: list[int] = []
@@ -467,9 +463,7 @@ def build_morphology(
         if idx is not None:
             calendar_obs.append(idx)
     if calendar_obs:
-        nodes.append(
-            MorphologyNode("calendar", CALENDAR, tuple(calendar_obs), ())
-        )
+        nodes.append(MorphologyNode("calendar", CALENDAR, tuple(calendar_obs), ()))
         assigned_obs.update(calendar_obs)
 
     energy_obs: list[int] = []
@@ -478,9 +472,7 @@ def build_morphology(
         if idx is not None:
             energy_obs.append(idx)
     if energy_obs:
-        nodes.append(
-            MorphologyNode("energy", ENERGY, tuple(energy_obs), ())
-        )
+        nodes.append(MorphologyNode("energy", ENERGY, tuple(energy_obs), ()))
         assigned_obs.update(energy_obs)
 
     # -- Equipment-driven zone & supply nodes ------------------------------
@@ -509,7 +501,10 @@ def build_morphology(
             node_id = f"zone:{zone}"
             nodes.append(
                 MorphologyNode(
-                    node_id, UNITARY_ZONE, tuple(o_idx), tuple(a_idx),
+                    node_id,
+                    UNITARY_ZONE,
+                    tuple(o_idx),
+                    tuple(a_idx),
                     attributes=_attrs_for(zone),
                 )
             )
@@ -526,9 +521,7 @@ def build_morphology(
             )
             supply_act = (supply_ai,) if supply_ai is not None else ()
             supply_id = f"supply:{supply_ad.component_name}"
-            nodes.append(
-                MorphologyNode(supply_id, VAV_SUPPLY, (), supply_act)
-            )
+            nodes.append(MorphologyNode(supply_id, VAV_SUPPLY, (), supply_act))
 
             for terminal in eq.terminals:  # type: ignore[attr-defined]
                 zone = terminal.zone
@@ -537,11 +530,14 @@ def build_morphology(
 
                 # Check which actuators are in the agent action space.
                 flow_ai = _find_action_index_for_actuator(
-                    action_names, *_ad_triple(terminal.flow_fraction))
+                    action_names, *_ad_triple(terminal.flow_fraction)
+                )
                 htg_ai = _find_action_index_for_actuator(
-                    action_names, *_ad_triple(terminal.heating_setpoint))
+                    action_names, *_ad_triple(terminal.heating_setpoint)
+                )
                 clg_ai = _find_action_index_for_actuator(
-                    action_names, *_ad_triple(terminal.cooling_setpoint))
+                    action_names, *_ad_triple(terminal.cooling_setpoint)
+                )
 
                 if clg_ai is not None:
                     # All three actuators present.
@@ -555,19 +551,18 @@ def build_morphology(
                 node_id = f"zone:{zone}"
                 nodes.append(
                     MorphologyNode(
-                        node_id, nt, tuple(o_idx), tuple(a_idx),
+                        node_id,
+                        nt,
+                        tuple(o_idx),
+                        tuple(a_idx),
                         attributes=_attrs_for(zone),
                     )
                 )
                 assigned_obs.update(o_idx)
                 zones_with_nodes.add(zone)
 
-                edges.append(
-                    MorphologyEdge(supply_id, node_id, "hvac_system")
-                )
-                edges.append(
-                    MorphologyEdge(supply_id, node_id, "controls")
-                )
+                edges.append(MorphologyEdge(supply_id, node_id, "hvac_system"))
+                edges.append(MorphologyEdge(supply_id, node_id, "controls"))
 
         elif eq_type == "heating_only":
             zone = eq.zones()[0]
@@ -588,7 +583,10 @@ def build_morphology(
             node_id = f"zone:{zone}"
             nodes.append(
                 MorphologyNode(
-                    node_id, HEATING_ZONE, tuple(o_idx), tuple(a_idx),
+                    node_id,
+                    HEATING_ZONE,
+                    tuple(o_idx),
+                    tuple(a_idx),
                     attributes=_attrs_for(zone),
                 )
             )
@@ -607,7 +605,10 @@ def build_morphology(
             node_id = f"zone:{zone}"
             nodes.append(
                 MorphologyNode(
-                    node_id, UNCONTROLLED_ZONE, (temp_idx,), (),
+                    node_id,
+                    UNCONTROLLED_ZONE,
+                    (temp_idx,),
+                    (),
                     attributes=_attrs_for(zone),
                 )
             )
@@ -651,9 +652,7 @@ def add_thermal_adjacency_edges(
     """
     existing_node_ids = {n.node_id for n in morphology.nodes}
     new_edges = list(morphology.edges)
-    seen: set[tuple[str, str]] = {
-        (e.source, e.target) for e in morphology.edges
-    }
+    seen: set[tuple[str, str]] = {(e.source, e.target) for e in morphology.edges}
 
     for zone, neighbors in zone_adjacency.items():
         src_id = f"zone:{zone}"
@@ -665,9 +664,7 @@ def add_thermal_adjacency_edges(
                 continue
             pair = (src_id, tgt_id)
             if pair not in seen:
-                new_edges.append(
-                    MorphologyEdge(src_id, tgt_id, "thermal_adjacency")
-                )
+                new_edges.append(MorphologyEdge(src_id, tgt_id, "thermal_adjacency"))
                 seen.add(pair)
 
     return Morphology(

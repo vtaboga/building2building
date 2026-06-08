@@ -124,9 +124,7 @@ class BuildingPool:
         by_type: dict[str, list[BuildingSpec]] = {}
         for spec in self.specs:
             by_type.setdefault(spec.building_type, []).append(spec)
-        return [
-            specs[int(rng.integers(len(specs)))] for specs in by_type.values()
-        ]
+        return [specs[int(rng.integers(len(specs)))] for specs in by_type.values()]
 
 
 # ---------------------------------------------------------------------------
@@ -314,7 +312,15 @@ def ppo_update(
     for _epoch in range(n_epochs):
         if kl_exceeded:
             break
-        for policy, local_obs_t, actions, old_logprobs, advantages, returns, bt_onehot in all_data:
+        for (
+            policy,
+            local_obs_t,
+            actions,
+            old_logprobs,
+            advantages,
+            returns,
+            bt_onehot,
+        ) in all_data:
             if kl_exceeded:
                 break
             T = len(advantages)
@@ -350,9 +356,7 @@ def ppo_update(
 
                 optimizer.zero_grad()
                 loss.backward()
-                all_params = [
-                    p for g in optimizer.param_groups for p in g["params"]
-                ]
+                all_params = [p for g in optimizer.param_groups for p in g["params"]]
                 nn.utils.clip_grad_norm_(all_params, max_grad_norm)
                 optimizer.step()
 
@@ -565,23 +569,15 @@ def train(cfg: TrainConfig) -> None:
         task=cfg.task,
     )
 
-    model_kwargs = dict(
-        d_model=cfg.d_model, n_heads=cfg.n_heads, n_layers=cfg.n_layers
-    )
+    model_kwargs = dict(d_model=cfg.d_model, n_heads=cfg.n_heads, n_layers=cfg.n_layers)
     model = Model(**model_kwargs).to(device)
-    logger.info(
-        "Model parameters: %d", sum(p.numel() for p in model.parameters())
-    )
+    logger.info("Model parameters: %d", sum(p.numel() for p in model.parameters()))
 
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=cfg.learning_rate, eps=1e-5
-    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate, eps=1e-5)
 
     start_iteration = 1
     if cfg.resume_from is not None:
-        ckpt = torch.load(
-            cfg.resume_from, map_location=device, weights_only=False
-        )
+        ckpt = torch.load(cfg.resume_from, map_location=device, weights_only=False)
         model.load_state_dict(ckpt["model_state_dict"])
         optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         start_iteration = ckpt["iteration"] + 1
@@ -649,9 +645,7 @@ def train(cfg: TrainConfig) -> None:
             for spec in current_batch
         ]
 
-        with spawn_ctx.Pool(
-            processes=min(cfg.max_workers, len(jobs))
-        ) as wp:
+        with spawn_ctx.Pool(processes=min(cfg.max_workers, len(jobs))) as wp:
             results = wp.map(_run_rollout_job, jobs)
 
         trajectories: list[Trajectory] = []
@@ -711,14 +705,14 @@ def train(cfg: TrainConfig) -> None:
 
         t_ppo_done = time.time()
         elapsed = t_ppo_done - t0
-        ppo_s = t_ppo_done - t0 - max(
-            s + c for s, c in zip(env_setup_times, collect_times)
-        ) if env_setup_times else 0.0
+        ppo_s = (
+            t_ppo_done - t0 - max(s + c for s, c in zip(env_setup_times, collect_times))
+            if env_setup_times
+            else 0.0
+        )
         if iteration % cfg.log_interval == 0:
             mean_r = np.mean([t.rewards.mean() for t in trajectories])
-            ep_str = (
-                f"{np.mean(ep_rewards):.1f}" if ep_rewards else "n/a"
-            )
+            ep_str = f"{np.mean(ep_rewards):.1f}" if ep_rewards else "n/a"
             mean_setup = np.mean(env_setup_times)
             mean_collect = np.mean(collect_times)
             logger.info(
@@ -785,17 +779,11 @@ def train(cfg: TrainConfig) -> None:
                 eval_results = ep.map(_run_eval_job, eval_jobs)
 
             for bt, bid, rew, steps in eval_results:
-                logger.info(
-                    "  %s %s: reward=%.1f steps=%d", bt, bid, rew, steps
-                )
-            mean_eval = float(
-                np.mean([r for _, _, r, _ in eval_results])
-            )
+                logger.info("  %s %s: reward=%.1f steps=%d", bt, bid, rew, steps)
+            mean_eval = float(np.mean([r for _, _, r, _ in eval_results]))
             logger.info("iter %d | eval mean: %.1f", iteration, mean_eval)
             if wandb_run is not None:
-                wandb_run.log(
-                    {"eval/mean_reward": mean_eval}, step=iteration
-                )
+                wandb_run.log({"eval/mean_reward": mean_eval}, step=iteration)
 
     torch.save(
         {
@@ -822,9 +810,7 @@ def main() -> None:
         import hydra
         from omegaconf import DictConfig, OmegaConf
 
-        @hydra.main(
-            version_base=None, config_path="configs", config_name="config"
-        )
+        @hydra.main(version_base=None, config_path="configs", config_name="config")
         def hydra_main(cfg: DictConfig) -> None:
             logging.basicConfig(level=logging.INFO)
             raw = OmegaConf.to_container(cfg, resolve=True)
@@ -838,26 +824,18 @@ def main() -> None:
                     d_model=int(model_cfg.get("d_model", 64)),
                     n_heads=int(model_cfg.get("n_heads", 4)),
                     n_layers=int(model_cfg.get("n_layers", 3)),
-                    total_iterations=int(
-                        training_cfg.get("total_iterations", 200)
-                    ),
+                    total_iterations=int(training_cfg.get("total_iterations", 200)),
                     n_steps=int(training_cfg.get("n_steps", 672)),
                     max_workers=int(training_cfg.get("max_workers", 8)),
-                    learning_rate=float(
-                        training_cfg.get("learning_rate", 5e-5)
-                    ),
+                    learning_rate=float(training_cfg.get("learning_rate", 5e-5)),
                     gamma=float(training_cfg.get("gamma", 0.98)),
                     gae_lambda=float(training_cfg.get("gae_lambda", 0.95)),
                     n_ppo_epochs=int(training_cfg.get("n_ppo_epochs", 5)),
-                    minibatch_size=int(
-                        training_cfg.get("minibatch_size", 336)
-                    ),
+                    minibatch_size=int(training_cfg.get("minibatch_size", 336)),
                     clip_eps=float(training_cfg.get("clip_eps", 0.2)),
                     vf_coef=float(training_cfg.get("vf_coef", 0.5)),
                     ent_coef=float(training_cfg.get("ent_coef", 0.01)),
-                    max_grad_norm=float(
-                        training_cfg.get("max_grad_norm", 0.5)
-                    ),
+                    max_grad_norm=float(training_cfg.get("max_grad_norm", 0.5)),
                     target_kl=training_cfg.get("target_kl", 0.02),
                     seed=int(training_cfg.get("seed", 42)),
                     building_types=list(
@@ -869,14 +847,10 @@ def main() -> None:
                     n_buildings_per_type=int(
                         training_cfg.get("n_buildings_per_type", 10)
                     ),
-                    resample_interval=int(
-                        training_cfg.get("resample_interval", 10)
-                    ),
+                    resample_interval=int(training_cfg.get("resample_interval", 10)),
                     split=str(training_cfg.get("split", "train")),
                     task=str(raw.get("task", "task1")),
-                    output_dir=str(
-                        raw.get("output_dir", "outputs/transfer")
-                    ),
+                    output_dir=str(raw.get("output_dir", "outputs/transfer")),
                     log_interval=int(training_cfg.get("log_interval", 1)),
                     save_interval=int(training_cfg.get("save_interval", 50)),
                     eval_interval=int(training_cfg.get("eval_interval", 50)),

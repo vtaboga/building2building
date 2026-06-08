@@ -13,7 +13,6 @@ from stable_baselines3 import PPO
 
 import building2building as b2b
 
-
 N_TRAIN_BUILDINGS = 5
 N_TEST_BUILDINGS = 3
 TOTAL_TIMESTEPS = 50_000

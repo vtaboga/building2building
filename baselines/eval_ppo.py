@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import csv
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -114,11 +115,13 @@ def main() -> None:
         help="Directory containing saved PPO models",
     )
     parser.add_argument(
-        "--output", type=str, default="results_ppo.csv", help="Output CSV path"
+        "--base-dir",
+        type=Path,
+        default=Path(os.environ.get("SCRATCH", "outputs")),
+        help="Root directory; results go under <base_dir>/b2b/eval/",
     )
-    parser.add_argument(
-        "--n-episodes", type=int, default=1, help="Episodes per model"
-    )
+    parser.add_argument("--output", type=Path, default=None, help="Output CSV path")
+    parser.add_argument("--n-episodes", type=int, default=1, help="Episodes per model")
     parser.add_argument(
         "--run-period",
         type=str,
@@ -132,6 +135,13 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s: %(message)s",
     )
+
+    out_path = (
+        args.output
+        if args.output is not None
+        else args.base_dir / "b2b" / "eval" / "ppo_results.csv"
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     model_dir = Path(args.model_dir)
     model_files = sorted(model_dir.rglob("ppo_*.zip"))
@@ -162,7 +172,6 @@ def main() -> None:
         except Exception:
             logger.exception("Failed: %s", mf.name)
 
-    out_path = Path(args.output)
     fieldnames = [
         "building_type",
         "building_id",
@@ -193,9 +202,7 @@ def main() -> None:
     logger.info("Wrote %d results to %s", len(all_results), out_path)
     if all_results:
         scores = [
-            r.normalized_score
-            for r in all_results
-            if r.normalized_score is not None
+            r.normalized_score for r in all_results if r.normalized_score is not None
         ]
         if scores:
             logger.info(

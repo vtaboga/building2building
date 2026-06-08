@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -65,7 +66,10 @@ def select_test_buildings(
     if len(matching) < n:
         logger.warning(
             "Only %d test buildings match %s / cz=%d (wanted %d) — returning what we have",
-            len(matching), building_type, climate_zone, n,
+            len(matching),
+            building_type,
+            climate_zone,
+            n,
         )
     return matching[:n]
 
@@ -164,7 +168,7 @@ def _zone_temp_indices(obs_names: list[str]) -> tuple[list[int], list[str]]:
         s = n.strip()
         if s.lower().startswith(prefix):
             indices.append(i)
-            labels.append(s[len("ZONE AIR TEMPERATURE"):].strip() or f"zone_{i}")
+            labels.append(s[len("ZONE AIR TEMPERATURE") :].strip() or f"zone_{i}")
     return indices, labels
 
 
@@ -180,7 +184,7 @@ def _setpoint_indices(obs_names: list[str]) -> tuple[list[int], list[str]]:
         s = n.strip()
         if s.lower().startswith(prefix):
             indices.append(i)
-            labels.append(s[len("target_temperature"):].strip() or f"setpoint_{i}")
+            labels.append(s[len("target_temperature") :].strip() or f"setpoint_{i}")
     return indices, labels
 
 
@@ -190,8 +194,16 @@ def _extract_energy_series(
     e_idx = _find_index(obs_names, "energy_electricity")
     g_idx = _find_index(obs_names, "energy_gas")
     T = observations.shape[0]
-    elec = observations[:, e_idx].astype(np.float32) if e_idx is not None else np.zeros(T, np.float32)
-    gas = observations[:, g_idx].astype(np.float32) if g_idx is not None else np.zeros(T, np.float32)
+    elec = (
+        observations[:, e_idx].astype(np.float32)
+        if e_idx is not None
+        else np.zeros(T, np.float32)
+    )
+    gas = (
+        observations[:, g_idx].astype(np.float32)
+        if g_idx is not None
+        else np.zeros(T, np.float32)
+    )
     return elec, gas
 
 
@@ -258,21 +270,23 @@ def _make_analysis_figure(art: RolloutArtifacts, deadband_c: float = 1.0) -> plt
     hours = np.arange(T) / 6.0  # 10-min env timestep → hours
 
     fig, axes = plt.subplots(4, 1, figsize=(13, 14), sharex=True)
-    title = f"{art.building_type} / {art.building_id} / cz{art.climate_zone} / {art.task}"
+    title = (
+        f"{art.building_type} / {art.building_id} / cz{art.climate_zone} / {art.task}"
+    )
     fig.suptitle(title, fontsize=11)
 
     # Panel 1: zone temperatures vs setpoints (only controlled zones for clarity).
     ax = axes[0]
     cmap = plt.get_cmap("tab10")
     controlled_set = set(art.controlled_zones)
-    visible_cols = [
-        j for j, z in enumerate(art.zone_names) if z in controlled_set
-    ]
+    visible_cols = [j for j, z in enumerate(art.zone_names) if z in controlled_set]
     if not visible_cols:
         visible_cols = list(range(min(len(art.zone_names), 10)))
     for k, j in enumerate(visible_cols):
         c = cmap(k % 10)
-        ax.plot(hours, art.zone_temperatures[:, j], color=c, lw=0.5, label=art.zone_names[j])
+        ax.plot(
+            hours, art.zone_temperatures[:, j], color=c, lw=0.5, label=art.zone_names[j]
+        )
         ax.plot(hours, art.setpoints[:, j], color=c, lw=0.4, ls="--", alpha=0.6)
     ax.set_ylabel("Temp (°C)")
     ax.set_title("Zone temperature (solid) vs per-zone setpoint (dashed)")
@@ -284,7 +298,13 @@ def _make_analysis_figure(art: RolloutArtifacts, deadband_c: float = 1.0) -> plt
         dev = art.zone_temperatures[:, visible_cols] - art.setpoints[:, visible_cols]
         for k, j in enumerate(visible_cols):
             ax.plot(hours, dev[:, k], color=cmap(k % 10), lw=0.5)
-        ax.axhspan(-deadband_c, deadband_c, color="green", alpha=0.1, label=f"±{deadband_c}°C deadband")
+        ax.axhspan(
+            -deadband_c,
+            deadband_c,
+            color="green",
+            alpha=0.1,
+            label=f"±{deadband_c}°C deadband",
+        )
         ax.axhline(0, color="black", lw=0.4, alpha=0.6)
     ax.set_ylabel("T − setpoint (°C)")
     ax.set_title("Deviation from setpoint (controlled zones)")
@@ -292,12 +312,23 @@ def _make_analysis_figure(art: RolloutArtifacts, deadband_c: float = 1.0) -> plt
 
     # Panel 3: outdoor temperature + HVAC energy.
     ax = axes[2]
-    ax.plot(hours, art.outdoor_temperature, color="gray", lw=0.4, label="Outdoor T (°C)")
+    ax.plot(
+        hours, art.outdoor_temperature, color="gray", lw=0.4, label="Outdoor T (°C)"
+    )
     ax.set_ylabel("Outdoor T (°C)")
     ax.legend(loc="upper left", fontsize=8)
     ax_en = ax.twinx()
-    ax_en.plot(hours, art.energy_electricity, color="tab:red", lw=0.4, label="Electricity", alpha=0.7)
-    ax_en.plot(hours, art.energy_gas, color="tab:blue", lw=0.4, label="Natural gas", alpha=0.7)
+    ax_en.plot(
+        hours,
+        art.energy_electricity,
+        color="tab:red",
+        lw=0.4,
+        label="Electricity",
+        alpha=0.7,
+    )
+    ax_en.plot(
+        hours, art.energy_gas, color="tab:blue", lw=0.4, label="Natural gas", alpha=0.7
+    )
     ax_en.set_ylabel("Energy (Wh/m²)")
     ax_en.legend(loc="upper right", fontsize=8)
 
@@ -348,7 +379,7 @@ def rollout_and_analyze(
             for node in morphology.nodes:
                 nid = getattr(node, "id", "")
                 if nid.startswith("zone:"):
-                    controlled_zones.append(nid[len("zone:"):])
+                    controlled_zones.append(nid[len("zone:") :])
 
         logger.info(
             "Rollout: %s / %s (cz=%d, task=%s) — zones=%d, run_period=%s",
@@ -439,7 +470,9 @@ def rollout_and_analyze(
     )
 
 
-def save_artifacts(art: RolloutArtifacts, output_dir: Path, deadband_c: float = 1.0) -> dict[str, Any]:
+def save_artifacts(
+    art: RolloutArtifacts, output_dir: Path, deadband_c: float = 1.0
+) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = f"{art.building_id}_cz{art.climate_zone}"
     npz_path = output_dir / f"{stem}.npz"
@@ -486,7 +519,9 @@ def save_artifacts(art: RolloutArtifacts, output_dir: Path, deadband_c: float = 
             if np.isnan(sp_col).all():
                 continue
             stats = _compute_deviation_stats(
-                art.zone_temperatures[:, j], np.where(np.isnan(sp_col), art.zone_temperatures[:, j], sp_col), deadband_c
+                art.zone_temperatures[:, j],
+                np.where(np.isnan(sp_col), art.zone_temperatures[:, j], sp_col),
+                deadband_c,
             )
             per_zone.append({"zone": zl, **stats})
             controlled_cols.append(j)
@@ -502,14 +537,22 @@ def save_artifacts(art: RolloutArtifacts, output_dir: Path, deadband_c: float = 
 
     actuator_stats = {
         "n_actuators": int(art.actions.shape[1]) if art.actions.ndim == 2 else 0,
-        "mean": [float(x) for x in art.actions.mean(axis=0)] if art.actions.size else [],
+        "mean": (
+            [float(x) for x in art.actions.mean(axis=0)] if art.actions.size else []
+        ),
         "frac_at_min": (
-            [float(x) for x in (art.actions <= art.actions.min(axis=0) + 1e-6).mean(axis=0)]
+            [
+                float(x)
+                for x in (art.actions <= art.actions.min(axis=0) + 1e-6).mean(axis=0)
+            ]
             if art.actions.size
             else []
         ),
         "frac_at_max": (
-            [float(x) for x in (art.actions >= art.actions.max(axis=0) - 1e-6).mean(axis=0)]
+            [
+                float(x)
+                for x in (art.actions >= art.actions.max(axis=0) - 1e-6).mean(axis=0)
+            ]
             if art.actions.size
             else []
         ),
@@ -535,7 +578,9 @@ def save_artifacts(art: RolloutArtifacts, output_dir: Path, deadband_c: float = 
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument("--building-type", required=True)
     p.add_argument(
         "--building-id",
@@ -551,15 +596,36 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "matching (--building-type, --climate-zone).",
     )
     p.add_argument("--task", default="task1")
-    p.add_argument("--run-period", default="full_year", choices=["full_year", "winter", "summer"])
-    p.add_argument("--output-dir", required=True, type=Path)
-    p.add_argument("--deadband-c", type=float, default=1.0, help="Deadband half-width for satisfaction stats.")
+    p.add_argument(
+        "--run-period", default="full_year", choices=["full_year", "winter", "summer"]
+    )
+    p.add_argument(
+        "--base-dir",
+        type=Path,
+        default=Path(os.environ.get("SCRATCH", "outputs")),
+        help="Root directory; results go under <base_dir>/b2b/analysis/tuned_controllers/",
+    )
+    p.add_argument("--output-dir", required=False, default=None, type=Path)
+    p.add_argument(
+        "--deadband-c",
+        type=float,
+        default=1.0,
+        help="Deadband half-width for satisfaction stats.",
+    )
     return p.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s: %(message)s"
+    )
     args = parse_args(argv)
+
+    output_dir = (
+        args.output_dir
+        if args.output_dir is not None
+        else args.base_dir / "b2b" / "analysis" / "tuned_controllers"
+    )
 
     if args.building_id is not None:
         building_ids = [args.building_id]
@@ -569,23 +635,35 @@ def main(argv: list[str] | None = None) -> None:
         )
         if not building_ids:
             logger.error(
-                "No test buildings found for %s / cz=%d", args.building_type, args.climate_zone
+                "No test buildings found for %s / cz=%d",
+                args.building_type,
+                args.climate_zone,
             )
             sys.exit(1)
         logger.info(
             "Auto-selected %d buildings for %s cz=%d: %s",
-            len(building_ids), args.building_type, args.climate_zone, building_ids,
+            len(building_ids),
+            args.building_type,
+            args.climate_zone,
+            building_ids,
         )
 
     for bid in building_ids:
         try:
             art = rollout_and_analyze(
-                args.building_type, bid, args.climate_zone, args.task, run_period=args.run_period,
+                args.building_type,
+                bid,
+                args.climate_zone,
+                args.task,
+                run_period=args.run_period,
             )
-            save_artifacts(art, args.output_dir, deadband_c=args.deadband_c)
+            save_artifacts(art, output_dir, deadband_c=args.deadband_c)
         except Exception:
             logger.exception(
-                "Rollout failed: %s / %s cz=%d", args.building_type, bid, args.climate_zone
+                "Rollout failed: %s / %s cz=%d",
+                args.building_type,
+                bid,
+                args.climate_zone,
             )
 
 

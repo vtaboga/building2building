@@ -49,20 +49,20 @@ logger = logging.getLogger(__name__)
 # now fires for that combination.
 ORION_SPACE: dict[str, str] = {
     "/learning_rate": "loguniform(1e-5, 5e-4)",
-    "/n_steps":       "choices([512, 1024, 2048])",
-    "/batch_size":    "choices([256, 512, 1024, 2048, 4096, 8192])",
-    "/ent_coef":      "loguniform(5e-4, 5e-2)",
-    "/gamma":         "choices([0.97, 0.98, 0.99, 0.995])",
-    "/n_epochs":      "choices([5, 10, 20])",
+    "/n_steps": "choices([512, 1024, 2048])",
+    "/batch_size": "choices([256, 512, 1024, 2048, 4096, 8192])",
+    "/ent_coef": "loguniform(5e-4, 5e-2)",
+    "/gamma": "choices([0.97, 0.98, 0.99, 0.995])",
+    "/n_epochs": "choices([5, 10, 20])",
 }
 
 # PPO parameters not in ORION_SPACE — fixed as robust across tasks.
 _FIXED_PPO_HPARAMS: dict[str, Any] = {
-    "gae_lambda":    0.95,
-    "clip_range":    0.2,
-    "vf_coef":       0.5,
+    "gae_lambda": 0.95,
+    "clip_range": 0.2,
+    "vf_coef": 0.5,
     "max_grad_norm": 0.5,
-    "target_kl":     0.02,
+    "target_kl": 0.02,
 }
 
 _FIXED_POLICY_KWARGS: dict[str, Any] = {
@@ -144,9 +144,7 @@ def _sample_one_per_cz(
 # ── Orion params to PPO hparams ─────────────────────────────────────
 
 
-def _params_to_ppo_hparams(
-    params: dict[str, Any], n_envs: int = 1
-) -> dict[str, Any]:
+def _params_to_ppo_hparams(params: dict[str, Any], n_envs: int = 1) -> dict[str, Any]:
     """Convert flat Orion trial params to PPO constructor kwargs.
 
     ``batch_size`` is clamped to ``n_steps * n_envs`` so SB3 never receives
@@ -159,11 +157,11 @@ def _params_to_ppo_hparams(
     batch_size = min(int(params["/batch_size"]), n_steps * n_envs)
     return {
         "learning_rate": params["/learning_rate"],
-        "n_steps":       n_steps,
-        "batch_size":    batch_size,
-        "ent_coef":      params["/ent_coef"],
-        "gamma":         float(params["/gamma"]),
-        "n_epochs":      int(params["/n_epochs"]),
+        "n_steps": n_steps,
+        "batch_size": batch_size,
+        "ent_coef": params["/ent_coef"],
+        "gamma": float(params["/gamma"]),
+        "n_epochs": int(params["/n_epochs"]),
         **_FIXED_PPO_HPARAMS,
         "policy_kwargs": dict(_FIXED_POLICY_KWARGS),
     }
@@ -269,17 +267,19 @@ def _trial_params_to_ppo_config(params: dict[str, Any]) -> dict[str, Any]:
     in _params_to_ppo_hparams applies when training with a specific n_envs.
     """
     return {
-        "algorithm":     "ppo",
-        "policy_type":   "MlpPolicy",
-        "device":        "auto",
+        "algorithm": "ppo",
+        "policy_type": "MlpPolicy",
+        "device": "auto",
         "learning_rate": float(params["/learning_rate"]),
-        "n_steps":       int(params["/n_steps"]),
-        "batch_size":    int(params["/batch_size"]),
-        "ent_coef":      float(params["/ent_coef"]),
-        "gamma":         float(params["/gamma"]),
-        "n_epochs":      int(params["/n_epochs"]),
-        **{k: float(v) if isinstance(v, float) else v
-           for k, v in _FIXED_PPO_HPARAMS.items()},
+        "n_steps": int(params["/n_steps"]),
+        "batch_size": int(params["/batch_size"]),
+        "ent_coef": float(params["/ent_coef"]),
+        "gamma": float(params["/gamma"]),
+        "n_epochs": int(params["/n_epochs"]),
+        **{
+            k: float(v) if isinstance(v, float) else v
+            for k, v in _FIXED_PPO_HPARAMS.items()
+        },
         "policy_kwargs": dict(_FIXED_POLICY_KWARGS),
     }
 
@@ -294,9 +294,7 @@ def _save_best_config(
     output_dir.mkdir(parents=True, exist_ok=True)
     fname = f"ppo_chs_all_{task}.yaml"
     out_path = output_dir / fname
-    out_path.write_text(
-        yaml.dump(cfg, default_flow_style=False, sort_keys=False)
-    )
+    out_path.write_text(yaml.dump(cfg, default_flow_style=False, sort_keys=False))
     logger.info("Saved CHS-tuned PPO config to %s", out_path)
     return out_path
 
@@ -330,9 +328,7 @@ def _run_sweep(
     """
     # Pre-compute the expected trial cost with a safety margin so workers that
     # start late (due to queue delays) exit before they run out of time.
-    trial_cost_sec = (
-        len(building_instances) * ntune_seeds * _SECS_PER_BUILDING_SEED
-    )
+    trial_cost_sec = len(building_instances) * ntune_seeds * _SECS_PER_BUILDING_SEED
 
     trial_counter = 0
     while not experiment.is_done:
@@ -360,7 +356,8 @@ def _run_sweep(
                 logger.warning(
                     "ReservationRaceCondition on suggest() attempt %d; "
                     "retrying in %.0f s",
-                    _attempt + 1, backoff,
+                    _attempt + 1,
+                    backoff,
                 )
                 time.sleep(backoff)
         if trial is None:
@@ -372,9 +369,7 @@ def _run_sweep(
         trial_idx = trial_counter
         trial_counter += 1
 
-        logger.info(
-            "Worker starting trial %s (idx %d)", trial.id, trial_idx
-        )
+        logger.info("Worker starting trial %s (idx %d)", trial.id, trial_idx)
 
         all_rewards: list[float] = []
         rewards_per_building: dict[str, list[float]] = {}
@@ -389,14 +384,25 @@ def _run_sweep(
             for seed in range(ntune_seeds):
                 try:
                     reward = _train_and_eval_single(
-                        btype, bid, bid, task, hparams,
-                        total_timesteps, n_envs, seed=seed,
-                        tensorboard_log=None, verbose=0,
+                        btype,
+                        bid,
+                        bid,
+                        task,
+                        hparams,
+                        total_timesteps,
+                        n_envs,
+                        seed=seed,
+                        tensorboard_log=None,
+                        verbose=0,
                     )
                 except Exception as exc:
                     logger.warning(
                         "Trial %s seed %d failed on %s/%s: %s",
-                        trial.id, seed, btype, bid, exc,
+                        trial.id,
+                        seed,
+                        btype,
+                        bid,
+                        exc,
                     )
                     failed = True
                     break
@@ -406,7 +412,11 @@ def _run_sweep(
                 seeds_done += 1
                 logger.info(
                     "Trial %s | %s/%s | seed %d | reward %.1f",
-                    trial.id, btype, bid, seed, reward,
+                    trial.id,
+                    btype,
+                    bid,
+                    seed,
+                    reward,
                 )
 
                 # After each seed, check whether this node is fast enough to
@@ -451,23 +461,30 @@ def _run_sweep(
         )
 
         _save_trial_rewards(
-            trial.id, trial_idx, rewards_per_building, results_dir,
+            trial.id,
+            trial_idx,
+            rewards_per_building,
+            results_dir,
             params=params,
         )
-        logger.info(
-            "Trial %s observed (objective=%.1f)", trial.id, objective_value
-        )
+        logger.info("Trial %s observed (objective=%.1f)", trial.id, objective_value)
 
-        _wandb_log({
-            "trial/index": trial_idx,
-            "trial/mean_reward": -objective_value if objective_value < 1e9 else float("nan"),
-            "trial/objective": objective_value,
-            "trial/failed": failed,
-            **{
-                f"trial/reward_{bid}": float(np.mean(rews)) if rews else float("nan")
-                for bid, rews in rewards_per_building.items()
-            },
-        })
+        _wandb_log(
+            {
+                "trial/index": trial_idx,
+                "trial/mean_reward": (
+                    -objective_value if objective_value < 1e9 else float("nan")
+                ),
+                "trial/objective": objective_value,
+                "trial/failed": failed,
+                **{
+                    f"trial/reward_{bid}": (
+                        float(np.mean(rews)) if rews else float("nan")
+                    )
+                    for bid, rews in rewards_per_building.items()
+                },
+            }
+        )
 
 
 # ── CHS analysis ────────────────────────────────────────────────────
@@ -506,9 +523,7 @@ def _run_analyze(
             break
 
     if best_params is None:
-        logger.error(
-            "Could not find trial %s in Orion experiment.", chs_best_id
-        )
+        logger.error("Could not find trial %s in Orion experiment.", chs_best_id)
         return
 
     _save_best_config(best_params, output_dir / "configs", task)
@@ -546,15 +561,15 @@ def _run_reeval(
             break
 
     if best_params is None:
-        logger.error(
-            "Could not find trial %s in Orion experiment.", chs_best_id
-        )
+        logger.error("Could not find trial %s in Orion experiment.", chs_best_id)
         return
 
     hparams = _params_to_ppo_hparams(best_params, n_envs=n_envs)
     logger.info(
         "Re-evaluating CHS-best trial %s on %d buildings x %d seeds",
-        chs_best_id, len(building_instances), reeval_seeds,
+        chs_best_id,
+        len(building_instances),
+        reeval_seeds,
     )
 
     results: dict[str, list[float]] = {}
@@ -563,25 +578,34 @@ def _run_reeval(
         for seed in range(reeval_seeds):
             try:
                 reward = _train_and_eval_single(
-                    btype, bid, bid, task, hparams,
-                    total_timesteps, n_envs, seed=seed,
+                    btype,
+                    bid,
+                    bid,
+                    task,
+                    hparams,
+                    total_timesteps,
+                    n_envs,
+                    seed=seed,
                     tensorboard_log=tensorboard_log,
                 )
                 results[bid].append(reward)
                 logger.info(
                     "Reeval %s/%s seed %d: reward %.1f",
-                    btype, bid, seed, reward,
+                    btype,
+                    bid,
+                    seed,
+                    reward,
                 )
-                _wandb_log({
-                    "reeval/building": bid,
-                    "reeval/building_type": btype,
-                    "reeval/seed": seed,
-                    "reeval/reward": reward,
-                })
+                _wandb_log(
+                    {
+                        "reeval/building": bid,
+                        "reeval/building_type": btype,
+                        "reeval/seed": seed,
+                        "reeval/reward": reward,
+                    }
+                )
             except Exception:
-                logger.exception(
-                    "Reeval failed on %s/%s seed %d", btype, bid, seed
-                )
+                logger.exception("Reeval failed on %s/%s seed %d", btype, bid, seed)
 
     reeval_dir = output_dir / "reeval"
     reeval_dir.mkdir(parents=True, exist_ok=True)
@@ -616,15 +640,17 @@ def _run_reeval(
     )
     logger.info("Saved re-evaluation summary to %s", summary_path)
 
-    _wandb_log({
-        "reeval/overall_mean": summary["overall_mean"],
-        "reeval/overall_std": summary["overall_std"],
-        **{
-            f"reeval/mean_{bid}": stats["mean"]
-            for bid, stats in summary["buildings"].items()
-            if stats["mean"] is not None
-        },
-    })
+    _wandb_log(
+        {
+            "reeval/overall_mean": summary["overall_mean"],
+            "reeval/overall_std": summary["overall_std"],
+            **{
+                f"reeval/mean_{bid}": stats["mean"]
+                for bid, stats in summary["buildings"].items()
+                if stats["mean"] is not None
+            },
+        }
+    )
 
     _save_best_config(best_params, output_dir / "configs", task)
 
@@ -675,7 +701,9 @@ def main(cfg: DictConfig) -> None:
         if len(bids) < n_tune_buildings:
             logger.warning(
                 "%s: only %d buildings available in test split (requested %d)",
-                bt, len(bids), n_tune_buildings,
+                bt,
+                len(bids),
+                n_tune_buildings,
             )
         for bid in bids[:n_tune_buildings]:
             building_instances.append((bt, bid))
@@ -686,7 +714,9 @@ def main(cfg: DictConfig) -> None:
 
     logger.info(
         "CHS PPO tuning for task=%s: %d buildings across %d types",
-        task, len(building_instances), len(building_types),
+        task,
+        len(building_instances),
+        len(building_types),
     )
     for btype, bid in building_instances:
         logger.info("  %s / %s", btype, bid)
@@ -703,9 +733,7 @@ def main(cfg: DictConfig) -> None:
             if is_reeval:
                 tb_log = str(output_dir / "tensorboard")
             wandb.init(
-                project=OmegaConf.select(
-                    wandb_cfg, "project", default="b2b-baselines"
-                ),
+                project=OmegaConf.select(wandb_cfg, "project", default="b2b-baselines"),
                 entity=OmegaConf.select(wandb_cfg, "entity", default=None),
                 tags=list(OmegaConf.select(wandb_cfg, "tags", default=[])),
                 config=OmegaConf.to_container(cfg, resolve=True),

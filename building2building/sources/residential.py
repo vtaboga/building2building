@@ -44,6 +44,7 @@ from pandas import DataFrame
 
 logger = logging.getLogger(__name__)
 
+
 def _row_source_metadata(row) -> dict[str, object]:
     """
     Extract a compact, JSON-friendly subset of identifying info from the selected row.
@@ -134,9 +135,11 @@ def table_index(root_zip: Path):
 
         df = df.assign(epw_filename=df["Region_Administrative"].apply(_region_to_epw))
     elif "weather_station_epw_filepath" in df.columns:
-        df = df.assign(epw_filename=df["weather_station_epw_filepath"].apply(
-            lambda name: f"weather/{name}"
-        ))
+        df = df.assign(
+            epw_filename=df["weather_station_epw_filepath"].apply(
+                lambda name: f"weather/{name}"
+            )
+        )
     else:
         raise KeyError(
             "Could not derive EPW filename: expected one of "
@@ -177,7 +180,9 @@ def _build_control_derivation(
 
     # Step 1: Prepare epJSON (upgrade, convert, add meters, set timestep)
     epjson = prepare_building(
-        idf_derivation, ep, src_version="24.2.0",
+        idf_derivation,
+        ep,
+        src_version="24.2.0",
         timesteps_per_hour=timesteps_per_hour,
     )
     run_period = TaskConfig.from_dict({"run_period": run_period_name}).run_period
@@ -326,7 +331,10 @@ def search_configs(
             warmup_phases = metadata.warmup_phases
 
             reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
-            if not isinstance(reward_section, dict) or "reward_type" not in reward_section:
+            if (
+                not isinstance(reward_section, dict)
+                or "reward_type" not in reward_section
+            ):
                 raise ValueError(
                     "The 'reward' section with a 'reward_type' key is required "
                     "in the building config."
@@ -361,7 +369,9 @@ def search_configs(
                     f.write(json.dumps(record) + "\n")
             except Exception:
                 # If even this fails, at least surface the info in logs.
-                logger.exception("Failed to write pipeline error record to %s", err_path)
+                logger.exception(
+                    "Failed to write pipeline error record to %s", err_path
+                )
 
             logger.warning(
                 "Failed to build BuildingConfig for row=%s: %s",

@@ -109,9 +109,7 @@ def load_results_csv(path: Path) -> list[ResultRow]:
     with path.open() as f:
         reader = csv.DictReader(f)
         for raw in reader:
-            reward_cols = [
-                k for k in raw.keys() if k.startswith("reward_run")
-            ]
+            reward_cols = [k for k in raw.keys() if k.startswith("reward_run")]
             rewards = [float(raw[k]) for k in sorted(reward_cols) if raw[k]]
             rows.append(
                 ResultRow(
@@ -209,7 +207,9 @@ def grouped_bar_chart(
     ax.legend()
 
 
-def save_figure(fig: plt.Figure, path: Path, formats: Sequence[str] = ("pdf", "png")) -> None:
+def save_figure(
+    fig: plt.Figure, path: Path, formats: Sequence[str] = ("pdf", "png")
+) -> None:
     """Save figure in multiple formats."""
     path.parent.mkdir(parents=True, exist_ok=True)
     for fmt in formats:

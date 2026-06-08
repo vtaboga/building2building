@@ -1,4 +1,8 @@
 """Tests for building2building.api — public API functions."""
+# This file pins the public API contract.
+# Changes here = breaking API changes; requires a CHANGELOG.md entry.
+# Marker applied automatically by conftest.py (api_contract glob).
+
 
 from __future__ import annotations
 
@@ -32,9 +36,7 @@ class TestListBuildings:
 
             result = list_buildings("OfficeSmall", "train")
             assert result == ["OS-0001", "OS-0002"]
-            mock_registry.list_buildings.assert_called_once_with(
-                "OfficeSmall", "train"
-            )
+            mock_registry.list_buildings.assert_called_once_with("OfficeSmall", "train")
 
     def test_delegates_test_small_to_registry(self) -> None:
         mock_registry = MagicMock()

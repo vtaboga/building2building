@@ -109,9 +109,7 @@ def _config_to_dict(cfg: UnitaryHvacConfig | AirLoopConfig) -> dict[str, Any]:
     return d
 
 
-def _aggregate_rewards(
-    rewards: list[float], method: str, percentile_q: float
-) -> float:
+def _aggregate_rewards(rewards: list[float], method: str, percentile_q: float) -> float:
     """Aggregate per-building rewards into a single objective value.
 
     ``method="percentile"`` (default) returns a low-quantile (e.g. 25th
@@ -217,12 +215,27 @@ def _make_objective(
 
         if executor is None:
             return _evaluate_sequential(
-                trial, cfg, is_vav, building_type, building_ids, task, run_period,
-                aggregation, percentile_q,
+                trial,
+                cfg,
+                is_vav,
+                building_type,
+                building_ids,
+                task,
+                run_period,
+                aggregation,
+                percentile_q,
             )
         return _evaluate_parallel(
-            trial, cfg, is_vav, building_type, building_ids, task, run_period,
-            aggregation, percentile_q, executor,
+            trial,
+            cfg,
+            is_vav,
+            building_type,
+            building_ids,
+            task,
+            run_period,
+            aggregation,
+            percentile_q,
+            executor,
         )
 
     return objective
@@ -276,7 +289,12 @@ def _evaluate_parallel(
     futures = {
         executor.submit(
             _run_one_building,
-            building_type, bid, task, run_period, cfg, is_vav,
+            building_type,
+            bid,
+            task,
+            run_period,
+            cfg,
+            is_vav,
         ): bid
         for bid in building_ids
     }
@@ -317,7 +335,7 @@ def main(cfg: DictConfig) -> None:
     n_trials: int = int(cfg.get("n_trials", 200))
     n_startup: int = int(cfg.get("n_startup_trials", 20))
     timeout: int | None = cfg.get("timeout_seconds")
-    task: str = cfg.get("reward", {}).get("task_name", "task1")
+    task: str = cfg.get("reward", {}).get("task_name", "task_occ_emed")
     run_period_raw = str(cfg.get("run_period", "full_year"))
     allowed_run_periods = {"full_year", "winter", "summer"}
     if run_period_raw not in allowed_run_periods:
@@ -339,22 +357,16 @@ def main(cfg: DictConfig) -> None:
         )
     percentile_q: float = float(cfg.get("percentile_q", 25.0))
     if not 0.0 < percentile_q < 100.0:
-        raise ValueError(
-            f"percentile_q must be in (0, 100); got {percentile_q}."
-        )
+        raise ValueError(f"percentile_q must be in (0, 100); got {percentile_q}.")
     storage_dir_cfg = cfg.get("storage_dir", None)
     storage_dir = (
         Path(str(storage_dir_cfg)) if storage_dir_cfg is not None else output_dir
     )
     n_building_workers: int = int(cfg.get("n_building_workers", 1))
     if n_building_workers < 1:
-        raise ValueError(
-            f"n_building_workers must be >= 1; got {n_building_workers}."
-        )
+        raise ValueError(f"n_building_workers must be >= 1; got {n_building_workers}.")
 
-    sampler = optuna.samplers.TPESampler(
-        n_startup_trials=n_startup, seed=42
-    )
+    sampler = optuna.samplers.TPESampler(n_startup_trials=n_startup, seed=42)
     study_name = f"tune_{building_type.lower()}_cz{climate_zone}_{task}"
     storage_dir.mkdir(parents=True, exist_ok=True)
     storage_path = storage_dir / f"{study_name}.db"
@@ -453,9 +465,7 @@ def main(cfg: DictConfig) -> None:
             from optuna.integration.wandb import WeightsAndBiasesCallback
 
             wandb.init(
-                project=OmegaConf.select(
-                    wandb_cfg, "project", default="b2b-baselines"
-                ),
+                project=OmegaConf.select(wandb_cfg, "project", default="b2b-baselines"),
                 entity=OmegaConf.select(wandb_cfg, "entity", default=None),
                 tags=list(OmegaConf.select(wandb_cfg, "tags", default=[])),
                 name=f"tune_{building_type}_cz{climate_zone}_{task}",
@@ -474,8 +484,10 @@ def main(cfg: DictConfig) -> None:
                 metric_name="worst_reward",
             )
             callbacks.append(wandb_callback)
-            logger.info("W&B logging enabled (project=%s)",
-                        OmegaConf.select(wandb_cfg, "project", default="b2b-baselines"))
+            logger.info(
+                "W&B logging enabled (project=%s)",
+                OmegaConf.select(wandb_cfg, "project", default="b2b-baselines"),
+            )
         except ImportError:
             logger.warning("wandb or optuna[wandb] not installed; skipping W&B logging")
     else:
@@ -490,19 +502,20 @@ def main(cfg: DictConfig) -> None:
         if use_wandb:
             try:
                 import wandb
+
                 if wandb.run is not None:
-                    wandb.log({
-                        "best_reward_so_far": _best_so_far,
-                        "trial_number": trial.number,
-                    })
+                    wandb.log(
+                        {
+                            "best_reward_so_far": _best_so_far,
+                            "trial_number": trial.number,
+                        }
+                    )
             except Exception:
                 pass
 
     callbacks.append(_track_best)
 
-    def _gc_callback(
-        study: optuna.Study, trial: optuna.trial.FrozenTrial
-    ) -> None:
+    def _gc_callback(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
         gc.collect()
 
     callbacks.append(_gc_callback)
@@ -521,9 +534,7 @@ def main(cfg: DictConfig) -> None:
         import multiprocessing as _mp
 
         ctx = _mp.get_context("spawn")
-        executor = ProcessPoolExecutor(
-            max_workers=effective_workers, mp_context=ctx
-        )
+        executor = ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx)
         logger.info(
             "Within-trial parallelism: %d worker processes (spawn)",
             effective_workers,
@@ -566,6 +577,7 @@ def main(cfg: DictConfig) -> None:
     if use_wandb:
         try:
             import wandb
+
             if wandb.run is not None:
                 wandb.run.summary["best_trial_number"] = study.best_trial.number
                 wandb.run.summary["best_reward"] = study.best_trial.value
@@ -582,21 +594,18 @@ def main(cfg: DictConfig) -> None:
 
     is_vav = building_type in VAV_BUILDING_TYPES
     if is_vav:
-        best_cfg = AirLoopConfig(**{
-            k: v
-            for k, v in study.best_params.items()
-            if k != "sat_aware_flow"
-        }, sat_aware_flow=study.best_params.get("sat_aware_flow", True))
+        best_cfg = AirLoopConfig(
+            **{k: v for k, v in study.best_params.items() if k != "sat_aware_flow"},
+            sat_aware_flow=study.best_params.get("sat_aware_flow", True),
+        )
     else:
         best_cfg = UnitaryHvacConfig(**study.best_params)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     if is_vav:
-        fname = f"air_loop_{building_type.lower()}_{task}_cz{climate_zone}.yaml"
+        fname = f"air_loop_{building_type.lower()}_cz{climate_zone}.yaml"
     else:
-        fname = (
-            f"unitary_hvac_{building_type.lower()}_{task}_cz{climate_zone}.yaml"
-        )
+        fname = f"unitary_hvac_{building_type.lower()}_cz{climate_zone}.yaml"
 
     out_path = output_dir / fname
     cfg_dict = _config_to_dict(best_cfg)

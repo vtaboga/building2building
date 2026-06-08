@@ -431,14 +431,18 @@ def flat_observation_info(
             "natural_gas": (
                 "energy_gas",
                 FunctionHole(
-                    DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area * joules_to_watthours)
+                    DivideBy(
+                        DynamicMeter(["NaturalGas:HVAC"]), area * joules_to_watthours
+                    )
                 ),
                 (0.0, energy_bound),
             ),
             "electricity": (
                 "energy_electricity",
                 FunctionHole(
-                    DivideBy(DynamicMeter(["Electricity:HVAC"]), area * joules_to_watthours)
+                    DivideBy(
+                        DynamicMeter(["Electricity:HVAC"]), area * joules_to_watthours
+                    )
                 ),
                 (0.0, energy_bound),
             ),
@@ -525,18 +529,14 @@ def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
                 {
                     "natural_gas": TransformScalarToArray(
                         FunctionHole(
-                            DivideBy(
-                                DynamicMeter(["NaturalGas:HVAC"]), area * 3600.0
-                            )
+                            DivideBy(DynamicMeter(["NaturalGas:HVAC"]), area * 3600.0)
                         ),
                         0.0,
                         50.0,
                     ),
                     "electricity": TransformScalarToArray(
                         FunctionHole(
-                            DivideBy(
-                                DynamicMeter(["Electricity:HVAC"]), area * 3600.0
-                            )
+                            DivideBy(DynamicMeter(["Electricity:HVAC"]), area * 3600.0)
                         ),
                         0.0,
                         50.0,

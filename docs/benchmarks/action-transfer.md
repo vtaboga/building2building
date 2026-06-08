@@ -7,11 +7,29 @@ changes** between training and test. The building dynamics and reward stay
 fixed; only the action interface changes. Train and test use the **same
 building** — only the subset of actuators exposed to the agent differs.
 
-This tests scenarios like:
+| Axis | Train | Test |
+|---|---|---|
+| Building | Fixed | Fixed (same instance) |
+| Reward | Fixed | Fixed |
+| Actuator set | Reduced or full | Full or reduced |
 
-- A building control system is upgraded with additional actuators
-- Some actuators become unavailable due to maintenance
-- The control interface is simplified or expanded
+## Metric
+
+```python
+import building2building as b2b
+
+bench = b2b.benchmarks.ActionSpaceTransfer(
+    system_type="unitary",
+    direction="expand",
+    task="task_const_e0",
+)
+traj = b2b.rollout(bench.make_test_env(), controller=my_policy)
+score = b2b.compute_normalized_score(traj)
+```
+
+Score is normalised against the reactive-controller baseline that also sees
+the test actuator set.  A score above 0.0 outperforms the reactive baseline on
+the larger/smaller action space.
 
 ## Paper Reference (Section 4)
 

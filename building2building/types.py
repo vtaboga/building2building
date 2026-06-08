@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar, Literal, Protocol, Sequence
 
-
 RunPeriodName = Literal["full_year", "winter", "summer"]
 TargetTemperatureMode = Literal["constant", "occupancy", "random_schedule"]
 SeasonName = Literal["winter", "shoulder", "summer"]
@@ -90,7 +89,9 @@ class RunPeriodConfig:
             )
         return mapping[normalized]
 
-    def expected_steps(self, timesteps_per_hour: int = DEFAULT_TIMESTEPS_PER_HOUR) -> int:
+    def expected_steps(
+        self, timesteps_per_hour: int = DEFAULT_TIMESTEPS_PER_HOUR
+    ) -> int:
         """Return the expected number of simulation steps for this period.
 
         Args:
@@ -303,9 +304,13 @@ class TaskConfig:
             TypeError: If ``"zone_target_temperatures"`` is not a
                 mapping or contains non-string keys.
         """
-        run_period = RunPeriodConfig.from_name(task_section.get("run_period", "full_year"))
+        run_period = RunPeriodConfig.from_name(
+            task_section.get("run_period", "full_year")
+        )
 
-        mode_raw = str(task_section.get("target_temperature_mode", "constant")).strip().lower()
+        mode_raw = (
+            str(task_section.get("target_temperature_mode", "constant")).strip().lower()
+        )
         if mode_raw not in VALID_TARGET_TEMPERATURE_MODES:
             raise ValueError(
                 "task.target_temperature_mode must be one of "
@@ -327,12 +332,12 @@ class TaskConfig:
             if not isinstance(zone_name, str):
                 raise TypeError("task.zone_target_temperatures keys must be strings")
             if not isinstance(zone_cfg, dict):
-                raise TypeError(
-                    "task.zone_target_temperatures values must be mappings"
+                raise TypeError("task.zone_target_temperatures values must be mappings")
+            zone_targets[zone_name.strip().lower()] = (
+                ZoneTargetTemperatureConfig.from_dict(
+                    zone_cfg,
+                    fallback_temperature_c=default_temp.occupied_c,
                 )
-            zone_targets[zone_name.strip().lower()] = ZoneTargetTemperatureConfig.from_dict(
-                zone_cfg,
-                fallback_temperature_c=default_temp.occupied_c,
             )
 
         timesteps_per_hour = int(
@@ -388,7 +393,9 @@ class TaskConfig:
             The zone-specific or default target temperature config.
         """
         key = zone_name.strip().lower()
-        return self.zone_target_temperatures.get(key, self.default_zone_target_temperature)
+        return self.zone_target_temperatures.get(
+            key, self.default_zone_target_temperature
+        )
 
 
 @dataclass(frozen=True)
@@ -583,8 +590,6 @@ class BuildingConfig:
     area: float
     hvac_equipment: Sequence[Equipment]
     source_metadata: dict[str, Any] = field(default_factory=dict)
-    task_config: TaskConfig = field(
-        default_factory=lambda: TaskConfig.from_dict({})
-    )
+    task_config: TaskConfig = field(default_factory=lambda: TaskConfig.from_dict({}))
     expose_heating_only_zones: bool = True
     fixed_actuator_overrides: dict[str, float] = field(default_factory=dict)

@@ -18,9 +18,7 @@ def find_obs_index(observation_names: list[str], key: str) -> int:
     raise RuntimeError(f"Could not find observation {key!r} in observation_names")
 
 
-def find_obs_index_optional(
-    observation_names: list[str], key: str
-) -> int | None:
+def find_obs_index_optional(observation_names: list[str], key: str) -> int | None:
     """Like :func:`find_obs_index` but returns ``None`` when missing."""
     key_l = key.strip().lower()
     for i, name in enumerate(observation_names):
@@ -29,9 +27,7 @@ def find_obs_index_optional(
     return None
 
 
-def find_zone_air_temp_index(
-    observation_names: list[str], zone_name: str
-) -> int:
+def find_zone_air_temp_index(observation_names: list[str], zone_name: str) -> int:
     """Find the observation index for a zone's air temperature."""
     prefix = "zone air temperature"
     zn = zone_name.strip().lower()
@@ -39,19 +35,17 @@ def find_zone_air_temp_index(
         sl = name.strip().lower()
         if not sl.startswith(prefix):
             continue
-        zone_part = sl[len(prefix):].strip()
+        zone_part = sl[len(prefix) :].strip()
         if zone_part == zn:
             return i
     for i, name in enumerate(observation_names):
         sl = name.strip().lower()
         if not sl.startswith(prefix):
             continue
-        zone_part = sl[len(prefix):].strip()
+        zone_part = sl[len(prefix) :].strip()
         if zn in zone_part or zone_part in zn:
             return i
-    raise RuntimeError(
-        f"Could not find Zone Air Temperature for zone {zone_name!r}"
-    )
+    raise RuntimeError(f"Could not find Zone Air Temperature for zone {zone_name!r}")
 
 
 def find_first_zone_air_temp_index(observation_names: list[str]) -> int:
@@ -92,14 +86,10 @@ def find_action_indices(
     ``"{component_type}::{control_type}::{component_name}"``.
     """
     out: list[int] = []
-    ct_pfx = (
-        component_type_prefix.strip().lower() if component_type_prefix else None
-    )
+    ct_pfx = component_type_prefix.strip().lower() if component_type_prefix else None
     ctrl = control_type.strip().lower() if control_type else None
     name_sub = (
-        component_name_contains.strip().lower()
-        if component_name_contains
-        else None
+        component_name_contains.strip().lower() if component_name_contains else None
     )
 
     for i, name in enumerate(action_names):

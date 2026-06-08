@@ -11,6 +11,10 @@ The tests exercise a lightweight patched version of ``new_make_env``
 that stops right after the ``TaskConfig`` is built, so they do **not**
 require the HuggingFace registry or EnergyPlus.
 """
+# This file pins the public API contract.
+# Changes here = breaking API changes; requires a CHANGELOG.md entry.
+# Marker applied automatically by conftest.py (api_contract glob).
+
 
 from __future__ import annotations
 
@@ -30,6 +34,7 @@ class _StubInfo:
         self.weather_file = "weather.epw"
         self.warmup_phases = 0
         self.net_conditioned_area_m2 = 100.0
+        self.climate_zone = 5
 
 
 class _StubRegistry:
@@ -70,9 +75,7 @@ def _patch_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(simulator_mod, "create_simulator", _raise)
 
-    monkeypatch.setattr(
-        api_mod, "_patch_epjson_run_period", lambda *a, **k: None
-    )
+    monkeypatch.setattr(api_mod, "_patch_epjson_run_period", lambda *a, **k: None)
 
 
 @pytest.mark.quick
@@ -80,11 +83,15 @@ class TestNewMakeEnvModeDefault:
     @pytest.mark.parametrize(
         ("task_name", "expected_mode"),
         [
-            ("task1", "constant"),
-            ("task2", "constant"),
-            ("task3", "occupancy"),
-            ("task4", "constant"),
-            ("task5", "random_schedule"),
+            ("task_const_e0", "constant"),
+            ("task_const_emed", "constant"),
+            ("task_const_ehigh", "constant"),
+            ("task_occ_e0", "occupancy"),
+            ("task_occ_emed", "occupancy"),
+            ("task_occ_ehigh", "occupancy"),
+            ("task_rand_e0", "random_schedule"),
+            ("task_rand_emed", "random_schedule"),
+            ("task_rand_ehigh", "random_schedule"),
         ],
     )
     def test_preset_mode_wins_when_default(
@@ -106,43 +113,45 @@ class TestNewMakeEnvModeDefault:
         with pytest.raises(_CapturedConfig) as excinfo:
             api_mod.new_make_env(
                 "OfficeSmall",
-                task="task3",
+                task="task_occ_emed",
                 target_temperature_mode="constant",
             )
         assert excinfo.value.task.target_temperature_mode == "constant"
 
-    def test_task3_carries_seasonal_unoccupied(
+    def test_occ_task_carries_seasonal_unoccupied(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         _patch_env(monkeypatch, tmp_path)
         with pytest.raises(_CapturedConfig) as excinfo:
-            api_mod.new_make_env("OfficeSmall", task="task3")
+            api_mod.new_make_env("OfficeSmall", task="task_occ_emed")
         zone_target = excinfo.value.task.default_zone_target_temperature
         assert zone_target.unoccupied_policy == "seasonal"
         assert zone_target.seasonal_unoccupied_c is not None
         assert zone_target.seasonal_unoccupied_c["summer"] == 26.0
 
-    def test_task5_populates_random_schedule_config(
+    def test_rand_task_populates_random_schedule_config(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         _patch_env(monkeypatch, tmp_path)
         with pytest.raises(_CapturedConfig) as excinfo:
             api_mod.new_make_env(
-                "OfficeSmall", task="task5", random_schedule_seed=42
+                "OfficeSmall", task="task_rand_emed", random_schedule_seed=42
             )
         rs = excinfo.value.task.random_schedule_config
         assert rs is not None
         assert rs.building_type == "OfficeSmall"
         assert rs.seed == 42
 
-    def test_task1_has_no_random_schedule(
+    def test_const_task_has_no_random_schedule(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         _patch_env(monkeypatch, tmp_path)
         with pytest.raises(_CapturedConfig) as excinfo:
-            api_mod.new_make_env("OfficeSmall", task="task1")
+            api_mod.new_make_env("OfficeSmall", task="task_const_e0")
         assert excinfo.value.task.random_schedule_config is None
 
     def test_preset_used_intact(self) -> None:
-        assert TASK_PRESETS["task3"].target_temperature_mode == "occupancy"
-        assert TASK_PRESETS["task5"].target_temperature_mode == "random_schedule"
+        assert TASK_PRESETS["task_occ_emed"].target_temperature_mode == "occupancy"
+        assert (
+            TASK_PRESETS["task_rand_emed"].target_temperature_mode == "random_schedule"
+        )

@@ -120,7 +120,7 @@ def extract_trajectory_data(
     for i, name in enumerate(obs_names):
         if name.strip().lower().startswith(zone_temp_prefix):
             zone_temp_indices.append(i)
-            zone_part = name.strip()[len("ZONE AIR TEMPERATURE"):].strip()
+            zone_part = name.strip()[len("ZONE AIR TEMPERATURE") :].strip()
             zone_temp_labels.append(zone_part if zone_part else f"zone_{i}")
 
     setpoint_prefix = "target_temperature"
@@ -128,7 +128,7 @@ def extract_trajectory_data(
     setpoint_labels: list[str] = []
     for i, name in enumerate(obs_names):
         if name.strip().lower().startswith(setpoint_prefix):
-            zone_part = name.strip()[len("target_temperature"):].strip()
+            zone_part = name.strip()[len("target_temperature") :].strip()
             setpoint_indices.append(i)
             setpoint_labels.append(zone_part if zone_part else f"setpoint_{i}")
 
@@ -322,9 +322,7 @@ def plot_trajectory(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Plot a saved trajectory (.npz)."
-    )
+    parser = argparse.ArgumentParser(description="Plot a saved trajectory (.npz).")
     parser.add_argument(
         "--trajectory",
         type=str,

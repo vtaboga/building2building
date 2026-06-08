@@ -92,7 +92,7 @@ tests/, tutorials/, docs/, paper/
 
 Working/scratch (gitignored, retained as tripwires per
 `notes.md` § Repo hygiene): `analysis/` (load-bearing — see notes),
-`scripts/`, `summaries/` (slated for deletion). Do not recreate:
+`scripts/`. Do not recreate:
 `scrap/`, `staging/`, `plans/`, `refactoring/`, `wandb/`, `site/`,
 `logs/`, `.venv/`.
 

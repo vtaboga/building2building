@@ -33,8 +33,8 @@ def get_cache_dir() -> Path:
     if os.name == "nt":  # Windows
         return Path(os.environ.get("LOCALAPPDATA", "~")) / "b2b"
     elif os.name == "posix":  # Linux/macOS
-        # Prefer  scratch if any
-        for var in "SCRATCH":
+        # Prefer persistent scratch space if available.
+        for var in ["SCRATCH"]:
             val = os.environ.get(var)
             if val:
                 return Path(val) / "b2b"

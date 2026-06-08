@@ -1,5 +1,4 @@
-"""Normalized scoring relative to baseline reactive controller performance.
-"""
+"""Normalized scoring relative to baseline reactive controller performance."""
 
 from __future__ import annotations
 

@@ -1,13 +1,15 @@
 """Tests for building2building.types — run period, task, and reward configs."""
+# This file pins the public API contract.
+# Changes here = breaking API changes; requires a CHANGELOG.md entry.
+# Marker applied automatically by conftest.py (api_contract glob).
+
 
 from __future__ import annotations
 
 import pytest
 
 from building2building.types import (
-    BarrierRewardConfig,
-    BaseRewardConfig,
-    DeadbandRewardConfig,
+    NormalizedDeadbandRewardConfig,
     RandomScheduleConfig,
     RunPeriodConfig,
     TaskConfig,
@@ -54,9 +56,7 @@ class TestZoneTargetTemperatureConfig:
         assert cfg.unoccupied_c == 18.0
 
     def test_from_dict_uses_fallback(self) -> None:
-        cfg = ZoneTargetTemperatureConfig.from_dict(
-            {}, fallback_temperature_c=19.0
-        )
+        cfg = ZoneTargetTemperatureConfig.from_dict({}, fallback_temperature_c=19.0)
         assert cfg.occupied_c == 19.0
         assert cfg.unoccupied_c == 19.0
 
@@ -77,15 +77,17 @@ class TestTaskConfig:
         assert tc.default_zone_target_temperature.occupied_c == 21.0
 
     def test_from_dict_explicit_values(self) -> None:
-        tc = TaskConfig.from_dict({
-            "run_period": "winter",
-            "target_temperature_mode": "occupancy",
-            "timesteps_per_hour": 4,
-            "default_zone_target_temperature": {
-                "occupied_c": 22.0,
-                "unoccupied_c": 18.0,
-            },
-        })
+        tc = TaskConfig.from_dict(
+            {
+                "run_period": "winter",
+                "target_temperature_mode": "occupancy",
+                "timesteps_per_hour": 4,
+                "default_zone_target_temperature": {
+                    "occupied_c": 22.0,
+                    "unoccupied_c": 18.0,
+                },
+            }
+        )
         assert tc.run_period.name == "winter"
         assert tc.target_temperature_mode == "occupancy"
         assert tc.timesteps_per_hour == 4
@@ -104,11 +106,13 @@ class TestTaskConfig:
         assert tc.timesteps_per_hour == tph
 
     def test_zone_target_temperatures(self) -> None:
-        tc = TaskConfig.from_dict({
-            "zone_target_temperatures": {
-                "Core Zone": {"occupied_c": 23.0, "unoccupied_c": 19.0},
-            },
-        })
+        tc = TaskConfig.from_dict(
+            {
+                "zone_target_temperatures": {
+                    "Core Zone": {"occupied_c": 23.0, "unoccupied_c": 19.0},
+                },
+            }
+        )
         target = tc.target_for_zone("Core Zone")
         assert target.occupied_c == 23.0
         target_default = tc.target_for_zone("Unknown Zone")
@@ -201,47 +205,31 @@ class TestZoneTargetTemperatureConfigExtended:
 
 @pytest.mark.quick
 class TestRewardConfigs:
-    def test_deadband_reward_config(self) -> None:
-        cfg = DeadbandRewardConfig(energy_weight=0.01, dT=1.0)
+    def test_normalized_deadband_reward_config(self) -> None:
+        cfg = NormalizedDeadbandRewardConfig(energy_weight=0.01, dT=1.0)
         assert cfg.energy_weight == 0.01
         assert cfg.dT == 1.0
+        assert not cfg.is_filled
 
-    def test_barrier_reward_config_defaults(self) -> None:
-        cfg = BarrierRewardConfig(energy_weight=0.5)
-        assert cfg.dT == 0.5
-        assert cfg.violation_penalty == 100.0
-
-    def test_base_reward_config(self) -> None:
-        cfg = BaseRewardConfig(energy_weight=0.0)
-        assert cfg.energy_weight == 0.0
+    def test_normalized_deadband_reward_config_filled(self) -> None:
+        cfg = NormalizedDeadbandRewardConfig(
+            energy_weight=1.0, dT=1.0, tau_T=0.4, tau_E=0.7
+        )
+        assert cfg.is_filled
 
 
 @pytest.mark.quick
 class TestRewardConfigFromDict:
-    def test_deadband(self) -> None:
-        cfg = reward_config_from_dict({
-            "reward_type": "DeadbandRewardConfig",
-            "energy_weight": 0.05,
-            "dT": 2.0,
-        })
-        assert isinstance(cfg, DeadbandRewardConfig)
-        assert cfg.dT == 2.0
-
-    def test_barrier(self) -> None:
-        cfg = reward_config_from_dict({
-            "reward_type": "BarrierRewardConfig",
-            "energy_weight": 1.0,
-            "violation_penalty": 50.0,
-        })
-        assert isinstance(cfg, BarrierRewardConfig)
-        assert cfg.violation_penalty == 50.0
-
-    def test_base(self) -> None:
-        cfg = reward_config_from_dict({
-            "reward_type": "BaseRewardConfig",
-            "energy_weight": 0.1,
-        })
-        assert isinstance(cfg, BaseRewardConfig)
+    def test_normalized_deadband(self) -> None:
+        cfg = reward_config_from_dict(
+            {
+                "reward_type": "NormalizedDeadbandRewardConfig",
+                "energy_weight": 1.0,
+                "dT": 1.0,
+            }
+        )
+        assert isinstance(cfg, NormalizedDeadbandRewardConfig)
+        assert cfg.energy_weight == 1.0
 
     def test_missing_reward_type_raises(self) -> None:
         with pytest.raises(ValueError, match="reward_type is required"):

@@ -21,7 +21,6 @@ from building2building.types import (
     ZoneTargetTemperatureConfig,
 )
 
-
 pytestmark = pytest.mark.long
 
 
@@ -86,11 +85,13 @@ def test_summer_unoccupied_target_is_warm(tmp_path: Path) -> None:
     try:
         obs_arr, obs_names = _collect_obs(env, 24 * 12 * 3)
         target_idx = [
-            i for i, n in enumerate(obs_names)
+            i
+            for i, n in enumerate(obs_names)
             if n.strip().lower().startswith("target_temperature")
         ]
         occ_idx = [
-            i for i, n in enumerate(obs_names)
+            i
+            for i, n in enumerate(obs_names)
             if n.strip().lower().startswith("zone_occupancy")
         ]
         assert target_idx and occ_idx
@@ -114,11 +115,13 @@ def test_winter_unoccupied_target_is_cold(tmp_path: Path) -> None:
     try:
         obs_arr, obs_names = _collect_obs(env, 24 * 12 * 3)
         target_idx = [
-            i for i, n in enumerate(obs_names)
+            i
+            for i, n in enumerate(obs_names)
             if n.strip().lower().startswith("target_temperature")
         ]
         occ_idx = [
-            i for i, n in enumerate(obs_names)
+            i
+            for i, n in enumerate(obs_names)
             if n.strip().lower().startswith("zone_occupancy")
         ]
         occ_mask = (obs_arr[:, occ_idx] <= 0.0).any(axis=1)
@@ -137,22 +140,21 @@ def test_full_year_has_distinct_summer_and_winter_targets(tmp_path: Path) -> Non
     """Rolling out a full year, the mean unoccupied target in
     JAN/FEB must be strictly below the mean in JUL/AUG."""
     _requires_long_runtime()
-    env = _make_seasonal_env(
-        tmp_path, "full_year", max_steps=365 * 24 * 12
-    )
+    env = _make_seasonal_env(tmp_path, "full_year", max_steps=365 * 24 * 12)
     try:
         obs_arr, obs_names = _collect_obs(env, 365 * 24 * 12)
         target_idx = [
-            i for i, n in enumerate(obs_names)
+            i
+            for i, n in enumerate(obs_names)
             if n.strip().lower().startswith("target_temperature")
         ]
         occ_idx = [
-            i for i, n in enumerate(obs_names)
+            i
+            for i, n in enumerate(obs_names)
             if n.strip().lower().startswith("zone_occupancy")
         ]
         doy_idx = next(
-            i for i, n in enumerate(obs_names)
-            if n.strip().lower() == "day_of_year"
+            i for i, n in enumerate(obs_names) if n.strip().lower() == "day_of_year"
         )
         occ_mask = (obs_arr[:, occ_idx] <= 0.0).any(axis=1)
         doy = obs_arr[:, doy_idx]

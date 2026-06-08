@@ -21,6 +21,7 @@ import argparse
 import csv
 import json
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -177,9 +178,7 @@ def write_csv(results: list[TestResult], path: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Evaluate dynamics adaptation models"
-    )
+    parser = argparse.ArgumentParser(description="Evaluate dynamics adaptation models")
     parser.add_argument("--model-path", type=str, required=True)
     parser.add_argument(
         "--difficulty",
@@ -195,7 +194,13 @@ def main() -> None:
     )
     parser.add_argument("--task", type=str, default="task1")
     parser.add_argument("--n-episodes", type=int, default=1)
-    parser.add_argument("--output", type=str, default="results_dynamics.csv")
+    parser.add_argument(
+        "--base-dir",
+        type=Path,
+        default=Path(os.environ.get("SCRATCH", "outputs")),
+        help="Root directory; results go under <base_dir>/b2b/eval/",
+    )
+    parser.add_argument("--output", type=Path, default=None)
     parser.add_argument(
         "--pad-obs-size",
         type=int,
@@ -212,6 +217,13 @@ def main() -> None:
         format="%(asctime)s %(name)s %(levelname)s: %(message)s",
     )
 
+    out_path = (
+        args.output
+        if args.output is not None
+        else args.base_dir / "b2b" / "eval" / "dynamics_results.csv"
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
     bench = b2b.benchmarks.DynamicsAdaptation(
         difficulty=args.difficulty, task=args.task
     )
@@ -225,9 +237,7 @@ def main() -> None:
 
     if args.approach == "specialist":
         model_dir = Path(args.model_path)
-        results = evaluate_specialist(
-            model_dir, bench, n_episodes=args.n_episodes
-        )
+        results = evaluate_specialist(model_dir, bench, n_episodes=args.n_episodes)
     elif args.approach in ("baseline", "parameterized"):
         pad_obs_size: int | None = args.pad_obs_size
         if pad_obs_size is None:
@@ -238,9 +248,7 @@ def main() -> None:
                     "Pass --pad-obs-size explicitly or re-run training to "
                     "generate the metadata file."
                 )
-            pad_obs_size = int(
-                json.loads(metadata_path.read_text())["pad_obs_size"]
-            )
+            pad_obs_size = int(json.loads(metadata_path.read_text())["pad_obs_size"])
         logger.info("Using pad_obs_size=%d", pad_obs_size)
         results = evaluate_multi_building(
             Path(args.model_path),
@@ -252,14 +260,10 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown approach: {args.approach!r}")
 
-    write_csv(results, Path(args.output))
+    write_csv(results, out_path)
 
     if results:
-        scores = [
-            r.normalized_score
-            for r in results
-            if r.normalized_score is not None
-        ]
+        scores = [r.normalized_score for r in results if r.normalized_score is not None]
         if scores:
             logger.info(
                 "Mean normalized score: %.4f (std=%.4f, n=%d)",

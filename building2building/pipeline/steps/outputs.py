@@ -230,9 +230,9 @@ def modify_timestep(
                 logger.info(
                     f"Changing timestep from {current_timestep} to {timesteps_per_hour}"
                 )
-                epjson["Timestep"][timestep_key]["number_of_timesteps_per_hour"] = (
-                    timesteps_per_hour
-                )
+                epjson["Timestep"][timestep_key][
+                    "number_of_timesteps_per_hour"
+                ] = timesteps_per_hour
             else:
                 logger.info(f"Timestep already set to {timesteps_per_hour}")
     else:
@@ -264,18 +264,18 @@ def modify_run_period(
 
     template_run_period = {
         "Run Period 1": {
-        "apply_weekend_holiday_rule": "No",
-        "begin_day_of_month": begin_day_of_month,
-        "begin_month": begin_month,
-        "begin_year": 2023,
-        "day_of_week_for_start_day": "Sunday",
-        "end_day_of_month": end_day_of_month,
-        "end_month": end_month,
-        "end_year": 2023,
-        "use_weather_file_daylight_saving_period": "No",
-        "use_weather_file_holidays_and_special_days": "No",
-        "use_weather_file_rain_indicators": "Yes",
-        "use_weather_file_snow_indicators": "Yes"
+            "apply_weekend_holiday_rule": "No",
+            "begin_day_of_month": begin_day_of_month,
+            "begin_month": begin_month,
+            "begin_year": 2023,
+            "day_of_week_for_start_day": "Sunday",
+            "end_day_of_month": end_day_of_month,
+            "end_month": end_month,
+            "end_year": 2023,
+            "use_weather_file_daylight_saving_period": "No",
+            "use_weather_file_holidays_and_special_days": "No",
+            "use_weather_file_rain_indicators": "Yes",
+            "use_weather_file_snow_indicators": "Yes",
         }
     }
 

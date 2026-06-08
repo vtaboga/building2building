@@ -4,6 +4,10 @@ Verifies that the top-level building2building package exposes
 the expected attributes.  Detailed tests for each subsystem live
 in their own test modules.
 """
+# This file pins the public API contract.
+# Changes here = breaking API changes; requires a CHANGELOG.md entry.
+# Marker applied automatically by conftest.py (api_contract glob).
+
 
 from __future__ import annotations
 
@@ -32,6 +36,5 @@ class TestTopLevelImports:
     def test_reward_configs_exposed(self) -> None:
         import building2building
 
-        assert hasattr(building2building, "DeadbandRewardConfig")
-        assert hasattr(building2building, "BarrierRewardConfig")
-        assert hasattr(building2building, "BaseRewardConfig")
+        assert hasattr(building2building, "NormalizedDeadbandRewardConfig")
+        assert hasattr(building2building, "RewardConfig")

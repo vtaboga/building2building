@@ -42,7 +42,6 @@ from building2building.morphology import (
     NodeType,
 )
 
-
 # ---------------------------------------------------------------------------
 # ScaledBeta distribution
 # ---------------------------------------------------------------------------
@@ -152,16 +151,11 @@ class Model(nn.Module):
             }
         )
         self.decoders = nn.ModuleDict(
-            {
-                nt.name: nn.Linear(d_model, 2 * nt.action_dim)
-                for nt in ALL_NODE_TYPES
-            }
+            {nt.name: nn.Linear(d_model, 2 * nt.action_dim) for nt in ALL_NODE_TYPES}
         )
 
         if self.extensions.spectral_pe:
-            self.spectral_pe_proj = nn.Linear(
-                self.extensions.spectral_pe_k, d_model
-            )
+            self.spectral_pe_proj = nn.Linear(self.extensions.spectral_pe_k, d_model)
 
         enc_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
@@ -170,9 +164,7 @@ class Model(nn.Module):
             batch_first=True,
             dropout=0.0,
         )
-        self.transformer = nn.TransformerEncoder(
-            enc_layer, num_layers=n_layers
-        )
+        self.transformer = nn.TransformerEncoder(enc_layer, num_layers=n_layers)
 
         self.value_head = nn.Sequential(
             nn.Linear(d_model, d_model),
@@ -278,7 +270,9 @@ class Policy:
 
         alpha = F.softplus(torch.cat(alpha_parts, dim=-1)) + 1.0
         beta_param = F.softplus(torch.cat(beta_parts, dim=-1)) + 1.0
-        dist = ScaledBeta(Beta(alpha, beta_param), torch.cat(low_parts), torch.cat(high_parts))
+        dist = ScaledBeta(
+            Beta(alpha, beta_param), torch.cat(low_parts), torch.cat(high_parts)
+        )
         value = self.value_head(encoded.mean(dim=1)).squeeze(-1)
         return dist, value
 
@@ -288,9 +282,7 @@ class Policy:
 # ---------------------------------------------------------------------------
 
 
-def encode_observation(
-    morphology: Morphology, obs: np.ndarray
-) -> list[np.ndarray]:
+def encode_observation(morphology: Morphology, obs: np.ndarray) -> list[np.ndarray]:
     """Split a flat env observation into per-node local arrays.
 
     Returns one array per morphology node (in node order).  Nodes with
@@ -306,9 +298,7 @@ def encode_observation(
     ]
 
 
-def join_action(
-    morphology: Morphology, flat_action: np.ndarray
-) -> np.ndarray:
+def join_action(morphology: Morphology, flat_action: np.ndarray) -> np.ndarray:
     """Scatter a flat action vector (in physical units) into the global env action.
 
     *flat_action* is concatenated in morphology node order (matching the
@@ -335,9 +325,7 @@ def join_action(
 def adjacency_matrix(morphology: Morphology) -> np.ndarray:
     """Symmetric adjacency matrix over the morphology node sequence."""
     n = len(morphology.nodes)
-    node_id_to_idx = {
-        node.node_id: i for i, node in enumerate(morphology.nodes)
-    }
+    node_id_to_idx = {node.node_id: i for i, node in enumerate(morphology.nodes)}
     adj = np.zeros((n, n), dtype=np.float32)
     for edge in morphology.edges:
         si = node_id_to_idx.get(edge.source)
@@ -375,9 +363,7 @@ def laplacian_eigenvectors(morphology: Morphology, k: int) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 
-def make_building_type_onehot(
-    building_type: str, device: torch.device
-) -> torch.Tensor:
+def make_building_type_onehot(building_type: str, device: torch.device) -> torch.Tensor:
     """Return a ``(1, N_BUILDING_TYPES)`` one-hot tensor."""
     idx = BUILDING_TYPE_INDEX.get(building_type, 0)
     v = torch.zeros(1, N_BUILDING_TYPES, device=device)
@@ -431,9 +417,7 @@ class AmorpheusPolicy(nn.Module):
             extensions=extensions,
         )
 
-    def forward(
-        self, obs: torch.Tensor
-    ) -> tuple[ScaledBeta, torch.Tensor]:
+    def forward(self, obs: torch.Tensor) -> tuple[ScaledBeta, torch.Tensor]:
         """Forward pass from flat observation tensor."""
         policy = self.model.condition(self.morphology)
         B = obs.shape[0]
@@ -445,13 +429,9 @@ class AmorpheusPolicy(nn.Module):
                 idx = torch.tensor(node.obs_indices, device=device)
                 local_obs.append(obs[:, idx])
             else:
-                local_obs.append(
-                    obs.new_zeros(B, node.node_type.observation_dim)
-                )
+                local_obs.append(obs.new_zeros(B, node.node_type.observation_dim))
 
-        bt = make_building_type_onehot(self.building_type, device).expand(
-            B, -1
-        )
+        bt = make_building_type_onehot(self.building_type, device).expand(B, -1)
         return policy.forward(local_obs, bt)
 
     @torch.no_grad()

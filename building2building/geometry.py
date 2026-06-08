@@ -21,13 +21,16 @@ from typing import Any
 import numpy as np
 from minergym.ontology import Ontology
 
-
 # Names for the per-zone attribute slots, in the order that
 # `ZoneGeometry.to_array` emits them. The corresponding bounds live on
 # the zone NodeTypes (`_attr_low` / `_attr_high`).
 ZONE_ATTRIBUTE_NAMES: tuple[str, ...] = (
-    "centroid_x", "centroid_y", "centroid_z",
-    "size_x", "size_y", "size_z",
+    "centroid_x",
+    "centroid_y",
+    "centroid_z",
+    "size_x",
+    "size_y",
+    "size_z",
     "floor_area_frac",
     "ext_wall_area_frac",
     "ground_contact_frac",
@@ -38,13 +41,15 @@ assert ZONE_ATTRIBUTE_DIM == 9
 
 # Names of the :class:`NodeType`s in :data:`ALL_NODE_TYPES` that
 # represent thermal zones (and therefore carry geometry attributes).
-ZONE_TYPE_NAMES: frozenset[str] = frozenset({
-    "unitary_zone",
-    "vav_zone",
-    "vav_zone_no_cooling",
-    "heating_zone",
-    "uncontrolled_zone",
-})
+ZONE_TYPE_NAMES: frozenset[str] = frozenset(
+    {
+        "unitary_zone",
+        "vav_zone",
+        "vav_zone_no_cooling",
+        "heating_zone",
+        "uncontrolled_zone",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -151,7 +156,8 @@ def extract_zone_geometry(
     for zone, surfs in hierarchy.items():
         zone_name = str(zone)
         zone_pts = np.array(
-            [v for verts in surfs.values() for v in verts], dtype=float,
+            [v for verts in surfs.values() for v in verts],
+            dtype=float,
         )
         if zone_pts.size == 0:
             continue
@@ -179,16 +185,15 @@ def extract_zone_geometry(
             centroid=tuple(float(x) for x in centroid),
             size=tuple(float(x) for x in size),
             floor_area_frac=(
-                float(floor_area / total_floor_area)
-                if total_floor_area > 0 else 0.0
+                float(floor_area / total_floor_area) if total_floor_area > 0 else 0.0
             ),
             ext_wall_area_frac=(
                 float(ext_wall_area / total_ext_wall_area)
-                if total_ext_wall_area > 0 else 0.0
+                if total_ext_wall_area > 0
+                else 0.0
             ),
             ground_contact_frac=(
-                float(ground_floor_area / floor_area)
-                if floor_area > 0 else 0.0
+                float(ground_floor_area / floor_area) if floor_area > 0 else 0.0
             ),
         )
     return out

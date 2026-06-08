@@ -14,7 +14,9 @@ from baselines.models.amorpheus import AmorpheusPolicy
 
 
 def main() -> None:
-    bench = b2b.benchmarks.CrossDomainGeneralization(difficulty="easy", task="task_const_e0")
+    bench = b2b.benchmarks.CrossDomainGeneralization(
+        difficulty="easy", task="task_const_e0"
+    )
     print(f"Train type: {bench.train_type}")
     print(f"Test type:  {bench.test_type}")
 
@@ -66,10 +68,7 @@ def main() -> None:
 
     obs_test = torch.randn(1, test_env.observation_space.shape[0])
     dist_test, values_test = policy(obs_test)
-    print(
-        f"{bench.test_type}: "
-        f"action_dist={dist_test}, values={values_test.shape}"
-    )
+    print(f"{bench.test_type}: " f"action_dist={dist_test}, values={values_test.shape}")
     print("\nSame policy, different building type -- Amorpheus adapts via morphology!")
     test_env.close()
 

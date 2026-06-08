@@ -67,7 +67,9 @@ def _trimmed_traceback_str(max_lines: int = 30) -> str:
 def _prefetch_building_types(metadata: pd.DataFrame) -> dict[str, str]:
     """Download each building-type archive once before env creation."""
     failures: dict[str, str] = {}
-    building_types = sorted({str(value) for value in metadata["building_type"].tolist()})
+    building_types = sorted(
+        {str(value) for value in metadata["building_type"].tolist()}
+    )
     total = len(building_types)
     logger.info("Prefetching %d building type archive(s)...", total)
     for i, building_type in enumerate(building_types, 1):
@@ -92,7 +94,9 @@ def _prefetch_building_types(metadata: pd.DataFrame) -> dict[str, str]:
             failures[building_type] = (
                 f"{type(exc).__name__}: {exc}\n{_trimmed_traceback_str()}"
             )
-    logger.info("Prefetch complete: %d ok, %d failed", total - len(failures), len(failures))
+    logger.info(
+        "Prefetch complete: %d ok, %d failed", total - len(failures), len(failures)
+    )
     return failures
 
 
@@ -314,7 +318,9 @@ def test_all_buildings_make_env_reset_and_step(tmp_path: Path) -> None:
     if prefetch_failures:
         pf_messages: list[str] = []
         for building_type, reason in prefetch_failures.items():
-            ids = metadata.loc[metadata["building_type"] == building_type, "building_id"]
+            ids = metadata.loc[
+                metadata["building_type"] == building_type, "building_id"
+            ]
             sample = ", ".join(str(item) for item in ids.head(5).tolist())
             pf_messages.append(
                 "\n".join(

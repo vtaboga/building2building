@@ -27,8 +27,7 @@ from building2building.data.reward_normalizers import (
 
 def _good_yaml() -> str:
     """Synthetic YAML covering one CZ-bucketed type and one single-bucket type."""
-    return textwrap.dedent(
-        """
+    return textwrap.dedent("""
         schema_version: 1
         source:
           controller: tuned_reactive
@@ -47,8 +46,7 @@ def _good_yaml() -> str:
             cz2: { tau_T: 0.5, tau_E: 0.8, tau_T_iqr: 0.1, tau_E_iqr: 0.2, n_buildings: 30 }
           SingleFamilyHouse:
             cz0: { tau_T: 1.9, tau_E: 0.85, tau_T_iqr: 0.6, tau_E_iqr: 0.3, n_buildings: 152 }
-        """
-    ).strip()
+        """).strip()
 
 
 def _write_yaml(tmp_path: Path, body: str) -> Path:
@@ -85,16 +83,14 @@ class TestParseRewardNormalizers:
             load_reward_normalizers(tmp_path / "does-not-exist.yaml")
 
     def test_missing_required_source_keys_raises(self, tmp_path: Path) -> None:
-        body = textwrap.dedent(
-            """
+        body = textwrap.dedent("""
             schema_version: 1
             source:
               controller: tuned_reactive
             constants:
               OfficeMedium:
                 cz1: { tau_T: 0.4, tau_E: 0.7 }
-            """
-        ).strip()
+            """).strip()
         path = _write_yaml(tmp_path, body)
         with pytest.raises(ValueError, match="source"):
             load_reward_normalizers(path)
@@ -111,8 +107,7 @@ class TestRewardNormalizerFloor:
                 assert not bucket.floor_applied_E
 
     def test_floor_clips_pathological_bucket(self, tmp_path: Path) -> None:
-        body = textwrap.dedent(
-            """
+        body = textwrap.dedent("""
             schema_version: 1
             source:
               controller: tuned_reactive
@@ -128,8 +123,7 @@ class TestRewardNormalizerFloor:
                 cz1: { tau_T: 0.4, tau_E: 0.7, tau_T_iqr: 0.1, tau_E_iqr: 0.2, n_buildings: 24 }
                 cz2: { tau_T: 0.5, tau_E: 0.8, tau_T_iqr: 0.1, tau_E_iqr: 0.2, n_buildings: 30 }
                 cz3: { tau_T: 1.0e-9, tau_E: 1.0e-9, tau_T_iqr: 0.0, tau_E_iqr: 0.0, n_buildings: 1 }
-            """
-        ).strip()
+            """).strip()
         path = _write_yaml(tmp_path, body)
         table = load_reward_normalizers(path)
         clipped = table.constants["OfficeMedium"]["cz3"]
@@ -152,9 +146,7 @@ class TestResolveRewardNormalizer:
     def test_resolve_for_sfh(self, tmp_path: Path) -> None:
         path = _write_yaml(tmp_path, _good_yaml())
         clear_reward_normalizers_cache()
-        bucket = resolve_reward_normalizer(
-            "SingleFamilyHouse", "ignored-id", path=path
-        )
+        bucket = resolve_reward_normalizer("SingleFamilyHouse", "ignored-id", path=path)
         assert bucket.tau_T == pytest.approx(1.9)
         assert bucket.tau_E == pytest.approx(0.85)
         assert bucket.n_buildings == 152
@@ -171,6 +163,6 @@ class TestDefaultPathSentinel:
     def test_default_path_constant_points_inside_package(self) -> None:
         assert DEFAULT_REWARD_NORMALIZERS_PATH.name == "reward_normalizers.yaml"
         assert DEFAULT_REWARD_NORMALIZERS_PATH.parent.name == "data"
-        assert DEFAULT_REWARD_NORMALIZERS_PATH.exists(), (
-            "Committed YAML not found; was it accidentally removed?"
-        )
+        assert (
+            DEFAULT_REWARD_NORMALIZERS_PATH.exists()
+        ), "Committed YAML not found; was it accidentally removed?"

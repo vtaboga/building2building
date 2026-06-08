@@ -25,9 +25,9 @@ run_periods: [full_year]
 max_buildings_per_type: 2
 tasks: [task_occ_e0, task_rand_e0]
 n_runs: 1
-output_csv: baseline_returns_season_ablation.csv
+output_csv: ${base_dir}/b2b/baseline_returns/baseline_returns_season_ablation.csv
 
 save_trajectories: true
 plot_trajectories: false
-trajectory_dir: trajectories/season_ablation
-plot_dir: plots/season_ablation
+trajectory_dir: ${base_dir}/b2b/baseline_returns/trajectories/season_ablation
+plot_dir: ${base_dir}/b2b/baseline_returns/plots/season_ablation

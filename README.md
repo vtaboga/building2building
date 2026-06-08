@@ -181,6 +181,9 @@ mkdocs serve          # http://localhost:8000
 To reproduce every figure and table from the paper, see
 [`REPRODUCING.md`](REPRODUCING.md).
 
+The four benchmark problems are documented at
+[`docs/benchmarks/`](docs/benchmarks/overview.md).
+
 ---
 
 ## Tests
@@ -197,10 +200,15 @@ B2B_RUN_LONG_TESTS=1 pytest              # Full suite
 
 ### Other Limitations
 
-- `eval_dynamics_adaptation.py` hard-codes `PadObservation(env, target_size=20)`
-  which may not match the value computed during training.
 - No tests exist for `baselines/` code (controllers, training, evaluation).
-- License is not yet selected.
+
+---
+
+## License
+
+MIT — see [`LICENSE`](LICENSE). See [`CHANGELOG.md`](CHANGELOG.md) for
+version history and [`docs/api/stability.md`](docs/api/stability.md) for the
+public API contract and deprecation policy.
 
 ---
 

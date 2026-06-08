@@ -77,7 +77,9 @@ def get_hvac_actuators(edd_path: Path) -> list[dict[str, str]]:
                 is_hvac = True
             elif "fan," in line_lower and "mass flow" in line_lower:
                 is_hvac = True
-            elif "coil" in line_lower and ("speed" in line_lower or "stage" in line_lower):
+            elif "coil" in line_lower and (
+                "speed" in line_lower or "stage" in line_lower
+            ):
                 is_hvac = True
             elif "airloophvac," in line_lower and "availability status" in line_lower:
                 is_hvac = True
@@ -311,7 +313,8 @@ def get_airflow_and_coil_node_setpoint_actuators(
         # 2) Coil node temperature setpoint actuators
         if ct == "system node setpoint" and ctrl == "temperature setpoint":
             if matches_any_suffix(a.component_name) or (
-                outlet_nodes_norm and a.component_name.strip().upper() in outlet_nodes_norm
+                outlet_nodes_norm
+                and a.component_name.strip().upper() in outlet_nodes_norm
             ):
                 selected.append(a)
             continue
@@ -331,4 +334,3 @@ def get_airflow_and_coil_node_setpoint_actuators(
         seen.add(key)
         out.append(a.to_dict())
     return out
-

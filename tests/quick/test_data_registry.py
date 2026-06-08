@@ -1,4 +1,8 @@
 """Tests for building2building.data.registry — BuildingRegistry with fake data."""
+# This file pins the public API contract.
+# Changes here = breaking API changes; requires a CHANGELOG.md entry.
+# Marker applied automatically by conftest.py (api_contract glob).
+
 
 from __future__ import annotations
 
@@ -88,9 +92,7 @@ class TestBuildingRegistryLookups:
             assert info.building_id == "Warehouse-0001"
             assert info.net_conditioned_area_m2 == 4800.0
 
-    def test_get_building_by_id_not_found(
-        self, registry: BuildingRegistry
-    ) -> None:
+    def test_get_building_by_id_not_found(self, registry: BuildingRegistry) -> None:
         with pytest.raises(KeyError, match="not found in metadata"):
             registry.get_building_by_id("OfficeSmall", "OfficeSmall-9999")
 

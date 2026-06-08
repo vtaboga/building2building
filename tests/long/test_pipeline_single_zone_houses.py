@@ -7,7 +7,6 @@ import pytest
 
 import building2building as b2b
 
-
 pytestmark = pytest.mark.long
 
 

@@ -31,9 +31,7 @@ from baselines.plotting.common import (
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--results-csv", type=str, required=True)
-    parser.add_argument(
-        "--output", type=str, default="figures/fig7_cross_domain"
-    )
+    parser.add_argument("--output", type=str, default="figures/fig7_cross_domain")
     args = parser.parse_args()
 
     apply_paper_style()

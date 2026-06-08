@@ -22,7 +22,6 @@ from baselines.utils.metadata import (
     find_zone_air_temp_index,
 )
 
-
 # ---------------------------------------------------------------------------
 # Config (plain dataclass, no OmegaConf dependency)
 # ---------------------------------------------------------------------------
@@ -63,6 +62,15 @@ class AirLoopConfig:
     clg_sp_default: float = 22.0
     error_ema_alpha: float = 0.3
 
+    # Per-loop outdoor-air mass-flow command written by the reactive
+    # baseline at every step.  Pinned to the DOE OfficeMedium autosized
+    # minimum ventilation flow (~1.12 m³/s × 1.225 kg/m³ ≈ 1.37 kg/s);
+    # see notes.md § "OfficeMedium OA-mixer fix" Q3.  This knob is
+    # intentionally NOT in the Optuna search space -- the agent is the
+    # one learning to modulate OA, the RBC just provides a constant
+    # floor against which agent learning is measured.
+    oa_mass_flow: float = 1.37
+
 
 # ---------------------------------------------------------------------------
 # Internal state
@@ -86,6 +94,13 @@ class _ZoneState:
 @dataclass
 class _LoopState:
     sat_act_idx: int
+    # Index of the per-loop OA-mixer actuator in the env's flat
+    # ``action_names`` list.  Required: every VAVSystem produced by
+    # ``make_vav_system_controllable`` (post-M1) carries an OA actuator
+    # (see notes.md § "OfficeMedium OA-mixer fix" Q2).  Stale
+    # equipment.json files predating M1 will already fail to load via
+    # ``cattrs.structure`` before reaching this point.
+    oa_act_idx: int
     zones: list[_ZoneState] = field(default_factory=list)
     prev_sat: float = 20.5
 
@@ -147,9 +162,7 @@ class AirLoopPolicy:
 
         equipment = env.metadata.get("hvac_equipment", [])
         vav_systems = [
-            e
-            for e in equipment
-            if getattr(e, "equipment_type", None) == "vavsystem"
+            e for e in equipment if getattr(e, "equipment_type", None) == "vavsystem"
         ]
         if not vav_systems:
             raise RuntimeError(
@@ -172,6 +185,14 @@ class AirLoopPolicy:
                 vav.supply_temp_setpoint.component_name,
             )
             assert sat_idx is not None
+
+            oa_idx = _match_actuator(
+                act_names,
+                vav.oa_mass_flow.component_type,
+                vav.oa_mass_flow.control_type,
+                vav.oa_mass_flow.component_name,
+            )
+            assert oa_idx is not None
 
             zones: list[_ZoneState] = []
             for term in vav.terminals:
@@ -213,6 +234,7 @@ class AirLoopPolicy:
             self._loops.append(
                 _LoopState(
                     sat_act_idx=sat_idx,
+                    oa_act_idx=oa_idx,
                     zones=zones,
                     prev_sat=cfg.sat_neutral,
                 )
@@ -233,9 +255,7 @@ class AirLoopPolicy:
                 z.prev_reheat_sp = cfg.reheat_sp_min
         self._initialized = False
 
-    def predict(
-        self, obs: Any, deterministic: bool = True
-    ) -> tuple[np.ndarray, None]:
+    def predict(self, obs: Any, deterministic: bool = True) -> tuple[np.ndarray, None]:
         if not self._loops:
             raise RuntimeError("Not bound; call bind_env() first.")
 
@@ -244,17 +264,12 @@ class AirLoopPolicy:
         action = np.zeros(self._n_act, dtype=np.float64)
 
         t_outdoor = float("nan")
-        if (
-            self._outdoor_temp_idx is not None
-            and self._outdoor_temp_idx < len(obs_arr)
-        ):
+        if self._outdoor_temp_idx is not None and self._outdoor_temp_idx < len(obs_arr):
             t_outdoor = float(obs_arr[self._outdoor_temp_idx])
 
         outdoor_offset = 0.0
         if not np.isnan(t_outdoor):
-            outdoor_offset = cfg.outdoor_sat_gain * (
-                cfg.target_temp - t_outdoor
-            )
+            outdoor_offset = cfg.outdoor_sat_gain * (cfg.target_temp - t_outdoor)
 
         for loop in self._loops:
             raw_errors = np.array(
@@ -275,13 +290,10 @@ class AirLoopPolicy:
                     z.smooth_error = raw_errors[i]
                 else:
                     z.smooth_error = (
-                        alpha * raw_errors[i]
-                        + (1 - alpha) * z.smooth_error
+                        alpha * raw_errors[i] + (1 - alpha) * z.smooth_error
                     )
 
-            errors = np.array(
-                [z.smooth_error for z in loop.zones], dtype=np.float64
-            )
+            errors = np.array([z.smooth_error for z in loop.zones], dtype=np.float64)
 
             # SAT
             w_cold = cfg.sat_cold_bias
@@ -292,20 +304,22 @@ class AirLoopPolicy:
                 + w_warm * float(np.max(errors))
                 + w_mean * float(np.mean(errors))
             )
-            sat_target = (
-                cfg.sat_neutral - cfg.sat_kp * weighted_err + outdoor_offset
-            )
+            sat_target = cfg.sat_neutral - cfg.sat_kp * weighted_err + outdoor_offset
             sat_target = np.clip(sat_target, cfg.sat_min, cfg.sat_max)
             delta = np.clip(
                 sat_target - loop.prev_sat,
                 -cfg.sat_rate_limit,
                 cfg.sat_rate_limit,
             )
-            sat = float(
-                np.clip(loop.prev_sat + delta, cfg.sat_min, cfg.sat_max)
-            )
+            sat = float(np.clip(loop.prev_sat + delta, cfg.sat_min, cfg.sat_max))
             action[loop.sat_act_idx] = sat
             loop.prev_sat = sat
+
+            # OA mixer: pinned at the constant configured value
+            # (per notes.md § "OfficeMedium OA-mixer fix" Q3).  Not
+            # rate-limited or modulated -- the agent learns OA
+            # modulation; the RBC supplies a constant minimum floor.
+            action[loop.oa_act_idx] = cfg.oa_mass_flow
 
             # Flow
             for i, z in enumerate(loop.zones):
@@ -314,19 +328,11 @@ class AirLoopPolicy:
 
                 z.integral *= cfg.integral_decay
                 if in_cooling:
-                    at_max = (
-                        z.prev_flow >= cfg.flow_max - 0.01 and errors[i] > 0
-                    )
-                    at_min = (
-                        z.prev_flow <= cfg.flow_min + 0.01 and errors[i] < 0
-                    )
+                    at_max = z.prev_flow >= cfg.flow_max - 0.01 and errors[i] > 0
+                    at_min = z.prev_flow <= cfg.flow_min + 0.01 and errors[i] < 0
                 else:
-                    at_max = (
-                        z.prev_flow >= cfg.flow_max - 0.01 and errors[i] < 0
-                    )
-                    at_min = (
-                        z.prev_flow <= cfg.flow_min + 0.01 and errors[i] > 0
-                    )
+                    at_max = z.prev_flow >= cfg.flow_max - 0.01 and errors[i] < 0
+                    at_min = z.prev_flow <= cfg.flow_min + 0.01 and errors[i] > 0
                 if not at_max and not at_min:
                     z.integral += errors[i]
                 z.integral = float(
@@ -337,9 +343,7 @@ class AirLoopPolicy:
                 flow_target = cfg.flow_base - flow_sign * (
                     cfg.flow_kp * errors[i] + cfg.flow_ki * z.integral
                 )
-                flow_target = float(
-                    np.clip(flow_target, cfg.flow_min, cfg.flow_max)
-                )
+                flow_target = float(np.clip(flow_target, cfg.flow_min, cfg.flow_max))
                 d = float(
                     np.clip(
                         flow_target - z.prev_flow,
@@ -347,9 +351,7 @@ class AirLoopPolicy:
                         cfg.flow_rate_limit,
                     )
                 )
-                flow = float(
-                    np.clip(z.prev_flow + d, cfg.flow_min, cfg.flow_max)
-                )
+                flow = float(np.clip(z.prev_flow + d, cfg.flow_min, cfg.flow_max))
                 action[z.flow_act_idx] = flow
                 z.prev_flow = flow
 

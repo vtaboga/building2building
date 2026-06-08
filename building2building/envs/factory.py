@@ -20,7 +20,9 @@ from building2building.simulator import create_simulator
 from building2building.types import BuildingConfig, TaskConfig
 
 
-def make_env_from_config(config: EnvBuildConfig, eplus_output_dir: str | Path) -> gym.Env:
+def make_env_from_config(
+    config: EnvBuildConfig, eplus_output_dir: str | Path
+) -> gym.Env:
     """Construct a time-limited Gymnasium environment from an ``EnvBuildConfig``.
 
     Resolves the building via the unified :class:`BuildingRegistry`, then
@@ -46,14 +48,14 @@ def make_env_from_config(config: EnvBuildConfig, eplus_output_dir: str | Path) -
         info = registry.get_building_by_id(sel.building_type, sel.building_id)
     else:
         split = sel.split or "train"
-        info = registry.get_building_by_index(
-            sel.building_type, split, sel.split_index
-        )
+        info = registry.get_building_by_index(sel.building_type, split, sel.split_index)
 
     epjson_path = info.building_dir / "building.epjson"
     equipment_path = info.building_dir / "equipment.json"
     weather_path = info.building_dir / info.weather_file
-    equipment_data = structure(json.loads(equipment_path.read_text()), list[AnyEquipment])
+    equipment_data = structure(
+        json.loads(equipment_path.read_text()), list[AnyEquipment]
+    )
 
     building_config = BuildingConfig(
         path_to_building=epjson_path,

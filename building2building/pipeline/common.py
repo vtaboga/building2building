@@ -89,4 +89,3 @@ def _resolve_temperature_schedule_type_limits_name(epjson: dict[str, Any]) -> st
         "unit_type": "Temperature",
     }
     return name
-

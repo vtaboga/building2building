@@ -4,7 +4,29 @@
 
 Evaluate whether a policy can adapt when the **reward function or task changes**
 while the building and action space stay fixed. This tests how well an agent
-generalizes to different control objectives on the same physical system.
+generalises to different control objectives on the same physical system.
+
+| Axis | Train | Test |
+|---|---|---|
+| Building | Fixed | Fixed (same instance) |
+| Action space | Fixed | Fixed |
+| Reward / task | Task A | Task B (different) |
+
+## Metric
+
+```python
+import building2building as b2b
+
+bench = b2b.benchmarks.GoalAdaptation(
+    train_task="task_occ_emed",
+    test_task="task_occ_ehigh",
+)
+traj = b2b.rollout(bench.make_test_env(), controller=my_policy)
+score = b2b.compute_normalized_score(traj)
+```
+
+The score is normalised against the reactive-controller baseline on the *test*
+task.  A score above 1.0 means the agent exceeds the reactive controller.
 
 ## API
 

@@ -8,6 +8,7 @@ name = "building2building"
 version = "0.1.0"
 description = "A framework for energyplus building simulation for RL."
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.10"
 
 dependencies = [
@@ -73,4 +74,5 @@ testpaths = ["tests"]
 markers = [
     "quick: fast tests that do not require EnergyPlus simulation",
     "long: slower tests that rely on simulation or heavy data processing",
+    "api_contract: pins the public API surface; a failing test here means a breaking API change; requires a CHANGELOG.md entry",
 ]

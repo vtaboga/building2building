@@ -15,10 +15,7 @@ from typing import Any
 import pytest
 
 from building2building.simulator import _maybe_warn_normalized_deadband
-from building2building.simulator.rewards import (
-    DeadbandReward,
-    NormalizedDeadbandReward,
-)
+from building2building.simulator.rewards import NormalizedDeadbandReward
 from building2building.types import (
     DEFAULT_SEASONAL_UNOCCUPIED_C,
     NormalizedDeadbandRewardConfig,
@@ -107,19 +104,13 @@ class TestNormalizedDeadbandRewardConfig:
 
 
 @pytest.mark.quick
-class TestNormalizedDeadbandRewardEquivalence:
-    def test_tau_equals_one_matches_deadband_reward(self) -> None:
-        # When tau_T = tau_E = 1.0, the normalized reward must equal
-        # the un-normalized DeadbandReward bit-for-bit on the same obs.
+class TestNormalizedDeadbandRewardFormula:
+    def test_reward_is_squared_temp_error_plus_scaled_energy(self) -> None:
+        # |dev|=1.5: temp_error = 1.5^2 = 2.25; energy = 1.5+0.5 = 2.0
+        # reward = -(2.25/1.0 + 0.5 * 2.0/1.0) = -3.25
         task_cfg = _make_task_config(target_temperature_mode="constant")
-        obs = _make_obs(temp_c=22.5, target_c=21.0)  # |dev|=1.5 > dT=1.0 → linear
-        deadband = DeadbandReward(
-            controlled_zones=["z1"],
-            energy_weight=0.5,
-            dT=1.0,
-            task_config=task_cfg,
-        )
-        normalized = NormalizedDeadbandReward(
+        obs = _make_obs(temp_c=22.5, target_c=21.0)
+        reward_fn = NormalizedDeadbandReward(
             controlled_zones=["z1"],
             energy_weight=0.5,
             dT=1.0,
@@ -127,22 +118,16 @@ class TestNormalizedDeadbandRewardEquivalence:
             tau_E=1.0,
             task_config=task_cfg,
         )
-        assert normalized(obs) == pytest.approx(deadband(obs))
+        assert reward_fn(obs) == pytest.approx(-3.25)
 
     def test_tau_two_halves_temp_contribution(self) -> None:
-        # tau_T = 2.0 should halve the temp_penalty term in the reward.
+        # |dev|=2.5: temp_error = 2.5^2 = 6.25; energy_weight=0
+        # tau_T=2.0: reward = -(6.25/2.0) = -3.125
         task_cfg = _make_task_config(target_temperature_mode="constant")
-        # Deviation 2.5 > dT=1.0 → temp_penalty = 2.5 (linear branch).
         obs = _make_obs(
             temp_c=23.5, target_c=21.0, electricity_wh_m2=0.0, natural_gas_wh_m2=0.0
         )
-        deadband = DeadbandReward(
-            controlled_zones=["z1"],
-            energy_weight=0.0,
-            dT=1.0,
-            task_config=task_cfg,
-        )
-        normalized = NormalizedDeadbandReward(
+        reward_fn = NormalizedDeadbandReward(
             controlled_zones=["z1"],
             energy_weight=0.0,
             dT=1.0,
@@ -150,8 +135,7 @@ class TestNormalizedDeadbandRewardEquivalence:
             tau_E=1.0,
             task_config=task_cfg,
         )
-        # reward_norm = -temp_penalty / 2  =  reward_db / 2
-        assert normalized(obs) == pytest.approx(deadband(obs) / 2.0)
+        assert reward_fn(obs) == pytest.approx(-3.125)
 
 
 @pytest.mark.quick

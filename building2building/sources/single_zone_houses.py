@@ -95,9 +95,7 @@ def building_ids_from_split_indices(
     out: list[int] = []
     for idx in split_indices:
         out.append(
-            building_id_from_split_index(
-                split, int(idx), row_id_splits=row_id_splits
-            )
+            building_id_from_split_index(split, int(idx), row_id_splits=row_id_splits)
         )
     return out
 

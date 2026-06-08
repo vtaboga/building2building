@@ -51,9 +51,7 @@ def _make_env(
     task: str,
 ) -> gym.Env:
     """Create a single B2B environment."""
-    return b2b.new_make_env(
-        building_type, building_id=building_id, task=task
-    )
+    return b2b.new_make_env(building_type, building_id=building_id, task=task)
 
 
 def _apply_wrappers(
@@ -105,9 +103,7 @@ def _make_resampling_env(
     )
 
 
-def _detect_max_obs_dim(
-    building_type: str, building_ids: list[str], task: str
-) -> int:
+def _detect_max_obs_dim(building_type: str, building_ids: list[str], task: str) -> int:
     """Probe a few environments to find the max observation dimension."""
     max_dim = 0
     sample_ids = building_ids[: min(5, len(building_ids))]
@@ -175,9 +171,7 @@ def train_multi_building(
     """Train a single PPO across many buildings."""
     pad_obs_to = _detect_max_obs_dim(building_type, train_ids, task)
     logger.info("Padding observations to %d", pad_obs_to)
-    (output_dir / "metadata.json").write_text(
-        json.dumps({"pad_obs_size": pad_obs_to})
-    )
+    (output_dir / "metadata.json").write_text(json.dumps({"pad_obs_size": pad_obs_to}))
 
     def make_train_fn(idx: int) -> Callable[[], gym.Env]:
         def fn() -> gym.Env:
@@ -249,9 +243,7 @@ def main(cfg: DictConfig) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "models").mkdir(exist_ok=True)
 
-    bench = b2b.benchmarks.DynamicsAdaptation(
-        difficulty=difficulty, task=task
-    )
+    bench = b2b.benchmarks.DynamicsAdaptation(difficulty=difficulty, task=task)
     building_type = bench.building_type
     train_ids = bench.train_building_ids()
     test_ids = bench.test_building_ids()
@@ -274,9 +266,7 @@ def main(cfg: DictConfig) -> None:
             import wandb
 
             wandb.init(
-                project=OmegaConf.select(
-                    wandb_cfg, "project", default="b2b-dynamics"
-                ),
+                project=OmegaConf.select(wandb_cfg, "project", default="b2b-dynamics"),
                 config=OmegaConf.to_container(cfg, resolve=True),
                 name=f"{difficulty}_{approach}",
             )
