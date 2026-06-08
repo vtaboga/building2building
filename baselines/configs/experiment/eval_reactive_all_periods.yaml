@@ -1,6 +1,6 @@
 # @package _global_
 # Recompute reactive-controller baseline returns across all three run
-# periods.  Intended for the 30-job SLURM sweep in
+# periods.  Intended for the 54-job SLURM sweep in
 # `baselines/scripts/run_baseline_returns.sh`, which fills `building_types`,
 # `tasks`, and `output_csv` per array index.
 name: eval_reactive_all_periods

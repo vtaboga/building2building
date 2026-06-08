@@ -209,6 +209,7 @@ def write_csv(results: list[RunResult], path: Path, *, n_runs: int) -> None:
         "reward_mean",
     ]
 
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
