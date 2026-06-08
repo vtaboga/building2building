@@ -109,6 +109,21 @@ PLACE_TO_WEATHER: dict[str, str] = {
     "Tucson": "USA_AZ_Tucson-Davis-Monthan.AFB.722745_TMY3.epw",
 }
 
+# The upstream ASHRAE/NREL TMY3 distribution ships the San Diego Brown Field
+# file with a typo ("San.Deigo"). We locate the source file by its real name
+# (PLACE_TO_WEATHER) but PUBLISH it under the corrected spelling so the
+# metadata weather_file column and the per-building .epw filename always agree.
+WEATHER_PUBLISH_RENAMES: dict[str, str] = {
+    "USA_CA_San.Deigo-Brown.Field.Muni.AP.722904_TMY3.epw":
+    "USA_CA_San.Diego-Brown.Field.Muni.AP.722904_TMY3.epw",
+}
+
+
+def published_weather_filename(source_name: str) -> str:
+    """Map a source EPW filename to its published (corrected) filename."""
+    return WEATHER_PUBLISH_RENAMES.get(source_name, source_name)
+
+
 # ---------------------------------------------------------------------------
 # ASHRAE 90.1-2022 climate zones (Tables 5.5-1 … 5.5-8)
 # Used to compute climate-specific LHS parameter ranges.
@@ -306,7 +321,7 @@ def load_base_buildings(
                 BaseBuilding(
                     building_type=btype,
                     place=place,
-                    weather_file=PLACE_TO_WEATHER[place],
+                    weather_file=published_weather_filename(PLACE_TO_WEATHER[place]),
                     source_idf=source_idf,
                     epjson=epjson_obj,
                 )
@@ -329,18 +344,18 @@ def extract_weather_files(output_dir: Path) -> None:
     weather_dir.mkdir(parents=True, exist_ok=True)
 
     for epw_filename in PLACE_TO_WEATHER.values():
-        dst = weather_dir / epw_filename
+        dst = weather_dir / published_weather_filename(epw_filename)
         if dst.exists():
             continue
-        rows = search_weathers(filename=epw_filename)
+        rows = search_weathers(filename=epw_filename)  # locate the REAL source (Deigo)
         if rows.empty:
             raise FileNotFoundError(
                 f"EPW file {epw_filename!r} not found in ASHRAE901_all "
                 f"extracted tree. "
                 f"Run ASHRAE901_all() to verify the zip contents."
             )
-        shutil.copy(rows.iloc[0]["path"], dst)
-        logger.debug("  copied %s", epw_filename)
+        shutil.copy(rows.iloc[0]["path"], dst)  # publish under corrected name
+        logger.debug("  copied %s -> %s", epw_filename, dst.name)
 
     logger.info("Weather files ready at %s", weather_dir)
 
