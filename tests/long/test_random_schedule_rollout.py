@@ -55,7 +55,7 @@ def _make_env(tmp_path: Path, seed: int, *, suffix: str = "") -> "object":
             split_index=0,
         ),
         task=task,
-        reward=RewardConfig(energy_weight=0.0),
+        reward=RewardConfig(energy_weight=0.0, dT=1.0, tau_T=1.0, tau_E=1.0),
         env_max_steps=N_STEPS,
     )
     return make_env_from_config(
@@ -70,8 +70,16 @@ def _target_trace(env, n_steps: int) -> np.ndarray:
         for i, n in enumerate(obs_names)
         if n.strip().lower().startswith("target_temperature")
     ]
-    assert target_idx, "task5 must expose target_temperature slots"
+    assert target_idx, "random-schedule task must expose target_temperature slots"
 
+    # The random-schedule target is deterministic in (seed, day_of_year, hour),
+    # but the hour sampled at a given step depends on the action stream: the
+    # actions drive EnergyPlus HVAC system-iteration counts, which shift when
+    # a setpoint transition lands on a step index.  To compare two same-seed
+    # rollouts the action stream must be identical, so seed the action space
+    # deterministically here (otherwise reproducibility checks see spurious
+    # ~1-step misalignments at transitions).
+    env.action_space.seed(0)
     trace = np.empty((n_steps, len(target_idx)), dtype=np.float32)
     obs, _ = env.reset()
     trace[0] = obs[target_idx]
@@ -151,7 +159,7 @@ def test_week_reproducibility_via_new_make_env(tmp_path: Path) -> None:
             "OfficeSmall",
             split="train",
             index=0,
-            task="task5",
+            task="task_rand_e0",
             run_period="full_year",
             random_schedule_seed=seed,
             eplus_output_dir=tmp_path / f"week_repro{suffix}",

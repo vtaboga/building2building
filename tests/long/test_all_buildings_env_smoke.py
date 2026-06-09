@@ -138,7 +138,15 @@ def _run_batch(
                     "run_period": "winter",
                     "timesteps_per_hour": 4,
                 },
-                "reward": {"reward_type": "DeadbandRewardConfig"},
+                # Smoke test only builds/reset/steps the env, so the exact
+                # normalizer scale is irrelevant; supply filled tau_T/tau_E
+                # (the EnvBuildConfig path does not autofill them — only
+                # new_make_env does).
+                "reward": {
+                    "reward_type": "NormalizedDeadbandRewardConfig",
+                    "tau_T": 1.0,
+                    "tau_E": 1.0,
+                },
             }
         )
 

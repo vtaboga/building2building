@@ -1,4 +1,12 @@
-"""End-to-end rollout tests for the seasonal unoccupied policy (task3).
+"""End-to-end rollout tests for the seasonal unoccupied policy (``task_occ_*``).
+
+The ``task_occ_e0`` preset uses ``target_temperature_mode="occupancy"`` with
+``unoccupied_policy="seasonal"`` and the default seasonal map
+(winter 18 C / shoulder 21 C / summer 26 C).  Built through the public
+``new_make_env`` so the requested ``run_period`` is actually applied — the
+lower-level ``make_env_from_config`` does not patch the run period, so
+"summer" would otherwise silently simulate January (see
+``building2building.api._patch_epjson_run_period``).
 
 Requires EnergyPlus — run with
 ``B2B_RUN_LONG_TESTS=1 pytest -s tests/long/test_seasonal_unoccupied.py``.
@@ -12,14 +20,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
-from building2building.envs.factory import make_env_from_config
-from building2building.types import (
-    RewardConfig,
-    RunPeriodConfig,
-    TaskConfig,
-    ZoneTargetTemperatureConfig,
-)
+import building2building as b2b
 
 pytestmark = pytest.mark.long
 
@@ -33,34 +34,18 @@ def _make_seasonal_env(
     tmp_path: Path,
     run_period: str,
     *,
-    seasonal: dict[str, float] | None = None,
     max_steps: int = 24 * 12 * 7,
     suffix: str = "",
 ) -> "object":
-    seasonal_map = seasonal or {"winter": 18.0, "shoulder": 21.0, "summer": 26.0}
-    task = TaskConfig(
-        run_period=RunPeriodConfig.from_name(run_period),
-        target_temperature_mode="occupancy",
-        default_zone_target_temperature=ZoneTargetTemperatureConfig(
-            occupied_c=21.0,
-            unoccupied_c=18.0,
-            unoccupied_policy="seasonal",
-            seasonal_unoccupied_c=seasonal_map,
-        ),
-    )
-    config = EnvBuildConfig(
-        dataset_selection=DatasetSelectionConfig(
-            building_type="OfficeSmall",
-            split="train",
-            mode="split_index",
-            split_index=0,
-        ),
-        task=task,
-        reward=RewardConfig(energy_weight=0.0),
-        env_max_steps=max_steps,
-    )
-    return make_env_from_config(
-        config, eplus_output_dir=tmp_path / f"eplus_seasonal_{run_period}{suffix}"
+    return b2b.new_make_env(
+        "OfficeSmall",
+        split="train",
+        index=0,
+        task="task_occ_e0",
+        run_period=run_period,
+        timesteps_per_hour=12,
+        max_episode_steps=max_steps,
+        eplus_output_dir=tmp_path / f"eplus_seasonal_{run_period}{suffix}",
     )
 
 
