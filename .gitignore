@@ -49,7 +49,10 @@ scrap/
 refactoring/
 /scripts/
 /configs/
-baselines/scripts/
+# Per-user Slurm/cluster launch wrappers churn per developer; ignore them,
+# but keep the Python entry points (make_test_small_split.py,
+# merge_baseline_returns.py) tracked — REPRODUCING.md and docs cite them.
+baselines/scripts/*.sh
 staging/
 summaries/
 plans/
