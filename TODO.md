@@ -2,233 +2,46 @@
 
 # TODO
 
-Atomic action items toward open-source release and paper rerun under the
-new normalized reward. **One TODO, one commit** (per `AGENTS.md`).
+Remaining work toward the open-source release and paper rerun under the
+normalized reward. **One TODO, one commit** (per `AGENTS.md`).
 
-## Execution order (2026-05-25 brainstorm)
+Two phases remain. **Phase B (reward-coefficient study) must complete
+before Phase A (paper rerun)**: the final `emed` / `ehigh` values must be
+pinned in `building2building/config/tasks.py` so every Phase-A artefact is
+produced by the locked coefficients. Every Phase-A artefact must be
+reproducible by the public OSS code, not by the in-flight branch.
 
-The phases are listed in the order they must run end-to-end. Inside a
-phase, items are reorderable except where a dependency is called out.
+Phases M (OfficeMedium OA-mixer fix), D-house, T (test suite), F (file/doc
+audit), and D-API (public surface) are complete — their history lives in
+git.
 
-1. **Phase M — OfficeMedium OA-mixer action-space fix.** *Must land
-   first.* Changes the action space → invalidates every OfficeMedium
-   artefact downstream of it (HF dataset, tuned RBC, reward
-   normalizers, baselines). Reference fix in `../RL2GNNs` (see M1).
-2. **Phase D-house — codebase cleanup.** LICENSE, CI, legacy code
-   purge, formatter passes, README refresh, **promote useful
-   `analysis/` scripts into `baselines/`** (see "Cross-phase
-   principles" below). Closes the OSS-release housekeeping debt.
-3. **Phase T — test suite.** Per the principles already laid out in
-   the Phase T preamble: pipeline coverage, contract tests, wrapper
-   correctness, fixture matrix.
-4. **Phase F — file and documentation audit (read-only).** Walk
-   every file in `building2building/` and `baselines/` plus every
-   docs page; produce a follow-up checklist. Includes the
-   `analysis/` → `baselines/` migration audit. No edits in this
-   phase.
-5. **Phase R — empirical reward-coefficient study.** Determine the
-   final values of `emed` and `ehigh` (and confirm `e0`) by
-   training a SAC agent while monitoring the per-term reward
-   distribution. Demonstrate (a) balance of the two terms at the
-   chosen settings on a random → SAC-optimal policy ladder, and
-   (b) invariance across buildings within `test_small`. The final
-   plotting / data-gathering scripts live under `baselines/` (the
-   prototype under `analysis/` is dev-only); the resulting
-   figures are slated for the **paper appendix**.
-6. **Phase C — paper rerun on the FINAL codebase.** Strict
-   precondition: M, D-house, T, F, R must all be merged first so
-   every Phase-C artefact is produced by the version of the code
-   that will be open-sourced. Order inside C:
-   - **C1.** Regen `baseline_returns.csv` on the **full
-     train + test split** under the locked `emed`/`ehigh` values.
-   - **C2.** PPO + SAC specialists on `test_small`, 1 seed,
-     default params, full 9-task grid.
-   - **C5 (partial).** Paper updates for the specialist figure
-     and the task table.
-   - **C3.** Dynamics adaptation (paper §6.1) — re-run as the
-     final-step batch.
-   - **C4.** Cross-domain Amorpheus (paper §6.2) — re-run as the
-     final-step batch.
-   - **C5 (final).** Paper updates for Fig 5 (dynamics) and
-     Fig 7 (cross-domain).
-7. **Phase D-API — public-surface finalization.** D5
-   (`REPRODUCING.md`) is done; D9 (docs migration), D12 (contract
-   marker), D13 (`CHANGELOG.md`), D14 (benchmark pages) close
-   alongside / after Phase C.
+The LaTeX paper itself lives outside this repository (`paper/` was removed
+in `3a808c5`). Phase A / B produce the figures and CSVs the paper consumes;
+the paper edits themselves are out of scope for this repo.
 
-**Hard dependency:** D2 (legacy reward deletion) was a hard
-precondition for C1 in the previous plan. D2 is now ✓ done, so the
-constraint is satisfied; the new hard constraint is **M completes
-before C1** (the OfficeMedium row in `baseline_returns.csv` would
-otherwise reference the old action space).
-
-**Dropped:** B2 (SAC ablation), B3 (PPO `target_kl` re-tune), B4
-(PPO reward-design full-year study). Decision 2026-05-25: no
-further PPO/SAC hyperparameter sweeps before the camera-ready
-rerun. The final agents use the existing defaults from B1
-(`log_std_init=0.0`, `ent_coef=0.2`, `use_sde=false` for SAC;
-`baselines/configs/policy/ppo.yaml` as committed for PPO).
+Format per item: short title; affected files; acceptance check; references.
 
 ---
 
-## Cross-phase principles (2026-05-25)
+## Phase A — Re-run paper experiments (FINAL stage, on the OSS codebase)
 
-These are project-wide rules that apply to every item below. They
-modify or extend the principles in `AGENTS.md` and `design_doc.md`.
+**Prerequisite — must be merged before A1 starts:** Phase B, so the final
+`emed` / `ehigh` values are pinned in `building2building/config/tasks.py`
+and every Phase-A run uses the locked coefficients. (Phases M, D-house, T,
+and F are already complete.)
 
-1. **`analysis/` is a development scratchpad. `baselines/` is the
-   release surface.** Scripts that are intermediate exploration —
-   one-off sanity plots, ablation harnesses used to make a decision
-   that is then captured in a YAML — stay in `analysis/`. Any
-   script whose **outputs are cited in the paper** (figures,
-   tables, appendix plots) must have its final form — including the
-   plotting code — committed under `baselines/`. The migration is
-   tracked by **F2** (audit) and **D-house** (execution); it must
-   be complete before Phase C runs, because Phase C runs against
-   "the version of the code that will be open-sourced".
+The OfficeMedium fix (Phase M) is in, so OfficeMedium rows are produced
+against the correct action space.
 
-2. **`REPRODUCING.md` is kept in lock-step with the code.** Every
-   item below that adds, moves, or removes a user-runnable script
-   has an implicit "update `REPRODUCING.md`" sub-step. Specifically:
-   when an item's acceptance criterion mentions a new entry
-   point under `baselines/` or `building2building/`, the same
-   commit must update the corresponding section of
-   `REPRODUCING.md`. The cheat-sheet table at the bottom of
-   `REPRODUCING.md` is the canonical reference; if a command is
-   not in that table, it is not part of the reproduction path.
-
-3. **The OSS release ships Python entry points, not Slurm
-   scripts.** Slurm wrappers (`baselines/scripts/*.sh`,
-   `analysis/task_study/scripts/*.sh`, `building2building/pipeline/
-   scripts/*.sh`) are internal developer convenience for the
-   compute cluster — they may live in the repo (and may be cited
-   in `REPRODUCING.md` as "if you have Slurm, you can also run
-   …"), but every paper artefact must be **reproducible from a
-   `python -m …` invocation** that runs on a single machine. When
-   a TODO item below proposes a Slurm script, the sibling
-   `python -m …` invocation is the canonical entry point and the
-   Slurm wrapper is a thin loop around it. If a script today only
-   exists as a Slurm template, Phase D-house extracts the Python
-   entry point.
-
-4. **Decisions still owed (none for the current plan).** C3
-   (dynamics adaptation) and C4 (cross-domain Amorpheus) are now
-   confirmed in scope; they run as the final batch of Phase C
-   per the user's 2026-05-25 follow-up. No `?`-marked items
-   remain.
-
-Format per item: short title; affected files; acceptance check;
-references.
-
----
-
-## Archive — closed items
-
-Bodies of fully-closed items have been removed to keep this file
-compact. Each line below is the canonical pointer: see the cited
-commit for the code + the cited section of `notes.md` for any
-surviving rationale.
-
-| Item | Commit(s) | One-line summary |
-| --- | --- | --- |
-| Phase A — reward finalized | various | `reward_normalizers.yaml` locked; `notes.md` § "Calibration sanity plot" + "Reward — calibration regime and impl map" |
-| B0 / B0.1 — EnergyPlus resource leak | upstream `6d03b9a` + `956c3e1`; in-tree `5118af5`–`7dd389f` | Fixed; `notes.md` § "Operational gotchas" documents the residual ~14 MB/cycle and watchlist |
-| B1 — SAC critic-stability fixes | `64a4eb5` | `log_std_init=0.0`, `ent_coef=0.2`, `use_sde=false` in `baselines/configs/policy/sac.yaml` |
-| B2 / B3 / B4 — further PPO/SAC sweeps | — | Cancelled 2026-05-25. Final agents use B1 SAC defaults + committed `ppo.yaml`. Empirical balance study moved to Phase R |
-| G0 — phase plan | `b615c9a` | — |
-| G1 — restore ASHRAE 90.1 prototype source | `3bfc4b8` | `building2building/sources/ashrae_90_1.py` |
-| G2 — Stage 1 generator (LHS → raw epJSON) | `19fa101` | `building2building/pipeline/generate_raw_dataset.py` + Slurm wrapper |
-| G3 — Stage 1 validation | `2e75673` + `772b7ca` (closure) | Two long tests + bit-perfect full-grid metadata diff vs upstream `multizones_reference_buildings.zip` |
-| G4 — Stage 2 generator | `098599c` + `81d7f66` (G5 follow-up) | `building2building/pipeline/generate_dataset.py` replaces M2's `regen_dataset.py` |
-| G5 — Stage 2 validation + M2 re-run | `81d7f66` + `9b980ad` | HF revisions `ce0c68d9` (per-building) + `26efedd9` (parquet `action_dim` = agent-facing) |
-| M0 — OA-mixer design note | `3c84984` | `notes.md` § "OfficeMedium OA-mixer fix" |
-| M1 — pipeline emits OA-mixer actuator | `5a9772d` | OfficeMedium agent action dim: 33 → 36 |
-| M2 — HF dataset regen for OfficeMedium | superseded by G5 (`81d7f66`) | Interim `28f2e0a` deleted by G4; canonical entry point is `generate_dataset.sh --export=BUILDING_TYPE=OfficeMedium` |
-| D1 — MIT LICENSE | `83711d0` | — |
-| D2 — delete legacy reward family | `574baaa` | Presets renamed to `task_<mode>_<e0/emed/ehigh>` |
-| D3 — fix documented eval bugs | `de258ae` | — |
-| D4 — drop `baselines/requirements.txt` | `f6ec020` | Install: `pip install -e ".[training]"` |
-| D5 — write `REPRODUCING.md` | `45799f3` | Kept in lock-step per Cross-phase principle 2; D16 is the final parity sweep |
-| D6 — `baselines/` smoke tests | `89d7f34` (partial) | PPO + reactive-control smoke; deferred bits absorbed by Phase T |
-| D6.5 — quick-tier test triage | `e1c7a3c` (partial) + T-pre closure `3c66a06`/`9ab1044` | `tests/quick/` collection cleared in D6.5; deferred long-tier/import + ordering leak closed in T-pre |
-| D7 — GitHub Actions CI | `3017b5c` + T-pre closure `3c66a06`/`9ab1044` | Workflow introduced in D7; red-state unblock completed in T-pre |
-| D9 — docs migration off legacy presets | `f7fa693` | D-lite: thin prose `.md` + links to runnable `.py` tutorials |
-| D10 — black pass + pyright triage | `1abfc42` (partial) | Remaining pyright errors in `notes.md` § "D10 — pyright status (2026-05-26)"; ThermostatSetpoint stub removal deferred to T27 step 7 |
-| D11 — delete `summaries/` | `d0767a2` | — |
-| D12 — `api_contract` pytest marker | `3017b5c` (partial) | Coverage acceptance deferred to T27 |
-| D13 — `CHANGELOG.md` + deprecation policy | `333f46b` | `docs/api/stability.md` |
-| D14 — benchmark-problem docs pages | `1e60d3c` | Metric / axis tables + code blocks for 4 benchmarks |
-
----
-
-## Phase M — OfficeMedium OA-mixer action-space fix (artefacts pending)
-
-Code-side complete (M0/M1/M2 committed; see Archive). The two
-outstanding follow-up commits below produce artefacts that depend
-on cluster runs the user is currently driving.
-
-### M3. Re-tune the Optuna reactive controller for OfficeMedium
-
-Pipeline + RBC code is in (`0141961`). User runs
-`sbatch baselines/scripts/tune_controller.sh` then commits the
-8 new `baselines/configs/tuned_controllers/air_loop_officemedium_cz{1..8}.yaml`.
-
-- Acceptance: 8 new YAMLs committed; previous versions overwritten
-  in place (no `_v2` files); `REPRODUCING.md` § "Reactive-controller
-  tuning" unchanged (already cites the Python entry point).
-
-### M4. Re-run reward-normalizer calibration (all building types)
-
-Calibration-script fix landed (`e9da856` + `4a326aa` move to
-`baselines/`). User runs:
-
-```
-rm -rf $SCRATCH/b2b_reward_normalizers_random/data/
-sbatch baselines/scripts/launch_compute_random_policy_reward_normalizers.sh   # 1-48 array
-python -m baselines.compute_random_policy_reward_normalizers --mode aggregate
-```
-
-then commits the resulting `building2building/data/reward_normalizers.yaml`
-diff (touches every row, not just OfficeMedium — see `notes.md`
-§ "OfficeMedium OA-mixer fix" M4 entry for the full-regen rationale).
-
-- Acceptance: every row in `reward_normalizers.yaml` recomputed
-  under the fixed calibration scripts; sanity plot regenerated by
-  the aggregate step shows medians at 1.0 across buildings.
-
----
-
-## Phase C — Re-run paper experiments (FINAL stage, on the OSS codebase)
-
-**Strict prerequisites — all of these must be merged before C1
-starts:**
-
-1. **Phase M** (OfficeMedium fix + HF re-upload + RBC re-tune +
-   normalizer recompute) — otherwise OfficeMedium rows are
-   produced against the wrong action space.
-2. **Phase D-house** (legacy deletion, LICENSE, formatter,
-   `pyright`, README refresh).
-3. **Phase T** (test suite green on `pytest -m quick`).
-4. **Phase F** (read-only file/doc audit; follow-up edits from F
-   landed in D-house or merged separately before C starts).
-5. **Phase R** (final `emed` / `ehigh` values pinned in
-   `building2building/config/tasks.py` so every Phase-C run uses
-   the locked coefficients).
-
-The intent is captured by the user's "the scripts to generate the
-new results must be run on the final version of the codebase"
-rule: every artefact produced in Phase C must be reproducible by
-the public OSS code, not by the in-flight branch.
-
-### C1. Regenerate `baseline_returns.csv` on the **full** split
+### A1. Regenerate `baseline_returns.csv` on the **full** split
 
 Run `baselines/run_reactive_control.py` across **every**
 `(building_type, building_id, task, run_period)` tuple in the
 full train + test split, under the locked `emed` / `ehigh`
-values from Phase R. The reactive baseline is the reference
+values from Phase B. The reactive baseline is the reference
 controller for the normalized score and underlies every figure
-in the paper — both the specialists (C2) and the transfer
-benchmarks (C3 / C4), so train-split rows are not optional.
+in the paper — both the specialists (A2) and the transfer
+benchmarks (A3 / A4), so train-split rows are not optional.
 
 - Files (release artefact): `building2building/scores/
   baseline_returns.csv` (replaced in full); schema unchanged from
@@ -236,7 +49,7 @@ benchmarks (C3 / C4), so train-split rows are not optional.
 - Files (release entry point): `baselines/run_reactive_control.py`
   + the existing
   `baselines/configs/experiment/eval_reactive_control.yaml`. The
-  full reproduction command (in `REPRODUCING.md` § C1) is the
+  full reproduction command (in `REPRODUCING.md` § A1) is the
   single-machine Hydra invocation:
 
       python -m baselines.run_reactive_control \
@@ -244,11 +57,11 @@ benchmarks (C3 / C4), so train-split rows are not optional.
           output_csv=building2building/scores/baseline_returns.csv
 
 - Files (developer convenience): `baselines/scripts/
-  run_baseline_returns.sh` Slurm wrapper for the cluster (does
-  **not** ship as the canonical reproduction step per
-  Cross-phase principle 3). Update the Slurm script's header to
-  iterate the full 9-cell task grid + 3 run periods + the full
-  building catalogue; user submits.
+  run_baseline_returns.sh` Slurm wrapper for the cluster (a thin
+  loop around the Python entry point — not the canonical
+  reproduction step). Update the Slurm script's header to iterate
+  the full 9-cell task grid + 3 run periods + the full building
+  catalogue; user submits.
 - Tasks × run periods: full 9-cell grid
   (`task_{const,occ,rand}_{e0,emed,ehigh}`) × `run_period ∈
   {full_year, winter, summer}`. Total row count ≈
@@ -256,15 +69,14 @@ benchmarks (C3 / C4), so train-split rows are not optional.
 - Acceptance: every `(building_type, building_id, task,
   run_period)` tuple the paper figures cite is present;
   `pytest -m quick tests/quick/test_scoring.py` passes;
-  `tests/release/test_baseline_returns_coverage.py` (T16) passes
-  against the new CSV; `REPRODUCING.md` § C1 is updated to point
+  `tests/release/test_baseline_returns_coverage.py` passes
+  against the new CSV; `REPRODUCING.md` § A1 is updated to point
   at the locked-`emed`/`ehigh` values.
 
-### C2. PPO + SAC specialists on `test_small` (paper §5)
+### A2. PPO + SAC specialists on `test_small` (paper §5)
 
-Scope per the 2026-05-25 brainstorm: **1 seed, default params, no
-tuning, full 9-task grid, evaluated on the test_small subset of
-every building type.**
+Scope: **1 seed, default params, no tuning, full 9-task grid,
+evaluated on the test_small subset of every building type.**
 
 Total cells = `len(building_types) × len(test_small per type) ×
 9 tasks × 2 algorithms × 1 seed`. With 6 building types and ~5
@@ -274,9 +86,8 @@ each SAC specialist run is ~1M steps × 4 envs. CPU-only.
 
 The reduction from the camera-ready original plan (3 seeds, full
 test split) to (1 seed, test_small) is deliberate compute
-shedding. **Document this reduction in the paper prose
-(`paper/main.tex` §5)** as part of C5a — the figure caption must
-state the seed count and the building subset.
+shedding — the figure caption must state the seed count and the
+building subset.
 
 - Files (release artefacts): `baselines/train_ppo.py`,
   `baselines/train_sac.py` Hydra outputs collected under
@@ -285,8 +96,7 @@ state the seed count and the building subset.
   figure rendered by an extended
   `baselines/plotting/plot_ppo_specialist.py` (or a new
   `baselines/plotting/plot_specialists.py` covering both
-  algorithms — pick one in the C2 first commit, per the D5
-  follow-up noted in `REPRODUCING.md`).
+  algorithms — pick one in the A2 first commit).
 - Files (release entry points, cited from `REPRODUCING.md`):
 
       python -m baselines.train_ppo experiment=train_ppo_task_study \
@@ -301,7 +111,7 @@ state the seed count and the building subset.
 
   Both Hydra entry points must support the `building_split=`
   override (today they may hard-code "train"); land that as the
-  first C2 commit if missing.
+  first A2 commit if missing.
 - Files (developer convenience): existing
   `baselines/scripts/train_ppo_small_test_array.sh` and
   `baselines/scripts/train_sac_array.sh` are updated in-place
@@ -312,52 +122,22 @@ state the seed count and the building subset.
   Python command; the figure shows PPO and SAC on the same axis;
   numerical values for the paper table can be cited from the
   merged CSVs; seed count (1) and `test_small` restriction are
-  explicit in the figure caption; `REPRODUCING.md` § C2 + § C2-bis
+  explicit in the figure caption; `REPRODUCING.md` § A2 + § A2-bis
   are updated to reflect the locked `emed`/`ehigh` values and the
   combined-figure command.
 
-### C5a. Specialist paper updates
+### A3. Dynamics adaptation (paper §6.1) — final step
 
-Land **after C2** so the specialist figure exists. Splits C5 into
-two; C5a covers everything that depends only on C1+C2; C5b
-covers C3/C4.
-
-- Files: `paper/main.tex` —
-  - Task table: replace any remaining legacy `Task 1`–`Task 4`
-    references with the normalized 9-cell
-    `task_{const,occ,rand}_{e0,emed,ehigh}` family. Pin the
-    final `emed` and `ehigh` values from Phase R in the table
-    caption.
-  - Swap Fig 4 (PPO specialist) for the new PPO + SAC side-by-
-    side figure from C2.
-  - Update §5 prose: seed count (1 not 3), building subset
-    (`test_small`), per-term reward decomposition citation
-    forward-referencing the appendix from Phase R.
-  - Address the reviewer-flagged confound about cross-building
-    `w_E` comparability explicitly in §5 prose; cite the Phase R
-    invariance plot in the appendix.
-  - **Add the Phase R appendix.** Per the user's 2026-05-25
-    follow-up, the empirical reward-coefficient study is included
-    in the camera-ready as an appendix. The appendix lays out R0's
-    methodology, the policy ladder, and the invariance result;
-    figures from R3 are embedded.
-- Acceptance: PDF compiles; reviewer-flagged confound is
-  addressed; the Phase R appendix is present and cited from §5;
-  user has reviewed and approved the diff.
-
-### C3. Dynamics adaptation (paper §6.1) — final step
-
-Confirmed in scope (2026-05-25 follow-up). Runs as the
-**final-step batch** after C1, C2, C5a are complete, on exactly
-the same OSS-ready codebase.
+Runs as the **final-step batch** after A1 and A2 are complete,
+on exactly the same OSS-ready codebase.
 
 Re-run the three approaches (specialist, baseline, parameterized)
 at three difficulty levels (easy = SingleFamilyHouse, medium =
 OfficeSmall, hard = OfficeMedium) under the new reward and the
 new OfficeMedium action space. 1 seed, default params, matching
-the C2 compute-shedding rationale.
+the A2 compute-shedding rationale.
 
-- Files (release entry points, cited from `REPRODUCING.md` § C3):
+- Files (release entry points, cited from `REPRODUCING.md` § A3):
 
       python -m baselines.train_dynamics_adaptation \
           experiment=train_dynamics_specialist difficulty=easy
@@ -368,1433 +148,56 @@ the C2 compute-shedding rationale.
 
   (Repeat with `difficulty=medium,hard`.) Plotting via
   `baselines.plotting.plot_dynamics_adaptation` — see
-  `REPRODUCING.md` § C3 for the full invocation.
+  `REPRODUCING.md` § A3 for the full invocation.
 - Acceptance: `fig_transfer_rew` and `fig_transfer_temp_deviation`
   regenerate from a single Python command per
   `REPRODUCING.md`; seed count and OfficeMedium action-space
   update are noted in the figure caption.
 
-### C4. Cross-domain Amorpheus (paper §6.2) — final step
+### A4. Cross-domain Amorpheus (paper §6.2) — final step
 
-Confirmed in scope (2026-05-25 follow-up). Runs alongside C3 as
-part of the final-step batch.
+Runs alongside A3 as part of the final-step batch.
 
-- Files (release entry points, cited from `REPRODUCING.md` § C4):
+- Files (release entry points, cited from `REPRODUCING.md` § A4):
 
       python -m baselines.train_cross_domain experiment=train_cross_domain
 
   followed by the eval and plotting commands documented in
-  `REPRODUCING.md` § C4.
+  `REPRODUCING.md` § A4.
 - Acceptance: the cross-domain figure regenerates from a single
   Python command per `REPRODUCING.md`; the action-space update is
   noted in the figure caption.
 
-### C5b. Transfer paper updates
-
-Land **after C3 + C4**. Closes Phase C.
-
-- Files: `paper/main.tex` — re-render Fig 5 (dynamics adaptation,
-  3-panel) and Fig 7 (cross-domain). Update §6 prose for the new
-  reward + the new OfficeMedium action space; add the same
-  seed-count and configuration notes as in C5a.
-- Acceptance: PDF compiles; figures are produced by the
-  `REPRODUCING.md` commands as committed; user has reviewed and
-  approved the diff.
-
 ---
 
-## Phase D — Open-source readiness
+## Phase B — Empirical reward-coefficient study
 
-D1–D14 are closed (see Archive). Remaining items: D8 (README
-"Known Issues" refresh), D15 (`analysis/` → `baselines/`
-migration, depends on F2's audit), D16 (`REPRODUCING.md` parity
-sweep, lands last in D-house).
+Output: final values of `emed` and `ehigh` (and confirmation that
+`e0 = 0.0`), backed by empirical evidence on a policy ladder and
+demonstrated invariance across the `test_small` building subset.
 
-### D8. Update `README.md` "Known Issues" section
-
-After D3, D6, and D7 have landed (all done as of 2026-05-26).
-
-- Files: `README.md`.
-- Acceptance: items fixed in D3 are removed; the stale
-  "No tests exist for `baselines/` code" bullet (line 203) is
-  removed or narrowed now that D6 added PPO + reactive-control
-  smoke tests; remaining honest limitations (legacy SAC stability
-  if Phase B is incomplete at release time, CI red until Phase T
-  T-pre) are listed.
-
-### D15. Execute the `analysis/` → `baselines/` migration
-
-**Depends on F2's migration audit table** in
-`notes.md` § "Phase F analysis/ migration audit". Each row of that
-table becomes a one-commit "FX" sub-item here; this D15 entry is
-the umbrella tracker for them.
-
-For each row labelled **(promote to baselines/)**:
-
-1. Move the script (or its useful subset) into `baselines/` at the
-   destination path pinned by F2.
-2. Move the plotting code into `baselines/plotting/`.
-3. Rewrite imports against the public `building2building` API
-   (no `from building2building.simulator.<internal>`).
-4. Add a Hydra config under `baselines/configs/experiment/` if
-   the script wants Hydra-style invocation.
-5. Update `REPRODUCING.md` in the same commit to cite the new
-   Python entry point.
-6. Delete the original `analysis/` file (or leave a one-line
-   pointer comment to the new location if F2's table flagged the
-   audit-trail value).
-
-For each row labelled **(delete)**: `git rm` the file in a single
-sweep commit at the end.
-
-For each row labelled **(stay in analysis/)**: no action — the
-file already has a destination.
-
-- Files: per F2's migration table; this item lists no files
-  itself.
-- Acceptance: `rg "from analysis" baselines/ building2building/`
-  returns nothing; every script cited in `REPRODUCING.md` lives
-  under `baselines/` or `building2building/`; the migration table
-  in `notes.md` has every row marked done.
-
-### D16. `REPRODUCING.md` parity sweep
-
-**Land last in D-house, after D15.** A one-shot read-through of
-every section in `REPRODUCING.md` against the actual `baselines/`
-state. Catches stale Hydra group names, stale flag names, stale
-output paths, and the migration's downstream effects on the
-cheat-sheet table.
-
-Per Cross-phase principle 2 this is also the "audit your
-predecessors' contributions" gate — every D15 commit was
-*supposed* to update `REPRODUCING.md`, but a sweep at the end
-guarantees the file is internally consistent.
-
-- Files: `REPRODUCING.md` only (no code changes here; if a
-  command is broken, that's a separate bug fix).
-- Acceptance: every `python -m baselines.…` command in the file
-  can be at least dry-run-parsed by Hydra
-  (`python -m baselines.<entry> --help` returns 0 for each entry
-  point cited); the cheat-sheet table at the bottom is in 1:1
-  correspondence with the in-body sections.
-
----
-
-## Phase T — Test suite cleanup and core coverage
-
-The test suite has accreted around bug fixes rather than around the
-project's stated stability priorities (the building processing
-pipeline and the public API). This phase prunes the dead weight and
-fills the highest-risk gaps. The umbrella goal is: **after Phase T,
-`pytest -m quick` on a fresh checkout should give a contributor
-genuine confidence that the pipeline and `new_make_env` still
-work**, not just that some legacy regression hasn't reverted.
-
-Reference: `docs/about/testing.md` for the current per-file inventory
-and gap analysis.
-
-**One logical change, one commit.** Each item below is sized to be a
-single reviewable commit. A few items legitimately fan out (T0, T4,
-T11, T24c, T27) — those declare their sub-commits explicitly. The
-underlying rule is that every commit lands as a coherent, bisectable
-unit, not that every item is exactly one commit.
-
-### Tier definitions for Phase T
-
-Phase T redefines `quick` / `long` along the **rollout length** axis,
-not the **EnergyPlus availability** axis. EnergyPlus is a hard
-dependency of this project (`tests/conftest.py` already wires it up
-once at collection time); pretending otherwise is what produced the
-`MockEnv`-everywhere problem in the first place.
-
-| Marker    | Meaning                                                                       |
-| --------- | ----------------------------------------------------------------------------- |
-| `quick`   | No rollout, or a short rollout (≤ ~20 steps). EnergyPlus and the cached HF dataset are allowed. Aim for each test under a few seconds. |
-| `long`    | Multi-day rollouts (hundreds to tens of thousands of steps), or per-cycle leak/lifecycle iteration. Gated on `B2B_RUN_LONG_TESTS=1`. |
-| `release` | Dataset / artifact integrity checks against the published `vtaboga/building2building_dataset`. Not run on every push; lives in `tests/release/`. Wired into CI in deferred item TZ1. |
-
-Consequences for Phase T:
-
-- The headline gate "no EnergyPlus, no network" for `quick` is gone.
-  `quick` tests may call `new_make_env` against a committed minimal
-  fixture and run a 10–20-step rollout. EnergyPlus startup (~1–3 s)
-  is acceptable.
-- The "long" marker no longer means "needs EnergyPlus" — it means
-  "needs a multi-day rollout to be meaningful" (leaks across cycles,
-  seasonal-mean assertions, full-year integrity).
-- `tests/release/` is new in this phase; T15.0 registers it.
-
-### Test design principles for Phase T
-
-These principles govern every item in Phase T (and should govern
-test PRs after the phase closes too). They exist because a test
-that lives in its own parallel universe — hand-rolled mocks, fake
-config dicts, `MagicMock(spec=...)` stand-ins for B2B objects —
-silently drifts as the production code evolves. The real code
-changes shape, the mock keeps passing, and the test becomes
-false reassurance.
-
-1. **Exercise the real code path.** Build envs through real
-   `new_make_env` / `make_env_from_config` against a committed
-   fixture; do not build a `MockEnv` that pretends to be a B2B env.
-   Construct configs (`TaskConfig`, `EnvBuildConfig`,
-   `BuildingInfo`, `BuildingConfig`) via their real
-   constructors / `from_dict` / `from_json` methods, not via
-   `MagicMock(spec=...)` or hand-rolled dicts.
-2. **Mock only at external I/O boundaries.** The HuggingFace
-   network call is the only legitimate mock target inside Phase T —
-   and even then, the preferred pattern is to point the registry at
-   the committed minimal fixture via the shared `fixture_registry`
-   helper (T0), not to monkeypatch ad-hoc. EnergyPlus itself is not
-   mocked.
-3. **Minimal, shared, real fixtures.** Prefer the committed
-   minimal-building matrix (T0: one fixture per HVAC type) +
-   one committed equipment.json per HVAC type (T9) reused across
-   the whole quick suite, over per-test hand-rolled fixtures.
-   Every fixture is documented in a `README.md` next to it so its
-   provenance is reproducible.
-4. **Mock surface is itself a code smell.** If a test needs more
-   than ~5 lines of `monkeypatch` / `MagicMock` setup, that is a
-   signal the test is at the wrong layer. Extract a small helper
-   from production code and test that directly (see T4 for the
-   pattern: T4a extracts a helper, T4b tests it).
-5. **Wrappers and other generic `gym.Env` consumers may use a
-   `MockEnv`** — those are general by design. But where the
-   wrapper interacts with B2B-specific metadata (e.g.
-   `PadObservation` reading `observation_names`), the test must
-   *also* gain a companion test against the real minimal-building
-   fixture, so a wrapper that works on `MockEnv` but breaks on the
-   real `metadata` / `observation_space` shape is caught.
-
-These are guidelines, not absolute rules — the goal is fewer
-sources of false positives, not maximum integration-test purity.
-
-### T-pre. Unblock CI (closed)
-
-Closed in `3c66a06` + `9ab1044`.
-
-- Import-sweep fix landed for the five `tests/long/` files that still
-  referenced deleted `BaseRewardConfig`, restoring clean collection
-  under `pytest -m quick`.
-- Ordering leak root cause was fixed in
-  `tests/quick/test_climate_zones.py`: a direct module monkeypatch of
-  `download_metadata` was persisting across tests. It now uses
-  `monkeypatch.setattr(...)` so state restores automatically.
-- Quick-suite hardening for wrapper/api tests was included in the same
-  patch so `pytest -m quick` is green from a fresh checkout.
-
-### T0. Minimal-building fixture matrix + shared registry helper (closed)
-
-Closed in `c0499bf`.
-
-Delivered:
-
-- Added committed fixture dirs:
-  `tests/fixtures/minimal_vav/`,
-  `tests/fixtures/minimal_unitary/`,
-  `tests/fixtures/minimal_heating_only/` with
-  `building.epjson`, `equipment.json`, `weather.epw`, `README.md`.
-- Added shared fixtures in `tests/conftest.py`:
-  `minimal_building_dir` and `fixture_registry`.
-- Migrated `tests/quick/test_api_mode_default.py` off local `_Stub*`
-  registry classes to the shared fixture helper.
-- Kept `new_make_env` public signature unchanged (no `building_dir=`
-  test hook).
-
-Carry-forward notes for future `T*` items:
-
-- The "heating" fixture currently uses a real
-  `heating_only+unitarysystem` building (dataset-native); future tasks
-  should treat this as the heating-path fixture unless a pure
-  heating-only artifact is later introduced.
-- T7/T10/T17 should reuse this fixture matrix directly; do not
-  reintroduce ad-hoc local stub registries in test files.
-
-### T1. Delete tautological tests (closed)
-
-Closed in `c0499bf`.
-
-Applied:
-
-- Deleted `tests/quick/test_new_api.py`.
-- Collapsed gym import-side-effect coverage into
-  `test_gym_registration.py::test_all_building_types_registered`.
-- Deleted the two JSON roundtrip-only tests in
-  `TestDynamicsAdaptationMetadataRoundTrip`.
-- Deleted
-  `TestEvalPpoCsvRewardMeanColumn::test_csv_fieldnames_contain_reward_mean`.
-- Preserved
-  `TestDynamicsAdaptationMetadataRoundTrip::test_metadata_missing_raises_without_cli_flag`
-  for later rewrite/move in T27 step 3.
-
-Acceptance snapshot at close: `pytest -m quick` green.
-
-### T2. Consolidate duplicates (closed)
-
-Applied:
-
-- Merged clipping-invariant coverage from
-  `tests/test_building_param_clipping.py` into
-  `tests/test_wrappers.py::TestAugmentObservationWithBuildingParams::test_normalized_params_clipped_when_out_of_range`,
-  then deleted `tests/test_building_param_clipping.py`.
-- Deleted only
-  `tests/quick/test_types.py::TestZoneTargetTemperatureConfigExtended::test_from_dict_seasonal_roundtrip`.
-  Kept `test_from_dict_unknown_policy_raises` and
-  `test_from_dict_seasonal_unknown_season_key_raises`.
-- Verified the legacy task-preset assertions called out for T2 are
-  already covered in `tests/quick/test_task_presets.py`
-  (`unoccupied_policy` and `reward.dT` contracts remain pinned).
-
-Acceptance snapshot at close: `uv run pytest -m quick` green.
-
-### T3. Audit `tests/long/` against the new rollout-length definition (closed)
-
-Applied:
-
-- Audited every module in `tests/long/` against the updated criterion
-  ("multi-day rollout or many envs/sims", not merely "needs
-  EnergyPlus").
-- Marked for T27 follow-up (not long by the new definition):
-  `tests/long/test_pipeline_single_zone_houses.py` (delete),
-  `tests/long/test_rescale_action.py` (move to `quick/`),
-  `tests/long/test_observation_dimension.py` (move to `quick/`).
-- Kept in `long` (multi-day rollout or many envs/sims):
-  `test_env_leak.py`, `test_env_lifecycle.py`,
-  `test_seasonal_unoccupied.py`, `test_occupancy_observation.py`,
-  `test_random_schedule_rollout.py`,
-  `test_all_buildings_env_smoke.py`,
-  `test_generate_dataset.py`,
-  `test_generate_raw_dataset_matches_existing.py`.
-- Added/normalized one-line module docstrings in surviving `long`
-  modules to state why they remain long.
-
-Acceptance snapshot at close: all surviving `tests/long/` modules now
-carry a one-line long-justification docstring; deferred marker/file
-moves remain scheduled for T27.
-
-### T4. Rewrite over-mocked tests against the layer they actually mean to test (closed)
-
-T4 is a small *cluster* of independent rewrites. T4a is the only
-production-code change; T4b–T4d are pure test rewrites. Each is its
-own commit.
-
-#### T4a. Extract two helpers from `new_make_env`
-
-Pure refactor, no behaviour change. The inline block in
-`new_make_env` (`building2building/api/__init__.py`, roughly lines
-252–353) does **two** distinct things:
-
-1. **TaskConfig resolution** — preset lookup, effective-mode
-   override, default `ZoneTargetTemperatureConfig` build,
-   `RandomScheduleConfig` build, `TaskConfig` build.
-2. **Effective reward resolution** — `effective_reward = reward if
-   reward is not None else preset.reward`, plus the
-   `NormalizedDeadbandRewardConfig` autofill path that looks up
-   `(tau_T, tau_E)` from `reward_normalizers.yaml` using the
-   building's `(building_type, climate_zone)` bucket.
-
-(2) is the more bug-prone branch — it can `KeyError` at env-build
-time on a stale YAML, and the existing tests do not exercise the
-autofill. Extracting both in one commit means T4b can test each
-independently.
-
-Extract into two module-level helpers:
-
-```python
-def _resolve_task_config(
-    *,
-    preset: TaskPreset,
-    run_period_cfg: RunPeriodConfig,
-    timesteps_per_hour: int,
-    target_temperature_mode: str | None,
-    random_schedule_seed: int | None,
-    building_type: BuildingType,
-) -> TaskConfig: ...
-
-def _resolve_effective_reward(
-    *,
-    preset: TaskPreset,
-    reward_override: RewardConfig | None,
-    building_type: BuildingType,
-    building_id: str,
-    run_period: str,
-    normalizer_path: Path | None,
-) -> RewardConfig: ...
-```
-
-Existing tests (`test_api_mode_default.py`, all env-build tests)
-must keep passing unchanged. This commit unblocks T4b.
-
-- Files: `building2building/api/__init__.py`.
-- Acceptance: `pytest -m quick` green; the inline block in
-  `new_make_env` is reduced to one call to each helper; both
-  helpers are importable from `building2building.api` (private
-  underscore prefix, but importable for T4b's tests).
-
-#### T4b. Rewrite `test_api_mode_default.py` against the new helpers
-
-T0c already removed `_StubInfo` / `_StubRegistry` / `_CapturedConfig`
-from this file. T4b drops the remaining `create_simulator`
-monkey-patch and tests the helpers directly:
-
-- For each paper preset (`task1`–`task5`) and each normalized
-  preset, call `_resolve_task_config` with real `TaskPreset`
-  instances from `TASK_PRESETS` and assert on the returned
-  `TaskConfig` (mode, default zone target, random schedule).
-- For `_resolve_effective_reward`: parametrize over (a) a normal
-  preset with `reward_override=None` (returns `preset.reward`
-  unchanged), (b) a normalized preset (returns a *filled*
-  `NormalizedDeadbandRewardConfig`), (c) an explicit reward
-  override (returns the override). Use `fixture_registry` (T0b)
-  to provide the building's climate zone for the autofill path,
-  or commit a tiny `tests/fixtures/reward_normalizers_fixture.yaml`
-  pointing `normalizer_path` at a one-bucket file.
-- Keep one quick integration test that builds a full env via
-  `new_make_env` against `fixture_registry` and asserts
-  `env.unwrapped.task_config.target_temperature_mode` end-to-end.
-
-- Files: `tests/quick/test_api_mode_default.py`.
-- Acceptance: file shrinks by ~50% relative to its post-T0c size;
-  total mock surface in the file is under 5 lines; the
-  reward-autofill `KeyError`-on-stale-YAML case is now covered
-  (use a one-bucket fixture YAML and request a building outside
-  the bucket; assert `KeyError`).
-
-#### T4c. `test_climate_zones.py::TestMetadataColumnGuard`
-
-Replace the `pd.read_parquet` / `download_metadata` double
-monkey-patch with a unit test of a tiny `_validate_metadata(df)`
-helper extracted from `BuildingRegistry._ensure_loaded`. The
-helper takes a `DataFrame`, raises the same `RuntimeError` if
-`climate_zone` is missing, returns `None` otherwise. The test
-constructs a `DataFrame`, calls the helper, asserts the raise.
-
-- Files: `building2building/data/registry.py` (extract helper);
-  `tests/quick/test_climate_zones.py` (rewrite test).
-- Acceptance: zero monkey-patches in the rewritten test; the
-  `_ensure_loaded` path keeps its existing behaviour.
-
-#### T4d. `test_task_presets.py::test_factory_lazy_imports_loader`
-
-The current grep-the-source test is correct in intent but too
-narrow: it only catches a direct top-level import in `tasks.py`.
-A reward-normalizer import added to any other file that
-`config.tasks` transitively imports at top level would still
-trigger dataset I/O at `import building2building.config.tasks`
-time, but the grep test wouldn't notice.
-
-Rewrite as a runtime contract — "after `import
-building2building.config.tasks`, `reward_normalizers` is not in
-`sys.modules`" — executed in a **fresh subprocess** so the result
-isn't polluted by the parent pytest process's module cache:
-
-```python
-import subprocess, sys, textwrap
-
-def test_factory_lazy_imports_loader() -> None:
-    code = textwrap.dedent("""
-        import sys
-        import building2building.config.tasks  # noqa: F401
-        assert (
-            "building2building.data.reward_normalizers" not in sys.modules
-        ), sorted(m for m in sys.modules if m.startswith("building2building"))
-    """)
-    subprocess.run([sys.executable, "-c", code], check=True)
-```
-
-The subprocess is necessary: pytest itself imports
-`building2building` (via `conftest.py`'s `setup_energyplus_path`),
-which may transitively pull `reward_normalizers` into the parent
-process's `sys.modules` cache long before the test runs. Popping
-from `sys.modules` and re-importing in the same process does
-*not* re-execute the module body — cached child symbols keep the
-original module alive — so an in-process version of this test
-would have false negatives.
-
-- Files: `tests/quick/test_task_presets.py`.
-- Acceptance: the test fails if anyone adds a top-level import of
-  `reward_normalizers` to `tasks.py` *or* to any module
-  transitively imported at file scope. The subprocess overhead
-  (~200 ms for Python startup) is acceptable for a single test.
-
-#### T4e. Delete `test_wrappers.py::test_pad_raises_error_if_too_many_zones`
-
-The current test's own comment admits the code path hits the size
-check first, not the zone-specific one — i.e. the test name is a
-lie. Delete it. T24b adds a proper zone-specific error test
-against real `observation_names` metadata (the assertion this
-test was *trying* to make), and
-`test_pad_raises_error_if_obs_too_large` already covers the size
-check that this test actually hits.
-
-T4e must land **after** T24b so that the zone-specific contract
-is never uncovered between commits. If T4e is reviewed first and
-T24b is not yet merged, hold T4e.
-
-- Files: `tests/test_wrappers.py`.
-- Acceptance: `pytest -m quick` green; T24b's zone-specific test
-  is present in the same merge train.
-
-Applied:
-
-- T4a: extracted `_resolve_task_config` and `_resolve_effective_reward`
-  from `new_make_env` in `building2building/api/__init__.py` (pure
-  refactor, no behaviour change).
-- T4b: rewrote `tests/quick/test_api_mode_default.py` to target the
-  new helpers directly, added reward-autofill stale-YAML `KeyError`
-  coverage, and committed `tests/fixtures/reward_normalizers_fixture.yaml`.
-- T4c: extracted `_validate_metadata(df)` from
-  `BuildingRegistry._ensure_loaded` and rewrote
-  `TestMetadataColumnGuard` as a direct unit test with zero monkey-patches.
-- T4d: rewrote
-  `test_task_presets.py::test_factory_lazy_imports_loader` as a
-  subprocess runtime contract (`reward_normalizers` absent from
-  `sys.modules` after importing `building2building.config.tasks`).
-- T4e: deleted
-  `tests/test_wrappers.py::test_pad_raises_error_if_too_many_zones`.
-
-Acceptance snapshot at close: `uv run pytest -m quick` green.
-
-### T5. Pipeline: end-to-end `prepare_building` on a fixture IDF ✅
-
-The pipeline (`building2building/pipeline/`) is the project's biggest
-untested surface and the highest blast radius — pipeline bugs
-silently corrupt the dataset.
-
-The fixture matrix **must include one SFH building with a
-`Schedule:File` reference**. SFH `Schedule:File` rewriting is the
-specific footgun that `_patch_epjson_run_period` exists for (T8
-covers the post-conversion patching; T5 covers the pre-conversion
-pipeline). Without SFH in T5's matrix, the SFH-specific paths in
-`prepare_building` stay implicitly tested by
-`tests/long/test_pipeline_single_zone_houses.py` — which T27 deletes.
-
-- Files: new `tests/quick/test_pipeline_prepare_building.py`. Use
-  tiny committed IDF fixtures under `tests/fixtures/pipeline_idfs/`
-  — at minimum one multi-zone (VAV) and one SFH (with at least one
-  `Schedule:File` object pre-conversion). Parametrize the test
-  over the matrix. For each, run `prepare_building` through to
-  epJSON and assert:
-  (a) HVAC + outdoor-air meter objects present,
-  (b) `Timestep:NumberOfTimestepsPerHour` matches the input,
-  (c) `RunPeriod` spans the full year,
-  (d) the result round-trips through `json.load`,
-  (e) for SFH: every `Schedule:File` survives the conversion (the
-      conversion itself doesn't rewrite paths — that's T8's job —
-      but the objects must be present and parseable post-conversion).
-- Marker: `quick` under the new tier definition. EnergyPlus is
-  invoked for the IDF → epJSON conversion (~1–3 s per case), no
-  rollout.
-- Acceptance: `pytest tests/quick/test_pipeline_prepare_building.py`
-  green; both VAV and SFH cases run.
-
-### T6. Pipeline: `make_controllable` per HVAC system type ✅
-
-`make_controllable` can run against a pre-converted epJSON, so this
-is `quick` — no IDF → epJSON step required at test time.
-
-- Files: new `tests/quick/test_pipeline_make_controllable.py`. One
-  parametrize per system type (`VAV`, `Unitary`, `HeatingOnly`),
-  reusing the three post-conversion epJSONs committed by T0a
-  (`tests/fixtures/minimal_{vav,unitary,heating_only}/building.epjson`).
-  Assert the returned `ActuatorDescription` list contains the
-  expected `(component_type, control_type)` shape and no
-  `autosized` entries.
-- Acceptance: catches the case where `make_controllable` silently
-  emits the wrong actuator set for one of the three system types
-  (today, only VAV + Unitary are exercised, and only indirectly
-  via the benchmarks tests).
-
-### T7. Pipeline: `extract_discovery_metadata` ✅
-
-- Files: new `tests/quick/test_pipeline_discovery.py`. Parametrize
-  over the three T0a fixtures; for each, run discovery and
-  assert `area`, `warmup_phases`, and `hvac_actuators` come out
-  with the values pinned in
-  `tests/fixtures/minimal_{vav,unitary,heating_only}/README.md`.
-- Marker: `quick` — discovery runs against a committed
-  post-conversion epJSON; EnergyPlus is invoked once per fixture
-  for the EDD dump (T7 implicitly verifies that each T0a fixture
-  round-trips through EnergyPlus, which is useful free coverage).
-- Acceptance: any future change to the discovery parser that
-  silently shifts a returned value fails this test for at least
-  one HVAC type.
-
-### T8. API: `_patch_epjson_run_period` schedule-file rewriting + RunPeriod patching ✅
-
-The `Schedule:File` relative-path rewriting in
-`building2building/api/__init__.py::_patch_epjson_run_period` is a
-known footgun (EnergyPlus segfaults without it) with zero coverage.
-Pure in-memory test; no EnergyPlus.
-
-- Files: new `tests/quick/test_patch_epjson_run_period.py`. Build a
-  tiny epJSON `dict` in-memory and write it to disk in a temp
-  source directory. Cover:
-  (a) **Relative `Schedule:File` paths get resolved to absolute
-      paths rooted at `src_epjson.parent`** when `dst_epjson` lives
-      in a different directory. Use `Path(...).resolve()` in the
-      expected value to match the production code's behaviour.
-  (b) **Absolute `Schedule:File` paths are left alone.**
-  (c) **`winter` RunPeriod** dates are rewritten correctly
-      (`begin_month`, `begin_day_of_month`, `end_month`,
-      `end_day_of_month` match the `RunPeriodConfig`).
-  (d) **`summer` RunPeriod** dates ditto.
-  (e) **No-RunPeriod source epJSON** — when the input lacks any
-      `RunPeriod`, the function fabricates one with hard-coded
-      `begin_year=2023`, `apply_weekend_holiday_rule="No"`, etc.
-      Lock that contract or, if you'd rather raise, change the
-      production code in a sibling commit and update the test.
-- Acceptance: quick test; protects the SFH segfault fix and the
-  full-year-default fabrication branch.
-
-### T9. Pipeline: `equipment.json` schema round-trip per HVAC type ✅
-
-T0a already commits one `equipment.json` per HVAC type inside each
-fixture directory
-(`tests/fixtures/minimal_{vav,unitary,heating_only}/equipment.json`).
-T9 reuses those — no new fixture files.
-
-- Files: new `tests/quick/test_equipment_schema.py`. Parametrize
-  over the three HVAC types; for each, load the T0a fixture's
-  `equipment.json` and assert
-  `cattrs.structure(json.loads(...), list[AnyEquipment])` succeeds
-  and produces objects of the expected concrete type.
-- Acceptance: schema drift in `pipeline/actuators.py` is caught by
-  a quick test instead of by every `new_make_env` call dying.
-
-### T10. API: `new_make_env` against the minimal fixture matrix ✅
-
-- Files: new `tests/quick/test_new_make_env_minimal.py`. Use the
-  T0b `fixture_registry`, parametrized over HVAC type (defaults
-  to `minimal_vav` for most knob-coverage cases; HVAC-type-
-  specific cases pick the matching fixture). Assert the returned
-  env has the expected `observation_space`, `action_space`, and
-  `metadata["controlled_zones"]`. Parametrize over the knobs that
-  have historically regressed: `target_temperature_mode`,
-  `random_schedule_seed`, `reward` override, `run_period`,
-  `rescale_action`, `max_episode_steps`. Each parametrize case
-  builds the env, asserts on its spaces / metadata, optionally
-  runs ≤ 20 steps, and closes.
-- Marker: `quick`. EnergyPlus runs once per parametrize case
-  (~1–3 s each); no multi-day rollout.
-- Acceptance: covers every public `new_make_env` knob through the
-  T0b registry path; no HuggingFace cache is touched. At least
-  one knob-coverage case parametrizes over HVAC type to keep all
-  three fixtures exercised through the full env-build path (not
-  just the per-pipeline tests in T5/T6/T7).
-
-Acceptance snapshot at close:
-`uv run pytest tests/quick/test_pipeline_prepare_building.py tests/quick/test_pipeline_make_controllable.py tests/quick/test_pipeline_discovery.py tests/quick/test_patch_epjson_run_period.py tests/quick/test_equipment_schema.py tests/quick/test_new_make_env_minimal.py` green.
-
-### T11. API: `new_make_env` cleanup contract for the epjson staging dir ✅
-
-`weakref.finalize(env, _shutil.rmtree, _epjson_staging_dir, True)`
-in `new_make_env` is critical when `run_period != "full_year"`.
-Never tested. `del env; gc.collect()` is **not** a reliable
-trigger across `TimeLimit` / `RescaleAction` wrappers — the
-finalizer fires only when the *innermost* env loses all
-references, and wrapper references can outlive the test scope
-unpredictably.
-
-Test design: monkey-patch `weakref.finalize` in the
-`building2building.api` namespace with a recording wrapper that
-captures `(target, callback, args, kwargs)` for every call, then
-invoke the captured callback directly:
-
-```python
-import weakref
-from building2building import api as api_mod
-
-calls: list[tuple] = []
-
-class _RecordingFinalize:
-    def __init__(self, target, callback, *args, **kwargs):
-        calls.append((target, callback, args, kwargs))
-        self._inner = weakref.finalize(target, callback, *args, **kwargs)
-
-    def __call__(self):
-        return self._inner()
-
-monkeypatch.setattr(api_mod.weakref, "finalize", _RecordingFinalize)
-
-env = api_mod.new_make_env(
-    "OfficeSmall",
-    task="task1",
-    run_period="winter",       # triggers the staging-dir branch
-)
-# Exactly one finalize was registered, for the staging dir.
-assert len(calls) == 1
-target, callback, args, kwargs = calls[0]
-import shutil
-assert callback is shutil.rmtree
-staging = args[0]
-assert staging.is_dir()                # exists before invocation
-calls[0]                                # invoke the captured callable
-# fire the inner finalize directly via the recording wrapper:
-env._test_finalize_handle = None       # only needed if you stored one
-# call the original finalize handle:
-_RecordingFinalize(target, callback, *args, **kwargs).__call__()
-assert not staging.exists()            # cleanup ran
-env.close()
-```
-
-(Sketch — flesh out in the test file. The key points: the recording
-wrapper preserves the real `weakref.finalize` contract; we invoke
-the captured `(callback, args)` synchronously to verify the
-side effect; we never rely on GC.)
-
-This requires no production-code change — `weakref` is already
-imported at module scope in `api/__init__.py` (line 12), so
-`monkeypatch.setattr(api_mod.weakref, "finalize", ...)` reaches
-the right call site. If a future refactor moves the `import
-weakref` inside `new_make_env`, the patch target moves with it
-and the test docstring must be updated. (Add an `assert
-hasattr(api_mod, "weakref")` to catch that breakage explicitly.)
-
-- Files: new `tests/quick/test_new_make_env_cleanup.py`.
-- Marker: `quick` — env build + immediate cleanup, no rollout.
-- Acceptance: deterministic, no GC race. The test fails if the
-  `weakref.finalize` call in `new_make_env` is dropped, its
-  callback is wrong (not `shutil.rmtree`), or its args are wrong
-  (not the staging dir).
-
-### T12. API: `Trajectory.from_npz` round-trip with real nested types ✅
-
-- Files: extend
-  `tests/quick/test_rollout.py::TestTrajectoryRoundTrip` with one
-  case that populates `building_info` (a real `BuildingInfo` built
-  from the `fake_metadata` fixture or `fixture_registry`) and
-  `task_config` (a real `TaskConfig` built from a preset via
-  `_resolve_task_config` from T4a). Assert these survive the
-  round-trip.
-- Acceptance: the only existing round-trip case sets both to
-  `None`, so the serialization path for these nested dataclasses is
-  currently untested.
-
-### T13. Scoring: real CSV loader ✅
-
-The scoring CSV has two failure modes worth pinning: schema drift
-(column rename) and dataset drift (a `(building_type, task)` row
-the paper grid expects is missing). Today both surface as opaque
-errors deep inside `b2b.compute_normalized_score(...)`.
-
-- Files: new `tests/quick/test_scoring_csv.py`. Point
-  `scoring._load_cache` at the committed
-  `tests/fixtures/baseline_returns_fixture.csv`. Cover:
-  (a) **Happy path** — the loaded cache has the expected keys
-      and values for the rows in the fixture.
-  (b) **Column rename** — write a temp variant of the fixture
-      with `reward_mean` → `reward`; assert
-      `compute_normalized_score` (or whichever public entry
-      point first touches the renamed column) raises a clear
-      error mentioning the column name.
-  (c) **Missing row** — call `compute_normalized_score` for a
-      `(building_type, task)` tuple absent from the fixture;
-      assert a clear `KeyError` / `LookupError` that names the
-      missing tuple. This is the actual runtime failure mode at
-      eval time (renames are rare; missing rows are common after
-      a partial baseline re-run).
-- Acceptance: column renames and missing rows both surface at
-  test time with messages that point at the specific column or
-  tuple, not at line numbers inside `scoring.py`.
-
-### T14. Data integrity: splits ⊆ metadata, no train/test overlap ✅
-
-T14, T15, T16 are **dataset validation**, not code tests. They live
-under `tests/release/` (new tier — see T15.0), not `tests/long/`.
-Contributors debugging wrappers should not pay for a full
-HuggingFace download when they run `B2B_RUN_LONG_TESTS=1`.
-
-- Files: new `tests/release/test_data_integrity.py`. Against the
-  real registry (`get_registry()`), assert:
-  (a) every building ID in `splits.json` exists in
-      `metadata.parquet`,
-  (b) `train ∩ test == ∅` for every building type,
-  (c) `test_small ⊆ test` for every building type.
-- Marker: `release`.
-- Acceptance: one run on a release candidate catches dataset-build
-  mistakes that would otherwise distort every paper number by a
-  small, unattributable amount.
-
-### T15.0. Register the `release` marker + scaffold `tests/release/` ✅
-
-Prerequisite for T14, T15, T16.
-
-- Files: `pyproject.toml` (register the marker under
-  `[tool.pytest.ini_options].markers` and exclude `release` from
-  default runs); `tests/release/__init__.py` (empty);
-  `tests/release/README.md` (new — explains the tier, lists the
-  tests, and links to deferred item **TZ1** for the CI automation);
-  `tests/conftest.py` (tiny change — keep `release` tests out of
-  the auto-`quick` tagger so they remain opt-in via
-  `@pytest.mark.release`); `docs/about/testing.md` (T28 will pick up
-  the documentation pass; T15.0 only needs the marker registered).
-- Acceptance: `pytest --markers | grep release` lists the marker;
-  `pytest -m release` collects zero tests until T14 lands; running
-  `pytest` without `-m release` does **not** collect the release
-  tests (verify with a placeholder test in the directory).
-
-### T15. Data integrity: `reward_normalizers.yaml` covers the metadata ✅
-
-- Files: new `tests/release/test_reward_normalizers_coverage.py`.
-  For every `(building_type, climate_zone)` pair present in
-  `metadata.parquet`, assert that `reward_normalizers.yaml` has a
-  matching bucket. SFH bucketed under `cz0`; multi-zone types
-  bucketed under their climate zone.
-- Marker: `release`.
-- Acceptance: prevents the
-  `new_make_env(task="task_occ_wmed", building_id=...)` →
-  `KeyError` failure mode at eval time.
-
-### T16. Data integrity: `baseline_returns` covers the paper grid ✅
-
-- Files: new `tests/release/test_baseline_returns_coverage.py`.
-  For the `(building_type, task, run_period, building_id)` tuples
-  the paper reports, assert each row exists in the scoring CSV.
-- Marker: `release`.
-- Acceptance: missing rows surface at release time instead of at
-  eval time.
-
-### T17. Observation contract: zone-aware padding on real buildings ✅
-
-The "non-zone features at consistent indices" invariant is what
-makes multi-building generalization work. Currently tested *once*,
-with a `MockEnv`.
-
-T0a already commits a 2-zone `minimal_vav/` fixture and a 1-zone
-`minimal_unitary/` (or `minimal_heating_only/`) fixture, so no
-new fixture is needed for T17.
-
-- Files: new `tests/quick/test_obs_padding_invariants.py`. Use
-  T0b's `fixture_registry` parametrized over a 1-zone and a
-  2-zone fixture. Wrap both real envs in
-  `PadObservation(target_size=N)` for some N comfortably larger
-  than the 2-zone case; assert that for both, the last 7 slots
-  are the non-zone features in the same order with non-trivial
-  values, and that the padded zone slots in between are zero.
-- Marker: `quick`. Two env builds, no rollout.
-- Acceptance: catches any future change that puts non-zone features
-  at building-dependent indices.
-
-### T18. Observation contract: `observation_names` ordering stability ✅
-
-Every plotting script and reactive controller depends on
-`obs_names = env.metadata["observation_names"]`. The ordering is
-never asserted.
-
-- Files: new `tests/quick/test_observation_names_stability.py`.
-  Snapshot-test the `observation_names` output for the
-  `minimal_vav` fixture (the default, multi-zone case is the most
-  informative snapshot) under each `target_temperature_mode`.
-  Commit expected lists under
-  `tests/fixtures/minimal_vav/expected_observation_names_<mode>.json`.
-  Fail loudly when the order changes — changing it is fine, but
-  should be a deliberate commit that touches the snapshot file,
-  not a silent diff. T18 snapshots only `minimal_vav` for now;
-  if a future bug surfaces a HeatingOnly-specific ordering issue,
-  expand to the other HVAC types then.
-- Acceptance: relies on T0.
-
-### T19. Observation contract: `action_space` ↔ `controlled_zones` consistency ✅
-
-- Files: extend the new minimal-building test (T10) with:
-  `assert env.action_space.shape[0] == n_agent_actuators`, derived
-  from `controlled_zones` and equipment metadata. Don't make it a
-  separate file — it's one assertion that belongs alongside T10's
-  other space checks.
-- Acceptance: catches the case where the action space and the
-  declared controlled zones diverge.
-
-### T20. Benchmark behaviour: `make_train_envs` actually returns working envs ✅
-
-The four benchmark classes are tested for their config but not for
-behaviour. **T20 stays `long`.** The new tier definition would
-allow `quick` (single env build + a handful of steps), but the
-benchmarks pull from the real registry by design: each benchmark
-fans out to many real buildings even at `n=1` because each
-benchmark is a different building/task combination, and pointing
-them at `fixture_registry` would hollow out the test (you'd be
-asserting that a stub benchmark works on a stub registry, which
-is not the contract).
-
-- Files: new `tests/long/test_benchmarks_behaviour.py`.
-  For each of `DynamicsAdaptation(difficulty="easy")`,
-  `GoalAdaptation()`,
-  `CrossDomainGeneralization(difficulty="easy")`,
-  `ActionSpaceTransfer(system_type="unitary")`, call
-  `.make_train_envs(n=1)` and `.make_test_envs(n=1)`, run one
-  `reset` + one `step` per env, assert no crash.
-- Marker: `long`. Document the rationale ("real-registry fanout,
-  not rollout length") in the file's module docstring so future
-  contributors don't try to relabel it `quick`.
-- Acceptance: catches behavioural regressions in the benchmark
-  factories that the existing config tests cannot see.
-
-### T21. HVAC coverage: `HeatingOnly` system type ✅
-
-`HeatingOnly` is one of the three advertised HVAC types but has no
-unit tests. `Unitary` and `VAV` are covered by the
-`ActionSpaceTransfer` helpers.
-
-- Files: extend `tests/quick/test_benchmarks.py` with a
-  `HeatingOnly` parametrize on `hvac_action_space`. Reuse
-  `tests/fixtures/minimal_heating_only/equipment.json` from T0a
-  (no new fixture required).
-- Acceptance: every advertised HVAC type has at least one
-  action-space unit test.
-
-### T22. Leak coverage: multi-zone building ✅
-
-`tests/long/test_env_leak.py` only exercises `SingleFamilyHouse`.
-Leak risk is highest on multi-zone buildings.
-
-T22 splits into a measurement step and an execution step so that
-"_N=3 takes longer than 5 minutes" doesn't quietly produce a
-useless test.
-
-#### T22a. Measure
-
-Time one `OfficeMedium` create/reset/close cycle on the local
-interactive node (no commit; record in the T22b commit message
-and in the test's module docstring). OfficeMedium per-step cost
-can be 3–5× SFH, so this is essential.
-
-Measured (2026-05-27): OfficeMedium create/reset/close cycle is ~4.75s
-(`create=1.95s`, `reset=2.68s`, `close=0.12s`) on the interactive node.
-
-#### T22b. Parametrize
-
-Based on T22a's measurement:
-
-- If total `OfficeMedium` runtime at `_N ≥ 5` fits in ~5 minutes:
-  parametrize `_BUILDING_TYPE` over `SingleFamilyHouse` (keep
-  `_N = 20`) and `OfficeMedium` (pick the largest `_N` that fits
-  under 5 minutes; ≥ 5 required for leak signal to dominate
-  noise).
-- If even `_N = 3` exceeds 5 minutes: **do not ship a `_N = 3`
-  leak test**. The signal-to-noise at `_N = 3` is too low to
-  catch anything but a catastrophic regression, which the
-  existing SFH test already catches. Instead, ship T22b as a
-  parallelization refactor (run cycles in subprocesses via
-  `multiprocessing` or a `pytest-xdist`-style fan-out) and
-  defer the OfficeMedium parametrize to T22c.
-
-- Acceptance: either OfficeMedium leak coverage is in the suite
-  with `_N ≥ 5` and total runtime under 5 minutes, or the
-  parallelization refactor is committed and a follow-up T22c is
-  filed. Do not commit a measurement-free `_N` value.
-
-Implemented: parametrized `tests/long/test_env_leak.py` over
-`SingleFamilyHouse (N=20)` and `OfficeMedium (N=10)`.
-
-### T24. Wrapper data-processing correctness ✅
-
-The five wrappers in `building2building/simulator/wrappers.py` and
-`building2building/api/rl_wrappers.py` are unevenly tested: existing
-tests only hit the `low`/`high` boundaries on a `MockEnv`, never
-exercise the `reset()` rebuild paths, never check the
-metadata-driven branches, and don't cover
-`ResampleBuildingOnResetWrapper` at all. These wrappers sit on the
-critical data path between EnergyPlus and the agent — a silent bug
-in any of them corrupts every observation or action without
-crashing.
-
-One commit per wrapper (T24a–T24e), so a regression in one wrapper
-is bisectable to a single sub-task.
-
-#### T24a. `NormalizeObservation`: affine math + reset rebuild
-
-The existing two tests only assert that `low → 0` and `high → 1`,
-which is trivially true for any affine map. They miss the actual
-arithmetic.
-
-- Files: extend `tests/test_wrappers.py` (or a new
-  `tests/quick/test_normalize_observation.py`) with:
-  (a) **Mid-range affine check** — for a `Box(low=[10, -5], high=[30, 5])`
-      env, assert `observation([20, 0]) == [0.5, 0.5]`.
-  (b) **Round-trip** — for random observations within the bounds,
-      `denormalize(observation(x)) == x` to float32 tolerance.
-  (c) **Zero-range guard** — when `low[i] == high[i]`, construction
-      must raise `ValueError` (the code does this; lock the
-      contract).
-  (d) **Reset rebuild** — construct a `MockEnv` whose
-      `observation_space` is reassigned between two `reset()`
-      calls (simulating `ResampleBuildingOnResetWrapper`); assert
-      the second `reset` re-reads the new bounds and the second
-      `observation()` uses them.
-- Acceptance: a sign flip or `(high + low)` typo in the affine map
-  fails (a)–(b); a stale-bounds bug after `ResampleBuildingOnResetWrapper`
-  swap fails (d).
-
-#### T24b. `PadObservation`: metadata-driven zone split + reset rebuild
-
-The existing tests use a `MockEnv` without `observation_names`, so
-they always hit the *fallback* "last 7 features" heuristic. The
-real code path — splitting on `obs_names[i].startswith("zone air
-temperature")` — is never executed.
-
-- Files: extend `tests/test_wrappers.py` (or new
-  `tests/quick/test_pad_observation.py`) with:
-  (a) **Metadata-driven split** — `MockEnv` with
-      `metadata["observation_names"] = ["Zone Air Temperature Z1",
-      "Zone Air Temperature Z2", "Outdoor Air Temperature", ...]`
-      (using the real EnergyPlus naming). Assert
-      `_zone_air_temperature_indices` returns `[0, 1]`, not the
-      fallback range.
-  (b) **Case / whitespace robustness** — same test with one name
-      that has trailing whitespace and mixed case. Document the
-      current behaviour (it lower-cases and strips) by locking it
-      in a test.
-  (c) **Non-zone features land at the end** — with the metadata
-      from (a), assert `observation(obs)` puts the original
-      non-zone values at indices `[max_zones :]` and pads zone
-      slots `[current_num_zones : max_zones]` with zeros.
-  (d) **Reset rebuild after resample** — `MockEnv` whose inner
-      `observation_space` and `observation_names` both change
-      between two resets (different zone counts); assert the
-      padded output remains valid.
-  (e) Rewrite or delete
-      `test_pad_raises_error_if_too_many_zones` (currently doesn't
-      exercise the zone-specific branch its name claims; see T4).
-- Acceptance: a regression in `observation_names` capitalization,
-  or in the zone/non-zone split, fails (a)–(c).
-
-#### T24c.0. `AugmentObservationWithBuildingParams`: fail-loudly contract
-
-Prerequisite for T24c (test). Resolves the silent-fallback
-violation in `_extract_building_params` against `AGENTS.md`'s "no
-silent fallbacks" rule.
-
-Contract: **raise by default; opt-in fallback via a constructor
-kwarg.**
-
-```python
-class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
-    def __init__(
-        self,
-        env: gym.Env,
-        building_params: dict[str, float] | None = None,
-        *,
-        allow_defaults: bool = False,
-    ): ...
-```
-
-When `allow_defaults=False` (the new default), missing keys in the
-extracted metadata raise `KeyError` with the missing key name.
-When `True`, the current default-filling + warning behaviour is
-preserved exactly.
-
-Caller audit (mandatory in this commit) — covers **both production
-and test call sites**:
-
-- **Production call sites.** Grep every call site for
-  `AugmentObservationWithBuildingParams` outside `tests/`.
-  Anywhere multi-building training or eval currently relies on the
-  silent fallback (likely
-  `baselines/utils/training.py`, `baselines/eval_dynamics_adaptation.py`,
-  and analysis scripts), pass `allow_defaults=True` *explicitly*.
-  This preserves runtime behaviour while making the dependence on
-  the fallback visible at the call site.
-- **Test call sites.** Grep the same in `tests/`. Existing tests
-  like
-  `tests/test_wrappers.py::TestAugmentObservationWithBuildingParams::test_augment_with_custom_params`
-  construct a `MockEnv` without full metadata; without
-  `allow_defaults=True` they would break the moment T24c.0 lands.
-  Patch every such test to set `allow_defaults=True` explicitly in
-  this same commit. T24c (the test rewrite) replaces these
-  patched calls with the new contract in a sibling commit, but
-  T24c.0 must not be allowed to red-light the suite.
-- Document the audit in the commit message: list every call site
-  (production *and* test), whether it sets `allow_defaults=True`
-  or relies on the new raise-by-default behaviour, and why.
-
-- Files: `building2building/simulator/wrappers.py`; every caller
-  identified by the audit.
-- Acceptance: production behaviour unchanged for current callers
-  (they all set `allow_defaults=True`); `pytest -m quick` green
-  immediately after T24c.0 lands (no test starts raising); any
-  *new* call site that forgets to provide full metadata raises
-  immediately.
-
-#### T24c. `AugmentObservationWithBuildingParams`: test the new contract
-
-- Files: extend `tests/test_wrappers.py` (or new
-  `tests/quick/test_augment_building_params.py`) with:
-  (a) **Happy path** — env with full metadata; assert
-      `building_params` matches and `normalized_params` are
-      finite, in `[-1, 1]`.
-  (b) **Missing metadata raises by default** — env with no `area`
-      raises `KeyError` mentioning `"area"`.
-  (c) **`allow_defaults=True` preserves old behaviour** — env
-      with no `area`, constructed with `allow_defaults=True`,
-      falls back to `100.0` and emits a `logger.warning`. (Use
-      `caplog` to check the warning.)
-  (d) **Reset re-extraction** — swap the inner env's `metadata`
-      between two resets; assert `wrapped.building_params` and
-      the observation space update on the second reset.
-  (e) **Round-trip via `denormalize`** — assert
-      `wrapper.denormalize(wrapper.observation(obs))` recovers the
-      original obs (the wrapper strips the trailing param block
-      and delegates to inner `denormalize` if present).
-- Acceptance: silent-fallback contract is now explicit; the
-  resample-swap path is exercised.
-
-#### T24d. `ResampleBuildingOnResetWrapper`: zero → meaningful coverage
-
-This wrapper is central to multi-building training (dynamics
-adaptation, cross-domain transfer) and has *no tests*.
-
-**`IndexError` contract (decided):** keep the current swallow-and-
-resample behaviour, but make it audible. The fail-loudly principle
-in `AGENTS.md` is real, but unilaterally removing the swallow
-would crash multi-building training runs that today survive a bad
-actuator on one of the buildings in the resample pool. The
-contract for Phase T is:
-
-- `step()` catches `IndexError`, **emits a `RuntimeWarning`**
-  (via `warnings.warn`, *not* just `logger.warning` — that way it
-  surfaces in CI test runs by default), returns
-  `terminated=True, reward=0.0`, and resamples on the next
-  `reset()`.
-- The wrapper docstring is updated to document this branch as
-  intentional, with a pointer to a follow-up phase (TZ2 or
-  similar) for the deeper fix: emit a B2B-defined
-  `ActuatorMismatchError` from the simulator dispatch site so the
-  wrapper can catch a narrow exception class instead of bare
-  `IndexError`.
-
-T24d therefore covers both the production-code touchup and the
-new tests in one commit.
-
-- Files: `building2building/simulator/wrappers.py` (swap
-  `logger.warning` for `warnings.warn(RuntimeWarning)` in the
-  `step()` `except IndexError` branch; update docstring); new
-  `tests/quick/test_resample_building_wrapper.py` using a tiny
-  `FactoryMockEnv(index)` that records its index. Cover:
-  (a) **Empty available_indices raises** —
-      `available_indices=[]` raises `ValueError` at construction.
-  (b) **Single-index is stable** — with
-      `available_indices=[0]`, `reset()` does not swap the inner
-      env (verify the factory is called exactly once across N
-      resets).
-  (c) **Multi-index sometimes swaps** — with
-      `available_indices=[0, 1, 2]` and a seeded `random`,
-      verify the factory is called again with a new index when
-      `reset()` draws a different one; the previous env's
-      `close()` is invoked.
-  (d) **Episode counters reset** — after a 5-step episode and a
-      `reset()`, `_episode_reward = 0.0` and `_episode_steps = 0`;
-      `_episode_count` increments.
-  (e) **`IndexError` is swallowed, warns, and resamples** — a
-      factory that produces an env whose `step()` raises
-      `IndexError` triggers a `RuntimeWarning` (assert with
-      `pytest.warns(RuntimeWarning, match="actuator")`), returns
-      `terminated=True, reward=0.0`, and the next `reset()` calls
-      the factory again with a (possibly new) index.
-  (f) **W&B no-op when inactive** — without an active `wandb` run,
-      `reset()` and `step()` must not raise and must not import
-      side-effects (use `monkeypatch.setitem(sys.modules, "wandb",
-      None)` or similar).
-- Acceptance: every code branch in the wrapper has at least one
-  assertion; the `IndexError` swallow is documented as intentional
-  in the docstring and surfaces a `RuntimeWarning` in CI; a
-  follow-up item (TZ2) is filed for the `ActuatorMismatchError`
-  refactor.
-
-#### T24e. `wrap_env_for_rl`: composition + action round-trip
-
-`wrap_env_for_rl` is the single source of truth for "wrap an env
-for RL training". Today it is only tested against a real
-`OfficeSmall` env (mis-marked as quick; see T3). After T0 lands we
-can do this properly against the minimal fixture or a stub.
-
-- Files: new `tests/quick/test_wrap_env_for_rl.py` using a `MockEnv`
-  with `action_space=Box(low=[15.0, 5.0], high=[30.0, 25.0])` and
-  `observation_space=Box(low=[10, -5], high=[30, 5])`:
-  (a) **Composition order** — with `rescale_action=True,
-      normalize_obs=True`, the *outermost* `observation_space` is
-      `Box([0, 0], [1, 1])` and the *outermost* `action_space` is
-      `Box([-1, -1], [1, 1])`. Document via assertion that
-      `RescaleAction` is inner.
-  (b) **Action round-trip** — pass `action=[-1, -1]`; capture the
-      action the inner `MockEnv.step` receives (record it in a
-      list); assert it equals `[15.0, 5.0]` (the engineering-unit
-      low). Same for `action=[1, 1]` → `[30.0, 25.0]`. Same for
-      `action=[0, 0]` → `[22.5, 15.0]` (mid-range).
-  (c) **Independence of flags** — `normalize_obs=False` leaves the
-      action stack unchanged; `rescale_action=False` leaves the
-      observation stack unchanged.
-  (d) **`metadata` passthrough** — set
-      `env.metadata["observation_names"] = [...]` on the inner env;
-      assert it is accessible on the wrapped env via `getattr`
-      fallthrough.
-- Acceptance: a wrong composition order, or a sign flip in
-  `RescaleAction`, fails. Removes the need for the (currently
-  mis-marked) `test_rl_wrappers.py` in `tests/quick/`.
-
-### T25. Document wrapper expectations in `docs/guide/wrappers.md` ✅
-
-After T24a–T24e land, the wrappers' contracts are pinned by tests.
-The user-facing wrapper guide should cite those contracts so
-contributors know what is enforced (vs. what is convention).
-
-- Files: `docs/guide/wrappers.md` (add a "Tested invariants"
-  section per wrapper).
-- Acceptance: `mkdocs build --strict` passes; each wrapper section
-  in the guide cross-links to its test file.
-
-Implemented: `docs/guide/wrappers.md` now includes a "Tested
-invariants" subsection for `NormalizeObservation`,
-`PadObservation`, `AugmentObservationWithBuildingParams`,
-`ResampleBuildingOnResetWrapper`, and `wrap_env_for_rl`, each with a
-direct cross-link to its test file; `mkdocs build --strict` passes.
-
-### T27. Final sweep: audit, delete, relocate
-
-Implemented. Shipped as a single commit (T27a checklist +
-T27b execution together):
-
-**T27a** — `tests/PHASE_T_SWEEP.md` committed with per-item
-decisions and rationale for all 11 checklist items.
-
-**T27b** — checklist executed in full:
-
-- `tests/test_get_actuators.py` deleted (dead export — no call sites).
-- `tests/test_wrappers.py` deleted (fully superseded by T24 files).
-- `tests/long/test_pipeline_single_zone_houses.py` deleted.
-- `tests/quick/test_eval_bugs.py` → `test_eval_path_layout.py`
-  (3 historical-bug-fix classes removed; `TestParseModelPath` kept).
-- `tests/long/test_observation_dimension.py` deleted — subsumed by
-  `test_observation_names_stability.py` snapshots.
-- `tests/long/test_rescale_action.py` deleted — subsumed by wrapper
-  tests + new real-env companion.
-- 7 stale fixture files git-rm'd.
-- `building2building/pipeline/steps/thermostat_setpoints.py` deleted;
-  3 exports removed from `pipeline/__init__.py` (D10 deferred stub).
-- Real-env companion tests added to `test_augment_building_params.py`,
-  `test_normalize_observation.py`, `test_wrap_env_for_rl.py`.
-- Module docstrings added to all 14 files that were missing them.
-- Items 4, 5, 8, 11: no action required (confirmed by grep).
-
-Quick-suite after: **361 passed, 43 s** wall-clock
-(was 358 tests / 51 s before the sweep).
-
-### T28. Document the new tests in `docs/about/testing.md`
-
-After T1–T27 land, update the testing page to reflect the new
-inventory and tier definitions:
-
-1. **Rewrite the tier definitions table** to use the new
-   rollout-length definition (see "Tier definitions for Phase T"
-   at the top of this section). Make explicit that `quick`
-   includes EnergyPlus.
-2. **Add a `release` tier section** linking to `tests/release/`
-   and pointing at deferred item TZ1 for the CI automation.
-3. **Remove deleted-test entries** and add new-test entries.
-4. **Update the "intentionally not covered" section** —
-   pipeline / wrappers / etc. have moved out of that list during
-   Phase T.
-5. **Surface the *Test design principles for Phase T* block** on
-   the testing page so future contributors see it without
-   having to read `TODO.md`. Reproduce the block verbatim under
-   a "Test design principles" heading in `docs/about/testing.md`
-   — mkdocs has no first-class transclude, and a stale snapshot
-   is preferable to a broken include directive. Add a note at
-   the top of the section pointing at `TODO.md` Phase T as the
-   canonical source for as long as Phase T is in flight, and
-   remove the pointer once the phase closes.
-
-- Files: `docs/about/testing.md`.
-- Acceptance: `mkdocs build --strict` passes; the gap analysis at
-  the bottom of the page shrinks visibly; the principles and the
-  three-tier definition are reproduced (or linked) on the testing
-  page.
-
-### T29. (Dropped.)
-
-A grep-based public-function coverage script was considered
-(import each `__all__` symbol, look for it in `tests/`, fail on
-zero hits) but dropped from Phase T. The grep approach has
-well-known false negatives — a symbol exercised transitively
-through `new_make_env` does not appear by name in any test — and
-in practice every false positive ends up on an exemption list
-that grows until the script is a rubber stamp.
-
-If a coverage gate becomes worthwhile after the suite has
-stabilised, the right tool is `coverage.py` with a per-file line-
-coverage threshold (e.g. `api/__init__.py ≥ 80%`,
-`pipeline/*.py ≥ 60%`), not a grep script. That decision is
-deferred until after Phase T closes and the testing.md page
-reflects the new inventory.
-
----
-
-## Phase F — File and documentation audit (read-only)
-
-**Run between Phase T and Phase R.** Output is a checklist, not
-code changes. The phase exists because once Phase D-house and
-Phase T close, the repo is *almost* OSS-ready; this is the last
-chance to catch dead code, stale comments, half-migrated docs,
-private paths leaking into public files, and inconsistent
-narration across the docs site before paper-figure runs lock the
-state of the codebase.
-
-**Rule:** F items only **read** and **note**. Do not edit. Edits
-land in a follow-up D-house or D9 commit (or in a fresh "FX"
-fix-up phase if the audit surfaces more than the existing items
-can absorb).
-
-### F1. Walk every file in `building2building/`
-
-Read every `.py`, `.yaml`, `.json`, `.md`, `.txt` under
-`building2building/` and capture, per file:
-
-1. Is the file still used? (`rg <filename> baselines/ tests/
-   tutorials/ docs/` — zero hits ⇒ candidate for deletion.)
-2. Is the docstring honest? (Does what it says it does, no
-   stale claims about removed features.)
-3. Are there `TODO` / `XXX` / `WIP` / `FIXME` comments? List them.
-4. Any hardcoded paths, magic numbers, or commented-out code?
-5. Any imports from `analysis/` or `baselines/` (which would
-   break the public/research barrier)?
-6. Is the file in the right module? (Pipeline code shouldn't
-   sit under `api/`; API code shouldn't sit under `pipeline/`,
-   etc.)
-
-- Output: `notes.md` § "Phase F file audit — building2building/"
-  — one bullet per file, with the six checks above as sub-bullets
-  where applicable. ~1 hour read-through; the output is a flat
-  list, not prose.
-- Acceptance: the section is committed; every file under
-  `building2building/` is mentioned at least once (even if the
-  mention is "fine; no notes").
-
-### F2. Walk every file in `baselines/` + `analysis/` migration audit
-
-Same checks as F1, applied to `baselines/`. Extra checks specific
-to `baselines/`:
-
-7. Does the script use only the public `building2building` API?
-   (`rg "from building2building" baselines/` — every import should
-   resolve to a public symbol per `design_doc.md` §3.2.)
-8. Are Hydra configs (`baselines/configs/`) consistent in style?
-   (One naming convention, one set of default values, no
-   `task_const_e0_legacy` leftovers.)
-9. Are the eval scripts (`eval_ppo.py`,
-   `eval_dynamics_adaptation.py`, etc.) consistent with the eval
-   schema described in `REPRODUCING.md`?
-10. **Is there any Slurm-only entry point** with no Python
-    sibling? Per Cross-phase principle 3, every `baselines/scripts/
-    *.sh` must wrap a `python -m baselines.…` invocation that
-    works on a single machine. Flag any `.sh` whose body
-    contains logic beyond a simple shell loop / array dispatch
-    over a Python entry point.
-
-**Plus a separate `analysis/` → `baselines/` migration audit:**
-
-Walk every `.py` under `analysis/` and label each file as one of:
-
-- **(stay in analysis/)** — pure exploration / decision-making
-  scaffolding whose outputs are not cited in the paper. Examples:
-  `analysis/officemedium_tuned/`, `analysis/_sfh_0014_sweep/`,
-  ad-hoc `plot_*.py` files used to make one figure that informed
-  a decision recorded in `notes.md`.
-- **(promote to baselines/)** — script whose outputs **are**
-  cited in the paper (including the appendix), or are part of a
-  paper-figure pipeline. Examples: the SAC reward-distribution
-  script that Phase R productionizes; the per-building reward-
-  decomposition plotters whose figures will land in the Phase R
-  appendix.
-- **(delete)** — dead scripts whose outputs are not in the paper
-  and whose decisions have already been baked into a YAML / a
-  TODO item / a `notes.md` entry. The originating decision should
-  still be reachable; the script itself can go.
-
-For each (promote) file, name the destination file under
-`baselines/` (or `baselines/plotting/` for plotting code), the
-config-group rewiring needed, and any `analysis.*` imports that
-need rewriting against the `building2building` public API.
-
-- Output: `notes.md` § "Phase F file audit — baselines/" (the
-  first 10 checks) and `notes.md` § "Phase F analysis/ migration
-  audit" (the migration audit, as a three-column table:
-  *file → destination → notes*).
-- Acceptance: F1-style file roll-up plus the migration table; the
-  migration table feeds **D-house FX** items that actually
-  perform the moves before Phase C starts.
-
-### F3. Walk every page in `docs/`
-
-Same checks as F1, applied to `docs/`. Extra docs-specific
-checks:
-
-10. Does `mkdocs build --strict` pass before AND after the F3
-    read-through? (Run it once to baseline, then no F3 edits
-    can break it.)
-11. Are there pages that duplicate content already in
-    `README.md`, `REPRODUCING.md`, or `notes.md`? Flag
-    duplication; D9 absorbs the de-dup work.
-12. Cross-link audit: every `building2building.<symbol>`
-    mention in `docs/` should hyperlink to the API page; every
-    paper-figure mention should hyperlink to `REPRODUCING.md`.
-13. Are there pages that still reference legacy `task1`–`task5`
-    presets? (D9 is supposed to migrate these; F3 verifies.)
-
-- Output: `notes.md` § "Phase F file audit — docs/".
-- Acceptance: same shape as F1; `mkdocs build --strict` still
-  passes.
-
-### F4. Tutorials cross-check
-
-Tutorials are 1:1 paired (`tutorials/*.py` ↔
-`docs/tutorials/*.md`, per the D9 description). For each pair,
-confirm they are still in sync after D9 lands (or note that they
-diverged again).
-
-- Output: `notes.md` § "Phase F tutorial sync check".
-- Acceptance: every pair is checked; divergences are listed with
-  a one-line note about which side is the source of truth.
-
-### F5. Roll-up + sign-off
-
-Merge F1–F4 into a single follow-up checklist under
-`notes.md` § "Phase F roll-up". Each entry from F1–F4 that is
-*not* a no-op gets mapped to either:
-
-- (a) an existing TODO item that already covers it (cite by id),
-- (b) a new "FX" follow-up item (file under "Deferred" if
-  out-of-scope for the camera-ready, or under D-house if it must
-  ship), or
-- (c) explicitly **noted-and-accepted** (the imperfection is
-  documented but won't be fixed).
-
-- Acceptance: every non-no-op note from F1–F4 has a destination
-  in (a)/(b)/(c); user signs off on the checklist before Phase R
-  starts.
-
----
-
-## Phase R — Empirical reward-coefficient study
-
-**Run between Phase F and Phase C.** Output: final values of
-`emed` and `ehigh` (and confirmation that `e0 = 0.0`), backed by
-empirical evidence on a policy ladder and demonstrated invariance
-across the `test_small` building subset.
-
-The user-confirmed methodology (2026-05-25): reuse
+The user-confirmed methodology: reuse
 `analysis/task_study/reward_design_comparison_sac.py` to train a
 SAC agent while monitoring the per-term reward distribution over
 training. The SAC trajectory itself provides the random →
 optimal policy ladder (early training is near-random, late
 training is the SAC optimum for that building).
 
-### R0. Pin the empirical question
+Because B3's outputs land in the paper appendix and `baselines/`
+is the release surface (`analysis/` is dev-only scratch), B1/B3
+also execute the relevant slice of the deferred `analysis/` →
+`baselines/` migration: the reward-study training script and its
+plotters move into `baselines/`, rewritten against the public
+`building2building` API. Any other paper-cited `analysis/` plotter
+discovered while doing this moves alongside them.
+
+### B0. Pin the empirical question
 
 **Before any rollout.** Write a short methodology note
-(`notes.md` § "Phase R methodology") that answers:
+(`notes.md` § "Phase B methodology") that answers:
 
 1. **Target invariance criterion.** What quantitative claim
-   does R make? Recommendation:
+   does B make? Recommendation:
    - For `emed`: at the SAC final checkpoint, the ratio
      `mean(temp_penalty / tau_T) / mean(emed * power_penalty /
      tau_E)` is in `[0.5, 2.0]` on every `test_small` building,
@@ -1804,19 +207,18 @@ training is the SAC optimum for that building).
      drops below `0.5` (energy term dominates) on every
      `test_small` building.
    - For `e0`: trivially satisfied (`power_penalty` term has
-     zero weight by construction); R0 only verifies that the
+     zero weight by construction); B0 only verifies that the
      temperature term behaves sensibly.
 2. **Building subset.** `test_small` per building type. For
-   compute reasons, R can restrict to a sub-subset (e.g. 2
+   compute reasons, B can restrict to a sub-subset (e.g. 2
    buildings per type, 12 total) for the *value search* and
    then validate on the full `test_small` for the chosen
-   values. Pin the split in R0.
-3. **Run period.** `full_year` (matches Phase A calibration).
-   `winter` is faster but the calibration regime is `full_year`,
-   so use `full_year`.
+   values. Pin the split in B0.
+3. **Run period.** `full_year` (matches the reward-normalizer
+   calibration regime). `winter` is faster but the calibration
+   regime is `full_year`, so use `full_year`.
 4. **SAC config.** Default from `baselines/configs/policy/sac.yaml`
-   + `baselines/configs/training/sac.yaml`. No tuning per the
-   2026-05-25 brainstorm.
+   + `baselines/configs/training/sac.yaml`. No tuning.
 5. **Coefficient grid to test.** Start with the current
    `{emed=1.0, ehigh=5.0}` plus a small grid around each:
    - `emed ∈ {0.5, 1.0, 2.0}`
@@ -1825,23 +227,22 @@ training is the SAC optimum for that building).
    (since the SAC trajectory itself spans the policy ladder, only
    one run per cell is needed).
 
-- Files: `notes.md` § "Phase R methodology".
+- Files: `notes.md` § "Phase B methodology".
 - Acceptance: every numbered choice above is pinned with a
   concrete value before any Slurm submission.
 
-### R1. Productionize the SAC reward-distribution script into `baselines/`
+### B1. Productionize the SAC reward-distribution script into `baselines/`
 
 `analysis/task_study/reward_design_comparison_sac.py` already
 trains a SAC agent and decomposes the per-step reward into
-`(temp_penalty, power_penalty)`. Since the **outputs of R3 land
-in the paper appendix**, per Cross-phase principle 1 the final
-script must live under `baselines/`, not `analysis/`. R1 is the
-productionization commit.
+`(temp_penalty, power_penalty)`. Since the **outputs of B3 land
+in the paper appendix**, the final script must live under
+`baselines/`, not `analysis/`. B1 is the productionization commit.
 
 Concretely:
 
 1. Promote the script to **`baselines/run_reward_coefficient_study.py`**
-   (or a similar name; pin in R1's first commit). Move only the
+   (or a similar name; pin in B1's first commit). Move only the
    logic that produces the appendix data; leave any prototype-
    only branches behind in `analysis/` (they remain there for the
    audit trail).
@@ -1849,7 +250,7 @@ Concretely:
    the energy-weight grid, the building subset, the run period,
    and the SAC config. The Hydra entry point becomes the
    canonical Python invocation cited in `REPRODUCING.md`.
-3. Extend the building loop to iterate the R0-pinned subset (a
+3. Extend the building loop to iterate the B0-pinned subset (a
    sub-subset of `test_small`).
 
 - Files: new
@@ -1857,21 +258,19 @@ Concretely:
   `baselines/configs/experiment/reward_coefficient_study.yaml`;
   the prototype under
   `analysis/task_study/reward_design_comparison_sac.py` is
-  preserved as historical artefact (D-house FX may later move it
-  alongside the rest of the migration). Update `REPRODUCING.md`
+  preserved as historical artefact. Update `REPRODUCING.md`
   in the same commit (new "Appendix: reward-coefficient study"
-  section under the Phase B/A block, with the Python
-  invocation).
+  section, with the Python invocation).
 - Acceptance: a dry-run with one building × one energy weight
   produces the expected NPZ artefact under
   `outputs/reward_coefficient_study/`; the file size, schema,
-  and column names match the prototype's output (so R3's
+  and column names match the prototype's output (so B3's
   plotting code can read it).
 
-### R2. Run the sweep
+### B2. Run the sweep
 
 The user runs the sweep from the Python entry point committed in
-R1. The canonical invocation in `REPRODUCING.md` is the
+B1. The canonical invocation in `REPRODUCING.md` is the
 single-machine command:
 
     python -m baselines.run_reward_coefficient_study \
@@ -1888,11 +287,11 @@ convenience only) loops the Python entry point per cell.
   valid NPZ under `outputs/reward_coefficient_study/`; total
   compute documented in `notes.md`.
 
-### R3. Aggregate + plot
+### B3. Aggregate + plot
 
-The plotting code is part of the OSS release per Cross-phase
-principle 1 — it produces the paper appendix figures. Land it
-under `baselines/plotting/`, not `analysis/`.
+The plotting code is part of the OSS release (it produces the
+paper appendix figures), so it lands under `baselines/plotting/`,
+not `analysis/`.
 
 Produce:
 
@@ -1906,149 +305,30 @@ Produce:
 3. **Per-building invariance plot.** At the chosen final `emed`
    and `ehigh`: the ratio per building, error bars over
    training-final variance, on one axis. Reader sees that the
-   ratio sits in the R0-pinned window on every building.
+   ratio sits in the B0-pinned window on every building.
 
 - Files: new
   `baselines/plotting/plot_reward_coefficient_study.py`;
-  appendix-quality figures committed under `figures/appendix/`
-  (or whatever the paper's existing appendix figure directory is).
+  appendix-quality figures saved to the plotting output directory.
   Update `REPRODUCING.md` with the plotting command alongside
-  R1's training command.
+  B1's training command.
 - Acceptance: the three figures regenerate from one Python
-  command; the values pinned in R0 are visibly satisfied (or, if
-  not, R3 recommends a different pair); the figures are at
+  command; the values pinned in B0 are visibly satisfied (or, if
+  not, B3 recommends a different pair); the figures are at
   paper-appendix quality (font size, axis labels, units).
 
-### R4. Pin final values + update presets
+### B4. Pin final values + update presets
 
-Based on R3, commit the final `emed` and `ehigh` values to
+Based on B3, commit the final `emed` and `ehigh` values to
 `building2building/config/tasks.py` (in `TASK_PRESETS`'s
 `NormalizedDeadbandRewardConfig.energy_weight` fields for the
 `task_{const,occ,rand}_{emed,ehigh}` presets). Update the
-README task-preset table, the docstrings, and the paper
-appendix that cites these values.
+README task-preset table and the docstrings that cite these
+values.
 
 - Files: `building2building/config/tasks.py`, `README.md` (task
-  table values), `docs/api/types.md` (if it cites the values),
-  `paper/main.tex` appendix (the chosen values + a back-reference
-  to the R3 figure). The main-text task-table caption is captured
-  under C5a.
-- Acceptance: the values in the code match the R3 conclusion;
-  `pytest -m quick tests/quick/test_task_presets.py` passes; the
-  values are cited (with a forward-reference to the R3 figure)
-  in the paper appendix; `REPRODUCING.md` § "Appendix: reward-
-  coefficient study" is updated to lock the values.
-
----
-
-## Landing the `feature/reward-normalization` branch
-
-The original "split the 5-commit branch into 4 PRs" plan
-(L0a / L0b / L1 / L2 / L3 / L4) is **superseded** as of
-2026-05-25. Since that plan was written, the branch has absorbed
-D2, D3, D4, D5, B1, the RL-wrapper refactor, the SAC baseline,
-and the Phase-T draft. It is no longer a tidy 4-PR stack.
-
-**Current intent (revisit before pushing):** land the branch as
-one or two large PRs against `dev` once Phase M / D-house / T / F
-close — not as a multi-PR stack. Phase D16's `REPRODUCING.md`
-parity sweep is the natural last commit before opening the PR.
-
-- Acceptance (revised): one or two merge commits on `dev`; the
-  resulting `dev` tip can rebuild every artefact cited in
-  `REPRODUCING.md` via its Python entry points.
-
----
-
-## Deferred — pick up in a later phase
-
-### TZ1. CI wiring for `tests/release/`
-
-Phase T introduces a third pytest tier (`release`) for data-integrity
-checks (T15, T16) that require the published HuggingFace dataset and
-should not run on every push. The marker, the directory, and the tests
-themselves land in Phase T (T15.0–T16), but the *automation* — a
-GitHub Action (or equivalent) that runs `pytest -m release` on
-release-candidate tags, plus a one-paragraph entry in `REPRODUCING.md`
-explaining the manual invocation — is deferred so Phase T stays
-focused on the test suite itself.
-
-- Files: `.github/workflows/release-checks.yml` (new),
-  `REPRODUCING.md` (add a "Release validation" section pointing at
-  the workflow and the manual `pytest -m release` command).
-- Acceptance: pushing a tag matching `v*` triggers the workflow;
-  failures block the release; `REPRODUCING.md` documents both the
-  automated and manual paths.
-
-### TZ2. Emit `ActuatorMismatchError` from the simulator dispatch site
-
-Phase T's T24d keeps the existing `IndexError` swallow in
-`ResampleBuildingOnResetWrapper.step` (with a `RuntimeWarning`) as
-an explicit, documented backwards-compat decision. The deeper fix
-is to stop catching a bare `IndexError` — which can mask unrelated
-bugs in the inner env — and instead catch a B2B-defined exception
-class raised from the precise call site where the actuator-set
-mismatch is detectable.
-
-- Files: define `ActuatorMismatchError` in
-  `building2building/simulator/` (next to the dispatch site);
-  raise it from the dispatch path that currently lets `IndexError`
-  propagate; narrow the wrapper's `except` clause from
-  `IndexError` to `ActuatorMismatchError`; update T24d's test (e)
-  to assert on the narrower exception class.
-- Acceptance: a non-actuator `IndexError` raised by the inner env
-  now propagates instead of being swallowed; T24d's
-  `pytest.warns(RuntimeWarning, match="actuator")` test still
-  passes; the `RuntimeWarning` message names the building index
-  and the mismatched actuator.
-
-### TZ3. (Conditional) Parallelize the multi-zone leak test
-
-Filed **only if** T22a's measurement on `OfficeMedium` shows that
-even `_N = 3` exceeds the 5-minute budget. T22b in that case
-ships a parallelization refactor (subprocess fan-out via
-`multiprocessing`, or a `pytest-xdist`-style worker pool) and
-defers the actual OfficeMedium parametrize to TZ3.
-
-- Files: `tests/long/test_env_leak.py` (parametrize
-  `_BUILDING_TYPE` over `SingleFamilyHouse` and `OfficeMedium`
-  using the new parallel harness from T22b).
-- Acceptance: OfficeMedium leak coverage is in the long suite
-  with `_N ≥ 5` and total runtime under 5 minutes on the
-  parallel harness; the per-cycle wall-clock measurement is
-  documented in the test's module docstring and the commit
-  message.
-- Do not file this item until T22a's measurement is recorded. If
-  T22b's measurement permits `_N ≥ 5` without parallelization,
-  TZ3 is moot and should not be filed.
-
-### TZ4. Coverage gate via `coverage.py` line-coverage thresholds
-
-Phase T's T29 was dropped in favour of deferring the coverage-
-gate question until after the suite has stabilised. Once Phase T
-closes and `docs/about/testing.md` reflects the new inventory
-(T28), revisit whether a coverage gate is worthwhile, and if so
-implement it with `coverage.py` per-file thresholds — not a
-grep-based script.
-
-The right framing is "lines covered" per file, with thresholds
-calibrated against the post-Phase-T baseline (so the gate
-ratchets up over time, not down). A reasonable starting matrix:
-
-- `building2building/api/__init__.py` ≥ 80 %
-- `building2building/pipeline/*.py` ≥ 60 %
-- `building2building/simulator/wrappers.py` ≥ 90 % (Phase T
-  brings this close to 100 % via T24a–T24e)
-- Everything else: no hard threshold, but a `coverage report`
-  artifact uploaded on every CI run for trend visibility.
-
-- Files: `pyproject.toml` (configure `[tool.coverage]` with
-  `source`, `omit`, and per-file thresholds), CI workflow
-  (run `coverage run -m pytest -m quick && coverage report
-  --fail-under=...`), `docs/about/testing.md` (one paragraph
-  pointing at the gate and listing the thresholds).
-- Acceptance: a deliberate coverage-reducing change in any
-  file with a threshold fails CI; the trend artifact is
-  visible on every CI run; the gate is documented.
-- Do not file before Phase T closes — calibrating thresholds
-  against a moving suite produces an unstable gate.
+  table values), `docs/api/types.md` (if it cites the values).
+- Acceptance: the values in the code match the B3 conclusion;
+  `pytest -m quick tests/quick/test_task_presets.py` passes;
+  `REPRODUCING.md` § "Appendix: reward-coefficient study" is
+  updated to lock the values.

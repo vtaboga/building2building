@@ -5,9 +5,9 @@
 Stable project reference. Slow-changing.
 
 Companions: `AGENTS.md` (working principles), `notes.md` (in-flight
-state, decisions, gotchas), `TODO.md` (atomic action items),
-`paper/main.tex` (authoritative for problem statement and final
-results), `paper/reviewer_feedback.md`.
+state, decisions, gotchas), `TODO.md` (atomic action items). The
+LaTeX paper (authoritative for problem statement and final results)
+is maintained outside this repository.
 
 ---
 
@@ -31,7 +31,7 @@ is hidden or documented as a hyperparameter. Secondary: building-energy
 researcher extending the benchmark via `building2building/pipeline/`
 (intentionally separate from the user-facing surface).
 
-### Benchmark problems (authoritative defs in `paper/main.tex`)
+### Benchmark problems (authoritative defs in the paper)
 
 | Problem | Varied | Held constant |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ researcher extending the benchmark via `building2building/pipeline/`
   deterministic obs normalization (`observation_space.low/high`) over
   running stats; committed `baseline_returns.csv` over regenerate;
   concrete seeds over `null`. Every shipped number reproducible from
-  one command — see [`REPRODUCING.md`](REPRODUCING.md) (Phase D).
+  one command — see [`REPRODUCING.md`](REPRODUCING.md).
 - **Fail loudly** (per `AGENTS.md`). No silent fallbacks, no swallowing
   try/except. Sole sanctioned non-fatal signal: the off-calibration
   `RuntimeWarning` in `simulator/__init__.py` (deduped, never
@@ -87,11 +87,11 @@ building2building/        # Public package
 baselines/                # Paper experiments (use only public API)
 ├── controllers/, configs/ (Hydra), train_*.py, eval_*.py, tune_*.py,
 ├── plotting/, utils/     # make_rl_env_fn lives in utils/training.py
-tests/, tutorials/, docs/, paper/
+tests/, tutorials/, docs/
 ```
 
-Working/scratch (gitignored, retained as tripwires per
-`notes.md` § Repo hygiene): `analysis/` (load-bearing — see notes),
+Working/scratch (gitignored): `analysis/` (load-bearing — dev
+scratchpad whose paper-cited scripts migrate into `baselines/`),
 `scripts/`. Do not recreate:
 `scrap/`, `staging/`, `plans/`, `refactoring/`, `wandb/`, `site/`,
 `logs/`, `.venv/`.
@@ -130,18 +130,19 @@ Working/scratch (gitignored, retained as tripwires per
 
 ## 4. Testing
 
-Three tiers, intentionally separated:
+Three tiers, separated by **rollout length** — not EnergyPlus
+availability (EP is a hard dependency, wired up once at collection).
+Per-file inventory and design principles: `docs/about/testing.md`.
 
-| Tier | What | Where | Runs EP? | CI |
-| --- | --- | --- | --- | --- |
-| 1 — API contract | Pins the §3.2 public surface | `tests/quick/test_api*.py`, `test_new_api.py`, `test_gym_registration.py`, `test_climate_zones.py`, `test_data_registry.py`, `test_selection_and_env_creation.py`, `test_types.py` | No (fixtures) | Every PR |
-| 2 — Pure logic | Reward, normalizers, scoring, schedules, wrappers | `tests/quick/test_*.py` (rest) | No | Every PR |
-| 3 — Integration | End-to-end EP on a small subset | `tests/long/*` | Yes | Nightly / pre-release |
+| Marker | What | Gate |
+| --- | --- | --- |
+| `quick` | No / short rollout (≤ ~20 steps); EP + cached HF fixtures allowed. Each test a few seconds. | Every PR (CI) |
+| `long` | Multi-day rollouts, or per-cycle leak / lifecycle iteration. | `B2B_RUN_LONG_TESTS=1` |
+| `release` | Dataset / artifact integrity vs the published HF dataset. | `tests/release/`, opt-in `-m release` |
 
-Tier-1 changes = deliberate API change ⇒ require `CHANGELOG.md` entry.
-Hydra config changes use 50-step smoke configs in
-`tests/quick/test_train_*_smoke.py`. Targets: Tier 1+2 < 5 min;
-Tier 3 < 1 h. (Phase D7 wires GitHub Actions.)
+Public-surface (§3.2) changes are deliberate API changes ⇒ require a
+`CHANGELOG.md` entry. CI (GitHub Actions) runs `pytest -m quick` on
+every push.
 
 ---
 
@@ -160,7 +161,7 @@ reward.
 
 This is **not** the core contribution (the benchmark + three
 generalization questions are), but deserves its own paper box and
-docs page (TODO D14).
+docs page.
 
 ### Formula
 
@@ -186,28 +187,20 @@ implementation map): `notes.md` § "Reward — calibration regime and impl map".
 
 ## 6. Roadmap
 
-Four phases. Hard cross-phase constraint: **D2 (legacy reward
-deletion) precedes C1 (regen `baseline_returns.csv`)**. Inside a
-phase, items are reorderable. Atomic items: `TODO.md`. In-flight
-status: `notes.md`.
+The reward is finalized (`reward_normalizers.yaml`; `(τ_T, τ_E)`
+locked) and the OSS-readiness phases are **complete**: M (OfficeMedium
+OA-mixer fix), D (LICENSE, CI, legacy-reward deletion, `REPRODUCING.md`,
+docs/tutorial migration, benchmark docs pages), T (test suite), F
+(file/doc audit). Two phases remain — atomic items in `TODO.md`,
+in-flight status in `notes.md`:
 
-- **Phase A — Finalize the reward.** ✓ Calibration controller chosen:
-  `reward_normalizers.yaml` (SAC-warmup uniform-random policy).
-  `(τ_T, τ_E)` are locked; downstream re-runs can proceed.
-- **Phase B — Stabilize RL training.** B0 first: fix EnergyPlus
-  resource leak. Then reconcile SAC config, re-tune PPO `target_kl`,
-  validate on `full_year` (not winter).
-- **Phase C — Re-run paper experiments.** Regen
-  `baseline_returns.csv`, then PPO specialists, dynamics adaptation,
-  cross-domain Amorpheus. Update `paper/main.tex` figures/tables
-  (camera-ready scope rule per `AGENTS.md`).
-- **Phase D — OSS readiness.** Two parallel tracks:
-  - **D-API**: freeze public surface, label Tier-1 contract tests,
-    `REPRODUCING.md`, tutorial/docs migration off legacy tasks,
-    benchmark-problem docs pages.
-  - **D-house**: LICENSE, CI, legacy reward deletion (D2 — precedes
-    C1), README refresh, `black` + `pyright`, drop
-    `requirements.txt`.
+- **Phase A — Re-run paper experiments** on the final OSS codebase:
+  regen `baseline_returns.csv`, PPO + SAC specialists, dynamics
+  adaptation, cross-domain Amorpheus. Produces the paper figures/CSVs.
+- **Phase B — Empirical reward-coefficient study:** pin the final
+  `emed` / `ehigh` energy weights via a SAC policy ladder and validate
+  invariance across `test_small`. **B precedes A** (A consumes the
+  locked coefficients).
 
 ---
 
