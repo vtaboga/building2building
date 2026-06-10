@@ -161,7 +161,7 @@ VAV_ZONE_NO_COOLING = NodeType("vav_zone_no_cooling",
     _act_low=(0.0, 10.0), _act_high=(1.0, 35.0),              # flow_frac, htg_sp (°C) — clg_sp fixed
     _attr_low=_ZONE_ATTR_LOW, _attr_high=_ZONE_ATTR_HIGH)
 VAV_SUPPLY = NodeType("vav_supply",
-    _act_low=(10.0,),  _act_high=(55.0,))                     # supply_air_temp (°C)
+    _act_low=(10.0, 0.0),  _act_high=(55.0, 5.0))             # supply_air_temp (°C), oa_mass_flow (kg/s)
 HEATING_ZONE = NodeType("heating_zone",
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
     _act_low=(10.0,),  _act_high=(35.0,),                     # htg_sp (°C)
@@ -520,12 +520,16 @@ def build_morphology(
         elif eq_type == "vavsystem":
             supply_ad = eq.supply_temp_setpoint  # type: ignore[attr-defined]
             supply_ai = _find_action_index_for_actuator(
-                action_names,
-                supply_ad.component_type,
-                supply_ad.control_type,
-                supply_ad.component_name,
+                action_names, *_ad_triple(supply_ad)
             )
-            supply_act = (supply_ai,) if supply_ai is not None else ()
+            # Per-loop OA-mixer actuator shares the supply node (both control
+            # the air loop, not a single zone). Order matches VAV_SUPPLY's
+            # action schema: (supply_air_temp, oa_mass_flow).
+            oa_ad = eq.oa_mass_flow  # type: ignore[attr-defined]
+            oa_ai = _find_action_index_for_actuator(
+                action_names, *_ad_triple(oa_ad)
+            )
+            supply_act = tuple(i for i in (supply_ai, oa_ai) if i is not None)
             supply_id = f"supply:{supply_ad.component_name}"
             nodes.append(MorphologyNode(supply_id, VAV_SUPPLY, (), supply_act))
 
