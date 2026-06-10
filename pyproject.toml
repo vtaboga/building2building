@@ -63,7 +63,7 @@ include = ["building2building*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-building2building = ["scores/*.csv"]
+building2building = ["scores/*.csv", "data/*.yaml"]
 
 [tool.black]
 line-length = 88
