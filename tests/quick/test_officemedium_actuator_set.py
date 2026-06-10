@@ -1,7 +1,5 @@
 """Regression test for the OfficeMedium OA-mixer actuator emission.
 
-Phase M item M1 (see TODO.md and notes.md § "OfficeMedium OA-mixer fix").
-
 Pins:
 - ``make_vav_system_controllable`` emits exactly one
   ``Outdoor Air Controller × Air Mass Flow Rate`` actuator per air loop,
@@ -11,10 +9,9 @@ Pins:
   flow, htg, clg, OA mass flow) -- i.e. every actuator is on the
   always-on regime installed by the existing fan/availability path.
 
-The fixture ``tests/fixtures/minimal_vav/building.epjson`` is the DOE
-Reference OfficeMedium prototype (3 air loops VAV_1/VAV_2/VAV_3, each
-with a single Controller:OutdoorAir).  Its provenance is the sibling
-RL2GNNs repo's ``officerl/data/building.epjson``.
+The fixture ``tests/fixtures/minimal_officemedium/building.epjson`` is the DOE
+Reference OfficeMedium prototype (3 air loops PACU_VAV_bot/mid/top, each
+with a single Controller:OutdoorAir). 
 """
 
 from __future__ import annotations
@@ -32,7 +29,7 @@ from building2building.pipeline.actuators import (
 )
 
 FIXTURE_PATH = (
-    Path(__file__).resolve().parents[1] / "fixtures" / "minimal_vav" / "building.epjson"
+    Path(__file__).resolve().parents[1] / "fixtures" / "minimal_officemedium" / "building.epjson"
 )
 
 
@@ -69,11 +66,12 @@ def test_three_vav_loops_yield_three_oa_actuators(
         oa_actuators.append(vav.oa_mass_flow)
 
     # All three OA actuators reference one of the canonical
-    # Controller:OutdoorAir names from the DOE OfficeMedium prototype.
+    # Controller:OutdoorAir names from the DOE OfficeMedium prototype
+    # (one packaged air-conditioning unit per floor: bot / mid / top).
     expected_controller_names = {
-        "VAV_1_OA_Controller",
-        "VAV_2_OA_Controller",
-        "VAV_3_OA_Controller",
+        "PACU_VAV_bot_OA_Controller",
+        "PACU_VAV_mid_OA_Controller",
+        "PACU_VAV_top_OA_Controller",
     }
     assert {a.component_name for a in oa_actuators} == expected_controller_names
 

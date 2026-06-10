@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import itertools
+import json
+from pathlib import Path
+
 import numpy as np
 import pytest
+from cattrs import structure
 
 from building2building.benchmarks import (
     ActionSpaceTransfer,
@@ -20,9 +25,16 @@ from building2building.benchmarks.action_space_transfer import (
 )
 from building2building.benchmarks.cross_domain import CROSS_DOMAIN_PRESETS
 from building2building.benchmarks.dynamics_adaptation import DYNAMICS_ADAPTATION_PRESETS
-from building2building.pipeline.actuators import UnitarySystem, VAVSystem, VAVTerminal
+from building2building.pipeline.actuators import (
+    AnyEquipment,
+    UnitarySystem,
+    VAVSystem,
+    VAVTerminal,
+)
 from building2building.simulator.action_spaces import hvac_action_space
 from building2building.types import ActuatorDescription
+
+_FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
 
 @pytest.mark.quick
@@ -372,6 +384,33 @@ class TestHvacActionSpaceAdditionalFixed:
         assert result.agent_actuators[0].component_name == "fan"
         assert len(result.fixed_indices) == 2
         assert set(result.fixed_indices) == {1, 2}
+
+
+@pytest.mark.quick
+class TestHvacActionSpaceFixtureCoverage:
+    @pytest.mark.parametrize(
+        ("fixture_name", "expected_action_dim"),
+        [
+            ("minimal_officemedium", 36),
+            ("minimal_officesmall", 10),
+            ("minimal_restaurantfastfood", 4),
+            ("minimal_retailstandalone", 9),
+            ("minimal_warehouse", 5),
+            ("minimal_singlefamilyhouse", 2),
+        ],
+    )
+    def test_hvac_action_space_supports_all_advertised_hvac_types(
+        self,
+        fixture_name: str,
+        expected_action_dim: int,
+    ) -> None:
+        equipment_path = _FIXTURES_DIR / fixture_name / "equipment.json"
+        equipment = structure(json.loads(equipment_path.read_text()), list[AnyEquipment])
+        actuators = list(
+            itertools.chain.from_iterable(eq.actuator_descriptions() for eq in equipment)
+        )
+        action_space = hvac_action_space(actuators)
+        assert len(action_space.agent_actuators) == expected_action_dim
 
 
 @pytest.mark.quick

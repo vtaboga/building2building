@@ -69,8 +69,14 @@ class ObservationFlattener:
     flatten_transform: Transform
 
     def __call__(self, obs) -> np.ndarray:
-        """Flatten *obs* into a 1-D ``np.ndarray``."""
-        return np.array(self.flatten_transform(obs))
+        """Flatten *obs* into a 1-D ``np.ndarray``.
+
+        Cast to ``float32`` so the observation matches the declared
+        ``Box`` space dtype (Gymnasium's ``Box`` defaults to ``float32``);
+        a ``float64`` array fails ``observation_space.contains`` on the
+        dtype check even when every value is within bounds.
+        """
+        return np.array(self.flatten_transform(obs), dtype=np.float32)
 
 
 @dataclass
@@ -294,6 +300,19 @@ _PEAK_HVAC_POWER_W_M2 = 200.0
 is derived as ``_PEAK_HVAC_POWER_W_M2 / timesteps_per_hour`` so that it
 scales automatically with the simulation timestep."""
 
+_CONTROLLED_ZONE_TEMP_BOUND = (10.0, 45.0)
+"""Zone-air-temperature observation bound (°C) for HVAC-controlled zones.
+These zones are held within a comfort band, so a tight bound keeps
+``NormalizeObservation`` accurate for the features the agent acts on."""
+
+_UNCONTROLLED_ZONE_TEMP_BOUND = (-40.0, 70.0)
+"""Zone-air-temperature observation bound (°C) for *uncontrolled* zones
+(e.g. vented attics, garages, plenums).  These free-float with the weather
+and overshoot outdoor temperature via solar gain, so they need a far wider
+bound than the conditioned space (outdoor temperature itself spans
+``(-30, 50)``).  Applying the conditioned bound here would put real
+observations outside the declared space."""
+
 
 def flat_observation_info(
     ont: Ontology,
@@ -384,14 +403,17 @@ def flat_observation_info(
                 (10.0, 35.0),
             )
 
+    controlled_zone_set = set(controlled_zones)
     template = {
         "temperature": {
-            z.toPython(): (
-                f"ZONE AIR TEMPERATURE {z.toPython()}",
-                VariableHole("ZONE AIR TEMPERATURE", z.toPython()),
-                (10.0, 45.0),
+            zone_name: (
+                f"ZONE AIR TEMPERATURE {zone_name}",
+                VariableHole("ZONE AIR TEMPERATURE", zone_name),
+                _CONTROLLED_ZONE_TEMP_BOUND
+                if zone_name in controlled_zone_set
+                else _UNCONTROLLED_ZONE_TEMP_BOUND,
             )
-            for z in ont.zones()
+            for zone_name in sorted(z.toPython() for z in ont.zones())
         },
         "zone_occupancy": occupancy_template,
         "target_temperature": target_template,
@@ -399,7 +421,10 @@ def flat_observation_info(
             "time_of_day": (
                 "time_of_day",
                 FunctionHole(lifted_current_time),
-                (1.0, 25.0),
+                # EnergyPlus current_time() returns fractional hours in
+                # (0, 24]; the first step of each day is ~0.08, so the low
+                # bound must be 0.0, not 1.0.
+                (0.0, 25.0),
             ),
             "day_of_week": (
                 "day_of_week",
@@ -466,7 +491,9 @@ def flat_observation_info(
     )
 
 
-def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
+def dict_observation_info(
+    ont: Ontology, *, area: float, controlled_zones: list[str]
+) -> Transform:
     """Build a dict-based observation transform (non-flattened).
 
     Unlike :func:`flat_observation_info`, this returns a nested
@@ -477,20 +504,30 @@ def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
         ont: Building ontology providing zone metadata.
         area: Building conditioned floor area (m²), used to normalise
             energy readings.
+        controlled_zones: Names of the HVAC-controlled zones. Controlled
+            zones get the tight :data:`_CONTROLLED_ZONE_TEMP_BOUND`;
+            free-floating zones get the wider
+            :data:`_UNCONTROLLED_ZONE_TEMP_BOUND`, so that real readings
+            stay inside the declared space (mirrors
+            :func:`flat_observation_info`).
 
     Returns:
         A ``Transform`` whose codomain is a Gymnasium ``Dict`` space.
     """
+    controlled_zone_set = set(controlled_zones)
     return TransformDictSpace(
         {
             "temperature": TransformDictSpace(
                 {
-                    z.toPython(): TransformScalarToArray(
-                        VariableHole("ZONE AIR TEMPERATURE", z.toPython()),
-                        10.0,
-                        45.0,
+                    zone_name: TransformScalarToArray(
+                        VariableHole("ZONE AIR TEMPERATURE", zone_name),
+                        *(
+                            _CONTROLLED_ZONE_TEMP_BOUND
+                            if zone_name in controlled_zone_set
+                            else _UNCONTROLLED_ZONE_TEMP_BOUND
+                        ),
                     )
-                    for z in ont.zones()
+                    for zone_name in sorted(z.toPython() for z in ont.zones())
                 }
             ),
             "time": TransformDictSpace(

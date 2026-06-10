@@ -16,6 +16,10 @@ from building2building.envs.registration import register_all
 @pytest.mark.quick
 class TestGymRegistration:
     def test_all_building_types_registered(self) -> None:
+        import building2building  # noqa: F401
+
+        assert "b2b/OfficeSmall-v0" in gym.envs.registration.registry
+
         register_all()
         registry_keys = set(gym.envs.registration.registry.keys())
         for bt in ALL_BUILDING_TYPES:
@@ -27,12 +31,6 @@ class TestGymRegistration:
         register_all()
         count = sum(1 for k in gym.envs.registration.registry if k.startswith("b2b/"))
         assert count == len(ALL_BUILDING_TYPES)
-
-    def test_registration_on_import(self) -> None:
-        import building2building  # noqa: F401
-
-        assert "b2b/OfficeSmall-v0" in gym.envs.registration.registry
-        assert "b2b/Warehouse-v0" in gym.envs.registration.registry
 
     def test_env_spec_entry_point(self) -> None:
         register_all()

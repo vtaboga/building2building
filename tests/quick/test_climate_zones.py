@@ -97,25 +97,11 @@ class TestBuildingInfoClimateZone:
 @pytest.mark.quick
 class TestMetadataColumnGuard:
     def test_missing_column_raises(self, fake_metadata: pd.DataFrame) -> None:
-        reg = BuildingRegistry()
         stripped = fake_metadata.drop(columns=["climate_zone"])
-        reg._metadata = None
-        import building2building.data.registry as registry_mod
+        from building2building.data.registry import _validate_metadata
 
-        orig_read_parquet = registry_mod.pd.read_parquet
-        orig_download_metadata = registry_mod.download_metadata
-
-        def fake_read_parquet(_path):  # noqa: ARG001
-            return stripped
-
-        registry_mod.pd.read_parquet = fake_read_parquet  # type: ignore[assignment]
-        registry_mod.download_metadata = lambda: Path("/dev/null")  # type: ignore[assignment]
-        try:
-            with pytest.raises(RuntimeError, match="climate_zone"):
-                reg._ensure_loaded()
-        finally:
-            registry_mod.pd.read_parquet = orig_read_parquet  # type: ignore[assignment]
-            registry_mod.download_metadata = orig_download_metadata  # type: ignore[assignment]
+        with pytest.raises(RuntimeError, match="climate_zone"):
+            _validate_metadata(stripped)
 
 
 @pytest.mark.quick
@@ -141,8 +127,7 @@ class TestPublicApi:
 class TestRealDatasetClimateZones:
     """End-to-end check against the published ``vtaboga/building2building_dataset``.
 
-    Requires network access and that Phase A's re-published parquet (with the
-    ``climate_zone`` column and ``San.Diego`` rename) is available.
+    Requires network access
     """
 
     def test_all_multizone_rows_have_climate_zone(self) -> None:

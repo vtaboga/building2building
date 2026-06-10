@@ -1,0 +1,46 @@
+[
+    {
+        "zone": "Dining",
+        "actuators": [
+            {
+                "component_type": "Fan",
+                "control_type": "Fan Air Mass Flow Rate",
+                "component_name": "PSZ-AC_1:1_addAQ Fan",
+                "units": "[kg/s]",
+                "lower_bound": 0,
+                "upper_bound": 15.0
+            },
+            {
+                "component_type": "Schedule:Constant",
+                "control_type": "Schedule Value",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (5)",
+                "units": "Temperature",
+                "lower_bound": 5.0,
+                "upper_bound": 60.0
+            }
+        ],
+        "equipment_type": "unitarysystem"
+    },
+    {
+        "zone": "Kitchen",
+        "actuators": [
+            {
+                "component_type": "Fan",
+                "control_type": "Fan Air Mass Flow Rate",
+                "component_name": "PSZ-AC_2:2_addAQ Fan",
+                "units": "[kg/s]",
+                "lower_bound": 0,
+                "upper_bound": 15.0
+            },
+            {
+                "component_type": "Schedule:Constant",
+                "control_type": "Schedule Value",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (10)",
+                "units": "Temperature",
+                "lower_bound": 5.0,
+                "upper_bound": 60.0
+            }
+        ],
+        "equipment_type": "unitarysystem"
+    }
+]

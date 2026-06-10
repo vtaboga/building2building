@@ -128,12 +128,30 @@ def _load_splits(
 ) -> dict[BuildingType, list[str]]:
     """Return the union of train ∪ test ∪ test_small processed IDs per type.
 
-    Reads ``splits.json`` from the HF cache (downloaded on first call).
-    Raises ``KeyError`` if a requested building type is absent from any
-    split set.
+    Sourced from the registry's split view rather than the raw
+    ``splits.json``, so the curated ``test_small`` subset is always
+    represented: when a published ``splits.json`` omits it (e.g. after a
+    dataset regeneration that did not re-upload the manifest), the registry
+    derives it deterministically from ``test`` (see
+    :func:`building2building.data.registry.derive_test_small_split`).
+    ``test_small`` ⊆ ``test`` so the union is unchanged, but test_small stays
+    first-class throughout the pipeline.
+
+    Going through the registry (rather than reading ``splits.json`` directly)
+    additionally loads ``metadata.parquet`` via ``download_metadata()`` — the
+    registry needs it to derive ``test_small`` when the manifest omits it. Like
+    ``download_splits()`` (already used by the previous implementation), this is
+    served from the HuggingFace cache and is offline-safe once the dataset has
+    been fetched, which any real generation run already does. The
+    ``get_registry`` import is function-local because ``registry`` does not
+    import this module — there is no import cycle, but keeping it local avoids
+    one if that ever changes.
+
+    Raises ``KeyError`` if a requested building type is absent from a split.
     """
-    splits_path = download_splits()
-    splits: dict = json.loads(splits_path.read_text(encoding="utf-8"))
+    from building2building.data.registry import get_registry
+
+    splits = get_registry().splits
 
     result: dict[BuildingType, list[str]] = {}
     for bt in building_types:
@@ -143,7 +161,7 @@ def _load_splits(
             split_data = splits.get(split_name, {})
             if bt not in split_data:
                 raise KeyError(
-                    f"Building type {bt!r} not found in splits.json "
+                    f"Building type {bt!r} not found in splits "
                     f"split {split_name!r}. "
                     f"Available: {sorted(split_data.keys())}"
                 )

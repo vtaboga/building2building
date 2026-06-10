@@ -2,6 +2,11 @@
 for an OfficeSmall building, and that the target temperature responds to
 occupancy when ``target_temperature_mode`` is ``"occupancy"``.
 
+Built through the public ``new_make_env`` entry point so the requested
+``run_period`` is actually applied to the simulation (the lower-level
+``make_env_from_config`` does not patch the run period — see
+``building2building.api.new_make_env`` / ``_patch_epjson_run_period``).
+
 Requires EnergyPlus — run with ``B2B_RUN_LONG_TESTS=1 pytest -s tests/long/test_occupancy_observation.py``.
 """
 
@@ -13,15 +18,20 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
-from building2building.envs.factory import make_env_from_config
-from building2building.types import BaseRewardConfig, TaskConfig
+import building2building as b2b
 
 pytestmark = pytest.mark.long
 
-OCCUPIED_C = 22.0
+# Values come from the ``task_occ_e0`` preset (occupancy mode, seasonal
+# unoccupied policy).  Occupied setpoint is 21 C; the unoccupied setpoint
+# in the winter run period is the seasonal-winter value, 18 C.
+OCCUPIED_C = 21.0
 UNOCCUPIED_C = 18.0
-N_STEPS = 200  # ~2 days at 4 timesteps/hour
+TIMESTEPS_PER_HOUR = 12
+# The winter run period starts Jan 1 (a Sunday + New Year holiday), so an
+# office is unoccupied for the whole first day.  Roll out 4 days to reach
+# weekday daytime occupancy (the first occupied step is ~06:00 on Jan 2).
+N_STEPS = TIMESTEPS_PER_HOUR * 24 * 4
 
 
 def _requires_long_runtime() -> None:
@@ -29,30 +39,17 @@ def _requires_long_runtime() -> None:
         pytest.skip("Set B2B_RUN_LONG_TESTS=1 to run long simulation tests")
 
 
-def _make_office_small_env(tmp_path: Path) -> tuple:
-    task = TaskConfig.from_dict(
-        {
-            "run_period": "winter",
-            "target_temperature_mode": "occupancy",
-            "default_zone_target_temperature": {
-                "occupied_c": OCCUPIED_C,
-                "unoccupied_c": UNOCCUPIED_C,
-            },
-        }
+def _make_office_small_env(tmp_path: Path):
+    return b2b.new_make_env(
+        "OfficeSmall",
+        split="train",
+        index=0,
+        task="task_occ_e0",
+        run_period="winter",
+        timesteps_per_hour=TIMESTEPS_PER_HOUR,
+        max_episode_steps=N_STEPS,
+        eplus_output_dir=tmp_path / "eplus",
     )
-    config = EnvBuildConfig(
-        dataset_selection=DatasetSelectionConfig(
-            building_type="OfficeSmall",
-            split="train",
-            mode="split_index",
-            split_index=0,
-        ),
-        task=task,
-        reward=BaseRewardConfig(energy_weight=0.0),
-        env_max_steps=N_STEPS,
-    )
-    env = make_env_from_config(config, eplus_output_dir=tmp_path / "eplus")
-    return env
 
 
 def test_occupancy_varies_and_drives_target_temperature(tmp_path: Path) -> None:
@@ -116,7 +113,7 @@ def test_occupancy_varies_and_drives_target_temperature(tmp_path: Path) -> None:
 
     assert any_zone_varies, (
         "Expected at least one zone with both occupied and unoccupied timesteps "
-        f"over {N_STEPS} steps (~2 days). Zones: {controlled_zones}"
+        f"over {N_STEPS} steps (~4 days). Zones: {controlled_zones}"
     )
 
     env.close()

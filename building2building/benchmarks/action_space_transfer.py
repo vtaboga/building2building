@@ -142,6 +142,7 @@ class ActionSpaceTransfer(BenchmarkProblem):
         """
         from cattrs import structure
 
+        from building2building.api import _resolve_effective_reward
         from building2building.config.tasks import resolve_task_preset
         from building2building.data.registry import BuildingInfo, get_registry
         from building2building.simulator import create_simulator
@@ -160,6 +161,14 @@ class ActionSpaceTransfer(BenchmarkProblem):
             self.building_type,  # type: ignore[arg-type]
             self.split,
             self.split_index,
+        )
+        effective_reward = _resolve_effective_reward(
+            preset=preset,
+            reward_override=None,
+            building_type=self.building_type,
+            building_id=info.building_id,
+            run_period="full_year",
+            normalizer_path=None,
         )
 
         eplus_output_dir = Path(tempfile.mkdtemp(prefix="b2b_eplus_"))
@@ -202,7 +211,7 @@ class ActionSpaceTransfer(BenchmarkProblem):
         building_config = BuildingConfig(
             path_to_building=epjson_path,
             path_to_weather=weather_path,
-            reward_config=preset.reward,
+            reward_config=effective_reward,
             eplus_output_dir=eplus_output_dir,
             warmup_phases=info.warmup_phases,
             area=info.net_conditioned_area_m2,

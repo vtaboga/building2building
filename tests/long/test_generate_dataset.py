@@ -25,10 +25,14 @@ def _requires_long_runtime() -> None:
 def test_generate_dataset_officemedium_smoke(tmp_path: Path) -> None:
     """Regenerate 1 OfficeMedium building; validate the written artefacts.
 
-    Acceptance criteria (TODO.md § G4):
-    - equipment.json round-trips through cattrs.structure.
-    - action_dim in the rewritten metadata.parquet matches
-      sum(len(e.actuator_descriptions()) for e in equipment_list).
+    Acceptance criteria (TODO.md § G4, updated for the G5 agent-facing
+    action_dim contract):
+    - equipment.json round-trips through cattrs.structure, and the raw
+      actuator count matches the generation summary.
+    - action_dim in the rewritten metadata.parquet equals the *agent-facing*
+      dimension ``agent_action_dim(equipment_list)`` (G5: fixed actuators are
+      filtered, so this is <= the raw actuator count) and reproduces the
+      value published in the upstream metadata.parquet.
     - splits.json is bit-identical to the HF upstream copy.
     """
     _requires_long_runtime()
@@ -96,8 +100,36 @@ def test_generate_dataset_officemedium_smoke(tmp_path: Path) -> None:
         f"re-counted {n_actuators_from_eq} from equipment.json"
     )
 
-    # Rebuild metadata.parquet and verify action_dim.
-    rebuild_metadata_parquet(out_root, [building_type])
+    # Rebuild metadata.parquet and verify the AGENT-FACING action_dim.
+    #
+    # rebuild_metadata_parquet is, by design, a whole-building-type operation:
+    # it loads the published metadata and requires a regenerated artefact dir
+    # for *every* building of the type (fail-loud, no silent skip).  This smoke
+    # test regenerates a single building, so we scope the function to that one
+    # building by pointing its metadata source at a single-row stand-in built
+    # from the published parquet.  This exercises the real rewrite path
+    # (equipment structuring + agent_action_dim + parquet write) without
+    # weakening the production "require every building" guard.
+    from unittest import mock
+
+    from building2building.data.download import download_metadata
+    from building2building.pipeline.actuators import AnyEquipment
+    from building2building.simulator.action_spaces import agent_action_dim
+
+    published = pd.read_parquet(download_metadata())
+    one_row = published[published["building_id"] == processed_id].copy()
+    assert len(one_row) == 1, f"{processed_id!r} not in published metadata.parquet"
+    published_action_dim = int(one_row.iloc[0]["action_dim"])
+
+    stand_in = tmp_path / "metadata_one_row.parquet"
+    one_row.to_parquet(stand_in, index=False)
+
+    with mock.patch(
+        "building2building.pipeline.generate_dataset.download_metadata",
+        return_value=stand_in,
+    ):
+        rebuild_metadata_parquet(out_root, [building_type])
+
     parquet_path = out_root / "metadata.parquet"
     assert parquet_path.exists(), "metadata.parquet not created"
 
@@ -106,9 +138,22 @@ def test_generate_dataset_officemedium_smoke(tmp_path: Path) -> None:
     assert (
         len(row) == 1
     ), f"processed_id={processed_id!r} not found in rewritten metadata.parquet"
-    assert int(row.iloc[0]["action_dim"]) == n_actuators_from_eq, (
-        f"action_dim in parquet ({row.iloc[0]['action_dim']}) "
-        f"!= actuator count ({n_actuators_from_eq})"
+
+    # action_dim is the AGENT-FACING action-space dimension (G5): agent_action_dim
+    # filters the fixed (non-agent) actuators, so it is <= the raw actuator count.
+    equipment_list = cattrs.structure(raw_eq, list[AnyEquipment])
+    expected_agent_dim = agent_action_dim(equipment_list)
+    assert int(row.iloc[0]["action_dim"]) == expected_agent_dim, (
+        f"rewritten action_dim ({row.iloc[0]['action_dim']}) "
+        f"!= agent_action_dim ({expected_agent_dim})"
+    )
+    assert 0 < expected_agent_dim <= n_actuators_from_eq, (
+        f"agent-facing dim {expected_agent_dim} must be in "
+        f"(0, raw actuator count {n_actuators_from_eq}]"
+    )
+    assert expected_agent_dim == published_action_dim, (
+        f"regenerated agent_action_dim ({expected_agent_dim}) "
+        f"!= published metadata action_dim ({published_action_dim})"
     )
 
     # Copy splits.json and verify it matches the HF upstream.

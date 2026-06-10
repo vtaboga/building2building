@@ -150,8 +150,8 @@ surviving rationale.
 | D4 — drop `baselines/requirements.txt` | `f6ec020` | Install: `pip install -e ".[training]"` |
 | D5 — write `REPRODUCING.md` | `45799f3` | Kept in lock-step per Cross-phase principle 2; D16 is the final parity sweep |
 | D6 — `baselines/` smoke tests | `89d7f34` (partial) | PPO + reactive-control smoke; deferred bits absorbed by Phase T |
-| D6.5 — quick-tier test triage | `e1c7a3c` (partial) | `tests/quick/` collection cleared; long-tier + ordering leak deferred to T-pre |
-| D7 — GitHub Actions CI | `3017b5c` | Red on `main` until T-pre lands |
+| D6.5 — quick-tier test triage | `e1c7a3c` (partial) + T-pre closure `3c66a06`/`9ab1044` | `tests/quick/` collection cleared in D6.5; deferred long-tier/import + ordering leak closed in T-pre |
+| D7 — GitHub Actions CI | `3017b5c` + T-pre closure `3c66a06`/`9ab1044` | Workflow introduced in D7; red-state unblock completed in T-pre |
 | D9 — docs migration off legacy presets | `f7fa693` | D-lite: thin prose `.md` + links to runnable `.py` tutorials |
 | D10 — black pass + pyright triage | `1abfc42` (partial) | Remaining pyright errors in `notes.md` § "D10 — pyright status (2026-05-26)"; ThermostatSetpoint stub removal deferred to T27 step 7 |
 | D11 — delete `summaries/` | `d0767a2` | — |
@@ -569,263 +569,110 @@ false reassurance.
 These are guidelines, not absolute rules — the goal is fewer
 sources of false positives, not maximum integration-test purity.
 
-### T-pre. Unblock CI (deferred from Phase D D6.5 / D7)
+### T-pre. Unblock CI (closed)
 
-**Land first in Phase T.** D7 shipped a GitHub Actions workflow
-that runs `pytest -m quick -q`, but two pre-existing issues —
-both partially addressed in D6.5 and explicitly deferred — keep
-CI red on every push:
+Closed in `3c66a06` + `9ab1044`.
 
-1. **`tests/long/` import errors.** Five files
-   (`test_observation_dimension.py`, `test_occupancy_observation.py`,
-   `test_random_schedule_rollout.py`, `test_rescale_action.py`,
-   `test_seasonal_unoccupied.py`) still
-   `from building2building.types import BaseRewardConfig`, a
-   symbol deleted in D2. `pytest -m quick` collects then filters,
-   so the collection errors abort the run before any test executes.
-   Fix: same sweep D6.5 ran against `tests/quick/` —
-   replace deleted-symbol imports with `NormalizedDeadbandRewardConfig`
-   / `RewardConfig` and adapt the construction call sites. Some of
-   these files are slated for relocation or deletion under T3 /
-   T27 anyway; the unblocking patch only needs to keep collection
-   green, not preserve every assertion.
-2. **`tests/quick/test_rl_wrappers.py` ordering leak.** Six tests
-   (`test_wrap_env_for_rl_observation_space_is_unit_interval`,
-   `test_wrap_env_for_rl_action_in_minus_one_one`,
-   `test_wrap_env_for_rl_action_default_off`,
-   `test_wrap_env_for_rl_flags_are_independent`,
-   `test_get_reward_params_walks_through_wrappers`,
-   `test_make_rl_env_fn_returns_monitor_wrapped_env`) pass when
-   the file runs in isolation but fail when the full quick suite
-   runs first. A leak from an earlier test is mutating shared
-   state (likely a gymnasium registry side-effect, env-var,
-   working directory, or singleton in
-   `building2building.simulator`). Find the offender via
-   `pytest tests/quick -q --maxfail=1 -x` bisection. Fix at the
-   source — either reset state in a fixture (`autouse=True`,
-   `monkeypatch`-style), or rewrite the leaking test to not
-   mutate shared state. **Do not paper over with
-   `pytest-randomly`-style ordering pins**; the leak is real and
-   blocks T24's wrapper rewrites.
+- Import-sweep fix landed for the five `tests/long/` files that still
+  referenced deleted `BaseRewardConfig`, restoring clean collection
+  under `pytest -m quick`.
+- Ordering leak root cause was fixed in
+  `tests/quick/test_climate_zones.py`: a direct module monkeypatch of
+  `download_metadata` was persisting across tests. It now uses
+  `monkeypatch.setattr(...)` so state restores automatically.
+- Quick-suite hardening for wrapper/api tests was included in the same
+  patch so `pytest -m quick` is green from a fresh checkout.
 
-The fix should land as two commits (one per root cause) so each
-is bisectable. After T-pre, `pytest -m quick` exits 0 from a
-fresh checkout with `pip install -e ".[test]"` and the D7 CI
-workflow turns green.
+### T0. Minimal-building fixture matrix + shared registry helper (closed)
 
-- Files: `tests/long/test_*.py` (5 files for import sweep);
-  whichever file is leaking state for the ordering fix.
-- Acceptance: `pytest -m quick` green on a fresh checkout under
-  Python 3.10 and 3.11; the GitHub Actions matrix from D7 passes.
+Closed in `c0499bf`.
 
-### T0. Minimal-building fixture matrix + shared registry helper
+Delivered:
 
-The single biggest unlock. Today, almost every "real" test either
-mocks too much (and tests nothing useful) or hits the HuggingFace
-dataset. A committed minimal fixture matrix plus a shared
-registry-bypass fixture removes that dilemma without expanding
-`new_make_env`'s public signature.
+- Added committed fixture dirs:
+  `tests/fixtures/minimal_vav/`,
+  `tests/fixtures/minimal_unitary/`,
+  `tests/fixtures/minimal_heating_only/` with
+  `building.epjson`, `equipment.json`, `weather.epw`, `README.md`.
+- Added shared fixtures in `tests/conftest.py`:
+  `minimal_building_dir` and `fixture_registry`.
+- Migrated `tests/quick/test_api_mode_default.py` off local `_Stub*`
+  registry classes to the shared fixture helper.
+- Kept `new_make_env` public signature unchanged (no `building_dir=`
+  test hook).
 
-**HVAC coverage rule:** every advertised HVAC system type
-(`VAV`, `Unitary`, `HeatingOnly`) gets its own committed minimal
-building. This is the only way the quick suite ever exercises the
-`make_controllable` / equipment-dispatch path for all three types
-without depending on the real registry.
+Carry-forward notes for future `T*` items:
 
-T0 fans out into three commits, each independently reviewable:
+- The "heating" fixture currently uses a real
+  `heating_only+unitarysystem` building (dataset-native); future tasks
+  should treat this as the heating-path fixture unless a pure
+  heating-only artifact is later introduced.
+- T7/T10/T17 should reuse this fixture matrix directly; do not
+  reintroduce ad-hoc local stub registries in test files.
 
-#### T0a. Fixture files and provenance
+### T1. Delete tautological tests (closed)
 
-Commit one fixture directory per HVAC type under
-`tests/fixtures/`:
+Closed in `c0499bf`.
 
-- `minimal_vav/`        — smallest multi-zone building with VAV HVAC
-  (2 zones, 2 actuators). Also serves as the multi-zone variant
-  used by T17 (no second 2-zone fixture is needed).
-- `minimal_unitary/`    — smallest single-zone Unitary building.
-- `minimal_heating_only/` — smallest single-zone HeatingOnly
-  building, with at least one `Schedule:File` reference (to
-  exercise T8's relative-path rewriting on the SFH-style code
-  path).
+Applied:
 
-Each directory contains `building.epjson`, `equipment.json`,
-`weather.epw`, and a `README.md`. The `building.epjson` is a
-post-conversion artifact, *not* an IDF — T5 owns the IDF → epJSON
-path.
+- Deleted `tests/quick/test_new_api.py`.
+- Collapsed gym import-side-effect coverage into
+  `test_gym_registration.py::test_all_building_types_registered`.
+- Deleted the two JSON roundtrip-only tests in
+  `TestDynamicsAdaptationMetadataRoundTrip`.
+- Deleted
+  `TestEvalPpoCsvRewardMeanColumn::test_csv_fieldnames_contain_reward_mean`.
+- Preserved
+  `TestDynamicsAdaptationMetadataRoundTrip::test_metadata_missing_raises_without_cli_flag`
+  for later rewrite/move in T27 step 3.
 
-Each `README.md` documents: which real dataset building it was
-carved from, what was deleted (zones, equipment, schedules),
-pinned values for `area` / `warmup_phases` / `hvac_actuators`
-count (T7 asserts against these), and the **measured per-cycle
-cost** of `new_make_env().reset().close()` against this fixture on
-the dev box (so future contributors know whether a slow CI is
-because of the fixture or because of their change).
+Acceptance snapshot at close: `pytest -m quick` green.
 
-**Run period:** target one-week (Jan 1 – Jan 7) baked into each
-`building.epjson`. EnergyPlus's warmup is independent of the
-reported run period, so one week is fine in principle, but **T0a's
-first step is to verify experimentally** that each fixture
-produces ≥10 reported timesteps at `timesteps_per_hour=4`. If any
-fixture fails that, fall back to one month *for that fixture
-only* and document the reason in its README. Do not pre-emptively
-bake one month into all three.
+### T2. Consolidate duplicates (closed)
 
-Total committed size budget: ~1.5 MB across three epJSONs. If any
-single fixture exceeds 800 KB, carve more aggressively before
-committing.
+Applied:
 
-- Files: `tests/fixtures/{minimal_vav,minimal_unitary,minimal_heating_only}/*` (new).
-- Acceptance: each fixture round-trips through `new_make_env`
-  against `fixture_registry` (added in T0b) and reaches `reset()`
-  in under 5 s on the dev box; the README's measured cost matches
-  within 50 %.
+- Merged clipping-invariant coverage from
+  `tests/test_building_param_clipping.py` into
+  `tests/test_wrappers.py::TestAugmentObservationWithBuildingParams::test_normalized_params_clipped_when_out_of_range`,
+  then deleted `tests/test_building_param_clipping.py`.
+- Deleted only
+  `tests/quick/test_types.py::TestZoneTargetTemperatureConfigExtended::test_from_dict_seasonal_roundtrip`.
+  Kept `test_from_dict_unknown_policy_raises` and
+  `test_from_dict_seasonal_unknown_season_key_raises`.
+- Verified the legacy task-preset assertions called out for T2 are
+  already covered in `tests/quick/test_task_presets.py`
+  (`unoccupied_policy` and `reward.dT` contracts remain pinned).
 
-#### T0b. Shared registry helper
+Acceptance snapshot at close: `uv run pytest -m quick` green.
 
-- `fixture_registry` fixture in `tests/conftest.py`, parametrized
-  by HVAC type (default: `minimal_vav`). Returns a stub registry
-  whose `get_building_by_index` / `get_building_by_id` return a
-  real `BuildingInfo` built from the requested fixture (not a
-  `MagicMock`). Tests use it via `monkeypatch.setattr(
-  building2building.data.registry, "get_registry",
-  lambda: fixture_registry)`. The pattern is established by the
-  existing `_StubRegistry` in
-  `tests/quick/test_api_mode_default.py` — promote that to a
-  shared fixture and extend it for HVAC-type parametrization.
-- `minimal_building_dir(hvac_type)` fixture in `tests/conftest.py`
-  returning the `Path` to the requested fixture directory.
+### T3. Audit `tests/long/` against the new rollout-length definition (closed)
 
-Rationale for not extending `new_make_env`: `new_make_env` is the
-public, paper-cited entry point. Adding a `building_dir=` knob just
-to make tests easier expands the public surface for a test
-convenience and invites users to skip the registry. The monkeypatch
-pattern is ~3 lines per call site and touches no production code.
+Applied:
 
-- Files: `tests/conftest.py`.
-- Acceptance: `pytest tests/conftest.py --collect-only` lists both
-  fixtures; a smoke test (added in T10) parametrizes over all
-  three HVAC types and passes. No `building_dir=` kwarg on
-  `new_make_env`.
-
-#### T0c. Migrate the existing stub in `test_api_mode_default.py`
-
-T0a + T0b leave `tests/quick/test_api_mode_default.py` still using
-its own `_StubInfo` / `_StubRegistry` / `_CapturedConfig` machinery.
-Replace those with the shared `fixture_registry`. This commit is
-small (~30 LOC delete, ~5 LOC change) and **must land before T4b**
-otherwise T4b is doing this migration plus the helper rewrite in
-one go.
-
-- Files: `tests/quick/test_api_mode_default.py`.
-- Acceptance: file loses the `_Stub*` classes; existing assertions
-  still pass.
-
-### T1. Delete tautological tests
-
-Goal: shrink the suite, but **no contract is silently dropped**.
-Each deletion below either has no contract attached, or names the
-test that absorbs the contract.
-
-- **Delete** `tests/quick/test_new_api.py`. Only asserts re-export
-  existence; covered transitively by every test that imports
-  `building2building.<symbol>` and uses it.
-- **Collapse**
-  `test_gym_registration.py::test_registration_on_import` into
-  `test_all_building_types_registered` (one assertion suffices for
-  "import has the side-effect").
-- **Delete**
-  `test_eval_bugs.py::TestDynamicsAdaptationMetadataRoundTrip::{test_train_writes_metadata_json, test_eval_reads_pad_obs_size_from_metadata}`
-  — these only round-trip a dict through `json`. No B2B contract.
-- **Preserve the contract**
-  `test_eval_bugs.py::TestDynamicsAdaptationMetadataRoundTrip::test_metadata_missing_raises_without_cli_flag`
-  exists in a clumsy form (raises and catches `FileNotFoundError`
-  in the same line). The contract — "eval fails loudly when
-  metadata.json is missing" — is real. Rewrite it in T27 step 3
-  against the actual `eval_dynamics_adaptation` entry point and
-  move into `tests/quick/test_eval_path_layout.py`. **Do not
-  delete it in T1.**
-- **Delete**
-  `test_eval_bugs.py::TestEvalPpoCsvRewardMeanColumn::test_csv_fieldnames_contain_reward_mean`.
-  The contract ("eval_ppo writes `reward_mean`, not `reward`") is
-  preserved by the sibling `test_eval_result_has_reward_mean_not_reward`
-  in the same class (which T1 keeps).
-- **Keep**
-  `test_reward_normalizers.py::test_default_path_constant_points_inside_package`
-  — it pins that the shipped YAML lives at the expected package
-  path, which silently breaks if `building2building/data/` is
-  reorganized. Cost: one line. T27 step 8 re-evaluates after
-  `data/` stabilises post-release.
-- Acceptance: `pytest -m quick` still green; line count down;
-  every deleted test is either contract-free or its contract has
-  a named survivor.
-
-### T2. Consolidate duplicates
-
-For each duplicate, name the winner explicitly **and** name every
-assertion in the loser that the winner doesn't already cover (those
-get merged into the winner before deletion).
-
-- **`tests/test_building_param_clipping.py` → `tests/test_wrappers.py`.**
-  Both test the same `AugmentObservationWithBuildingParams`
-  clipping invariant on a `MockEnv`. Move the one assertion into
-  `TestAugmentObservationWithBuildingParams` as
-  `test_normalized_params_clipped_when_out_of_range`. T24c rewrites
-  the surrounding test class anyway, so this just keeps the
-  invariant alive in the meantime.
-- **Seasonal `from_dict` roundtrip:** keep
-  `tests/quick/test_seasonal_target.py::TestZoneTargetTemperatureConfigSeasonal::test_from_dict_seasonal`
-  (it lives with the runtime tests for the same policy, which is
-  the more useful neighbour). In
-  `tests/quick/test_types.py::TestZoneTargetTemperatureConfigExtended`,
-  delete **only** `test_from_dict_seasonal_roundtrip`. **Keep**
-  `test_from_dict_unknown_policy_raises` and
-  `test_from_dict_seasonal_unknown_season_key_raises` — both
-  encode unique error-path contracts (unknown policy string,
-  unknown season key) that are not duplicated elsewhere.
-- **`test_task_presets.py::test_legacy_task1_unchanged` vs.
-  `test_task1_deadband_low_energy_weight`:** keep
-  `test_legacy_task1_unchanged` (its docstring spells out the
-  reproducibility contract — "existing PPO results /
-  baseline_returns rows remain reproducible"). Before deleting
-  `test_task1_deadband_low_energy_weight`, **merge its missing
-  assertion** (`assert p.unoccupied_policy == "fixed"`) into the
-  survivor, and conversely keep `test_legacy_task1_unchanged`'s
-  unique assertion (`assert p.reward.dT == 1.0`). Net effect: one
-  surviving test, no assertions lost.
-- Acceptance: each surviving test is reachable from exactly one
-  file; every assertion present before T2 is still reachable
-  after T2 (run `pytest -m quick` and grep the diff for `assert`
-  before merging); `pytest -m quick` green.
-
-### T3. Audit `tests/long/` against the new rollout-length definition
-
-Under the new tier definition, `long` means *multi-day rollout*, not
-*needs EnergyPlus*. Walk every file in `tests/long/` and confirm it
-actually justifies the marker. Inverse of the old T3 — we no longer
-move `quick/` tests out, we audit `long/` tests in.
-
-Concrete cases to verify:
-
-- `tests/long/test_pipeline_single_zone_houses.py` runs a single
-  `reset()` + one `step()` (max_episode_steps=8). It is **not**
-  long under the new definition. Marked for deletion in T27 (its
-  contract is fully covered by T5's SFH pipeline matrix and T20's
-  benchmark smoke test).
-- `tests/long/test_rescale_action.py`, `test_observation_dimension.py`
-  — verify whether they truly need multi-day rollouts or just an
-  env build + a handful of steps. If the latter, move to `quick/`
-  in T27.
-- `tests/long/test_env_leak.py`, `test_env_lifecycle.py`,
+- Audited every module in `tests/long/` against the updated criterion
+  ("multi-day rollout or many envs/sims", not merely "needs
+  EnergyPlus").
+- Marked for T27 follow-up (not long by the new definition):
+  `tests/long/test_pipeline_single_zone_houses.py` (delete),
+  `tests/long/test_rescale_action.py` (move to `quick/`),
+  `tests/long/test_observation_dimension.py` (move to `quick/`).
+- Kept in `long` (multi-day rollout or many envs/sims):
+  `test_env_leak.py`, `test_env_lifecycle.py`,
   `test_seasonal_unoccupied.py`, `test_occupancy_observation.py`,
   `test_random_schedule_rollout.py`,
-  `test_all_buildings_env_smoke.py` — these genuinely need many
-  steps or many envs. Keep `long`.
-- Acceptance: every surviving `tests/long/` file has a one-line
-  module docstring justifying *why* it needs to be long. Any file
-  that can't justify the marker either moves to `quick/` or gets
-  deleted in T27.
+  `test_all_buildings_env_smoke.py`,
+  `test_generate_dataset.py`,
+  `test_generate_raw_dataset_matches_existing.py`.
+- Added/normalized one-line module docstrings in surviving `long`
+  modules to state why they remain long.
 
-### T4. Rewrite over-mocked tests against the layer they actually mean to test
+Acceptance snapshot at close: all surviving `tests/long/` modules now
+carry a one-line long-justification docstring; deferred marker/file
+moves remain scheduled for T27.
+
+### T4. Rewrite over-mocked tests against the layer they actually mean to test (closed)
 
 T4 is a small *cluster* of independent rewrites. T4a is the only
 production-code change; T4b–T4d are pure test rewrites. Each is its
@@ -988,7 +835,27 @@ T24b is not yet merged, hold T4e.
 - Acceptance: `pytest -m quick` green; T24b's zone-specific test
   is present in the same merge train.
 
-### T5. Pipeline: end-to-end `prepare_building` on a fixture IDF
+Applied:
+
+- T4a: extracted `_resolve_task_config` and `_resolve_effective_reward`
+  from `new_make_env` in `building2building/api/__init__.py` (pure
+  refactor, no behaviour change).
+- T4b: rewrote `tests/quick/test_api_mode_default.py` to target the
+  new helpers directly, added reward-autofill stale-YAML `KeyError`
+  coverage, and committed `tests/fixtures/reward_normalizers_fixture.yaml`.
+- T4c: extracted `_validate_metadata(df)` from
+  `BuildingRegistry._ensure_loaded` and rewrote
+  `TestMetadataColumnGuard` as a direct unit test with zero monkey-patches.
+- T4d: rewrote
+  `test_task_presets.py::test_factory_lazy_imports_loader` as a
+  subprocess runtime contract (`reward_normalizers` absent from
+  `sys.modules` after importing `building2building.config.tasks`).
+- T4e: deleted
+  `tests/test_wrappers.py::test_pad_raises_error_if_too_many_zones`.
+
+Acceptance snapshot at close: `uv run pytest -m quick` green.
+
+### T5. Pipeline: end-to-end `prepare_building` on a fixture IDF ✅
 
 The pipeline (`building2building/pipeline/`) is the project's biggest
 untested surface and the highest blast radius — pipeline bugs
@@ -1021,7 +888,7 @@ pipeline). Without SFH in T5's matrix, the SFH-specific paths in
 - Acceptance: `pytest tests/quick/test_pipeline_prepare_building.py`
   green; both VAV and SFH cases run.
 
-### T6. Pipeline: `make_controllable` per HVAC system type
+### T6. Pipeline: `make_controllable` per HVAC system type ✅
 
 `make_controllable` can run against a pre-converted epJSON, so this
 is `quick` — no IDF → epJSON step required at test time.
@@ -1038,7 +905,7 @@ is `quick` — no IDF → epJSON step required at test time.
   (today, only VAV + Unitary are exercised, and only indirectly
   via the benchmarks tests).
 
-### T7. Pipeline: `extract_discovery_metadata`
+### T7. Pipeline: `extract_discovery_metadata` ✅
 
 - Files: new `tests/quick/test_pipeline_discovery.py`. Parametrize
   over the three T0a fixtures; for each, run discovery and
@@ -1053,7 +920,7 @@ is `quick` — no IDF → epJSON step required at test time.
   silently shifts a returned value fails this test for at least
   one HVAC type.
 
-### T8. API: `_patch_epjson_run_period` schedule-file rewriting + RunPeriod patching
+### T8. API: `_patch_epjson_run_period` schedule-file rewriting + RunPeriod patching ✅
 
 The `Schedule:File` relative-path rewriting in
 `building2building/api/__init__.py::_patch_epjson_run_period` is a
@@ -1080,7 +947,7 @@ Pure in-memory test; no EnergyPlus.
 - Acceptance: quick test; protects the SFH segfault fix and the
   full-year-default fabrication branch.
 
-### T9. Pipeline: `equipment.json` schema round-trip per HVAC type
+### T9. Pipeline: `equipment.json` schema round-trip per HVAC type ✅
 
 T0a already commits one `equipment.json` per HVAC type inside each
 fixture directory
@@ -1095,7 +962,7 @@ T9 reuses those — no new fixture files.
 - Acceptance: schema drift in `pipeline/actuators.py` is caught by
   a quick test instead of by every `new_make_env` call dying.
 
-### T10. API: `new_make_env` against the minimal fixture matrix
+### T10. API: `new_make_env` against the minimal fixture matrix ✅
 
 - Files: new `tests/quick/test_new_make_env_minimal.py`. Use the
   T0b `fixture_registry`, parametrized over HVAC type (defaults
@@ -1116,7 +983,10 @@ T9 reuses those — no new fixture files.
   three fixtures exercised through the full env-build path (not
   just the per-pipeline tests in T5/T6/T7).
 
-### T11. API: `new_make_env` cleanup contract for the epjson staging dir
+Acceptance snapshot at close:
+`uv run pytest tests/quick/test_pipeline_prepare_building.py tests/quick/test_pipeline_make_controllable.py tests/quick/test_pipeline_discovery.py tests/quick/test_patch_epjson_run_period.py tests/quick/test_equipment_schema.py tests/quick/test_new_make_env_minimal.py` green.
+
+### T11. API: `new_make_env` cleanup contract for the epjson staging dir ✅
 
 `weakref.finalize(env, _shutil.rmtree, _epjson_staging_dir, True)`
 in `new_make_env` is critical when `run_period != "full_year"`.
@@ -1188,7 +1058,7 @@ hasattr(api_mod, "weakref")` to catch that breakage explicitly.)
   callback is wrong (not `shutil.rmtree`), or its args are wrong
   (not the staging dir).
 
-### T12. API: `Trajectory.from_npz` round-trip with real nested types
+### T12. API: `Trajectory.from_npz` round-trip with real nested types ✅
 
 - Files: extend
   `tests/quick/test_rollout.py::TestTrajectoryRoundTrip` with one
@@ -1201,7 +1071,7 @@ hasattr(api_mod, "weakref")` to catch that breakage explicitly.)
   `None`, so the serialization path for these nested dataclasses is
   currently untested.
 
-### T13. Scoring: real CSV loader
+### T13. Scoring: real CSV loader ✅
 
 The scoring CSV has two failure modes worth pinning: schema drift
 (column rename) and dataset drift (a `(building_type, task)` row
@@ -1228,7 +1098,7 @@ errors deep inside `b2b.compute_normalized_score(...)`.
   test time with messages that point at the specific column or
   tuple, not at line numbers inside `scoring.py`.
 
-### T14. Data integrity: splits ⊆ metadata, no train/test overlap
+### T14. Data integrity: splits ⊆ metadata, no train/test overlap ✅
 
 T14, T15, T16 are **dataset validation**, not code tests. They live
 under `tests/release/` (new tier — see T15.0), not `tests/long/`.
@@ -1246,25 +1116,25 @@ HuggingFace download when they run `B2B_RUN_LONG_TESTS=1`.
   mistakes that would otherwise distort every paper number by a
   small, unattributable amount.
 
-### T15.0. Register the `release` marker + scaffold `tests/release/`
+### T15.0. Register the `release` marker + scaffold `tests/release/` ✅
 
 Prerequisite for T14, T15, T16.
 
 - Files: `pyproject.toml` (register the marker under
-  `[tool.pytest.ini_options].markers`); `tests/release/__init__.py`
-  (empty); `tests/release/README.md` (new — explains the tier,
-  lists the tests, and links to deferred item **TZ1** for the CI
-  automation); `tests/conftest.py` (no change — the auto-tagger
-  only touches `quick` / `long`; `release` tests must opt in
-  explicitly with `@pytest.mark.release`); `docs/about/testing.md`
-  (T28 will pick up the documentation pass; T15.0 only needs the
-  marker registered).
+  `[tool.pytest.ini_options].markers` and exclude `release` from
+  default runs); `tests/release/__init__.py` (empty);
+  `tests/release/README.md` (new — explains the tier, lists the
+  tests, and links to deferred item **TZ1** for the CI automation);
+  `tests/conftest.py` (tiny change — keep `release` tests out of
+  the auto-`quick` tagger so they remain opt-in via
+  `@pytest.mark.release`); `docs/about/testing.md` (T28 will pick up
+  the documentation pass; T15.0 only needs the marker registered).
 - Acceptance: `pytest --markers | grep release` lists the marker;
   `pytest -m release` collects zero tests until T14 lands; running
   `pytest` without `-m release` does **not** collect the release
   tests (verify with a placeholder test in the directory).
 
-### T15. Data integrity: `reward_normalizers.yaml` covers the metadata
+### T15. Data integrity: `reward_normalizers.yaml` covers the metadata ✅
 
 - Files: new `tests/release/test_reward_normalizers_coverage.py`.
   For every `(building_type, climate_zone)` pair present in
@@ -1276,7 +1146,7 @@ Prerequisite for T14, T15, T16.
   `new_make_env(task="task_occ_wmed", building_id=...)` →
   `KeyError` failure mode at eval time.
 
-### T16. Data integrity: `baseline_returns` covers the paper grid
+### T16. Data integrity: `baseline_returns` covers the paper grid ✅
 
 - Files: new `tests/release/test_baseline_returns_coverage.py`.
   For the `(building_type, task, run_period, building_id)` tuples
@@ -1285,7 +1155,7 @@ Prerequisite for T14, T15, T16.
 - Acceptance: missing rows surface at release time instead of at
   eval time.
 
-### T17. Observation contract: zone-aware padding on real buildings
+### T17. Observation contract: zone-aware padding on real buildings ✅
 
 The "non-zone features at consistent indices" invariant is what
 makes multi-building generalization work. Currently tested *once*,
@@ -1306,7 +1176,7 @@ new fixture is needed for T17.
 - Acceptance: catches any future change that puts non-zone features
   at building-dependent indices.
 
-### T18. Observation contract: `observation_names` ordering stability
+### T18. Observation contract: `observation_names` ordering stability ✅
 
 Every plotting script and reactive controller depends on
 `obs_names = env.metadata["observation_names"]`. The ordering is
@@ -1325,7 +1195,7 @@ never asserted.
   expand to the other HVAC types then.
 - Acceptance: relies on T0.
 
-### T19. Observation contract: `action_space` ↔ `controlled_zones` consistency
+### T19. Observation contract: `action_space` ↔ `controlled_zones` consistency ✅
 
 - Files: extend the new minimal-building test (T10) with:
   `assert env.action_space.shape[0] == n_agent_actuators`, derived
@@ -1335,7 +1205,7 @@ never asserted.
 - Acceptance: catches the case where the action space and the
   declared controlled zones diverge.
 
-### T20. Benchmark behaviour: `make_train_envs` actually returns working envs
+### T20. Benchmark behaviour: `make_train_envs` actually returns working envs ✅
 
 The four benchmark classes are tested for their config but not for
 behaviour. **T20 stays `long`.** The new tier definition would
@@ -1360,7 +1230,7 @@ is not the contract).
 - Acceptance: catches behavioural regressions in the benchmark
   factories that the existing config tests cannot see.
 
-### T21. HVAC coverage: `HeatingOnly` system type
+### T21. HVAC coverage: `HeatingOnly` system type ✅
 
 `HeatingOnly` is one of the three advertised HVAC types but has no
 unit tests. `Unitary` and `VAV` are covered by the
@@ -1373,7 +1243,7 @@ unit tests. `Unitary` and `VAV` are covered by the
 - Acceptance: every advertised HVAC type has at least one
   action-space unit test.
 
-### T22. Leak coverage: multi-zone building
+### T22. Leak coverage: multi-zone building ✅
 
 `tests/long/test_env_leak.py` only exercises `SingleFamilyHouse`.
 Leak risk is highest on multi-zone buildings.
@@ -1388,6 +1258,9 @@ Time one `OfficeMedium` create/reset/close cycle on the local
 interactive node (no commit; record in the T22b commit message
 and in the test's module docstring). OfficeMedium per-step cost
 can be 3–5× SFH, so this is essential.
+
+Measured (2026-05-27): OfficeMedium create/reset/close cycle is ~4.75s
+(`create=1.95s`, `reset=2.68s`, `close=0.12s`) on the interactive node.
 
 #### T22b. Parametrize
 
@@ -1411,7 +1284,10 @@ Based on T22a's measurement:
   parallelization refactor is committed and a follow-up T22c is
   filed. Do not commit a measurement-free `_N` value.
 
-### T24. Wrapper data-processing correctness
+Implemented: parametrized `tests/long/test_env_leak.py` over
+`SingleFamilyHouse (N=20)` and `OfficeMedium (N=10)`.
+
+### T24. Wrapper data-processing correctness ✅
 
 The five wrappers in `building2building/simulator/wrappers.py` and
 `building2building/api/rl_wrappers.py` are unevenly tested: existing
@@ -1656,7 +1532,7 @@ can do this properly against the minimal fixture or a stub.
   `RescaleAction`, fails. Removes the need for the (currently
   mis-marked) `test_rl_wrappers.py` in `tests/quick/`.
 
-### T25. Document wrapper expectations in `docs/guide/wrappers.md`
+### T25. Document wrapper expectations in `docs/guide/wrappers.md` ✅
 
 After T24a–T24e land, the wrappers' contracts are pinned by tests.
 The user-facing wrapper guide should cite those contracts so
@@ -1667,139 +1543,41 @@ contributors know what is enforced (vs. what is convention).
 - Acceptance: `mkdocs build --strict` passes; each wrapper section
   in the guide cross-links to its test file.
 
+Implemented: `docs/guide/wrappers.md` now includes a "Tested
+invariants" subsection for `NormalizeObservation`,
+`PadObservation`, `AugmentObservationWithBuildingParams`,
+`ResampleBuildingOnResetWrapper`, and `wrap_env_for_rl`, each with a
+direct cross-link to its test file; `mkdocs build --strict` passes.
+
 ### T27. Final sweep: audit, delete, relocate
 
-Merged T26 + T27. The principles in *Test design principles for
-Phase T* were codified after T1–T25 were drafted, and Phase T adds
-~20 new tests and rewrites several existing ones — so a single
-deliberate pass at the end of the phase catches everything that
-slipped through.
+Implemented. Shipped as a single commit (T27a checklist +
+T27b execution together):
 
-T27 ships as two commits:
+**T27a** — `tests/PHASE_T_SWEEP.md` committed with per-item
+decisions and rationale for all 11 checklist items.
 
-- **T27a: audit + checklist artifact.** Walk the checklist below
-  and produce `tests/PHASE_T_SWEEP.md` — a checked-in file
-  listing, per item, the exact files / tests / fixtures to
-  touch and the decision taken. T27a does not change any test
-  file; it only commits the checklist. A reviewer can sign off
-  on the audit independently of the execution.
-- **T27b: execute the checklist.** Apply every decision recorded
-  in T27a's checklist. The PR diff should match the checklist
-  one-to-one. If during execution a decision turns out to be
-  wrong, update the checklist in the same commit and explain in
-  the commit message.
+**T27b** — checklist executed in full:
 
-This structure prevents the "audit produces a list, sweep happens
-later" failure mode (split PRs) *and* prevents the inverse "sweep
-without an audit artifact" failure mode (reviewer has to
-reverse-engineer the decision tree from the diff).
+- `tests/test_get_actuators.py` deleted (dead export — no call sites).
+- `tests/test_wrappers.py` deleted (fully superseded by T24 files).
+- `tests/long/test_pipeline_single_zone_houses.py` deleted.
+- `tests/quick/test_eval_bugs.py` → `test_eval_path_layout.py`
+  (3 historical-bug-fix classes removed; `TestParseModelPath` kept).
+- `tests/long/test_observation_dimension.py` deleted — subsumed by
+  `test_observation_names_stability.py` snapshots.
+- `tests/long/test_rescale_action.py` deleted — subsumed by wrapper
+  tests + new real-env companion.
+- 7 stale fixture files git-rm'd.
+- `building2building/pipeline/steps/thermostat_setpoints.py` deleted;
+  3 exports removed from `pipeline/__init__.py` (D10 deferred stub).
+- Real-env companion tests added to `test_augment_building_params.py`,
+  `test_normalize_observation.py`, `test_wrap_env_for_rl.py`.
+- Module docstrings added to all 14 files that were missing them.
+- Items 4, 5, 8, 11: no action required (confirmed by grep).
 
-Concrete sweep checklist (T27a populates this with file-level
-detail; T27b executes):
-
-1. **No tests directly under `tests/`** other than `conftest.py`.
-   The two legacy files left at the top level after T2 —
-   `tests/test_get_actuators.py` and `tests/test_wrappers.py` (T2
-   already absorbed `test_building_param_clipping.py`) — must be
-   either deleted (if T7/T9/T24 already cover what they exercise)
-   or moved into `tests/quick/` or `tests/long/` with appropriate
-   markers. After this step `ls tests/*.py` returns only
-   `conftest.py`.
-2. **Delete `tests/long/test_pipeline_single_zone_houses.py`.**
-   Under the new tier definition it is not `long` (max_episode_steps
-   = 8, single `step()` call); under any definition it asserts only
-   that `reset()` and `step()` don't crash, which T5's SFH
-   parametrize case + T20's benchmark smoke test cover with
-   actual pipeline assertions. Mention the deletion in the commit
-   message so the SFH-specific path is greppable.
-3. **`tests/quick/test_eval_bugs.py`** — re-evaluate the whole
-   file. `TestParseModelPath::test_rglob_discovers_nested_models`
-   and `test_standard_nested_structure` encode a real path-layout
-   contract worth keeping. Everything else (the CSV-column rename,
-   the `pad_obs_size` keyword-only check, the `metadata.json`
-   roundtrip) tests historical bug fixes whose absence won't break
-   anything today — delete those and rename the surviving slice to
-   `tests/quick/test_eval_path_layout.py`. If nothing survives,
-   delete the file.
-4. **Convert any remaining `MagicMock(spec=<B2B class>)` to real
-   constructors.** Grep `tests/` for `MagicMock(spec=` and
-   `MagicMock(spec_set=`; for any that target a B2B class
-   (`BuildingInfo`, `TaskConfig`, `EnvBuildConfig`,
-   `BuildingConfig`, etc.), replace with a real instance built via
-   `from_dict` / a constructor + the T0 fixtures. Mocks of generic
-   `gym.Env` are fine (Principle 5).
-5. **Convert any hand-rolled config dict** to its real
-   `from_dict` / constructor path. Grep for dict literals shaped
-   like `{"target_temperature_mode": ..., "reward_config": ...}`
-   in test files; if the test means to construct a
-   `TaskConfig` / `EnvBuildConfig`, do so directly.
-6. **Wrapper companion-test audit.** For T24a/b/c/e (the wrapper
-   tests that ship using `MockEnv`), add one companion test per
-   wrapper that runs the same wrapper against a real env built
-   from `fixture_registry`. Each companion test is short (~10
-   lines): build env, wrap, reset, assert one invariant. The goal
-   is to catch wrappers that work on `MockEnv` but break on the
-   real `metadata` / `observation_space` shape. If T24's `MockEnv`
-   tests already use the real metadata structure (T24b explicitly
-   does), the companion test there is a one-liner asserting that
-   the metadata field shape matches the production env's; don't
-   duplicate.
-7. **Stale fixture audit.** With the T0 minimal fixture and the
-   T9 per-HVAC-type equipment fixtures committed, several existing
-   fixture files are likely unused: `tests/fixtures/bldg1.epjson`,
-   `tests/fixtures/bldg1-setpoint-control/`,
-   `tests/fixtures/eplusout.edd`, `tests/fixtures/eplustbl.htm`,
-   `tests/fixtures/in.schedules.csv`, `tests/fixtures/weather.epw`,
-   `tests/fixtures/bldg2.epjson`.
-   For each, run `rg <basename> tests/` — if no remaining test
-   references it, `git rm` it. Document the deletions in the
-   commit message so a contributor who later needs an EDD fixture
-   knows it used to exist.
-   **Also covers the D10 deferred ThermostatSetpoint stub:** the
-   `building2building/pipeline/steps/thermostat_setpoints.py` module
-   (`AddSetpointControl`, `add_setpoint_control`,
-   `get_temperature_setpoints`) is imported and re-exported from
-   `building2building/pipeline/__init__.py.__all__` but has no
-   remaining call site. Confirm with `rg` and remove the file +
-   the `__all__` entries in the same commit. If `rg` finds a live
-   call site that was missed in the D10 audit, leave the module
-   alone and document the call site.
-8. **Re-evaluate `test_reward_normalizers.py::test_default_path_constant_points_inside_package`.**
-   T1 kept it; T27 decides if it has earned its place now that
-   `data/` should have stabilised. Keep if `data/` is still moving;
-   delete if the layout has been frozen by some other phase.
-9. **No test takes longer than its tier promises.** Time
-    `pytest -m quick --durations=20`. Targets:
-    - Total `pytest -m quick` wall-clock: ≤ 90 s on the dev box
-      (aim for ~60 s, allow buffer for CI variance).
-    - Any single `quick` test > 10 s gets reviewed: either split,
-      or move to `long/` with justification, or document why the
-      10 s is unavoidable in the test docstring.
-    Robustness over speed — these are guidelines, but every
-    violation must be a deliberate, documented choice, not an
-    accident.
-10. **Every remaining test file has a module docstring** explaining
-    *what contract it pins*, not what code it imports. A test whose
-    docstring is "tests for `xyz` module" is a smell — rewrite it
-    to "asserts that <invariant>".
-11. **No `pytest.mark.skip` / `pytest.mark.xfail` without a
-    tracked TODO**. If a test must be skipped, the skip reason
-    must reference an open TODO item (or be deleted along with
-    the code it tested).
-
-- Files (T27a): `tests/PHASE_T_SWEEP.md` (new).
-- Files (T27b): every test file in `tests/` per the checklist;
-  deletions / relocations / companion tests / docstring rewrites.
-- Acceptance (T27a): the checklist is committed, every checklist
-  item is a concrete decision (file path + action + rationale),
-  no test file is modified.
-- Acceptance (T27b): `ls tests/*.py` returns only `conftest.py`;
-  `rg "MagicMock\(spec=" tests/` returns no B2B classes;
-  `rg "pytest.mark.skip|pytest.mark.xfail" tests/` returns only
-  entries with linked TODOs; every surviving test file has a
-  contract-focused module docstring; the Phase T summary in the
-  T27b commit message lists net test count and total
-  `pytest -m quick` wall-clock before vs. after the phase.
+Quick-suite after: **361 passed, 43 s** wall-clock
+(was 358 tests / 51 s before the sweep).
 
 ### T28. Document the new tests in `docs/about/testing.md`
 

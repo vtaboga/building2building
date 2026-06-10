@@ -117,7 +117,9 @@ def evaluate_multi_building(
             env = b2b.PadObservation(env, target_size=pad_obs_size)
             env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
             if augment_params:
-                env = b2b.AugmentObservationWithBuildingParams(env)
+                env = b2b.AugmentObservationWithBuildingParams(
+                    env, allow_defaults=True
+                )
             env = Monitor(env)
             try:
                 ep: EpisodeResult = run_episode(env, model)

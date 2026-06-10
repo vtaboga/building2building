@@ -1,0 +1,102 @@
+[
+    {
+        "zone": "Back_Space",
+        "actuators": [
+            {
+                "component_type": "Fan",
+                "control_type": "Fan Air Mass Flow Rate",
+                "component_name": "PSZ-AC:1_addAQ_Unitary_Package_fan",
+                "units": "[kg/s]",
+                "lower_bound": 0,
+                "upper_bound": 15.0
+            },
+            {
+                "component_type": "Schedule:Constant",
+                "control_type": "Schedule Value",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (5)",
+                "units": "Temperature",
+                "lower_bound": 5.0,
+                "upper_bound": 60.0
+            }
+        ],
+        "equipment_type": "unitarysystem"
+    },
+    {
+        "zone": "Core_Retail",
+        "actuators": [
+            {
+                "component_type": "Fan",
+                "control_type": "Fan Air Mass Flow Rate",
+                "component_name": "PSZ-AC:2_addAQ_Unitary_Package_fan",
+                "units": "[kg/s]",
+                "lower_bound": 0,
+                "upper_bound": 15.0
+            },
+            {
+                "component_type": "Schedule:Constant",
+                "control_type": "Schedule Value",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (10)",
+                "units": "Temperature",
+                "lower_bound": 5.0,
+                "upper_bound": 60.0
+            }
+        ],
+        "equipment_type": "unitarysystem"
+    },
+    {
+        "zone": "Front_Retail",
+        "actuators": [
+            {
+                "component_type": "Fan",
+                "control_type": "Fan Air Mass Flow Rate",
+                "component_name": "PSZ-AC:4_addAQ_Unitary_Package_fan",
+                "units": "[kg/s]",
+                "lower_bound": 0,
+                "upper_bound": 15.0
+            },
+            {
+                "component_type": "Schedule:Constant",
+                "control_type": "Schedule Value",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (15)",
+                "units": "Temperature",
+                "lower_bound": 5.0,
+                "upper_bound": 60.0
+            }
+        ],
+        "equipment_type": "unitarysystem"
+    },
+    {
+        "zone": "Point_Of_Sale",
+        "actuators": [
+            {
+                "component_type": "Fan",
+                "control_type": "Fan Air Mass Flow Rate",
+                "component_name": "PSZ-AC:3_addAQ_Unitary_Package_fan",
+                "units": "[kg/s]",
+                "lower_bound": 0,
+                "upper_bound": 15.0
+            },
+            {
+                "component_type": "Schedule:Constant",
+                "control_type": "Schedule Value",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (20)",
+                "units": "Temperature",
+                "lower_bound": 5.0,
+                "upper_bound": 60.0
+            }
+        ],
+        "equipment_type": "unitarysystem"
+    },
+    {
+        "zone": "Front_Entry",
+        "heating_setpoint": {
+            "component_type": "Schedule:Constant",
+            "control_type": "Schedule Value",
+            "component_name": "B2B heating only htg setpoint Front_Entry (29)",
+            "units": "[C]",
+            "lower_bound": 10.0,
+            "upper_bound": 35.0
+        },
+        "equipment_type": "heating_only"
+    }
+]

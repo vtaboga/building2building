@@ -1,4 +1,4 @@
-"""Quick tests for the random daily schedule module (``task5`` backend)."""
+"""Quick tests for the random daily schedule module."""
 
 from __future__ import annotations
 

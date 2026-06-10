@@ -1,0 +1,470 @@
+[
+    {
+        "supply_temp_setpoint": {
+            "component_type": "Schedule:Constant",
+            "control_type": "Schedule Value",
+            "component_name": "B2B vav supply temp setpoint schedule (24)",
+            "units": "[C]",
+            "lower_bound": 10.0,
+            "upper_bound": 55.0
+        },
+        "terminals": [
+            {
+                "zone": "Core_bottom",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (9)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Core_bottom (10)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Core_bottom (11)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_bot_ZN_1",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (12)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_bot_ZN_1 (13)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_bot_ZN_1 (14)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_bot_ZN_2",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (15)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_bot_ZN_2 (16)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_bot_ZN_2 (17)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_bot_ZN_3",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (18)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_bot_ZN_3 (19)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_bot_ZN_3 (20)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_bot_ZN_4",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (21)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_bot_ZN_4 (22)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_bot_ZN_4 (23)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            }
+        ],
+        "oa_mass_flow": {
+            "component_type": "Outdoor Air Controller",
+            "control_type": "Air Mass Flow Rate",
+            "component_name": "PACU_VAV_bot_OA_Controller",
+            "units": "[kg/s]",
+            "lower_bound": 0.0,
+            "upper_bound": 5.0
+        },
+        "equipment_type": "vavsystem"
+    },
+    {
+        "supply_temp_setpoint": {
+            "component_type": "Schedule:Constant",
+            "control_type": "Schedule Value",
+            "component_name": "B2B vav supply temp setpoint schedule (42)",
+            "units": "[C]",
+            "lower_bound": 10.0,
+            "upper_bound": 55.0
+        },
+        "terminals": [
+            {
+                "zone": "Core_mid",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (27)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Core_mid (28)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Core_mid (29)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_mid_ZN_1",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (30)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_mid_ZN_1 (31)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_mid_ZN_1 (32)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_mid_ZN_2",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (33)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_mid_ZN_2 (34)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_mid_ZN_2 (35)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_mid_ZN_3",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (36)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_mid_ZN_3 (37)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_mid_ZN_3 (38)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_mid_ZN_4",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (39)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_mid_ZN_4 (40)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_mid_ZN_4 (41)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            }
+        ],
+        "oa_mass_flow": {
+            "component_type": "Outdoor Air Controller",
+            "control_type": "Air Mass Flow Rate",
+            "component_name": "PACU_VAV_mid_OA_Controller",
+            "units": "[kg/s]",
+            "lower_bound": 0.0,
+            "upper_bound": 5.0
+        },
+        "equipment_type": "vavsystem"
+    },
+    {
+        "supply_temp_setpoint": {
+            "component_type": "Schedule:Constant",
+            "control_type": "Schedule Value",
+            "component_name": "B2B vav supply temp setpoint schedule (60)",
+            "units": "[C]",
+            "lower_bound": 10.0,
+            "upper_bound": 55.0
+        },
+        "terminals": [
+            {
+                "zone": "Core_top",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (45)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Core_top (46)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Core_top (47)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_top_ZN_1",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (48)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_top_ZN_1 (49)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_top_ZN_1 (50)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_top_ZN_2",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (51)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_top_ZN_2 (52)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_top_ZN_2 (53)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_top_ZN_3",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (54)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_top_ZN_3 (55)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_top_ZN_3 (56)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            },
+            {
+                "zone": "Perimeter_top_ZN_4",
+                "flow_fraction": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav flow fraction schedule (57)",
+                    "units": "[frac]",
+                    "lower_bound": 0.0,
+                    "upper_bound": 1.0
+                },
+                "heating_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav htg setpoint Perimeter_top_ZN_4 (58)",
+                    "units": "[C]",
+                    "lower_bound": 10.0,
+                    "upper_bound": 35.0
+                },
+                "cooling_setpoint": {
+                    "component_type": "Schedule:Constant",
+                    "control_type": "Schedule Value",
+                    "component_name": "B2B vav clg setpoint Perimeter_top_ZN_4 (59)",
+                    "units": "[C]",
+                    "lower_bound": 18.0,
+                    "upper_bound": 40.0
+                }
+            }
+        ],
+        "oa_mass_flow": {
+            "component_type": "Outdoor Air Controller",
+            "control_type": "Air Mass Flow Rate",
+            "component_name": "PACU_VAV_top_OA_Controller",
+            "units": "[kg/s]",
+            "lower_bound": 0.0,
+            "upper_bound": 5.0
+        },
+        "equipment_type": "vavsystem"
+    }
+]

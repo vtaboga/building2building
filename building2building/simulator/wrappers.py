@@ -1,5 +1,6 @@
 import logging
 import random
+import warnings
 from typing import Any, Callable
 
 import gymnasium as gym
@@ -286,12 +287,21 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
     - num_units: Number of units in the building
     """
 
-    def __init__(self, env: gym.Env, building_params: dict[str, float] | None = None):
+    def __init__(
+        self,
+        env: gym.Env,
+        building_params: dict[str, float] | None = None,
+        *,
+        allow_defaults: bool = False,
+    ):
         """
         Args:
             env: The environment to wrap
             building_params: Dictionary of building parameters to append.
                            If None, will try to extract from env metadata.
+            allow_defaults: If True and metadata is missing, keep the legacy
+                           default-filling behavior. If False (default),
+                           missing required keys raise KeyError.
         """
         super().__init__(env)
 
@@ -304,9 +314,12 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
 
         # Extract or use provided building parameters
         if building_params is None:
-            building_params = self._extract_building_params(env)
+            building_params = self._extract_building_params(
+                env, allow_defaults=allow_defaults
+            )
 
         self.building_params = building_params
+        self._allow_defaults = allow_defaults
 
         # Normalize building parameters for better learning
         self.normalized_params = self._normalize_params(building_params)
@@ -336,7 +349,9 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
             list(building_params.keys()),
         )
 
-    def _extract_building_params(self, env: gym.Env) -> dict[str, float]:
+    def _extract_building_params(
+        self, env: gym.Env, *, allow_defaults: bool
+    ) -> dict[str, float]:
         """Extract building parameters from environment metadata."""
         params: dict[str, float] = {}
 
@@ -386,6 +401,8 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         }
         for key, default_val in defaults.items():
             if key not in params:
+                if not allow_defaults:
+                    raise KeyError(key)
                 logger.warning(
                     "Could not extract %r from env metadata, using default",
                     key,
@@ -452,7 +469,9 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         obs, info = self.env.reset(**kwargs)
 
         # Re-extract in case the inner env was swapped (e.g. by ResampleBuildingOnResetWrapper)
-        self.building_params = self._extract_building_params(self.env)
+        self.building_params = self._extract_building_params(
+            self.env, allow_defaults=self._allow_defaults
+        )
         self.normalized_params = self._normalize_params(self.building_params)
 
         # Rebuild observation space in case inner env's obs shape changed
@@ -512,6 +531,11 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
     W&B logging is best-effort: if ``wandb`` is not installed or no
     active run exists the wrapper still works normally.
 
+    The wrapper intentionally catches ``IndexError`` in ``step()`` to
+    avoid hard-crashing multi-building runs on actuator mismatches. This
+    branch emits a ``RuntimeWarning``, returns a terminal transition with
+    zero reward, and forces environment recreation on the next ``reset()``.
+
     Args:
         env_factory: ``env_factory(index) -> gym.Env``.  Called to
             create a new environment for the given index.
@@ -549,6 +573,8 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         self._has_stepped: bool = False
         self._total_steps: int = 0
         self._steps_since_last_log: int = 0
+        self._force_resample_next_reset: bool = False
+        self._last_obs: Any = None
 
         logger.info(
             "ResampleBuildingOnResetWrapper(%s): %d buildings available, log_interval=%d",
@@ -640,6 +666,7 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
     def step(self, action):  # type: ignore[override]
         try:
             obs, reward, terminated, truncated, info = self.env.step(action)
+            self._last_obs = obs
             self._episode_reward += float(reward)
             self._episode_steps += 1
             self._total_steps += 1
@@ -654,17 +681,20 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
             return obs, reward, terminated, truncated, info
 
         except IndexError as exc:
-            # Handle actuator index errors from problematic buildings
-            logger.warning(
-                "IndexError in building %d during step (likely actuator mismatch): %s. "
-                "Resampling new building.",
-                self._current_index,
-                exc,
+            msg = (
+                "IndexError in building "
+                f"{self._current_index} during step (likely actuator mismatch): {exc}. "
+                "Episode terminated and building will be resampled on next reset."
             )
-            # Reset to a new building and return a terminal state
-            obs, info = self.reset()
-            # Return terminal state with zero reward to signal episode end
-            return obs, 0.0, True, False, info
+            # warnings.warn is deduplicated per call-site by the default filter,
+            # so it surfaces only the first occurrence in a long run; the logger
+            # line ensures every actuator mismatch is recorded.
+            warnings.warn(msg, RuntimeWarning)
+            logger.warning(msg)
+            self._force_resample_next_reset = True
+            if self._last_obs is None:
+                self._last_obs = self.observation_space.sample()
+            return self._last_obs, 0.0, True, False, {"resample_pending": True}
 
     def reset(self, **kwargs):  # type: ignore[override]
         """Reset with a newly sampled building."""
@@ -675,7 +705,10 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         # Sample a new building
         new_index = random.choice(self._available_indices)
 
-        if new_index != self._current_index:
+        should_recreate = self._force_resample_next_reset or (
+            new_index != self._current_index
+        )
+        if should_recreate:
             logger.info(
                 "Resampling building: index %d -> %d",
                 self._current_index,
@@ -684,6 +717,7 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
             self.env.close()
             self.env = self._env_factory(new_index)
             self._current_index = new_index
+            self._force_resample_next_reset = False
 
         # Reset episode counters
         self._episode_reward = 0.0
@@ -692,6 +726,7 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
         self._has_stepped = False
 
         obs_info = self.env.reset(**kwargs)
+        self._last_obs = obs_info[0]
 
         # Log the *new* building's parameters
         self._log_building_params()

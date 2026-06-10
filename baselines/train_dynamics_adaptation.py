@@ -70,7 +70,7 @@ def _apply_wrappers(
     if normalize_obs:
         env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
     if augment_params:
-        env = b2b.AugmentObservationWithBuildingParams(env)
+        env = b2b.AugmentObservationWithBuildingParams(env, allow_defaults=True)
     env = Monitor(env)
     return env
 

@@ -31,6 +31,82 @@ logger = logging.getLogger(__name__)
 
 SplitName = Literal["train", "test", "test_small"]
 
+# Canonical ``test_small`` definition (mirrored by
+# ``baselines/scripts/make_test_small_split.py``): a curated subset of the
+# ``test`` split with TEST_SMALL_SIZE buildings per type — commercial types
+# take the first (sorted) test building per ASHRAE climate zone 1..8;
+# SingleFamilyHouse takes TEST_SMALL_SIZE seeded-random test buildings.
+TEST_SMALL_SIZE = 8
+TEST_SMALL_SFH_SEED = 0
+_TEST_SMALL_CLIMATE_ZONES = tuple(range(1, 9))
+
+
+def derive_test_small_split(
+    registry: BuildingRegistry,
+    *,
+    seed: int = TEST_SMALL_SFH_SEED,
+) -> dict[str, list[str]]:
+    """Derive the ``test_small`` split deterministically from ``test``.
+
+    This is the canonical definition of ``test_small``. The published
+    ``splits.json`` may omit it (for example after a dataset regeneration
+    that does not re-run ``make_test_small_split.py`` and re-upload the
+    manifest), in which case :class:`BuildingRegistry` derives it on load so
+    that ``split="test_small"`` keeps working against the published dataset.
+
+    For each commercial building type, selects the first (sorted) test
+    building in each ASHRAE climate zone 1..8. For ``SingleFamilyHouse``
+    (no climate zone), selects ``TEST_SMALL_SIZE`` seeded-random test
+    buildings. A climate zone with no test buildings is skipped rather than
+    raising, so the registry never hard-fails on an incomplete dataset.
+
+    .. note::
+        The ``SingleFamilyHouse`` selection is seeded-random over
+        ``sorted(test_ids)``, so it is reproducible only while the set of
+        test IDs is unchanged. If the dataset is regenerated and SFH building
+        IDs change, the same seed yields a *different* subset. This fallback
+        is therefore not guaranteed reproducible across dataset
+        regenerations; the canonical, reproducible source is the published
+        ``splits.json``.
+    """
+    import random
+
+    result: dict[str, list[str]] = {}
+    for building_type in ALL_BUILDING_TYPES:
+        if building_type in TYPES_WITHOUT_CLIMATE_ZONE:
+            test_ids = sorted(registry.list_buildings(building_type, "test"))
+            if len(test_ids) >= TEST_SMALL_SIZE:
+                result[building_type] = random.Random(seed).sample(
+                    test_ids, k=TEST_SMALL_SIZE
+                )
+            else:
+                result[building_type] = test_ids
+        else:
+            ids: list[str] = []
+            for climate_zone in _TEST_SMALL_CLIMATE_ZONES:
+                zone_ids = sorted(
+                    registry.list_buildings_by_climate_zone(
+                        building_type, climate_zone, "test"
+                    )
+                )
+                if zone_ids:
+                    ids.append(zone_ids[0])
+            result[building_type] = ids
+    return result
+
+
+def _validate_metadata(df: pd.DataFrame) -> None:
+    """Fail fast if metadata is missing required columns."""
+    if "climate_zone" not in df.columns:
+        raise RuntimeError(
+            "metadata.parquet is missing the 'climate_zone' column. "
+            "Your HuggingFace cache is from the old dataset revision; "
+            "clear ~/.cache/huggingface/hub/datasets--vtaboga--"
+            "building2building_dataset/ (or re-download via "
+            "huggingface_hub.snapshot_download(..., force_download=True)) "
+            "and retry."
+        )
+
 
 @dataclass(frozen=True)
 class BuildingInfo:
@@ -65,21 +141,21 @@ class BuildingRegistry:
         if self._metadata is None:
             meta_path = download_metadata()
             self._metadata = pd.read_parquet(meta_path)
-            if "climate_zone" not in self._metadata.columns:
-                raise RuntimeError(
-                    "metadata.parquet is missing the 'climate_zone' column. "
-                    "Your HuggingFace cache is from the old dataset revision; "
-                    "clear ~/.cache/huggingface/hub/datasets--vtaboga--"
-                    "building2building_dataset/ (or re-download via "
-                    "huggingface_hub.snapshot_download(..., force_download=True)) "
-                    "and retry."
-                )
+            _validate_metadata(self._metadata)
         if self._splits is None:
             splits_path = download_splits()
             raw = json.loads(splits_path.read_text())
             if not isinstance(raw, dict):
                 raise TypeError("splits.json must be a JSON object")
             self._splits = raw
+            if not raw.get("test_small"):
+                # Published splits.json predates / dropped the curated
+                # test_small split; derive it so split="test_small" works.
+                self._splits["test_small"] = derive_test_small_split(self)
+                logger.info(
+                    "splits.json has no 'test_small' split; derived it "
+                    "deterministically from 'test'."
+                )
 
     @property
     def metadata(self) -> pd.DataFrame:

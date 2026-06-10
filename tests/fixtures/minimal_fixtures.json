@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "dataset_repo": "vtaboga/building2building_dataset",
+  "dataset_revision": "main",
+  "fixtures": {
+    "minimal_officemedium": {
+      "building_type": "OfficeMedium",
+      "building_id": "OfficeMedium-4001",
+      "hvac_type": "vavsystem",
+      "hvac_label": "VAV",
+      "climate_zone": 5,
+      "weather_file": "weather.epw",
+      "net_conditioned_area_m2": 5824.2,
+      "warmup_phases": 3,
+      "num_zones": 15,
+      "action_dim": 36,
+      "observation_dim": 63,
+      "hvac_actuators": 51
+    },
+    "minimal_officesmall": {
+      "building_type": "OfficeSmall",
+      "building_id": "OfficeSmall-5003",
+      "hvac_type": "unitarysystem",
+      "hvac_label": "Unitary",
+      "climate_zone": 3,
+      "weather_file": "weather.epw",
+      "net_conditioned_area_m2": 448.67,
+      "warmup_phases": 3,
+      "num_zones": 5,
+      "action_dim": 10,
+      "observation_dim": 15,
+      "hvac_actuators": 10
+    },
+    "minimal_restaurantfastfood": {
+      "building_type": "RestaurantFastFood",
+      "building_id": "RestaurantFastFood-3001",
+      "hvac_type": "unitarysystem",
+      "hvac_label": "Unitary",
+      "climate_zone": 1,
+      "weather_file": "weather.epw",
+      "net_conditioned_area_m2": 271.61,
+      "warmup_phases": 3,
+      "num_zones": 2,
+      "action_dim": 4,
+      "observation_dim": 6,
+      "hvac_actuators": 4
+    },
+    "minimal_retailstandalone": {
+      "building_type": "RetailStandalone",
+      "building_id": "RetailStandalone-2002",
+      "hvac_type": "heating_only+unitarysystem",
+      "hvac_label": "HeatingOnly",
+      "climate_zone": 7,
+      "weather_file": "weather.epw",
+      "net_conditioned_area_m2": 3361.89,
+      "warmup_phases": 3,
+      "num_zones": 5,
+      "action_dim": 9,
+      "observation_dim": 14,
+      "hvac_actuators": 9
+    },
+    "minimal_warehouse": {
+      "building_type": "Warehouse",
+      "building_id": "Warehouse-0006",
+      "hvac_type": "heating_only+unitarysystem",
+      "hvac_label": "HeatingOnly",
+      "climate_zone": 4,
+      "weather_file": "weather.epw",
+      "net_conditioned_area_m2": 4483.99,
+      "warmup_phases": 3,
+      "num_zones": 3,
+      "action_dim": 5,
+      "observation_dim": 8,
+      "hvac_actuators": 5
+    },
+    "minimal_singlefamilyhouse": {
+      "building_type": "SingleFamilyHouse",
+      "building_id": "SingleFamilyHouse-0001",
+      "hvac_type": "unitarysystem",
+      "hvac_label": "Unitary",
+      "climate_zone": null,
+      "weather_file": "weather.epw",
+      "net_conditioned_area_m2": 157.75,
+      "warmup_phases": 1,
+      "num_zones": 1,
+      "action_dim": 2,
+      "observation_dim": 3,
+      "hvac_actuators": 2
+    }
+  }
+}

@@ -24,7 +24,7 @@ class TestEnvLifecycle:
             building_type="SingleFamilyHouse",
             split="train",
             index=0,
-            task="task1",
+            task="task_const_e0",
             run_period="winter",
             timesteps_per_hour=4,
         )

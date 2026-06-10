@@ -1,0 +1,24 @@
+[
+    {
+        "zone": "conditioned space",
+        "actuators": [
+            {
+                "component_type": "Fan",
+                "control_type": "Fan Air Mass Flow Rate",
+                "component_name": "air source heat pump supply fan",
+                "units": "[kg/s]",
+                "lower_bound": 0,
+                "upper_bound": 0.23333081591808
+            },
+            {
+                "component_type": "Schedule:Constant",
+                "control_type": "Schedule Value",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (4)",
+                "units": "Temperature",
+                "lower_bound": 5.0,
+                "upper_bound": 93.3333333333333
+            }
+        ],
+        "equipment_type": "unitarysystem"
+    }
+]
