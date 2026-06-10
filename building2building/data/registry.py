@@ -59,6 +59,15 @@ def derive_test_small_split(
     (no climate zone), selects ``TEST_SMALL_SIZE`` seeded-random test
     buildings. A climate zone with no test buildings is skipped rather than
     raising, so the registry never hard-fails on an incomplete dataset.
+
+    .. note::
+        The ``SingleFamilyHouse`` selection is seeded-random over
+        ``sorted(test_ids)``, so it is reproducible only while the set of
+        test IDs is unchanged. If the dataset is regenerated and SFH building
+        IDs change, the same seed yields a *different* subset. This fallback
+        is therefore not guaranteed reproducible across dataset
+        regenerations; the canonical, reproducible source is the published
+        ``splits.json``.
     """
     import random
 

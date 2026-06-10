@@ -137,6 +137,16 @@ def _load_splits(
     ``test_small`` ⊆ ``test`` so the union is unchanged, but test_small stays
     first-class throughout the pipeline.
 
+    Going through the registry (rather than reading ``splits.json`` directly)
+    additionally loads ``metadata.parquet`` via ``download_metadata()`` — the
+    registry needs it to derive ``test_small`` when the manifest omits it. Like
+    ``download_splits()`` (already used by the previous implementation), this is
+    served from the HuggingFace cache and is offline-safe once the dataset has
+    been fetched, which any real generation run already does. The
+    ``get_registry`` import is function-local because ``registry`` does not
+    import this module — there is no import cycle, but keeping it local avoids
+    one if that ever changes.
+
     Raises ``KeyError`` if a requested building type is absent from a split.
     """
     from building2building.data.registry import get_registry

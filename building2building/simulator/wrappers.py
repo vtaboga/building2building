@@ -681,14 +681,16 @@ class ResampleBuildingOnResetWrapper(gym.Wrapper):
             return obs, reward, terminated, truncated, info
 
         except IndexError as exc:
-            warnings.warn(
-                (
-                    "IndexError in building "
-                    f"{self._current_index} during step (likely actuator mismatch): {exc}. "
-                    "Episode terminated and building will be resampled on next reset."
-                ),
-                RuntimeWarning,
+            msg = (
+                "IndexError in building "
+                f"{self._current_index} during step (likely actuator mismatch): {exc}. "
+                "Episode terminated and building will be resampled on next reset."
             )
+            # warnings.warn is deduplicated per call-site by the default filter,
+            # so it surfaces only the first occurrence in a long run; the logger
+            # line ensures every actuator mismatch is recorded.
+            warnings.warn(msg, RuntimeWarning)
+            logger.warning(msg)
             self._force_resample_next_reset = True
             if self._last_obs is None:
                 self._last_obs = self.observation_space.sample()
