@@ -491,7 +491,9 @@ def flat_observation_info(
     )
 
 
-def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
+def dict_observation_info(
+    ont: Ontology, *, area: float, controlled_zones: list[str]
+) -> Transform:
     """Build a dict-based observation transform (non-flattened).
 
     Unlike :func:`flat_observation_info`, this returns a nested
@@ -502,18 +504,28 @@ def dict_observation_info(ont: Ontology, *, area: float) -> Transform:
         ont: Building ontology providing zone metadata.
         area: Building conditioned floor area (m²), used to normalise
             energy readings.
+        controlled_zones: Names of the HVAC-controlled zones. Controlled
+            zones get the tight :data:`_CONTROLLED_ZONE_TEMP_BOUND`;
+            free-floating zones get the wider
+            :data:`_UNCONTROLLED_ZONE_TEMP_BOUND`, so that real readings
+            stay inside the declared space (mirrors
+            :func:`flat_observation_info`).
 
     Returns:
         A ``Transform`` whose codomain is a Gymnasium ``Dict`` space.
     """
+    controlled_zone_set = set(controlled_zones)
     return TransformDictSpace(
         {
             "temperature": TransformDictSpace(
                 {
                     zone_name: TransformScalarToArray(
                         VariableHole("ZONE AIR TEMPERATURE", zone_name),
-                        10.0,
-                        45.0,
+                        *(
+                            _CONTROLLED_ZONE_TEMP_BOUND
+                            if zone_name in controlled_zone_set
+                            else _UNCONTROLLED_ZONE_TEMP_BOUND
+                        ),
                     )
                     for zone_name in sorted(z.toPython() for z in ont.zones())
                 }
