@@ -136,7 +136,7 @@ class ActionSpaceTransfer(BenchmarkProblem):
         """Build a Gymnasium environment with full or reduced actuators.
 
         Mirrors the logic of
-        :func:`~building2building.api.new_make_env` but injects
+        :func:`~building2building.api.make_env` but injects
         ``fixed_actuator_overrides`` into the
         :class:`~building2building.types.BuildingConfig`.
         """

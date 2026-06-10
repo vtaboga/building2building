@@ -22,7 +22,7 @@ def main() -> None:
 
     # -- Compare building types --
     for btype in [bench.train_type, bench.test_type]:
-        env = b2b.new_make_env(btype, split="train", index=0, task="task_const_e0")
+        env = b2b.make_env(btype, split="train", index=0, task="task_const_e0")
         morph = env.metadata["morphology"]
         print(
             f"\n{btype}: obs={env.observation_space.shape[0]}, "
@@ -38,7 +38,7 @@ def main() -> None:
         env.close()
 
     # -- Instantiate Amorpheus --
-    train_env = b2b.new_make_env(
+    train_env = b2b.make_env(
         bench.train_type, split="train", index=0, task="task_const_e0"
     )
     train_morph = train_env.metadata["morphology"]
@@ -59,7 +59,7 @@ def main() -> None:
     train_env.close()
 
     # -- Transfer to test type --
-    test_env = b2b.new_make_env(
+    test_env = b2b.make_env(
         bench.test_type, split="test", index=0, task="task_const_e0"
     )
     test_morph = test_env.metadata["morphology"]

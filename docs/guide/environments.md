@@ -17,7 +17,7 @@ graph LR
 
 ## Creating Environments
 
-### `new_make_env` (recommended)
+### `make_env` (recommended)
 
 The primary user-facing API. Downloads pre-processed buildings from HuggingFace,
 resolves named task presets, and constructs the environment:
@@ -25,7 +25,7 @@ resolves named task presets, and constructs the environment:
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env(
+env = b2b.make_env(
     "OfficeSmall",
     split="train",
     index=0,
@@ -50,12 +50,12 @@ env = b2b.new_make_env(
 | `eplus_output_dir` | `str` / `Path` | EnergyPlus output directory |
 | `max_episode_steps` | `int` | Override episode length |
 
-### `make_env` (config-based)
+### `make_env_from_config` (config-based)
 
 For full control, construct an `EnvBuildConfig` manually:
 
 ```python
-from building2building.api import make_env
+from building2building.api import make_env_from_config
 from building2building.config.models import DatasetSelectionConfig, EnvBuildConfig
 from building2building.types import TaskConfig, reward_config_from_dict
 
@@ -70,7 +70,7 @@ cfg = EnvBuildConfig(
     reward=reward_config_from_dict({"reward_type": "NormalizedDeadbandRewardConfig", "energy_weight": 1.0, "dT": 1.0}),
     env_max_steps=8640,
 )
-env = make_env(cfg, eplus_output_dir="outputs/eplus")
+env = make_env_from_config(cfg, eplus_output_dir="outputs/eplus")
 ```
 
 ### Gymnasium Registration
@@ -86,7 +86,7 @@ env = gym.make("b2b/OfficeSmall-v0", split="train", index=0, task="task_const_e0
 ## Environment Lifecycle
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 
 obs, info = env.reset()         # Start EnergyPlus simulation
 for _ in range(100):

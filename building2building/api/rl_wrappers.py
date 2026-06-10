@@ -38,7 +38,7 @@ def wrap_env_for_rl(
 
     Args:
         env: Gymnasium env (typically the result of
-            :func:`building2building.api.new_make_env`).
+            :func:`building2building.api.make_env`).
         normalize_obs: Wrap with :class:`NormalizeObservation`.
             Defaults to ``True`` because RL policies almost always
             benefit from this; opt out for analysis tools that need
@@ -68,7 +68,7 @@ def wrap_env_for_rl(
         handle this gracefully.
 
         If ``rescale_action=True`` was already applied via
-        ``new_make_env(rescale_action=True)``, do **not** pass
+        ``make_env(rescale_action=True)``, do **not** pass
         ``rescale_action=True`` here as well — that would add a second
         ``RescaleAction`` layer (which is a no-op but needlessly
         deepens the chain).  The :func:`make_rl_env_fn` helper in

@@ -7,7 +7,7 @@ Nine presets form a 3x3 grid parameterized along
 ``(setpoint_mode, energy_weight_level)``.  All use
 :class:`~building2building.types.NormalizedDeadbandRewardConfig`
 with ``dT=1.0`` and ``(tau_T, tau_E) = (None, None)`` (the unfilled
-sentinel state); :func:`building2building.api.new_make_env` resolves
+sentinel state); :func:`building2building.api.make_env` resolves
 the per-(building_type, climate_zone) constants from
 :file:`building2building/data/reward_normalizers.yaml` at env-build
 time via :func:`make_normalized_deadband_task`.

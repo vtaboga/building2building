@@ -62,7 +62,7 @@ def main() -> None:
     # Warm up: one cycle outside measurement to let EnergyPlus initialise
     # any one-time global state.
     print("Warming up (1 cycle outside measurement)...", flush=True)
-    env = b2b.new_make_env(**env_kwargs)
+    env = b2b.make_env(**env_kwargs)
     env.reset()
     env.close()
     gc.collect()
@@ -73,7 +73,7 @@ def main() -> None:
         gc.collect()
         rss_before = proc.memory_info().rss
 
-        env = b2b.new_make_env(**env_kwargs)
+        env = b2b.make_env(**env_kwargs)
         env.reset()
         env.close()
 

@@ -111,7 +111,7 @@ class BuildingPool:
         )
 
     def make_env(self, spec: BuildingSpec, eplus_output_dir: Path) -> gym.Env:
-        return b2b.new_make_env(
+        return b2b.make_env(
             spec.building_type,
             split=spec.split,
             building_id=spec.building_id,
@@ -400,7 +400,7 @@ def _run_rollout_job(job: RolloutJob) -> tuple:
 
     t_start = time.time()
 
-    env = b2b.new_make_env(
+    env = b2b.make_env(
         job.spec.building_type,
         split=job.spec.split,
         building_id=job.spec.building_id,
@@ -469,7 +469,7 @@ def _run_eval_job(job: EvalJob) -> tuple[str, str, float, int]:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     torch.set_num_threads(1)
 
-    env = b2b.new_make_env(
+    env = b2b.make_env(
         job.spec.building_type,
         split=job.spec.split,
         building_id=job.spec.building_id,

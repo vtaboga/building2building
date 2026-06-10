@@ -92,7 +92,7 @@ def main() -> None:
     print(f"Comparing controllers on {building_type}/{task} ({run_period})")
     print("-" * 50)
 
-    env = b2b.new_make_env(
+    env = b2b.make_env(
         building_type, split="test", index=0, task=task, run_period=run_period
     )
 
@@ -114,7 +114,7 @@ def main() -> None:
     returns: list[float] = []
 
     for idx in range(5):
-        env = b2b.new_make_env(
+        env = b2b.make_env(
             building_type, split="test", index=idx, task=task, run_period=run_period
         )
         policy = ProportionalController(target_temp=21.0, kp=0.15)

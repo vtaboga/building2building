@@ -144,7 +144,7 @@ def evaluate_building(
     rewards: list[float] = []
 
     for run_idx in range(n_runs):
-        env = b2b.new_make_env(
+        env = b2b.make_env(
             building_type,
             building_id=building_id,
             task=task,

@@ -361,7 +361,7 @@ def rollout_and_analyze(
     task: str,
     run_period: Literal["full_year", "winter", "summer"] = "full_year",
 ) -> RolloutArtifacts:
-    env = b2b.new_make_env(
+    env = b2b.make_env(
         building_type,
         building_id=building_id,
         task=task,

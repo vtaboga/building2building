@@ -33,12 +33,12 @@ reward = NormalizedDeadbandRewardConfig(
 ```
 
 `tau_T = tau_E = None` is the *unfilled sentinel state*.  Pass the preset
-name to `new_make_env` and it resolves the constants automatically:
+name to `make_env` and it resolves the constants automatically:
 
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 ```
 
 ## Target Temperature Modes
@@ -71,12 +71,12 @@ occupied setpoint, and unoccupied setpoint are sampled from a per-building-type
 distribution.  This is what the `task_rand_*` family uses.
 
 ```python
-env = b2b.new_make_env(
+env = b2b.make_env(
     "OfficeSmall",
     task="task_occ_e0",  # seasonal occupancy-based targets
 )
 
-env = b2b.new_make_env(
+env = b2b.make_env(
     "OfficeSmall",
     task="task_rand_e0",  # per-day random arrival/departure + setpoints
     random_schedule_seed=42,

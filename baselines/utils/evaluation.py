@@ -127,7 +127,7 @@ def close_env_aggressively(
 
         This function will be removed in phase D.  Callers should switch to
         ``env.close()``.  The ``cleanup_dir`` argument is redundant when the
-        environment was created via :func:`~building2building.api.new_make_env`
+        environment was created via :func:`~building2building.api.make_env`
         or :func:`~building2building.envs.factory.make_env_from_config`
         (both track the output directory on the env); it is honoured here only
         as a fallback for envs constructed through other paths.
@@ -136,7 +136,7 @@ def close_env_aggressively(
         env: The environment to close, possibly wrapped.
         cleanup_dir: Directory to ``shutil.rmtree`` as a fallback when the
             env does not track its own output directory.  Redundant for envs
-            created via :func:`~building2building.api.new_make_env`.
+            created via :func:`~building2building.api.make_env`.
         thread_join_timeout: Ignored; the join timeout is now configured on
             the env via the upstream ``thread_join_timeout`` constructor
             parameter.  Kept for API compatibility.

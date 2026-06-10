@@ -7,7 +7,7 @@ that every code path is covered by a unit test. Tests exist to give a
 to debug when they break silently:
 
 - the **building processing pipeline** (`building2building/pipeline/`),
-- the **public API** (`building2building.new_make_env`, `b2b.rollout`,
+- the **public API** (`building2building.make_env`, `b2b.rollout`,
   `b2b.benchmarks`, the typed configs in `building2building/types.py`),
 - the **observation and action wrappers** (`building2building/simulator/wrappers.py`),
 - and the **data registry** that maps building IDs from the HuggingFace
@@ -26,7 +26,7 @@ the production code evolves. The real code changes shape, the mock keeps
 passing, and the test becomes false reassurance.
 
 1. **Exercise the real code path.** Build envs through real
-   `new_make_env` / `make_env_from_config` against a committed
+   `make_env` / `make_env_from_config` against a committed
    fixture; do not build a `MockEnv` that pretends to be a B2B env.
    Construct configs (`TaskConfig`, `EnvBuildConfig`,
    `BuildingInfo`, `BuildingConfig`) via their real
@@ -113,7 +113,7 @@ pytest -k "deadband and not legacy"            # keyword filter
 | `fake_splits`         | The fake `splits.json` loaded as a nested `dict`.                                                       |
 | `baseline_csv_path`   | Path to a small `baseline_returns_fixture.csv` used by scoring tests.                                   |
 | `minimal_building_dir`| Path to one minimal-building fixture dir, selectable by `indirect` param (fixture name, HVAC archetype alias, or building type). Defaults to `minimal_officemedium`. |
-| `fixture_registry`    | A `BuildingRegistry` stub pointed at the `minimal_building_dir` fixture, driven by `minimal_fixtures.json`, so `new_make_env` resolves to a real committed building without a HuggingFace download. |
+| `fixture_registry`    | A `BuildingRegistry` stub pointed at the `minimal_building_dir` fixture, driven by `minimal_fixtures.json`, so `make_env` resolves to a real committed building without a HuggingFace download. |
 
 #### The minimal-building fixture matrix
 
@@ -165,7 +165,7 @@ before pushing.
 - **`test_api.py`** — Smoke tests for `list_building_types` and
   `list_buildings`. Uses `unittest.mock.patch` to stub out the HuggingFace
   registry so the call delegates correctly without touching the network.
-- **`test_api_mode_default.py`** — Regression guard for `new_make_env`. A
+- **`test_api_mode_default.py`** — Regression guard for `make_env`. A
   previous bug silently defaulted `target_temperature_mode` to `"constant"`,
   which silently disabled occupancy-driven setpoints for `task_occ_*`/`task_rand_*`. The
   test monkey-patches `create_simulator` to raise a marker exception as soon
@@ -195,7 +195,7 @@ before pushing.
   unoccupied policy. Two additional tests guard that:
 
   1. Normalized presets are stored *unfilled* (`tau_T = tau_E = None`) so
-     that `new_make_env` resolves them per-building from the YAML.
+     that `make_env` resolves them per-building from the YAML.
   2. The `make_normalized_deadband_task` factory does its YAML import
      lazily — importing `config.tasks` must not trigger a metadata
      download.
@@ -282,13 +282,13 @@ before pushing.
 
 ### Environment construction
 
-- **`test_new_make_env_minimal.py`** — Pins the knobs-and-building-matrix
-  contract for `new_make_env`: every combination of run period,
+- **`test_make_env_minimal.py`** — Pins the knobs-and-building-matrix
+  contract for `make_env`: every combination of run period,
   target-temperature mode, and building type (one fixture per type, spanning
   the VAV / Unitary / HeatingOnly archetypes) produces an env whose
   `action_space` has the expected shape and well-formed metadata. Also
   verifies that `rescale_action=True` and `max_episode_steps` are honoured.
-- **`test_new_make_env_cleanup.py`** — Pins the staging-directory cleanup
+- **`test_make_env_cleanup.py`** — Pins the staging-directory cleanup
   contract: seasonal run periods register a cleanup callback for the
   EnergyPlus staging directory on `env.close()`; full-year periods skip
   the cleanup (the staging dir is reused across episodes).
@@ -432,7 +432,7 @@ B2B_RUN_LONG_TESTS=1 pytest tests/long -s
 
   - Multiple distinct setpoints per zone over 3 days.
   - Same seed → byte-identical target traces (both via
-    `make_env_from_config` and via `new_make_env`).
+    `make_env_from_config` and via `make_env`).
   - Different seeds → traces differ.
   - `zone_occupancy ∈ {0, 1}` and is consistent with the target
     transitions.

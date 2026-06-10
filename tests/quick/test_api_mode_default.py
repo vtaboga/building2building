@@ -131,12 +131,12 @@ class TestRewardResolution:
 
 
 @pytest.mark.quick
-def test_new_make_env_mode_end_to_end(
+def test_make_env_mode_end_to_end(
     monkeypatch: pytest.MonkeyPatch,
     fixture_registry: Any,
 ) -> None:
     _patch_registry(monkeypatch, fixture_registry)
-    env = api_mod.new_make_env(
+    env = api_mod.make_env(
         "OfficeSmall",
         task="task_occ_emed",
         reward=_FILLED_REWARD,

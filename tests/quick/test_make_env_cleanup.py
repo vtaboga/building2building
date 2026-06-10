@@ -1,4 +1,4 @@
-"""Pins the staging-directory cleanup contract for ``new_make_env``.
+"""Pins the staging-directory cleanup contract for ``make_env``.
 
 Asserts that seasonal run periods register a cleanup callback for the
 EnergyPlus staging directory on ``env.close()``, and that full-year periods
@@ -24,7 +24,7 @@ def _patch_registry(monkeypatch: pytest.MonkeyPatch, fixture_registry: Any) -> N
 
 
 @pytest.mark.quick
-def test_new_make_env_registers_staging_dir_cleanup_for_seasonal_period(
+def test_make_env_registers_staging_dir_cleanup_for_seasonal_period(
     monkeypatch: pytest.MonkeyPatch,
     fixture_registry: Any,
 ) -> None:
@@ -45,7 +45,7 @@ def test_new_make_env_registers_staging_dir_cleanup_for_seasonal_period(
 
     monkeypatch.setattr(api_mod.weakref, "finalize", _recording_finalize)
 
-    env = api_mod.new_make_env(
+    env = api_mod.make_env(
         "OfficeSmall",
         task="task_occ_emed",
         reward=RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0),
@@ -70,7 +70,7 @@ def test_new_make_env_registers_staging_dir_cleanup_for_seasonal_period(
 
 
 @pytest.mark.quick
-def test_new_make_env_skips_staging_dir_cleanup_for_full_year(
+def test_make_env_skips_staging_dir_cleanup_for_full_year(
     monkeypatch: pytest.MonkeyPatch,
     fixture_registry: Any,
 ) -> None:
@@ -90,7 +90,7 @@ def test_new_make_env_skips_staging_dir_cleanup_for_full_year(
 
     monkeypatch.setattr(api_mod.weakref, "finalize", _recording_finalize)
 
-    env = api_mod.new_make_env(
+    env = api_mod.make_env(
         "OfficeSmall",
         task="task_occ_emed",
         reward=RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0),

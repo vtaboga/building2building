@@ -58,7 +58,7 @@ def _maybe_warn_normalized_deadband(
 
     Called once per simulator construction.  The check sees the
     *resolved* ``task_config.target_temperature_mode`` (which
-    :func:`building2building.api.new_make_env` may have overridden via
+    :func:`building2building.api.make_env` may have overridden via
     its ``target_temperature_mode=`` argument), so the warning matches
     the regime the env will actually run under, not whatever the preset
     originally said.
@@ -102,7 +102,7 @@ def _maybe_warn_normalized_deadband(
     _NORMALIZED_REWARD_WARN_SEEN.add(key)
     for msg in messages:
         # ``stacklevel=4`` so ``pytest.warns`` from a test that calls
-        # ``new_make_env`` -> ``create_simulator`` ->
+        # ``make_env`` -> ``create_simulator`` ->
         # ``_maybe_warn_normalized_deadband`` reports the test frame
         # rather than this helper.
         warnings.warn(msg, RuntimeWarning, stacklevel=4)
@@ -246,7 +246,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         raise ValueError(
             "NormalizedDeadbandRewardConfig has unfilled tau_T/tau_E. "
             "This config is a preset sentinel; call "
-            "`building2building.api.new_make_env(...)` (which auto-fills "
+            "`building2building.api.make_env(...)` (which auto-fills "
             "the constants from reward_normalizers.yaml) or explicitly "
             "call `cfg.filled(tau_T, tau_E)` before constructing the "
             "simulator."
@@ -317,7 +317,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         "morphology": morphology,
         "task_config": task_config,
         # ``building_info`` is populated by the env factories
-        # (:func:`building2building.api.new_make_env`,
+        # (:func:`building2building.api.make_env`,
         # :func:`building2building.envs.factory.make_env_from_config`) after
         # simulator creation, since only they have the :class:`BuildingInfo`.
         "building_info": None,

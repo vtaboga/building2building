@@ -59,11 +59,11 @@ class CrossDomainGeneralization(BenchmarkProblem):
 
     def make_train_envs(self, n: int | None = None) -> list[gym.Env]:
         """Create training environments from the training building type."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         count = n if n is not None else self.n_train
         return [
-            new_make_env(
+            make_env(
                 building_type=self.train_type,
                 split="train",
                 index=i,
@@ -74,11 +74,11 @@ class CrossDomainGeneralization(BenchmarkProblem):
 
     def make_test_envs(self, n: int | None = None) -> list[gym.Env]:
         """Create test environments from the test building type."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         count = n if n is not None else self.n_test
         return [
-            new_make_env(
+            make_env(
                 building_type=self.test_type,
                 split="test",
                 index=i,

@@ -180,7 +180,7 @@ All baselines use only the public `building2building` API:
 import building2building as b2b
 
 # Create environment
-env = b2b.new_make_env("OfficeSmall", task="task1")
+env = b2b.make_env("OfficeSmall", task="task1")
 
 # Access metadata
 obs_names = env.metadata["observation_names"]

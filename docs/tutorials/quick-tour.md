@@ -13,7 +13,7 @@ morphology graph.
 1. **List building types** — `b2b.list_building_types()` returns the 6
    available building types.
 
-2. **Create an environment** — `b2b.new_make_env("OfficeSmall", split="test",
+2. **Create an environment** — `b2b.make_env("OfficeSmall", split="test",
    index=0, task="task_const_e0")` returns a Gymnasium-compatible env.
 
 3. **Inspect metadata** — `env.metadata` exposes `observation_names`,
@@ -37,7 +37,7 @@ morphology graph.
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env("OfficeSmall", split="test", index=0, task="task_const_e0")
+env = b2b.make_env("OfficeSmall", split="test", index=0, task="task_const_e0")
 obs, info = env.reset()
 obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 env.close()

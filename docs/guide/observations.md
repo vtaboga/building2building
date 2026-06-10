@@ -38,7 +38,7 @@ Every observation channel has a human-readable name accessible via metadata:
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 names = env.metadata["observation_names"]
 for i, name in enumerate(names):
     print(f"  [{i}] {name}")
@@ -68,7 +68,7 @@ B2B provides wrappers to harmonize observations across buildings:
 Zero-pads observations to a fixed target size:
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 env = b2b.PadObservation(env, target_size=40)
 # obs.shape is now always (40,)
 ```
@@ -78,7 +78,7 @@ env = b2b.PadObservation(env, target_size=40)
 Appends building-level parameters to the observation vector:
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 env = b2b.AugmentObservationWithBuildingParams(env)
 # obs now includes 5 extra features: area, n_zones, etc.
 ```

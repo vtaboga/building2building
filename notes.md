@@ -39,7 +39,7 @@ Implementation map:
 | Calibration constants loader | `building2building/data/reward_normalizers.py` |
 | Calibration YAML | `building2building/data/reward_normalizers.yaml` |
 | Task presets + factory | `building2building/config/tasks.py` |
-| Env-factory auto-fill of `(τ_T, τ_E)` | `building2building/api/__init__.py::new_make_env` |
+| Env-factory auto-fill of `(τ_T, τ_E)` | `building2building/api/__init__.py::make_env` |
 | Calibration scripts | `analysis/task_study/compute_reward_normalizers.py`, `compute_random_policy_reward_normalizers.py` |
 
 Sanity figure (git-ignored):
@@ -91,7 +91,7 @@ Monitor ( NormalizeObservation ( RescaleAction ( TimeLimit ( EnergyPlusSimulator
   `simulator/observation_spaces.py::flat_observation_info`). No
   `VecNormalize` stats file. The wrapper does **not** clip; values
   outside `[0, 1]` during warmup are expected.
-- `RescaleAction(-1, 1)` is applied **inside** `new_make_env` (with
+- `RescaleAction(-1, 1)` is applied **inside** `make_env` (with
   `rescale_action=True`); `wrap_env_for_rl` is then called with
   `rescale_action=False` to avoid double-rescaling.
 - Reactive controllers, tuning scripts, and `train_cross_domain.py`

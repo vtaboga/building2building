@@ -26,12 +26,12 @@ def make_registered_env(
     """Entry point used by ``gym.make()`` for registered B2B environments.
 
     This function is referenced via ``entry_point`` in the registration
-    calls below.  It delegates to :func:`building2building.api.make_env`
-    (the new functional API defined in Phase 3.3).
+    calls below.  It delegates to :func:`building2building.api.make_env`,
+    the high-level functional API.
     """
-    from building2building.api import new_make_env
+    from building2building.api import make_env
 
-    return new_make_env(
+    return make_env(
         building_type=building_type,
         split=split,
         index=index,

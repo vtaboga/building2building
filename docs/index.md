@@ -40,7 +40,7 @@ RL**, and **meta-learning** for building energy management.
 import building2building as b2b
 
 # Create a Gymnasium environment
-env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task_const_e0")
+env = b2b.make_env("OfficeSmall", split="train", index=0, task="task_const_e0")
 
 obs, info = env.reset()
 done = False
@@ -93,7 +93,7 @@ score = b2b.compute_normalized_score(
 ```mermaid
 graph TD
     B2B["building2building (pip package)"]
-    API["b2b.new_make_env()"]
+    API["b2b.make_env()"]
     Benchmarks["b2b.benchmarks (4 classes)"]
     Scoring["b2b.compute_normalized_score()"]
     Wrappers["Wrappers (Pad, Normalize, Augment, Resample)"]

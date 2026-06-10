@@ -69,7 +69,7 @@ python -m baselines.eval_ppo --model-dir outputs/train_ppo/.../models
 ## Pipeline
 
 1. For each (building_type, task, building_id):
-   a. Create environment with `b2b.new_make_env()`
+   a. Create environment with `b2b.make_env()`
    b. Wrap with `NormalizeObservation`
    c. Train PPO for `total_timesteps`
    d. Evaluate for one episode

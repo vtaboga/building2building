@@ -427,7 +427,7 @@ class NormalizedDeadbandRewardConfig:
     Task presets store this config with ``tau_T = tau_E = None`` (the
     *unfilled* sentinel state) because the constants depend on the
     chosen building.  At env-construction time
-    :func:`building2building.api.new_make_env` resolves the bucket via
+    :func:`building2building.api.make_env` resolves the bucket via
     :func:`building2building.data.reward_normalizers.resolve_reward_normalizer`
     and replaces the unfilled config with a filled one.  The simulator
     dispatch site rejects unfilled configs with a clear error.

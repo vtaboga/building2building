@@ -40,7 +40,7 @@ Optional extension points:
    loop; pass the `Trajectory` to `b2b.compute_normalized_score()`.
 
 4. **Evaluate across buildings** — loop over `split="test"` indices with
-   `b2b.new_make_env(...)`.
+   `b2b.make_env(...)`.
 
 ---
 
@@ -60,7 +60,7 @@ class ConstantController:
         return np.zeros(self._n_act, dtype=np.float32), None
 
 
-env = b2b.new_make_env("SingleFamilyHouse", split="test", index=0, task="task_const_e0")
+env = b2b.make_env("SingleFamilyHouse", split="test", index=0, task="task_const_e0")
 ctrl = ConstantController()
 ctrl.bind_env(env)
 traj = b2b.rollout(env, controller=b2b.callable_controller(ctrl.predict))

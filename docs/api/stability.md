@@ -15,8 +15,8 @@ require a `CHANGELOG.md` entry and must respect the deprecation window below.
 
 | Symbol | Description |
 |---|---|
-| `new_make_env` | Primary entry point: create a Gymnasium env by building type and index or ID. |
-| `make_env` | Legacy entry point (accepts a `BuildingConfig` directly). |
+| `make_env` | Primary entry point: create a Gymnasium env by building type and index or ID. |
+| `make_env_from_config` | Low-level factory: build an env from a fully-specified `EnvBuildConfig`. |
 | `list_building_types` | Return the list of supported building-type strings. |
 | `list_buildings` | Return metadata for all buildings of a given type. |
 | `list_buildings_by_climate_zone` | Filter buildings by ASHRAE climate zone. |

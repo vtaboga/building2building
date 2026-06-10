@@ -192,7 +192,7 @@ def run_rollout(
 
     eplus_dir = output_dir / "eplus" / building_id
     eplus_dir.mkdir(parents=True, exist_ok=True)
-    env = b2b.new_make_env(
+    env = b2b.make_env(
         "OfficeMedium",
         building_id=building_id,
         task="task1",

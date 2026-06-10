@@ -345,7 +345,7 @@ def rebuild_metadata_parquet(
 
     ``action_dim`` is the **agent-facing** action-space dimension — i.e.
     ``env.action_space.shape[0]`` for the env constructed by
-    :func:`building2building.api.new_make_env`.  We compute it by routing
+    :func:`building2building.api.make_env`.  We compute it by routing
     the equipment list through
     :func:`building2building.simulator.action_spaces.agent_action_dim`,
     which applies the same fixed-actuator filter

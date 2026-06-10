@@ -18,9 +18,9 @@ class TestEnvLifecycle:
 
     @pytest.fixture()
     def env(self) -> gym.Env:
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
-        env = new_make_env(
+        env = make_env(
             building_type="SingleFamilyHouse",
             split="train",
             index=0,

@@ -198,8 +198,8 @@ Files with no module-level docstring (confirmed via `ast.get_docstring`):
 ```
 tests/quick/test_augment_building_params.py
 tests/quick/test_equipment_schema.py
-tests/quick/test_new_make_env_cleanup.py
-tests/quick/test_new_make_env_minimal.py
+tests/quick/test_make_env_cleanup.py
+tests/quick/test_make_env_minimal.py
 tests/quick/test_normalize_observation.py
 tests/quick/test_observation_names_stability.py
 tests/quick/test_obs_padding_invariants.py

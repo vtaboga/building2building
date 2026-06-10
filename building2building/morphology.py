@@ -21,7 +21,7 @@ The morphological universe is fixed across all B2B environments::
 
 Usage::
 
-    env = building2building.new_make_env("OfficeSmall", task="task_const_e0")
+    env = building2building.make_env("OfficeSmall", task="task_const_e0")
     morphology = env.metadata["morphology"]
     obs, _ = env.reset()
     local_obs = morphology.split_observation(obs)

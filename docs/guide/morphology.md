@@ -28,7 +28,7 @@ The morphological universe is fixed across all B2B environments:
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 morph = env.metadata["morphology"]
 
 print(f"Nodes: {len(morph.nodes)}")

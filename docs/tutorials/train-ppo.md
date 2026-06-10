@@ -21,7 +21,7 @@ pip install -e ".[training]"
 1. **Pick a building and task** — `"OfficeSmall"`, `task="task_const_e0"`,
    `run_period="winter"` (shorter episodes for faster iteration).
 
-2. **Create a training environment** — `b2b.new_make_env(...)` wrapped with
+2. **Create a training environment** — `b2b.make_env(...)` wrapped with
    `b2b.NormalizeObservation(env)`.
 
 3. **Train PPO** — standard SB3 `PPO("MlpPolicy", env, ...)` loop; save with

@@ -1,4 +1,4 @@
-"""Pins the ``new_make_env`` knobs-and-HVAC-matrix contract.
+"""Pins the ``make_env`` knobs-and-HVAC-matrix contract.
 
 Asserts that every combination of run period, target-temperature mode, and
 building type (one fixture per type, spanning the VAV / Unitary / HeatingOnly
@@ -41,7 +41,7 @@ def _patch_registry(monkeypatch: pytest.MonkeyPatch, fixture_registry: Any) -> N
     ],
     indirect=["minimal_building_dir"],
 )
-def test_new_make_env_knobs_and_hvac_matrix(
+def test_make_env_knobs_and_hvac_matrix(
     monkeypatch: pytest.MonkeyPatch,
     fixture_registry: Any,
     run_period: str,
@@ -50,7 +50,7 @@ def test_new_make_env_knobs_and_hvac_matrix(
 ) -> None:
     _patch_registry(monkeypatch, fixture_registry)
 
-    env = api_mod.new_make_env(
+    env = api_mod.make_env(
         "OfficeSmall",
         task="task_occ_emed",
         reward=RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0),
@@ -88,12 +88,12 @@ def test_new_make_env_knobs_and_hvac_matrix(
 
 
 @pytest.mark.quick
-def test_new_make_env_rescale_action_and_max_steps(
+def test_make_env_rescale_action_and_max_steps(
     monkeypatch: pytest.MonkeyPatch,
     fixture_registry: Any,
 ) -> None:
     _patch_registry(monkeypatch, fixture_registry)
-    env = api_mod.new_make_env(
+    env = api_mod.make_env(
         "OfficeSmall",
         task="task_occ_emed",
         reward=RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0),

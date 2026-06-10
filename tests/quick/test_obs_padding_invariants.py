@@ -50,7 +50,7 @@ def test_pad_observation_keeps_non_zone_tail_at_stable_indices(
 ) -> None:
     _patch_registry(monkeypatch, fixture_registry)
 
-    env = api_mod.new_make_env(
+    env = api_mod.make_env(
         "OfficeSmall",
         task="task_occ_emed",
         reward=_FILLED_REWARD,

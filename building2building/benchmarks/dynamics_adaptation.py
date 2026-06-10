@@ -75,13 +75,13 @@ class DynamicsAdaptation(BenchmarkProblem):
 
     def make_train_envs(self, n: int | None = None) -> list[gym.Env]:
         """Create training environments, one per training building."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         ids = self.train_building_ids()
         if n is not None:
             ids = ids[:n]
         return [
-            new_make_env(
+            make_env(
                 building_type=self.building_type,
                 building_id=bid,
                 task=self.task,
@@ -91,13 +91,13 @@ class DynamicsAdaptation(BenchmarkProblem):
 
     def make_test_envs(self, n: int | None = None) -> list[gym.Env]:
         """Create test environments, one per test building."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         ids = self.test_building_ids()
         if n is not None:
             ids = ids[:n]
         return [
-            new_make_env(
+            make_env(
                 building_type=self.building_type,
                 building_id=bid,
                 task=self.task,

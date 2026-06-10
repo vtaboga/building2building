@@ -97,7 +97,7 @@ def test_normalize_observation_real_env(
     EnergyPlus simulation is only exercised by long tests.
     """
     _patch_registry(monkeypatch, fixture_registry)
-    env = api_mod.new_make_env(
+    env = api_mod.make_env(
         "OfficeSmall",
         task="task_occ_emed",
         reward=_FILLED_REWARD,

@@ -3,7 +3,7 @@
 The ``task_occ_e0`` preset uses ``target_temperature_mode="occupancy"`` with
 ``unoccupied_policy="seasonal"`` and the default seasonal map
 (winter 18 C / shoulder 21 C / summer 26 C).  Built through the public
-``new_make_env`` so the requested ``run_period`` is actually applied — the
+``make_env`` so the requested ``run_period`` is actually applied — the
 lower-level ``make_env_from_config`` does not patch the run period, so
 "summer" would otherwise silently simulate January (see
 ``building2building.api._patch_epjson_run_period``).
@@ -37,7 +37,7 @@ def _make_seasonal_env(
     max_steps: int = 24 * 12 * 7,
     suffix: str = "",
 ) -> "object":
-    return b2b.new_make_env(
+    return b2b.make_env(
         "OfficeSmall",
         split="train",
         index=0,

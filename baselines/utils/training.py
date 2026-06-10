@@ -190,7 +190,7 @@ def make_rl_env_fn(
     and :class:`~stable_baselines3.common.vec_env.DummyVecEnv` consume.
 
     The returned env is constructed via
-    :func:`building2building.api.new_make_env` (with the
+    :func:`building2building.api.make_env` (with the
     ``rescale_action`` keyword), then passed through
     :func:`building2building.wrap_env_for_rl` (with ``normalize_obs``).
     Optionally wrapped in :class:`~stable_baselines3.common.monitor.Monitor`.
@@ -202,25 +202,25 @@ def make_rl_env_fn(
         Monitor(NormalizeObservation(TimeLimit(RescaleAction(simulator))))
 
     Note: ``RescaleAction`` is applied inside ``TimeLimit`` because
-    ``new_make_env`` wraps with ``RescaleAction`` before returning the
+    ``make_env`` wraps with ``RescaleAction`` before returning the
     ``TimeLimit``-wrapped env.
 
     Args:
         building_type: Building type string (e.g. ``"OfficeSmall"``).
         building_id: Explicit building identifier.
-        task: Task name or preset passed to :func:`building2building.api.new_make_env`.
+        task: Task name or preset passed to :func:`building2building.api.make_env`.
         run_period: Simulation run period (``"full_year"``, ``"winter"``,
             ``"summer"``).
         normalize_obs: Apply deterministic ``[0, 1]`` observation scaling
             via :class:`~building2building.simulator.wrappers.NormalizeObservation`.
         rescale_action: Rescale the action space to ``[-1, 1]``.
-            Applied via ``new_make_env(rescale_action=True)`` so that
+            Applied via ``make_env(rescale_action=True)`` so that
             ``wrap_env_for_rl`` is always called with
             ``rescale_action=False`` to avoid double-rescaling.
         monitor: Wrap the env in
             :class:`~stable_baselines3.common.monitor.Monitor`.
         normalizer_path: Override the default reward-normalizer YAML
-            passed to :func:`building2building.api.new_make_env`.
+            passed to :func:`building2building.api.make_env`.
 
     Returns:
         A zero-argument callable that, when called, returns a fully
@@ -229,7 +229,7 @@ def make_rl_env_fn(
     import building2building as b2b
 
     def _factory() -> gym.Env:
-        env = b2b.new_make_env(
+        env = b2b.make_env(
             building_type,
             building_id=building_id,
             task=task,

@@ -30,7 +30,7 @@ def main() -> None:
 
     # -- Build multi-building training environment --
     def make_env(idx: int) -> b2b.ResampleBuildingOnResetWrapper:
-        env = b2b.new_make_env(
+        env = b2b.make_env(
             bench.building_type,
             building_id=train_ids[idx % len(train_ids)],
             task="task_const_e0",
@@ -58,7 +58,7 @@ def main() -> None:
     returns: list[float] = []
 
     for bid in test_ids:
-        eval_env = b2b.new_make_env(
+        eval_env = b2b.make_env(
             bench.building_type,
             building_id=bid,
             task="task_const_e0",

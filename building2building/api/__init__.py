@@ -248,7 +248,7 @@ def _patch_epjson_run_period(
         json.dump(epjson, f, indent=4)
 
 
-def new_make_env(
+def make_env(
     building_type: BuildingType,
     *,
     split: Literal["train", "test", "test_small"] = "train",
@@ -432,20 +432,6 @@ def new_make_env(
     return gym.wrappers.TimeLimit(env, max_episode_steps=int(steps))
 
 
-def make_env(config: EnvBuildConfig, eplus_output_dir: str | Path) -> gym.Env:
-    """Create a Gymnasium environment from a fully-specified build config.
-
-    Args:
-        config: Complete environment build configuration.
-        eplus_output_dir: Directory where EnergyPlus will write its
-            simulation output files.
-
-    Returns:
-        A configured Gymnasium environment backed by EnergyPlus.
-    """
-    return make_env_from_config(config=config, eplus_output_dir=eplus_output_dir)
-
-
 __all__ = [
     "list_building_types",
     "list_buildings",
@@ -458,6 +444,6 @@ __all__ = [
     "callable_controller",
     "rollout",
     "make_env",
-    "new_make_env",
+    "make_env_from_config",
     "parse_benchmark_config",
 ]

@@ -69,9 +69,9 @@ class GoalAdaptation(BenchmarkProblem):
 
     def make_train_env(self, **kwargs: object) -> gym.Env:
         """Create a single training environment."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
-        return new_make_env(
+        return make_env(
             building_type=self.building_type,
             split="train",
             index=self.split_index,
@@ -82,9 +82,9 @@ class GoalAdaptation(BenchmarkProblem):
 
     def make_test_env(self, **kwargs: object) -> gym.Env:
         """Create a single test environment."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
-        return new_make_env(
+        return make_env(
             building_type=self.building_type,
             split="train",
             index=self.split_index,

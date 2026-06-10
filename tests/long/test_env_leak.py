@@ -90,7 +90,7 @@ class TestEnvLeakClose:
 
     def test_close_removes_output_dir(self, profile: _LeakProfile) -> None:
         """(i) Output directory is removed after env.close()."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         env_kwargs = _env_kwargs(profile.building_type)
         with tempfile.TemporaryDirectory(prefix="b2b_leak_test_") as tmpdir:
@@ -98,7 +98,7 @@ class TestEnvLeakClose:
             for i in range(profile.n_cycles):
                 out_dir = parent / f"run_{i}"
                 out_dir.mkdir()
-                env = new_make_env(**env_kwargs, eplus_output_dir=out_dir)
+                env = make_env(**env_kwargs, eplus_output_dir=out_dir)
                 env.reset()
                 env.close()
 
@@ -109,14 +109,14 @@ class TestEnvLeakClose:
 
     def test_close_joins_thread(self, profile: _LeakProfile) -> None:
         """(ii) Thread count returns to baseline after env.close()."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         env_kwargs = _env_kwargs(profile.building_type)
         gc.collect()
         baseline = threading.active_count()
 
         for i in range(profile.n_cycles):
-            env = new_make_env(**env_kwargs)
+            env = make_env(**env_kwargs)
             env.reset()
             env.close()
 
@@ -134,7 +134,7 @@ class TestEnvLeakClose:
         """(iii) RSS growth across N cycles is bounded by _RSS_MAX_GROWTH_BYTES."""
         import psutil
 
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         env_kwargs = _env_kwargs(profile.building_type)
         rss_max_growth_bytes = _rss_limit_bytes(profile.n_cycles)
@@ -143,7 +143,7 @@ class TestEnvLeakClose:
         rss_before = proc.memory_info().rss
 
         for _ in range(profile.n_cycles):
-            env = new_make_env(**env_kwargs)
+            env = make_env(**env_kwargs)
             env.reset()
             env.close()
 
@@ -162,13 +162,13 @@ class TestEnvLeakClose:
         self, profile: _LeakProfile
     ) -> None:
         """Regression: close() alone is sufficient — no helper needed."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         env_kwargs = _env_kwargs(profile.building_type)
         with tempfile.TemporaryDirectory(prefix="b2b_plain_close_") as tmpdir:
             out_dir = Path(tmpdir) / "run"
             out_dir.mkdir()
-            env = new_make_env(**env_kwargs, eplus_output_dir=out_dir)
+            env = make_env(**env_kwargs, eplus_output_dir=out_dir)
             env.reset()
             env.close()
 
@@ -188,14 +188,14 @@ class TestEnvLeakReset:
 
     def test_reset_does_not_accumulate_threads(self, profile: _LeakProfile) -> None:
         """(i) reset() may keep one worker thread alive, but must not accumulate."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         env_kwargs = _env_kwargs(profile.building_type)
         gc.collect()
         baseline = threading.active_count()
         steady_state_count: int | None = None
 
-        env = new_make_env(**env_kwargs)
+        env = make_env(**env_kwargs)
         try:
             for i in range(profile.n_cycles):
                 env.reset()
@@ -228,14 +228,14 @@ class TestEnvLeakReset:
 
     def test_reset_does_not_accumulate_output_dirs(self, profile: _LeakProfile) -> None:
         """(ii) Parent eplus_output_dir contains exactly one run-dir at any time."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         env_kwargs = _env_kwargs(profile.building_type)
         with tempfile.TemporaryDirectory(prefix="b2b_reset_leak_") as tmpdir:
             parent = Path(tmpdir)
             out_dir = parent / "run"
             out_dir.mkdir()
-            env = new_make_env(**env_kwargs, eplus_output_dir=out_dir)
+            env = make_env(**env_kwargs, eplus_output_dir=out_dir)
             try:
                 for i in range(profile.n_cycles):
                     env.reset()
@@ -253,7 +253,7 @@ class TestEnvLeakReset:
         """(iii) RSS growth across N cycles is bounded by _RSS_MAX_GROWTH_BYTES."""
         import psutil
 
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         env_kwargs = _env_kwargs(profile.building_type)
         rss_max_growth_bytes = _rss_limit_bytes(profile.n_cycles)
@@ -261,7 +261,7 @@ class TestEnvLeakReset:
         gc.collect()
         rss_before = proc.memory_info().rss
 
-        env = new_make_env(**env_kwargs)
+        env = make_env(**env_kwargs)
         try:
             for _ in range(profile.n_cycles):
                 env.reset()
@@ -281,14 +281,14 @@ class TestEnvLeakReset:
 
     def test_double_reset_same_env(self, profile: _LeakProfile) -> None:
         """Two consecutive reset() calls without close() must not crash."""
-        from building2building.api import new_make_env
+        from building2building.api import make_env
 
         env_kwargs = _env_kwargs(profile.building_type)
         with tempfile.TemporaryDirectory(prefix="b2b_double_reset_") as tmpdir:
             parent = Path(tmpdir)
             out_dir = parent / "run"
             out_dir.mkdir()
-            env = new_make_env(**env_kwargs, eplus_output_dir=out_dir)
+            env = make_env(**env_kwargs, eplus_output_dir=out_dir)
             try:
                 env.reset()
                 env.reset()

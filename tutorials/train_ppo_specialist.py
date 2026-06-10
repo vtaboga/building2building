@@ -23,7 +23,7 @@ def main() -> None:
     print(
         f"Training PPO on {building_type}/{train_building_id}/{task} ({run_period})..."
     )
-    train_env = b2b.new_make_env(
+    train_env = b2b.make_env(
         building_type,
         building_id=train_building_id,
         task=task,
@@ -46,7 +46,7 @@ def main() -> None:
 
     # -- Evaluate --
     print("\nEvaluating on test building...")
-    eval_env = b2b.new_make_env(
+    eval_env = b2b.make_env(
         building_type,
         building_id=eval_building_id,
         task=task,

@@ -18,7 +18,7 @@ from building2building.api import (
     list_buildings,
     list_buildings_by_climate_zone,
     make_env,
-    new_make_env,
+    make_env_from_config,
     rollout,
 )
 from building2building.api.rl_wrappers import wrap_env_for_rl
@@ -77,7 +77,7 @@ __all__ = [
     "ClimateZoneUnavailableError",
     "TYPES_WITHOUT_CLIMATE_ZONE",
     "make_env",
-    "new_make_env",
+    "make_env_from_config",
     # Rollout / trajectory capture
     "Controller",
     "Trajectory",

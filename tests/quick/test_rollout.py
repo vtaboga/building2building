@@ -129,7 +129,7 @@ class TestControllerProtocol:
 @pytest.mark.long
 class TestRolloutEndToEnd:
     def test_small_rollout_captures_expected_shapes(self, tmp_path: Path) -> None:
-        env = b2b.new_make_env(
+        env = b2b.make_env(
             "OfficeSmall",
             task="task_const_e0",
             run_period="winter",

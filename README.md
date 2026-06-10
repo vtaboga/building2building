@@ -50,7 +50,7 @@ print(b2b.list_building_types())
 # ['SingleFamilyHouse', 'OfficeSmall', 'OfficeMedium', ...]
 
 # Create a Gymnasium environment
-env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task_const_e0")
+env = b2b.make_env("OfficeSmall", split="train", index=0, task="task_const_e0")
 
 obs, info = env.reset()
 done = False
@@ -101,7 +101,7 @@ calibration constants:
 The default is `task_const_e0` (constant setpoint, comfort-only).
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task_occ_emed")
+env = b2b.make_env("OfficeSmall", task="task_occ_emed")
 ```
 
 ---

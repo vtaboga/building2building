@@ -51,7 +51,7 @@ def _make_env(
     task: str,
 ) -> gym.Env:
     """Create a single B2B environment."""
-    return b2b.new_make_env(building_type, building_id=building_id, task=task)
+    return b2b.make_env(building_type, building_id=building_id, task=task)
 
 
 def _apply_wrappers(

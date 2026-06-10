@@ -2,10 +2,10 @@
 for an OfficeSmall building, and that the target temperature responds to
 occupancy when ``target_temperature_mode`` is ``"occupancy"``.
 
-Built through the public ``new_make_env`` entry point so the requested
+Built through the public ``make_env`` entry point so the requested
 ``run_period`` is actually applied to the simulation (the lower-level
 ``make_env_from_config`` does not patch the run period — see
-``building2building.api.new_make_env`` / ``_patch_epjson_run_period``).
+``building2building.api.make_env`` / ``_patch_epjson_run_period``).
 
 Requires EnergyPlus — run with ``B2B_RUN_LONG_TESTS=1 pytest -s tests/long/test_occupancy_observation.py``.
 """
@@ -40,7 +40,7 @@ def _requires_long_runtime() -> None:
 
 
 def _make_office_small_env(tmp_path: Path):
-    return b2b.new_make_env(
+    return b2b.make_env(
         "OfficeSmall",
         split="train",
         index=0,

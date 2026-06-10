@@ -137,11 +137,11 @@ def test_different_seeds_differ(tmp_path: Path) -> None:
 WEEK_STEPS = 7 * 24 * 12
 
 
-def test_week_reproducibility_via_new_make_env(tmp_path: Path) -> None:
+def test_week_reproducibility_via_make_env(tmp_path: Path) -> None:
     """Two independent one-week rollouts with the same seed must produce
     byte-identical ``target_temperature`` traces.
 
-    This exercises the public :func:`building2building.new_make_env`
+    This exercises the public :func:`building2building.make_env`
     entry point (the same one used by the analysis scripts), as opposed
     to :func:`make_env_from_config` covered by
     :func:`test_seed_determinism`.  The run window defaults to the
@@ -155,7 +155,7 @@ def test_week_reproducibility_via_new_make_env(tmp_path: Path) -> None:
     seed = 2025
 
     def _make(suffix: str):
-        return b2b.new_make_env(
+        return b2b.make_env(
             "OfficeSmall",
             split="train",
             index=0,

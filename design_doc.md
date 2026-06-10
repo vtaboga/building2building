@@ -21,7 +21,7 @@ slow-simulating real-world domain. Three intertwined questions:
    buildings (cross-domain benchmark; Amorpheus).
 2. **Transfer** — across dynamics, goal, or action-space changes
    (three transfer benchmarks).
-3. **Scale** — ~7,000 envs; which conclusions survive the jump.
+3. **Scale** — ~6,000 envs; which conclusions survive the jump.
 
 A change that helps one at the cost of another is rarely worth it.
 
@@ -71,7 +71,7 @@ researcher extending the benchmark via `building2building/pipeline/`
 
 ```
 building2building/        # Public package
-├── api/                  # new_make_env, list_buildings, rollout, RL wrappers
+├── api/                  # make_env, list_buildings, rollout, RL wrappers
 ├── benchmarks/           # 4 benchmark problem classes
 ├── config/               # TaskPreset + dataclass parsers
 ├── data/                 # HF dataset registry + reward_normalizers
@@ -99,7 +99,7 @@ scratchpad whose paper-cited scripts migrate into `baselines/`),
 ### 3.2 API stability tiers
 
 - **Public (stable).** Re-exports from `building2building/__init__.py`
-  (`new_make_env`, `list_buildings`, `list_building_types`,
+  (`make_env`, `list_buildings`, `list_building_types`,
   `list_buildings_by_climate_zone`, `get_climate_zone`,
   `wrap_env_for_rl`, `compute_normalized_score`, `types.py`
   dataclasses, morphology helpers). Contract — see §4. Breaking
@@ -113,7 +113,7 @@ scratchpad whose paper-cited scripts migrate into `baselines/`),
 
 - `NormalizedDeadbandRewardConfig` has two valid states: unfilled
   sentinel (`tau_T=tau_E=None`, used by presets) and filled (both
-  `>0`). Mixed → `__post_init__` raises. `new_make_env` resolves the
+  `>0`). Mixed → `__post_init__` raises. `make_env` resolves the
   per-bucket constants when it knows the building.
 - `make_rl_env_fn` (`baselines/utils/training.py`) is the **single**
   way to build an env for RL training/eval. Wrapper stack:
@@ -121,7 +121,7 @@ scratchpad whose paper-cited scripts migrate into `baselines/`),
 - `NormalizeObservation` is **deterministic** (uses
   `observation_space.low/high`). No `VecNormalize` stats file.
 - Reactive controllers, tuning, benchmark harnesses use
-  `new_make_env(rescale_action=False)` (raw engineering units).
+  `make_env(rescale_action=False)` (raw engineering units).
 - Off-calibration `(building_type, target_mode, dT)` usage emits a
   deduped `RuntimeWarning` from
   `simulator/__init__.py::_maybe_warn_normalized_deadband`.

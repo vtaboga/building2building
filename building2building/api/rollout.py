@@ -18,7 +18,7 @@ Example::
     import building2building as b2b
     import numpy as np
 
-    env = b2b.new_make_env("OfficeSmall", task="task_const_e0", run_period="winter")
+    env = b2b.make_env("OfficeSmall", task="task_const_e0", run_period="winter")
 
     def random_controller(_obs):
         return env.action_space.sample()
@@ -231,7 +231,7 @@ def rollout(
 
     Args:
         env: Gymnasium environment (typically created via
-            :func:`building2building.new_make_env`).
+            :func:`building2building.make_env`).
         controller: Either a :class:`Controller` instance or a plain callable
             ``fn(obs) -> action``. If it exposes a ``reset(env)`` method, it
             is called once after ``env.reset``.

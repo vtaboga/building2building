@@ -77,7 +77,7 @@ def main() -> None:
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    ref_env = b2b.new_make_env(
+    ref_env = b2b.make_env(
         args.test_building_types[0], split="test", index=0, task=args.task
     )
     ref_morph: b2b.Morphology = ref_env.metadata["morphology"]
@@ -101,7 +101,7 @@ def main() -> None:
         logger.info("Testing on %s (%d buildings)", bt, args.n_test)
         for i in range(args.n_test):
             try:
-                env = b2b.new_make_env(bt, split="test", index=i, task=args.task)
+                env = b2b.make_env(bt, split="test", index=i, task=args.task)
                 morph = env.metadata["morphology"]
                 policy.morphology = morph
 

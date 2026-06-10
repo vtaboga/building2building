@@ -13,7 +13,7 @@ environment bounds to `[0, 1]`:
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 env = b2b.NormalizeObservation(env)
 ```
 
@@ -34,7 +34,7 @@ multi-building training. Padding is zone-aware: zone temperatures are padded
 first and non-zone features stay grouped at the end.
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 env = b2b.PadObservation(env, target_size=40)
 ```
 
@@ -52,7 +52,7 @@ env = b2b.PadObservation(env, target_size=40)
 features to each observation.
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 env = b2b.AugmentObservationWithBuildingParams(env)
 ```
 
@@ -78,7 +78,7 @@ import gymnasium as gym
 import building2building as b2b
 
 def factory(idx: int) -> gym.Env:
-    return b2b.new_make_env("OfficeSmall", split="train", index=idx, task="task_const_e0")
+    return b2b.make_env("OfficeSmall", split="train", index=idx, task="task_const_e0")
 
 env = b2b.ResampleBuildingOnResetWrapper(factory, available_indices=[0, 1, 2, 3, 4])
 ```
@@ -107,7 +107,7 @@ next `reset()`.
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
 ```
 
@@ -124,7 +124,7 @@ env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
 For explicit composition outside `wrap_env_for_rl`, use:
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 env = b2b.PadObservation(env, target_size=40)
 env = b2b.AugmentObservationWithBuildingParams(env)
 env = b2b.NormalizeObservation(env)

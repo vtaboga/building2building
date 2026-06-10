@@ -284,13 +284,13 @@ minergym sense), so the thread-join branch is skipped.
 
 ---
 
-### 2.2  `building2building/api/__init__.py` — `new_make_env`
+### 2.2  `building2building/api/__init__.py` — `make_env`
 
 Add a `use_subprocess: bool = False` parameter and pass it to
 `create_simulator`.  Default `False` preserves all existing behaviour.
 
 ```python
-def new_make_env(
+def make_env(
     ...
     use_subprocess: bool = False,
 ) -> gym.Env:
@@ -347,7 +347,7 @@ Once the subprocess mode passes the RSS test:
 | `minergym/subprocess_worker.py` | **New** — worker function |
 | `minergym/subprocess_simulation.py` | **New** — `SubprocessEnergyPlusSimulation` |
 | `building2building/simulator/__init__.py` | Add `use_subprocess` to `MakeEnergyPlus`; update `create_simulator` |
-| `building2building/api/__init__.py` | Add `use_subprocess` param to `new_make_env` |
+| `building2building/api/__init__.py` | Add `use_subprocess` param to `make_env` |
 | `building2building/envs/factory.py` | Add `use_subprocess` param to `make_env_from_config` |
 | `tests/long/test_env_leak.py` | Add subprocess test class |
 | `tests/quick/` | Add picklability smoke test |

@@ -61,7 +61,7 @@ def evaluate_specialist(
 
         model = PPO.load(str(model_path))
         for _ in range(n_episodes):
-            env = b2b.new_make_env(
+            env = b2b.make_env(
                 bench.building_type, building_id=bid, task=bench.task
             )
             try:
@@ -111,7 +111,7 @@ def evaluate_multi_building(
 
     for bid in test_ids:
         for _ in range(n_episodes):
-            env: Any = b2b.new_make_env(
+            env: Any = b2b.make_env(
                 bench.building_type, building_id=bid, task=bench.task
             )
             env = b2b.PadObservation(env, target_size=pad_obs_size)

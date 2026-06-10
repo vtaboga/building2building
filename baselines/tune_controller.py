@@ -166,7 +166,7 @@ def _run_one_building(
     )
 
     policy = _AirLoopPolicy(cfg) if is_vav else _UnitaryHvacPolicy(cfg)
-    env = worker_b2b.new_make_env(
+    env = worker_b2b.make_env(
         building_type,
         building_id=building_id,
         task=task,
@@ -255,7 +255,7 @@ def _evaluate_sequential(
     policy = AirLoopPolicy(cfg) if is_vav else UnitaryHvacPolicy(cfg)
     rewards: list[float] = []
     for bid in building_ids:
-        env = b2b.new_make_env(
+        env = b2b.make_env(
             building_type,
             building_id=bid,
             task=task,

@@ -84,10 +84,10 @@ test_ids = b2b.list_buildings("OfficeSmall", split="test")
 print(f"Train: {len(train_ids)}, Test: {len(test_ids)}")
 
 # Select by index
-env = b2b.new_make_env("OfficeSmall", split="train", index=0)
+env = b2b.make_env("OfficeSmall", split="train", index=0)
 
 # Select by explicit ID
-env = b2b.new_make_env("OfficeSmall", building_id=train_ids[5])
+env = b2b.make_env("OfficeSmall", building_id=train_ids[5])
 ```
 
 ## Train/Test Splits

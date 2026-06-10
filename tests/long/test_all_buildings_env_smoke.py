@@ -1,7 +1,7 @@
 """Long-running smoke test across all dataset buildings.
 
 For each building present in the unified metadata, this test constructs an
-environment through ``make_env``, runs one ``reset`` and one ``step``, then
+environment through ``make_env_from_config``, runs one ``reset`` and one ``step``, then
 records any failures by building ID.
 
 Buildings are processed in small batches (``BATCH_SIZE``), each in a fresh
@@ -120,7 +120,7 @@ def _run_batch(
     """
     import gymnasium as gym
 
-    from building2building.api import make_env
+    from building2building.api import make_env_from_config
     from building2building.config.models import EnvBuildConfig
 
     logging.basicConfig(level=logging.INFO, force=True)
@@ -141,7 +141,7 @@ def _run_batch(
                 # Smoke test only builds/reset/steps the env, so the exact
                 # normalizer scale is irrelevant; supply filled tau_T/tau_E
                 # (the EnvBuildConfig path does not autofill them — only
-                # new_make_env does).
+                # make_env does).
                 "reward": {
                     "reward_type": "NormalizedDeadbandRewardConfig",
                     "tau_T": 1.0,
@@ -166,7 +166,7 @@ def _run_batch(
             output_dir = output_path / _sanitize_for_path(
                 f"{building_type}_{building_id}"
             )
-            env = make_env(config=config, eplus_output_dir=output_dir)
+            env = make_env_from_config(config=config, eplus_output_dir=output_dir)
             env.reset()
             action = env.action_space.sample()
             env.step(action)

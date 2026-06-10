@@ -37,7 +37,7 @@ pytest -m quick
 
 ## 2. Creating Your First Environment
 
-The primary entry point is `b2b.new_make_env()`:
+The primary entry point is `b2b.make_env()`:
 
 ```python
 import building2building as b2b
@@ -51,7 +51,7 @@ train_ids = b2b.list_buildings("OfficeSmall", split="train")
 print(f"{len(train_ids)} training buildings available")
 
 # Create an environment
-env = b2b.new_make_env(
+env = b2b.make_env(
     "OfficeSmall",
     split="train",
     index=0,
@@ -63,7 +63,7 @@ print(f"Observation shape: {obs.shape}")
 print(f"Action space: {env.action_space}")
 ```
 
-Key parameters of `new_make_env`:
+Key parameters of `make_env`:
 
 | Parameter | Description | Default |
 |---|---|---|
@@ -82,7 +82,7 @@ Key parameters of `new_make_env`:
 Each environment exposes rich metadata:
 
 ```python
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 
 obs_names = env.metadata["observation_names"]  # list[str]
 act_names = env.metadata["action_names"]       # list[str]
@@ -103,7 +103,7 @@ env.close()
 ```python
 import building2building as b2b
 
-env = b2b.new_make_env("OfficeSmall", split="train", index=0, task="task_const_e0")
+env = b2b.make_env("OfficeSmall", split="train", index=0, task="task_const_e0")
 
 obs, info = env.reset()
 total_reward = 0.0
@@ -140,7 +140,7 @@ import building2building as b2b
 from baselines.controllers import UnitaryHvacConfig, UnitaryHvacPolicy
 from baselines.utils.evaluation import run_episode
 
-env = b2b.new_make_env("OfficeSmall", task="task_const_e0")
+env = b2b.make_env("OfficeSmall", task="task_const_e0")
 policy = UnitaryHvacPolicy(UnitaryHvacConfig())
 policy.bind_env(env)
 
@@ -167,7 +167,7 @@ env.close()
     from stable_baselines3 import PPO
     import building2building as b2b
 
-    env = b2b.new_make_env(
+    env = b2b.make_env(
         "OfficeSmall",
         split="train",
         index=0,
