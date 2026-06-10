@@ -258,6 +258,11 @@ class Morphology:
         edges: All edges in the graph.
         unassigned_obs_indices: Observation indices not mapped to any node
             (e.g. task-specific occupancy or target temperature signals).
+        unassigned_action_indices: Action indices not mapped to any node.
+            Unlike unassigned observations (often benign task signals), an
+            unassigned action means ``join_actions`` silently leaves that
+            actuator at zero -- typically a sign the morphology is out of
+            sync with the actuator set the pipeline emits.
         common_attributes: Static morphology-wide attribute values
             (e.g. building-level metadata shared across all nodes).
             Defaults to an empty array; the bounds schema is module-level
@@ -268,6 +273,7 @@ class Morphology:
     nodes: tuple[MorphologyNode, ...]
     edges: tuple[MorphologyEdge, ...]
     unassigned_obs_indices: tuple[int, ...] = ()
+    unassigned_action_indices: tuple[int, ...] = ()
     common_attributes: np.ndarray = field(
         default_factory=_empty_array,
         compare=False,
@@ -622,16 +628,37 @@ def build_morphology(
     )
     if unassigned:
         unassigned_names = [observation_names[i] for i in unassigned]
-        logger.debug(
+        logger.warning(
             "Morphology: %d unassigned observation slots: %s",
             len(unassigned),
             unassigned_names,
+        )
+
+    # -- Collect unassigned actions ----------------------------------------
+    # Every actuator the pipeline emits must land on some node, else the
+    # slot silently defaults to zero in join_actions(). Unlike an unassigned
+    # observation (often a benign task signal), an unassigned *action* means
+    # the morphology cannot drive part of the building -- usually because the
+    # actuator set in pipeline/actuators.py grew a type the NodeTypes here
+    # don't account for. Warn loudly so that desync is visible.
+    assigned_actions = {i for n in nodes for i in n.action_indices}
+    unassigned_actions = tuple(
+        i for i in range(len(action_names)) if i not in assigned_actions
+    )
+    if unassigned_actions:
+        unassigned_action_names = [action_names[i] for i in unassigned_actions]
+        logger.warning(
+            "Morphology: %d action slot(s) not mapped to any node; "
+            "join_actions() will leave them at zero: %s",
+            len(unassigned_actions),
+            unassigned_action_names,
         )
 
     return Morphology(
         nodes=tuple(nodes),
         edges=tuple(edges),
         unassigned_obs_indices=unassigned,
+        unassigned_action_indices=unassigned_actions,
     )
 
 
