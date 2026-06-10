@@ -66,6 +66,27 @@ DEFAULT_SAT_MAX_C = (
 # range; see notes.md § "OfficeMedium OA-mixer fix" Q2.
 OA_MASS_FLOW_MAX_KGS = 5.0
 
+
+@dataclass(frozen=True)
+class Bounds:
+    """An inclusive ``(low, high)`` actuator range."""
+
+    low: float
+    high: float
+
+
+# Static actuator setpoint bounds: the canonical, building-independent envelope
+# for each controllable schedule. Unlike the fan/SAT bounds above (read from
+# per-building design data, with the DEFAULT_* values as fallback), these never
+# vary by building. building2building.morphology imports them for the matching
+# NodeTypes so the morphological universe and the pipeline cannot drift apart.
+VAV_SUPPLY_TEMP_C = Bounds(10.0, 55.0)   # SetpointManager:Scheduled supply-air temp
+VAV_HEATING_SP_C = Bounds(10.0, 35.0)    # VAV DualSetpoint heating schedule
+VAV_COOLING_SP_C = Bounds(18.0, 40.0)    # VAV DualSetpoint cooling schedule
+FLOW_FRACTION = Bounds(0.0, 1.0)         # VAV minimum-air-flow fraction schedule
+OA_MASS_FLOW_KGS = Bounds(0.0, OA_MASS_FLOW_MAX_KGS)  # Controller:OutdoorAir mass flow
+HEATING_ONLY_SP_C = Bounds(10.0, 35.0)   # heating-only zone setpoint schedule
+
 logger = logging.getLogger(__name__)
 
 DX_COOLING_COMPRESSOR_MIN_OAT_C = 10.0
@@ -680,7 +701,9 @@ def make_heating_only_controllable(
     ont = Ontology.from_object(obj)
     g = ont.rdf
 
-    htg_stl_name = create_temp_stl(obj, 10.0, 35.0, name="heating only setpoint stl")
+    htg_stl_name = create_temp_stl(
+        obj, HEATING_ONLY_SP_C.low, HEATING_ONLY_SP_C.high, name="heating only setpoint stl"
+    )
 
     onoff_stl = create_onoff_availability_stl(obj, name="heating only availability")
     always_on_sched = create_schedule_constant(
@@ -755,8 +778,8 @@ def make_heating_only_controllable(
                 control_type="Schedule Value",
                 component_name=htg_sched,
                 units="[C]",
-                lower_bound=10.0,
-                upper_bound=35.0,
+                lower_bound=HEATING_ONLY_SP_C.low,
+                upper_bound=HEATING_ONLY_SP_C.high,
             )
 
             new_devices.append(
@@ -884,9 +907,15 @@ def make_vav_system_controllable(
     # thermostat setpoint schedules and would fight our control.
     remove_thermostat_ems_overrides(obj)
 
-    temp_stl_name = create_temp_stl(obj, 10.0, 55.0, name="vav supply temp stl")
-    htg_stl_name = create_temp_stl(obj, 10.0, 35.0, name="vav heating setpoint stl")
-    clg_stl_name = create_temp_stl(obj, 18.0, 40.0, name="vav cooling setpoint stl")
+    temp_stl_name = create_temp_stl(
+        obj, VAV_SUPPLY_TEMP_C.low, VAV_SUPPLY_TEMP_C.high, name="vav supply temp stl"
+    )
+    htg_stl_name = create_temp_stl(
+        obj, VAV_HEATING_SP_C.low, VAV_HEATING_SP_C.high, name="vav heating setpoint stl"
+    )
+    clg_stl_name = create_temp_stl(
+        obj, VAV_COOLING_SP_C.low, VAV_COOLING_SP_C.high, name="vav cooling setpoint stl"
+    )
     setpoint_managers = obj.setdefault("SetpointManager:Scheduled", {})
 
     # Fraction STL for minimum air flow schedules (0-1, no unit type)
@@ -1000,8 +1029,8 @@ def make_vav_system_controllable(
             control_type="Schedule Value",
             component_name=sched_name,
             units="[C]",
-            lower_bound=10.0,
-            upper_bound=55.0,
+            lower_bound=VAV_SUPPLY_TEMP_C.low,
+            upper_bound=VAV_SUPPLY_TEMP_C.high,
         )
 
     def install_flow_fraction_actuator(terminal_name: str) -> ActuatorDescription:
@@ -1025,8 +1054,8 @@ def make_vav_system_controllable(
             control_type="Schedule Value",
             component_name=sched_name,
             units="[frac]",
-            lower_bound=0.0,
-            upper_bound=1.0,
+            lower_bound=FLOW_FRACTION.low,
+            upper_bound=FLOW_FRACTION.high,
         )
 
     def install_thermostat_actuators(
@@ -1064,16 +1093,16 @@ def make_vav_system_controllable(
             control_type="Schedule Value",
             component_name=htg_sched,
             units="[C]",
-            lower_bound=10.0,
-            upper_bound=35.0,
+            lower_bound=VAV_HEATING_SP_C.low,
+            upper_bound=VAV_HEATING_SP_C.high,
         )
         clg_actuator = ActuatorDescription(
             component_type="Schedule:Constant",
             control_type="Schedule Value",
             component_name=clg_sched,
             units="[C]",
-            lower_bound=18.0,
-            upper_bound=40.0,
+            lower_bound=VAV_COOLING_SP_C.low,
+            upper_bound=VAV_COOLING_SP_C.high,
         )
 
         return htg_actuator, clg_actuator
@@ -1203,8 +1232,8 @@ def make_vav_system_controllable(
             control_type="Air Mass Flow Rate",
             component_name=controller_name,
             units="[kg/s]",
-            lower_bound=0.0,
-            upper_bound=OA_MASS_FLOW_MAX_KGS,
+            lower_bound=OA_MASS_FLOW_KGS.low,
+            upper_bound=OA_MASS_FLOW_KGS.high,
         )
 
     def _find_supply_fans_for_loop(loop_name: str) -> list[tuple[str, str]]:

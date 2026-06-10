@@ -37,6 +37,15 @@ from typing import TYPE_CHECKING, Literal, Sequence
 import numpy as np
 from gymnasium.spaces import Box
 
+from building2building.pipeline.actuators import (
+    FLOW_FRACTION,
+    HEATING_ONLY_SP_C,
+    OA_MASS_FLOW_KGS,
+    VAV_COOLING_SP_C,
+    VAV_HEATING_SP_C,
+    VAV_SUPPLY_TEMP_C,
+)
+
 
 def _empty_array() -> np.ndarray:
     """Default factory for the per-node `attributes` and per-morphology
@@ -128,13 +137,15 @@ class NodeType:
 
 
 # fmt: off
-# NOTE: The bounds below are hardcoded to match the values produced by the
-# building pipeline (building2building/pipeline/actuators.py) and the
-# observation space construction (building2building/simulator/observation_spaces.py).
-# There is currently no single source of truth — if the pipeline changes
-# actuator bounds (e.g. a new equipment type or different setpoint ranges),
-# these must be updated manually to match.  A future refactor should unify
-# these so the morphological universe is derived from the pipeline definitions.
+# Action bounds for the controllable schedules are imported from
+# building2building.pipeline.actuators (the Bounds constants), so the
+# morphological universe and the pipeline share a single source of truth for
+# the static setpoint ranges and cannot drift apart.
+# Exception: UNITARY_ZONE's fan-flow / supply-air-temp bounds are read
+# per-building from design data in the pipeline (design fan flow, max SAT), so
+# here they keep the static fallback envelope (DEFAULT_FAN_MAX_KGS /
+# DEFAULT_SAT_MAX_C). Observation bounds still mirror
+# building2building.simulator.observation_spaces by hand — not yet unified.
 # Zone NodeTypes share the same 9-d attribute schema (ZONE_ATTRIBUTE_NAMES
 # in building2building.geometry). All values are dimensionless and in [0,1]
 # by construction of extract_zone_geometry(), so bounds = (0,)*9 / (1,)*9.
@@ -152,19 +163,22 @@ UNITARY_ZONE = NodeType("unitary_zone",
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
     _act_low=(0.0, 5.0), _act_high=(15.0, 60.0),              # fan_flow (kg/s), supply_air_temp (°C)
     _attr_low=_ZONE_ATTR_LOW, _attr_high=_ZONE_ATTR_HIGH)     # zone geometry (see building2building.geometry)
-VAV_ZONE = NodeType("vav_zone",
+VAV_ZONE = NodeType("vav_zone",                               # flow_frac, htg_sp (°C), clg_sp (°C)
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
-    _act_low=(0.0, 10.0, 18.0), _act_high=(1.0, 35.0, 40.0), # flow_frac, htg_sp (°C), clg_sp (°C)
+    _act_low=(FLOW_FRACTION.low, VAV_HEATING_SP_C.low, VAV_COOLING_SP_C.low),
+    _act_high=(FLOW_FRACTION.high, VAV_HEATING_SP_C.high, VAV_COOLING_SP_C.high),
     _attr_low=_ZONE_ATTR_LOW, _attr_high=_ZONE_ATTR_HIGH)
-VAV_ZONE_NO_COOLING = NodeType("vav_zone_no_cooling",
+VAV_ZONE_NO_COOLING = NodeType("vav_zone_no_cooling",         # flow_frac, htg_sp (°C) — clg_sp fixed
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
-    _act_low=(0.0, 10.0), _act_high=(1.0, 35.0),              # flow_frac, htg_sp (°C) — clg_sp fixed
+    _act_low=(FLOW_FRACTION.low, VAV_HEATING_SP_C.low),
+    _act_high=(FLOW_FRACTION.high, VAV_HEATING_SP_C.high),
     _attr_low=_ZONE_ATTR_LOW, _attr_high=_ZONE_ATTR_HIGH)
-VAV_SUPPLY = NodeType("vav_supply",
-    _act_low=(10.0, 0.0),  _act_high=(55.0, 5.0))             # supply_air_temp (°C), oa_mass_flow (kg/s)
-HEATING_ZONE = NodeType("heating_zone",
+VAV_SUPPLY = NodeType("vav_supply",                           # supply_air_temp (°C), oa_mass_flow (kg/s)
+    _act_low=(VAV_SUPPLY_TEMP_C.low, OA_MASS_FLOW_KGS.low),
+    _act_high=(VAV_SUPPLY_TEMP_C.high, OA_MASS_FLOW_KGS.high))
+HEATING_ZONE = NodeType("heating_zone",                       # htg_sp (°C)
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
-    _act_low=(10.0,),  _act_high=(35.0,),                     # htg_sp (°C)
+    _act_low=(HEATING_ONLY_SP_C.low,),  _act_high=(HEATING_ONLY_SP_C.high,),
     _attr_low=_ZONE_ATTR_LOW, _attr_high=_ZONE_ATTR_HIGH)
 UNCONTROLLED_ZONE = NodeType("uncontrolled_zone",
     _obs_low=(10.0,),  _obs_high=(45.0,),                     # zone_temp (°C)
