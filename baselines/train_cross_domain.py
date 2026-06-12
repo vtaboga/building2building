@@ -87,7 +87,7 @@ class BuildingPool:
         building_types: list[str],
         n_per_type: int,
         split: str = "train",
-        task: str = "task1",
+        task: str = "task_const_e0",
     ):
         self.specs: list[BuildingSpec] = []
         self.task = task
@@ -538,7 +538,7 @@ class TrainConfig:
     n_buildings_per_type: int = 10
     resample_interval: int = 10
     split: str = "train"
-    task: str = "task1"
+    task: str = "task_const_e0"
 
     output_dir: str = "outputs/transfer"
     log_interval: int = 1
@@ -849,7 +849,7 @@ def main() -> None:
                     ),
                     resample_interval=int(training_cfg.get("resample_interval", 10)),
                     split=str(training_cfg.get("split", "train")),
-                    task=str(raw.get("task", "task1")),
+                    task=str(raw.get("task", "task_const_e0")),
                     output_dir=str(raw.get("output_dir", "outputs/transfer")),
                     log_interval=int(training_cfg.get("log_interval", 1)),
                     save_interval=int(training_cfg.get("save_interval", 50)),

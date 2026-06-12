@@ -9,7 +9,7 @@ Usage::
     python -m baselines.eval_cross_domain \
         --model-path outputs/cross_domain/amorpheus_policy.pt \
         --test-building-types Warehouse SingleFamilyHouse \
-        --task task3 --n-test 5
+        --task task_const_emed --n-test 5
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ def main() -> None:
         required=True,
         help="Building types to evaluate on",
     )
-    parser.add_argument("--task", type=str, default="task3")
+    parser.add_argument("--task", type=str, default="task_const_emed")
     parser.add_argument("--n-test", type=int, default=5)
     parser.add_argument("--embed-dim", type=int, default=64)
     parser.add_argument("--n-heads", type=int, default=4)
