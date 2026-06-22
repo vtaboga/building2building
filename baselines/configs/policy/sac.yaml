@@ -1,0 +1,45 @@
+
+algorithm: sac
+policy_type: MlpPolicy
+device: auto
+learning_rate: 7.3e-4
+# Keep ~50% of a 1M-step run in the buffer (~14 full-year episodes across 4 envs).
+buffer_size: 500_000
+# Match paper default; 10k seed steps give a richer initial data distribution than 5k.
+learning_starts: 10_000
+batch_size: 512
+tau: 0.005
+gamma: 0.99
+# train_freq=1 + gradient_steps=-1 → SB3 performs n_envs gradient steps per
+# environment step, keeping the update-to-data ratio at exactly 1.0 regardless
+# of how many parallel envs are used.  The old train_freq=8/gradient_steps=8
+# with n_envs=4 gave a ratio of 8/(8*4)=0.25, wasting SAC's sample efficiency.
+train_freq: 1
+gradient_steps: -1
+# Diagnostic fix: replace auto-tuned ent_coef with a fixed
+# value.  With auto, once actions saturate and post-tanh effective entropy collapses,
+# the auto-tuner drives alpha downward, removing the last exploration pressure and
+# locking the policy into the saturated regime.  A fixed 0.2 keeps exploration alive
+# regardless of saturation state.  target_entropy is unused when ent_coef is fixed.
+ent_coef: 0.2
+target_update_interval: 1
+# Clip gradients for both actor and critic networks.  SB3 SAC has no default gradient
+# clipping (unlike PPO), which allows the critic loss to explode to 10^8+ on buildings
+# with large reward magnitudes and the calibration mismatch.
+max_grad_norm: 10.0
+# Diagnostic fix: disable gSDE.  gSDE noise is correlated
+# across time steps and reinforces boundary-side pushing rather than relieving it,
+# worsening action saturation.  Standard independent Gaussian noise is used instead.
+use_sde: false
+# sde_sample_freq is only meaningful when use_sde=true; removed to avoid confusion.
+policy_kwargs:
+  net_arch:
+    pi: [400, 300]
+    qf: [400, 300]
+  activation_fn: ReLU
+  # Diagnostic fix: initialise log_std at 0.0 instead of the
+  # previous -3.0.  log_std=-3.0 → post-tanh actions in [-0.05, 0.05], causing the
+  # agent to commit to near-zero actions before any exploration.  log_std=0.0 gives
+  # initial std≈1.0 in pre-tanh space, which maps to a broad uniform-like distribution
+  # over the action range after tanh squashing.
+  log_std_init: 0.0

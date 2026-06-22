@@ -1,0 +1,5 @@
+building_type,task,run_period,building_id,reward_run1,reward_mean
+OfficeSmall,task1,full_year,OfficeSmall-0001,-30000.0,-30000.0
+OfficeSmall,task1,winter,OfficeSmall-0001,-12000.0,-12000.0
+Warehouse,task1,full_year,Warehouse-0001,-40000.0,-40000.0
+SingleFamilyHouse,task1,full_year,SingleFamilyHouse-0001,-10000.0,-10000.0

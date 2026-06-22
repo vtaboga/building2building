@@ -1,0 +1,43 @@
+/.env/
+.env
+.venv
+.venv/
+/.conda/
+/.idea/
+/.vscode/
+.DS_Store
+__pycache__/
+/.pytest_cache/
+*.py[cod]
+*$py.class
+logs
+container/*.sif
+container/*.sh
+b2b.egg-info/
+building2building.egg-info/
+results/
+# Only the top-level wandb/ run-output dir; do NOT match
+# baselines/configs/wandb/ (Hydra group with default.yaml).
+/wandb/
+notebooks/
+jobs/
+eplus_out/
+outputs/
+uv.lock
+multirun/
+jobs_logs/
+site/
+data/
+dist/
+# Only the top-level analysis/ research dir; do NOT match
+# baselines/analysis/ (tracked per-building tuned-controller analysis).
+/analysis/
+
+dataset/
+*.zip
+/configs/
+# Per-user Slurm/cluster launch wrappers churn per developer; ignore them,
+# but keep the Python entry points (make_test_small_split.py,
+# merge_baseline_returns.py) tracked.
+baselines/scripts/*.sh
+

@@ -1,0 +1,25 @@
+heating_setpoint_c: 20.0
+cooling_setpoint_c: 22.0
+kp: 0.028991720759760493
+ki: 0.00012706292255450154
+integral_max: 16.56262093794652
+min_fan_fraction: 0.15868583991190496
+sat_min_c: 13.587168550247391
+sat_max_c: 22.53301439422958
+sat_initial_c: 12.782291806335124
+sat_trim: 0.4120225152879955
+sat_respond: 3.934023235999745
+demand_deadband: 0.010204320146832375
+availability_on: 2.466218443202351
+fan_error_mode: center_of_band
+target_schedule:
+  enabled: false
+  weekend_days: !!python/tuple
+  - 1
+  - 7
+  weekend_target_c: 18.0
+  weekday_target_c: 21.0
+  weekday_setback_target_c: 18.0
+  weekday_setback_start_hour: 9.0
+  weekday_setback_end_hour: 16.0
+type: unitary_hvac

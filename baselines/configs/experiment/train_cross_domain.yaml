@@ -1,0 +1,23 @@
+# @package _global_
+# Cross-domain transfer with Amorpheus (Section 6.2)
+name: cross_domain
+
+defaults:
+  - override /reward: task_occ_e0
+
+train_building_types:
+  - RetailStandalone
+  - RestaurantFastFood
+  - OfficeSmall
+  - OfficeMedium
+
+test_buildings_per_type: 5
+total_timesteps: 1_000_000
+resample_every_n_epochs: 10
+rollout_steps: 2048
+
+model:
+  embed_dim: 64
+  n_heads: 4
+  n_layers: 2
+  lr: 3.0e-4

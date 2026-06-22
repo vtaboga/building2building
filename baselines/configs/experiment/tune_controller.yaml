@@ -1,0 +1,43 @@
+# @package _global_
+# Optuna-based controller parameter tuning
+#
+# Each trial evaluates 5 buildings (25th-percentile objective by default).
+# With ~5 min per full-year simulation the cost is ~25 min/trial.  A 24 h
+# job can fit ~55 trials, so we set timeout_seconds as the binding constraint
+# and leave n_trials high.  n_startup_trials is ~40 % of the expected budget
+# to ensure broad exploration of the 13-24 dimensional parameter space.
+#
+# Trials are persisted to a SQLite study (under ``storage_dir``) and the
+# study is reopened with ``load_if_exists=True``, so an OOM-killed or
+# time-limited job can be resubmitted and will resume from the last
+# completed trial instead of starting over.
+name: tune_controller
+
+building_type: ???
+climate_zone: ???
+
+n_trials: 500
+n_startup_trials: 20
+timeout_seconds: 82800
+run_period: full_year
+n_eval_buildings: 5
+# Both paths rooted under ${base_dir}/b2b/tune_controller/
+output_dir: ${base_dir}/b2b/tune_controller/tuned_controllers
+# Persist Optuna studies here so jobs can resume after OOM / time-out.
+storage_dir: ${base_dir}/b2b/tune_controller/optuna_studies
+
+# Cross-building aggregation used to score each trial.
+# - "percentile" + percentile_q=25: robust low-quantile (default)
+# - "min": worst-of-N (very noisy, previous behavior)
+# - "mean": average reward
+aggregation: percentile
+percentile_q: 25.0
+
+# Within-trial parallelism: the N per-building EnergyPlus simulations of each
+# trial are dispatched to a persistent ProcessPoolExecutor (spawn start
+# method).  Set to 1 to keep the serial behavior.  Each worker uses roughly
+# one CPU core and a few hundred MB of RAM; make sure the SLURM request
+# (--cpus-per-task and --mem) covers ``n_building_workers`` workers plus
+# the parent process.  The effective worker count is capped at
+# ``n_eval_buildings``.
+n_building_workers: 5

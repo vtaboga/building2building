@@ -1,0 +1,26 @@
+{
+    "train": {
+        "OfficeSmall": ["OfficeSmall-0001"],
+        "SingleFamilyHouse": ["SingleFamilyHouse-0001"],
+        "Warehouse": ["Warehouse-0001"],
+        "RetailStandalone": [],
+        "RestaurantFastFood": [],
+        "OfficeMedium": []
+    },
+    "test": {
+        "OfficeSmall": ["OfficeSmall-0002"],
+        "SingleFamilyHouse": [],
+        "Warehouse": [],
+        "RetailStandalone": [],
+        "RestaurantFastFood": [],
+        "OfficeMedium": []
+    },
+    "test_small": {
+        "OfficeSmall": ["OfficeSmall-0002"],
+        "SingleFamilyHouse": [],
+        "Warehouse": [],
+        "RetailStandalone": [],
+        "RestaurantFastFood": [],
+        "OfficeMedium": []
+    }
+}

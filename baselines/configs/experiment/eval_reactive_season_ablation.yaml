@@ -1,0 +1,33 @@
+# @package _global_
+# Season-ablation study: occupancy vs random-schedule setpoint modes.
+#
+# Compares two presets on a reduced building sample across winter /
+# summer / full_year run periods:
+#
+#   * task_occ_e0   — occupancy-driven seasonal unoccupied setpoint (18 / 21 / 26)
+#   * task_rand_e0  — per-day random arrival/departure + setpoints
+#
+# Isolates the effect of setpoint mode in the comfort-only regime.
+name: eval_reactive_season_ablation
+
+building_types:
+  - OfficeSmall
+  - OfficeMedium
+  - RetailStandalone
+  - RestaurantFastFood
+  - Warehouse
+  - SingleFamilyHouse
+
+split: test
+# Override `run_periods` at invocation to run a single-period sweep; the
+# analysis driver runs this config three times with {winter, summer, full_year}.
+run_periods: [full_year]
+max_buildings_per_type: 2
+tasks: [task_occ_e0, task_rand_e0]
+n_runs: 1
+output_csv: ${base_dir}/b2b/baseline_returns/baseline_returns_season_ablation.csv
+
+save_trajectories: true
+plot_trajectories: false
+trajectory_dir: ${base_dir}/b2b/baseline_returns/trajectories/season_ablation
+plot_dir: ${base_dir}/b2b/baseline_returns/plots/season_ablation

@@ -1,0 +1,29 @@
+# @package _global_
+# Sweep of the tuned reactive controller across all 9 normalized tasks.
+#
+# One run per (building_type, building, task) using the tuned reactive
+# controllers already in baselines/configs/tuned_controllers/.  Targets
+# the same 8-building-per-type/climate-zone sample as Section 5 of the
+# paper.  Produces the input parquet consumed by
+# analysis/task_study/run_sweep.py.
+name: eval_reactive_control_task_study
+
+building_types:
+  - OfficeSmall
+  - OfficeMedium
+  - RetailStandalone
+  - RestaurantFastFood
+  - Warehouse
+  - SingleFamilyHouse
+
+split: test
+run_periods: [full_year]
+max_buildings_per_type: 8
+tasks: [task_const_e0, task_const_emed, task_const_ehigh, task_occ_e0, task_occ_emed, task_occ_ehigh, task_rand_e0, task_rand_emed, task_rand_ehigh]
+n_runs: 1
+output_csv: ${base_dir}/b2b/baseline_returns/baseline_returns_task_study.csv
+
+save_trajectories: true
+plot_trajectories: false
+trajectory_dir: ${base_dir}/b2b/baseline_returns/trajectories/task_study
+plot_dir: ${base_dir}/b2b/baseline_returns/plots/task_study

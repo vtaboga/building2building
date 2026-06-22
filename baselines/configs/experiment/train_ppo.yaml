@@ -1,0 +1,25 @@
+# @package _global_
+# Train per-building PPO specialists (Section 5, Appendix E.2)
+name: train_ppo
+
+defaults:
+  - override /policy: ppo
+  - override /training: default
+
+building_types:
+  - OfficeSmall
+  - OfficeMedium
+  - RetailStandalone
+  - RestaurantFastFood
+  - Warehouse
+  - SingleFamilyHouse
+
+split: test
+buildings_per_type: 8
+building_ids: null
+run_period: full_year  # one of full_year / winter / summer
+tasks: [task_const_e0, task_const_emed, task_const_ehigh, task_occ_e0, task_occ_emed, task_occ_ehigh, task_rand_e0, task_rand_emed, task_rand_ehigh]
+
+training:
+  total_timesteps: 5_000_000
+  n_envs: 14

@@ -1,0 +1,10 @@
+# SAC-specific training config.
+# eval_freq / eval_episodes / recycle_every from training/default.yaml are
+# PPO-specific keys consumed by train_ppo.py; train_sac.py does a single
+# post-training eval episode and does not use them, so they are omitted here.
+total_timesteps: 1_000_000
+n_envs: 4
+# Save a model checkpoint roughly every this many environment steps so a job
+# killed by the SLURM wall-clock limit leaves a usable partial policy
+# (models/<bt>/<task>/checkpoints/).  Replay buffer is not saved.
+checkpoint_freq: 200_000

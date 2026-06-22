@@ -1,0 +1,64 @@
+# @package _global_
+# CHS-based PPO hyperparameter tuning (Patterson et al., RLC 2024).
+#
+# A single Orion experiment evaluates each HP config across buildings sampled
+# from all building types and ASHRAE climate zones simultaneously.  Each
+# building is one CHS environment: training and evaluation happen on the same
+# building, matching the paper's procedure.
+#
+# Trial cost (default config):
+#   n_tune_buildings=2 × 5 types × ntune_seeds=3 × ~75 min ≈ 37.5 h/trial
+#   → 1 trial per worker in 48 h; 75 workers → ~75 trials per submission
+#   → n_startup_trials=30 leaves ~45 TPE-guided trials per submission
+#
+# Sweep (75 workers sharing one Orion DB):
+#   python -m baselines.tune_ppo experiment=tune_ppo task=task_const_e0
+#
+# CHS analysis (after all sweep jobs complete):
+#   python -m baselines.tune_ppo experiment=tune_ppo task=task_const_e0 analyze=true
+#
+# Re-evaluation:
+#   python -m baselines.tune_ppo experiment=tune_ppo task=task_const_e0 reeval=true
+
+name: tune_ppo
+
+defaults:
+  - override /policy: ppo
+  - override /training: default
+
+task: ???                     # e.g. task_const_e0, task_occ_e0, task_rand_emed
+
+# Building types included in the unified sweep
+building_types:
+  - OfficeSmall
+  - OfficeMedium
+  - RestaurantFastFood
+  - RetailStandalone
+  - Warehouse
+
+# Orion / CHS parameters
+n_trials: 500
+n_startup_trials: 30          # random exploration before TPE kicks in (≥ 5× n_dims = 30)
+ntune_seeds: 3                # seeds per (building, trial) — 3 × 10 buildings ≈ 37.5 h/trial
+n_tune_buildings: 2           # buildings per type from the test split (2 × 5 types = 10 total)
+algorithm: tpe
+
+# Paths — both rooted under ${base_dir}/b2b/tune_ppo/
+orion_db_dir: ${base_dir}/b2b/tune_ppo/orion_dbs
+results_dir: ${base_dir}/b2b/tune_ppo/results/all_${task}
+
+# Must match --time in launch_chs_sweep.sh.  Workers check remaining wall time
+# before each suggest() call and exit cleanly if a full trial would not fit,
+# preventing stale "reserved" entries in the Orion DB.
+wall_time_hours: 48
+
+# Modes
+reeval: false
+analyze: false
+reeval_seeds: 30
+reeval_timesteps: 5_000_000
+
+# Override training budget for the sweep (shorter than full training)
+training:
+  total_timesteps: 4_000_000
+  n_envs: 8

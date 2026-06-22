@@ -1,0 +1,20 @@
+# @package _global_
+# Per-building specialist training (Section 6.1)
+name: dynamics_specialist
+
+defaults:
+  - override /policy: ppo
+  - override /reward: task_const_e0
+  - override /training: default
+
+difficulty: easy
+approach: specialist
+
+training:
+  total_timesteps: 500_000
+  n_envs: 1
+
+env:
+  pad_obs_to: 20
+  normalize_obs: false
+  augment_params: false

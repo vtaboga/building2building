@@ -1,0 +1,58 @@
+[
+    {
+        "zone": "Zone1 Office",
+        "actuators": [
+            {
+                "component_type": "Fan",
+                "control_type": "Fan Air Mass Flow Rate",
+                "component_name": "PSZ-Office_addAQ Supply Fan",
+                "units": "[kg/s]",
+                "lower_bound": 0,
+                "upper_bound": 15.0
+            },
+            {
+                "component_type": "Schedule:Constant",
+                "control_type": "Schedule Value",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (5)",
+                "units": "Temperature",
+                "lower_bound": 5.0,
+                "upper_bound": 60.0
+            }
+        ],
+        "equipment_type": "unitarysystem"
+    },
+    {
+        "zone": "Zone2 Fine Storage",
+        "actuators": [
+            {
+                "component_type": "Fan",
+                "control_type": "Fan Air Mass Flow Rate",
+                "component_name": "PSZ-Fine Storage_addAQ Supply Fan",
+                "units": "[kg/s]",
+                "lower_bound": 0,
+                "upper_bound": 15.0
+            },
+            {
+                "component_type": "Schedule:Constant",
+                "control_type": "Schedule Value",
+                "component_name": "B2B unitaryhvac temp setpoint schedule (10)",
+                "units": "Temperature",
+                "lower_bound": 5.0,
+                "upper_bound": 60.0
+            }
+        ],
+        "equipment_type": "unitarysystem"
+    },
+    {
+        "zone": "Zone3 Bulk Storage",
+        "heating_setpoint": {
+            "component_type": "Schedule:Constant",
+            "control_type": "Schedule Value",
+            "component_name": "B2B heating only htg setpoint Zone3 Bulk Storage (19)",
+            "units": "[C]",
+            "lower_bound": 10.0,
+            "upper_bound": 35.0
+        },
+        "equipment_type": "heating_only"
+    }
+]

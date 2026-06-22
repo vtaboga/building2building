@@ -1,0 +1,18 @@
+schema_version: 1
+source:
+  controller: random
+  calibration_task: task_occ_emed
+  run_period: full_year
+  split: train
+  aggregation: median_over_buildings
+floor:
+  epsilon_abs: 1.0e-6
+  epsilon_rel: 0.05
+constants:
+  OfficeSmall:
+    cz5:
+      tau_T: 2.0
+      tau_E: 3.0
+      tau_T_iqr: 0.1
+      tau_E_iqr: 0.2
+      n_buildings: 1

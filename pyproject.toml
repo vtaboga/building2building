@@ -1,0 +1,81 @@
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "building2building"
+version = "0.1.0"
+description = "HVAC Control Benchmark for Generalizable Reinforcement Learning at Scale"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+
+dependencies = [
+    "minergym @ git+https://github.com/vtaboga/minergym.git@956c3e1",
+    "gitpython>=3.1.0",
+    "numpy>=1.24.0",
+    "scipy>=1.11.0",
+    "gymnasium>=1.2.0",
+    "cattrs>=25.3.0",
+    "beautifulsoup4",
+    "lxml>=6.0.2",
+    "requests>=2.32.3",
+    "rich>=14.1.0",
+    "huggingface-hub>=0.20.0",
+    "pandas>=2.2.0",
+    "duckdb>=1.3.0",
+    "pyarrow>=20.0.0",
+    "rdflib>=7.1.0",
+]
+
+[project.optional-dependencies]
+training = [
+    "torch>=2.0.0",
+    "stable-baselines3>=2.7.0",
+    "sb3-contrib>=2.7.0",
+    "tensorboard>=2.20.0",
+    "wandb>=0.22.3",
+    "hydra-core>=1.3.2",
+    "optuna>=4.0.0",
+    "matplotlib>=3.7.0",
+]
+test = [
+    "deepdiff",
+    "psutil",
+    "pytest==8.3.5",
+    "pytest-mock",
+]
+dev = [
+    "black",
+    "pyright",
+]
+docs = [
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "pymdown-extensions",
+]
+all = ["building2building[training,test,dev,docs]"]
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["building2building*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+building2building = ["scores/*.csv", "data/*.yaml"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not release'"
+markers = [
+    "quick: fast tests that do not require EnergyPlus simulation",
+    "long: slower tests that rely on simulation or heavy data processing",
+    "release: release-candidate integrity tests against real published artifacts",
+    "api_contract: pins the public API surface; a failing test here means a breaking API change; requires a CHANGELOG.md entry",
+]

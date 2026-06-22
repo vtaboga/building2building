@@ -1,0 +1,19 @@
+defaults:
+  - policy: ppo
+  - training: default
+  - wandb: default
+  - experiment: ???
+  - _self_
+
+seed: 0
+# Root directory under which all b2b results are stored.
+# Defaults to $SCRATCH when available, otherwise falls back to ./outputs.
+# All scripts write under ${base_dir}/b2b/<experiment_name>/...
+base_dir: ${oc.env:SCRATCH,outputs}
+output_dir: ${base_dir}/b2b/${name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+hydra:
+  run:
+    dir: ${base_dir}/b2b/hydra/${name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: false

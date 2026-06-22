@@ -1,0 +1,6 @@
+# Weights & Biases configuration.
+# Disabled by default; set `enabled: true` and your own `entity` to log runs.
+enabled: false
+project: building2building
+entity: null
+tags: []
