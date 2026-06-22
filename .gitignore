@@ -28,6 +28,7 @@ multirun/
 jobs_logs/
 site/
 data/
+!building2building/data/
 dist/
 # Only the top-level analysis/ research dir; do NOT match
 # baselines/analysis/ (tracked per-building tuned-controller analysis).
