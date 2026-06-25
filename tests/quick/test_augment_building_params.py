@@ -187,3 +187,35 @@ def test_augment_building_params_denormalize_round_trip() -> None:
     augmented = wrapped.observation(normalized_obs)
     round_trip = wrapped.denormalize(augmented)
     np.testing.assert_allclose(round_trip, raw_obs, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.quick
+def test_augment_building_params_output_scale_matches_observation_space() -> None:
+    """Param dims are scaled by 1/PARAM_OUTPUT_SCALE; box bounds must agree.
+
+    Regression guard: changing the divisor without updating the observation
+    space (or vice-versa) would silently break learning. Verifies both that
+    the normalized values land in [-1/SCALE, 1/SCALE] and that the wrapper's
+    observation_space exposes the same bounds.
+    """
+    env = MutableMetadataEnv(
+        low=np.array([10.0, -5.0], dtype=np.float32),
+        high=np.array([30.0, 5.0], dtype=np.float32),
+        metadata=_full_metadata(),
+    )
+    wrapped = AugmentObservationWithBuildingParams(env)
+
+    scale = AugmentObservationWithBuildingParams.PARAM_OUTPUT_SCALE
+    expected = 1.0 / float(scale)
+    assert scale > 0
+
+    # Values stay in the scaled range
+    assert np.all(wrapped.normalized_params >= -expected - 1e-6)
+    assert np.all(wrapped.normalized_params <= expected + 1e-6)
+
+    # Observation space bounds for the param tail match
+    n_params = len(wrapped.normalized_params)
+    param_low_tail = wrapped.observation_space.low[-n_params:]
+    param_high_tail = wrapped.observation_space.high[-n_params:]
+    np.testing.assert_allclose(param_low_tail, -expected, rtol=0, atol=1e-6)
+    np.testing.assert_allclose(param_high_tail, expected, rtol=0, atol=1e-6)
