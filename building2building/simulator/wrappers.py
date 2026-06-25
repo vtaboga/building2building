@@ -287,6 +287,16 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
     - num_units: Number of units in the building
     """
 
+    # Down-scale for the normalized building params. They are normalized to
+    # [-1, 1], but the base observation (after NormalizeObservation /
+    # PadObservation) has per-step std ~0.02-0.15. Building params change only
+    # at episode boundaries, so within a rollout batch their std is roughly
+    # 0.20-0.25 — about 5× larger than the base obs. Without rescaling they
+    # dominate the first-layer activations and the policy overfits to a coarse
+    # signal. Dividing by this constant brings the per-batch std into the same
+    # ballpark as the base obs (~0.04-0.05).
+    PARAM_OUTPUT_SCALE: float = 5.0
+
     def __init__(
         self,
         env: gym.Env,
@@ -328,9 +338,11 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         orig_low = env.observation_space.low
         orig_high = env.observation_space.high
 
-        # Add parameter dimensions (normalized to [-1, 1])
-        param_low = -np.ones(len(self.normalized_params), dtype=orig_low.dtype)
-        param_high = np.ones(len(self.normalized_params), dtype=orig_high.dtype)
+        # Add parameter dimensions (normalized to [-1, 1] then scaled by
+        # 1 / PARAM_OUTPUT_SCALE so per-batch std matches the base obs).
+        _param_max = 1.0 / float(self.PARAM_OUTPUT_SCALE) if self.PARAM_OUTPUT_SCALE else 1.0
+        param_low = np.full(len(self.normalized_params), -_param_max, dtype=orig_low.dtype)
+        param_high = np.full(len(self.normalized_params), _param_max, dtype=orig_high.dtype)
 
         new_low = np.concatenate([orig_low, param_low])
         new_high = np.concatenate([orig_high, param_high])
@@ -416,12 +428,10 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
 
         Logs warnings when values are clipped (outside expected ranges).
         """
-        # Define normalization ranges (min, max) for each parameter
         param_ranges = {
-            "area": (50.0, 500.0),  # m² - typical range for buildings
+            "area": (25.0, 1200.0),  # m² — spans SFH + OfficeSmall
             "warmup_phases": (1.0, 10.0),
             "num_actuators": (1.0, 20.0),
-            "num_zones": (1.0, 10.0),
             "year_built": (1940.0, 2025.0),  # year range for building stock
             "num_units": (1.0, 10.0),  # number of units in the building
         }
@@ -462,7 +472,10 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
 
             normalized.append(norm_val)
 
-        return np.array(normalized, dtype=np.float32)
+        arr = np.array(normalized, dtype=np.float32)
+        if self.PARAM_OUTPUT_SCALE and self.PARAM_OUTPUT_SCALE != 1.0:
+            arr = arr / float(self.PARAM_OUTPUT_SCALE)
+        return arr
 
     def reset(self, **kwargs):  # type: ignore[override]
         """Reset and re-extract building parameters (inner env may have changed)."""
@@ -478,8 +491,9 @@ class AugmentObservationWithBuildingParams(gym.ObservationWrapper):
         orig_low = self.env.observation_space.low
         orig_high = self.env.observation_space.high
 
-        param_low = -np.ones(len(self.normalized_params), dtype=orig_low.dtype)
-        param_high = np.ones(len(self.normalized_params), dtype=orig_high.dtype)
+        _param_max = 1.0 / float(self.PARAM_OUTPUT_SCALE) if self.PARAM_OUTPUT_SCALE else 1.0
+        param_low = np.full(len(self.normalized_params), -_param_max, dtype=orig_low.dtype)
+        param_high = np.full(len(self.normalized_params), _param_max, dtype=orig_high.dtype)
 
         new_low = np.concatenate([orig_low, param_low])
         new_high = np.concatenate([orig_high, param_high])
