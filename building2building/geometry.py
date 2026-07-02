@@ -13,9 +13,7 @@ the same EnergyPlus traversal layer used elsewhere in the pipeline.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -111,22 +109,18 @@ def _surface_attr(ont: Ontology, surface, predicate: str) -> str | None:
     return rows[0].val.toPython()
 
 
-def extract_zone_geometry(
-    epjson: dict[str, Any] | Path | str,
-) -> dict[str, ZoneGeometry]:
+def extract_zone_geometry(ont: Ontology) -> dict[str, ZoneGeometry]:
     """Compute per-zone :class:`ZoneGeometry` keyed by zone name.
 
     Args:
-        epjson: Parsed epJSON dict, or a path to a `building.epjson` file.
+        ont: The building's :class:`minergym.ontology.Ontology`. If you have
+            raw epJSON, build one at the call site with
+            ``Ontology.from_object(epjson)``.
 
     Returns:
         Mapping ``zone_name -> ZoneGeometry``. Zones with no surfaces
         (shouldn't happen for valid EnergyPlus inputs) are omitted.
     """
-    if isinstance(epjson, (str, Path)):
-        with open(epjson) as f:
-            epjson = json.load(f)
-    ont = Ontology.from_object(epjson)
     hierarchy = ont.zone_surface_point_hierarchy()
 
     all_pts = np.array(
