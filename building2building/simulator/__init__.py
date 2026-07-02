@@ -22,7 +22,6 @@ from building2building.simulator.observation_spaces import (
 from building2building.simulator.rewards import (
     NormalizedDeadbandReward,
 )
-from building2building.geometry import extract_zone_geometry
 from building2building.morphology import build_morphology
 from building2building.types import (
     BuildingConfig,
@@ -284,8 +283,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         observation_names=obs_info.slot_names,
         action_names=action_names,
         controlled_zones=controlled_zones,
-        all_zone_names=sorted(all_zones),
-        zone_geometry=extract_zone_geometry(epjson),
+        ontology=ont,
     )
 
     gymenv = EnergyPlusEnvironment(
