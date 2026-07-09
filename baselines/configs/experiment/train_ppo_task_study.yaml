@@ -1,10 +1,9 @@
 # @package _global_
-# PPO sweep across all 9 normalized tasks.
+# PPO sweep across all six normalized tasks.
 #
-# Trains per-building PPO specialists on the same pool as Section 5 of
-# the paper (8 buildings per type / one per climate zone) for all nine
+# Trains per-building PPO specialists for all six
 # normalized tasks across 3 seeds and the full-year run period.  Uses the
-# existing PPO hyperparameters from Appendix D.3.  Results feed the
+# existing PPO hyperparameters.  Results feed the
 # task-study analysis alongside the reactive baseline returns.
 name: train_ppo_task_study
 
@@ -22,7 +21,7 @@ building_types:
 
 split: test
 buildings_per_type: 8
-tasks: [task_const_e0, task_const_emed, task_const_ehigh, task_occ_e0, task_occ_emed, task_occ_ehigh, task_rand_e0, task_rand_emed, task_rand_ehigh]
+tasks: [task_const_e0, task_const_e05, task_occ_e0, task_occ_e05, task_rand_e0, task_rand_e05]
 seeds: [0, 1, 2]
 
 training:

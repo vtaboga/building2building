@@ -80,15 +80,15 @@ python -m baselines.train_ppo experiment=train_ppo \
     building_types=[OfficeSmall] tasks=[task_const_e0] \
     training.total_timesteps=100_000
 
-# Full 9-task grid on the fast (test_small) split, single seed:
+# Full 6-task grid on the fast (test_small) split, single seed:
 python -m baselines.train_ppo experiment=train_ppo_task_study \
     --multirun seed=0 building_split=test_small
 python -m baselines.train_sac experiment=train_sac_task_study \
     --multirun seed=0 building_split=test_small
 ```
 
-The nine task presets are `task_{const,occ,rand}_{e0,emed,ehigh}`; pass them
-as a list, e.g. `tasks=[task_const_e0,task_occ_emed]`.
+The six task presets are `task_{const,occ,rand}_{e0,e05}`; pass them
+as a list, e.g. `tasks=[task_const_e0,task_occ_e05]`.
 
 ### 3. Dynamics Adaptation 
 
@@ -178,7 +178,7 @@ The config structure lives in `baselines/configs/`:
 - **`tuned_controllers/`** -- Optuna-optimized controller configs per building type/climate zone
 
 Tasks are selected per experiment via a `tasks: [...]` list of preset names
-(`task_{const,occ,rand}_{e0,emed,ehigh}`) — reward configs are resolved from
+(`task_{const,occ,rand}_{e0,e05}`) — reward configs are resolved from
 the preset by the `building2building` package, so there is no `reward/` group
 to edit here.
 

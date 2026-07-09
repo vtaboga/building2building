@@ -7,6 +7,14 @@ has produced one CSV per ``(building_type, task)`` under ``$SCRATCH``.
 Usage::
 
     python baselines/scripts/merge_baseline_returns.py "$SCRATCH/b2b/baseline_returns"
+
+By default the destination is REBUILT from the source directory alone. To
+merge new rows into the existing master instead (e.g. adding rows for new
+tasks without re-collecting everything), pass ``--update``: the current
+``--dst`` rows are kept and freshly collected rows win on duplicate keys::
+
+    python baselines/scripts/merge_baseline_returns.py --update \
+        "$SCRATCH/b2b/baseline_returns_e05/csv"
 """
 
 from __future__ import annotations
@@ -20,7 +28,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DST = PROJECT_ROOT / "building2building" / "scores" / "baseline_returns.csv"
 
 N_BUILDING_TYPES = 6
-N_TASKS = 9  # 3x3 grid: (const, occ, rand) x (e0, emed, ehigh)
+N_TASKS = 6  # 3x2 grid: (const, occ, rand) x (e0, e05)
 N_RUN_PERIODS = 3
 N_BUILDINGS_PER_TYPE = 100
 EXPECTED_ROWS = N_BUILDING_TYPES * N_TASKS * N_RUN_PERIODS * N_BUILDINGS_PER_TYPE
@@ -44,13 +52,30 @@ def main() -> None:
         action="store_true",
         help="Assert that exactly %d rows were merged." % EXPECTED_ROWS,
     )
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help=(
+            "Keep the existing --dst rows and merge the source CSVs on top "
+            "(new rows win on duplicate keys). Without this flag the "
+            "destination is rebuilt from the source directory alone."
+        ),
+    )
     args = parser.parse_args()
 
     csvs = sorted(args.src.glob("*.csv"))
     if not csvs:
         raise SystemExit(f"No CSV files found under {args.src}")
 
-    df = pd.concat((pd.read_csv(p) for p in csvs), ignore_index=True)
+    frames = [pd.read_csv(p) for p in csvs]
+    if args.update:
+        if not args.dst.exists():
+            raise SystemExit(f"--update given but {args.dst} does not exist")
+        # Prepend the existing master: the stable sort below preserves input
+        # order within duplicate keys, so keep="last" lets new rows win.
+        frames.insert(0, pd.read_csv(args.dst))
+
+    df = pd.concat(frames, ignore_index=True)
 
     df.sort_values(
         ["building_type", "task", "run_period", "building_id"],

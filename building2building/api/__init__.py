@@ -278,9 +278,9 @@ def make_env(
         building_id: Explicit building ID, overrides *split*/*index*.
         task: Named task preset or a
             :class:`~building2building.config.tasks.TaskPreset` instance.
-            Recognised names are the 9 normalized presets
+            Recognised names are the 6 normalized presets
             ``"task_<mode>_<level>"`` with
-            ``mode ∈ {const, occ, rand}`` and ``level ∈ {e0, emed, ehigh}``.
+            ``mode ∈ {const, occ, rand}`` and ``level ∈ {e0, e05}``.
             ``(tau_T, tau_E)`` are auto-resolved from
             :file:`building2building/data/reward_normalizers.yaml`
             using the building's ``(building_type, climate_zone)`` bucket.
@@ -288,11 +288,14 @@ def make_env(
             comfort-only).
         reward: Override reward.  If ``None``, uses the task default.
         run_period: Simulation run period name (``"full_year"``,
-            ``"winter"``, ``"summer"``).
+            ``"winter"``, ``"summer"``).  ``tau_E`` is calibrated per
+            run period; a period absent from ``reward_normalizers.yaml``
+            raises at env-build time.
         normalizer_path: Override the default
             :data:`~building2building.data.reward_normalizers.DEFAULT_REWARD_NORMALIZERS_PATH`
             used to resolve ``(tau_T, tau_E)`` for normalized-reward presets.
-            When ``None`` (default), the built-in random-policy YAML is used.
+            When ``None`` (default), the built-in ``reward_normalizers.yaml``
+            is used.
         timesteps_per_hour: Number of simulation steps per hour.
         target_temperature_mode: Override the preset's target mode
             (``"constant"``, ``"occupancy"``, or ``"random_schedule"``).

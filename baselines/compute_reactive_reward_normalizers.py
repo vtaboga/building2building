@@ -1,22 +1,37 @@
-"""Compute reward normalizers from SAC warmup uniform-random rollouts.
+"""Produce ``building2building/data/reward_normalizers.yaml``.
 
-Rolls out ``env.action_space.sample()`` on the RL wrapper stack
-(``rescale_action=True``, ``normalize_obs=True``) under ``task_occ_emed``,
-recomputes ``(temp_penalty, power_penalty)`` from ``raw_observation``, and
-writes ``building2building/data/reward_normalizers.yaml``.
+Rolls out the reference reactive controllers (the same ones behind
+``baseline_returns.csv`` -- see :mod:`baselines.run_reactive_control`)
+on the calibration task (``task_occ_e0``: occupancy regime, ``dT=1``,
+seasonal unoccupied policy), records the per-building mean
+``(temp_penalty, power_penalty)``, and writes the median per
+``(building_type, climate_zone)`` bucket into one seasonal YAML section
+per run period.
+
+The reward has an asymmetric normalization (see
+:mod:`building2building.data.reward_normalizers`):
+
+* **Comfort is unnormalized:** ``tau_T`` is pinned to ``1.0`` for every
+  bucket, so ``temp_penalty`` is a raw squared out-of-band deviation in
+  degC^2 -- the same physical unit everywhere.
+* **Energy is normalized:** ``tau_E`` is the reference controller's
+  energy spend, so ``power_penalty / tau_E = 1`` means "spends like the
+  reference controller for this bucket".
+
+By default this writes the packaged
+``building2building/data/reward_normalizers.yaml`` in place.
 
 Usage::
 
-    python -m baselines.compute_random_policy_reward_normalizers --mode rollout \\
-        --shard-index 1 --shard-count 48 --n-workers 8
-
-    python -m baselines.compute_random_policy_reward_normalizers --mode aggregate
+    # regenerate the packaged normalizers for all validated periods
+    python -m baselines.compute_reactive_reward_normalizers \\
+        --run-periods winter summer full_year --max-per-type 64 \\
+        --n-workers 8 --mode all
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import logging
 import os
@@ -25,6 +40,9 @@ import traceback
 from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
+
+from building2building.config.tasks import TaskPreset, resolve_task_preset
+from building2building.types import NormalizedDeadbandRewardConfig
 
 from baselines.utils.reward_normalizer_calibration import (
     CALIBRATION_SPLIT,
@@ -36,7 +54,6 @@ from baselines.utils.reward_normalizer_calibration import (
     aggregate,
     build_specs,
     cz_key_for,
-    default_data_dir,
     list_train_buildings,
     load_stats,
     mean_deadband_penalties_from_infos,
@@ -49,31 +66,36 @@ from baselines.utils.reward_normalizer_calibration import (
 
 logger = logging.getLogger(__name__)
 
-GENERATOR_MODULE = "baselines.compute_random_policy_reward_normalizers"
+GENERATOR_MODULE = "baselines.compute_reactive_reward_normalizers"
 
-# Placeholder normalizers for env construction only.  Rollouts recompute
-# (temp_penalty, power_penalty) from raw_observation; the scalar reward
-# from env.step is never read.
+# Placeholder normalizers for env construction only: the reactive
+# controller never reads the scalar reward, and (temp_penalty,
+# power_penalty) are recomputed from raw_observation.
 _CALIBRATION_TAU_PLACEHOLDER = 1.0
 
 DEFAULT_OUTPUT_YAML = (
-    Path("building2building") / "data" / "reward_normalizers.yaml"
+    Path(__file__).resolve().parents[1]
+    / "building2building"
+    / "data"
+    / "reward_normalizers.yaml"
 )
 DEFAULT_PLOT_PATH = (
-    Path("analysis") / "task_study" / "reward_design" / "plots"
-    / "fig_random_policy_normalizer_calibration.png"
+    Path("experiences")
+    / "figures"
+    / "reward"
+    / "fig_reactive_policy_normalizer_calibration.png"
 )
 
 
-def _seed_for(building_type: str, building_id: str) -> int:
-    key = f"{building_type}/{building_id}".encode("utf-8")
-    digest = hashlib.sha256(key).digest()
-    return int.from_bytes(digest[:4], byteorder="little", signed=False)
+def _default_data_dir() -> Path:
+    scratch = os.environ.get("SCRATCH")
+    root = Path(scratch) if scratch else Path("/tmp")
+    return root / "b2b" / "reward_normalizers_reactive" / "data"
 
 
 @lru_cache(maxsize=1)
 def _calibration_task_preset() -> TaskPreset:
-    """``task_occ_emed`` with tau_T=tau_E=1 so env build needs no YAML."""
+    """Calibration preset with tau_T=tau_E=1 so env build needs no YAML."""
     preset = resolve_task_preset(CALIBRATION_TASK)
     reward = preset.reward
     if isinstance(reward, NormalizedDeadbandRewardConfig) and not reward.is_filled:
@@ -90,42 +112,26 @@ def _run_single_rollout(spec: RolloutSpec) -> str:
     if spec.out_path.exists():
         return "skip"
 
-    from baselines.utils.training import make_rl_env_fn
-
-    seed = _seed_for(spec.building_type, spec.building_id)
+    import building2building as b2b
+    from baselines.run_reactive_control import _select_policy
+    from baselines.utils.evaluation import run_episode
 
     try:
-        env = make_rl_env_fn(
-            building_type=spec.building_type,
+        env = b2b.make_env(
+            spec.building_type,
             building_id=spec.building_id,
             task=_calibration_task_preset(),
-            run_period=spec.run_period,
-            normalize_obs=True,
-            rescale_action=True,
-            monitor=False,
-        )()
+            run_period=spec.run_period,  # type: ignore[arg-type]
+        )
     except Exception as exc:
         return f"fail: env_init: {exc}"
 
-    rf = env.unwrapped.reward_fn
-    infos: list[dict] = []
-
     try:
-        env.action_space.seed(seed)
-        try:
-            _obs, info = env.reset(seed=seed)
-        except TypeError:
-            _obs, info = env.reset()
-        infos.append(info)
-
-        done = False
-        while not done:
-            action = env.action_space.sample()
-            _obs, _reward, terminated, truncated, info = env.step(action)
-            done = bool(terminated or truncated)
-            infos.append(info)
-
-        mean_t, mean_e, n_steps = mean_deadband_penalties_from_infos(infos[1:], rf)
+        policy = _select_policy(spec.building_type, spec.building_id, env)
+        result = run_episode(env, policy)
+        mean_t, mean_e, n_steps = mean_deadband_penalties_from_infos(
+            result.infos, env.unwrapped.reward_fn
+        )
 
         stats = BuildingStats(
             run_period=spec.run_period,
@@ -135,7 +141,6 @@ def _run_single_rollout(spec: RolloutSpec) -> str:
             mean_temp_penalty=mean_t,
             mean_power_penalty=mean_e,
             n_steps=n_steps,
-            seed=seed,
         )
         spec.out_path.parent.mkdir(parents=True, exist_ok=True)
         spec.out_path.write_text(json.dumps(stats.to_json(), indent=2))
@@ -153,19 +158,18 @@ def _run_single_rollout(spec: RolloutSpec) -> str:
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=(
-            "Compute (tau_T, tau_E) from SAC-warmup uniform-random rollouts "
+            "Compute (tau_T, tau_E) from tuned-reactive-controller rollouts "
             f"on {CALIBRATION_TASK}."
         )
     )
-    p.add_argument(
-        "--mode",
-        choices=("all", "rollout", "aggregate"),
-        default="all",
-    )
+    p.add_argument("--mode", choices=("all", "rollout", "aggregate"), default="all")
     p.add_argument(
         "--run-periods",
         nargs="+",
         choices=list(DEFAULT_RUN_PERIODS),
+        # Default to every period the packaged YAML ships: --output-yaml
+        # points at the packaged file, and writing a subset of periods
+        # would drop the missing sections and break env builds for them.
         default=list(DEFAULT_RUN_PERIODS),
     )
     p.add_argument("--data-dir", type=Path, default=None)
@@ -197,12 +201,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    data_dir = args.data_dir if args.data_dir is not None else default_data_dir()
-    if args.data_dir is None and "SCRATCH" not in os.environ:
-        logger.warning(
-            "$SCRATCH is not set; using %s for per-building cache.",
-            data_dir,
-        )
+    data_dir = args.data_dir if args.data_dir is not None else _default_data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Per-building cache dir: %s", data_dir)
 
@@ -214,11 +213,11 @@ def main(argv: list[str] | None = None) -> int:
             args.max_per_type,
             climate_zone=args.climate_zone,
         )
-        shard_picks_list = shard_picks(picks, args.shard_index, args.shard_count)
-        specs = build_specs(shard_picks_list, data_dir, run_periods)
+        shard = shard_picks(picks, args.shard_index, args.shard_count)
+        specs = build_specs(shard, data_dir, run_periods)
         logger.info(
-            "Planned %d train buildings, %d run periods, %d specs this worker.",
-            len(shard_picks_list),
+            "Planned %d buildings, %d run periods, %d specs this worker.",
+            len(shard),
             len(run_periods),
             len(specs),
         )
@@ -230,28 +229,31 @@ def main(argv: list[str] | None = None) -> int:
         statuses = run_rollouts(specs, args.n_workers, _run_single_rollout)
         failed = [k for k, v in statuses.items() if v.startswith("fail")]
         if failed:
-            logger.warning(
-                "%d rollouts failed (of %d).", len(failed), len(statuses)
-            )
+            logger.warning("%d rollouts failed (of %d).", len(failed), len(statuses))
+            for k in failed[:5]:
+                logger.warning("  %s -> %s", k, statuses[k])
 
     if args.mode in ("all", "aggregate"):
         stats = load_stats(data_dir, run_periods)
         logger.info("Loaded %d per-building stats from %s", len(stats), data_dir)
         if not stats:
-            logger.error(
-                "No stats under %s; run rollout shards first.", data_dir
-            )
+            logger.error("No stats under %s; run rollout shards first.", data_dir)
             return 1
 
         aggregated = aggregate(stats)
+        # Comfort is unnormalized: pin tau_T=1 for every bucket so
+        # temp_penalty stays in raw degC^2. Only tau_E (the reference
+        # controller's energy spend) is calibrated.
+        for period_payload in aggregated.values():
+            for payload in period_payload.values():
+                payload["tau_T"] = 1.0
+                payload["tau_T_iqr"] = 0.0
         save_calibration_plot(
             aggregated,
             args.plot_path,
             run_periods,
-            title="SAC-warmup random-policy reward-normalizer calibration",
+            title="Reference reactive-controller energy-normalizer calibration",
         )
-        logger.info("Saved sanity plot to %s", args.plot_path)
-
         clean = strip_internal_keys(aggregated)
         write_reward_normalizers_yaml(
             clean,
@@ -259,13 +261,12 @@ def main(argv: list[str] | None = None) -> int:
             run_periods,
             generator_module=GENERATOR_MODULE,
             source_lines=[
-                "controller: sac_warmup_uniform_random",
-                "policy: stable_baselines3_sac_learning_starts_action_space_sample",
+                "controller: reactive",
+                "policy: baselines.run_reactive_control reference RBCs (raw action "
+                "space); tau_T pinned to 1.0 (unnormalized comfort)",
                 f"calibration_task: {CALIBRATION_TASK}",
                 f"run_periods: [{', '.join(run_periods)}]",
                 f"split: {CALIBRATION_SPLIT}",
-                "action_space: rl_wrapped_rescaled_box",
-                "seed: sha256(building_type/building_id) first 32 bits",
                 "aggregation: median_over_buildings",
             ],
         )

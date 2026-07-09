@@ -133,6 +133,7 @@ def evaluate_building(
     plot_trajectories: bool = False,
     trajectory_dir: Path | None = None,
     plot_dir: Path | None = None,
+    normalizer_path: Path | None = None,
 ) -> RunResult:
     """Run the reactive controller on one building and return results.
 
@@ -149,6 +150,7 @@ def evaluate_building(
             building_id=building_id,
             task=task,
             run_period=run_period,
+            normalizer_path=normalizer_path,
         )
         try:
             policy = _select_policy(building_type, building_id, env)
@@ -255,6 +257,12 @@ def main(cfg: DictConfig) -> None:
     max_bldgs = cfg.get("max_buildings_per_type")
     n_runs: int = int(cfg.get("n_runs", 1))
     output_csv = Path(str(cfg.get("output_csv", "baseline_returns.csv")))
+    _norm_raw = cfg.get("normalizer_path", None)
+    normalizer_path: Path | None = Path(str(_norm_raw)) if _norm_raw else None
+    if normalizer_path is not None and not normalizer_path.exists():
+        raise FileNotFoundError(f"normalizer_path does not exist: {normalizer_path}")
+    if normalizer_path is not None:
+        logger.info("Using reward normalizers from %s", normalizer_path)
 
     save_trajectories: bool = bool(cfg.get("save_trajectories", False))
     plot_trajectories: bool = bool(cfg.get("plot_trajectories", False))
@@ -298,6 +306,7 @@ def main(cfg: DictConfig) -> None:
                             plot_trajectories=plot_trajectories,
                             trajectory_dir=trajectory_dir,
                             plot_dir=plot_dir,
+                            normalizer_path=normalizer_path,
                         )
                         results.append(result)
                     except Exception:

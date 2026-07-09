@@ -18,9 +18,11 @@ split: test
 buildings_per_type: 8
 building_ids: null
 run_period: full_year  # one of full_year / winter / summer
+# Optional alternate reward-normalizer YAML (null = packaged default).
+normalizer_path: null
 # Normalized-reward presets (NormalizedDeadbandReward with per-bucket tau_T/tau_E
 # from reward_normalizers.yaml).  energy_weight=0 (e0 suffix)
-# focuses the policy purely on thermal comfort; switch to emed/ehigh to add an
+# focuses the policy purely on thermal comfort; switch to the e05 variants to add an
 # energy penalty.  The three modes cover constant, occupancy, and random-schedule
 # temperature targets.
 tasks: [task_const_e0, task_occ_e0, task_rand_e0]

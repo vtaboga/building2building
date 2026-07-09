@@ -1,4 +1,4 @@
-"""Cross-domain generalization benchmark (Section 4, Table: Cross-domain).
+"""Cross-domain generalization benchmark.
 
 Agents are trained on one building type and tested on a *different*
 building type.

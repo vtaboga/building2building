@@ -42,22 +42,22 @@ class TestGoalAdaptation:
     def test_defaults(self) -> None:
         bm = GoalAdaptation()
         assert bm.building_type == "OfficeSmall"
-        # Defaults moved to the trade-off-transfer axis on the
-        # normalized 3x3 task family (see goal_adaptation.py docstring).
-        assert bm.train_task == "task_occ_emed"
-        assert bm.test_task == "task_occ_ehigh"
+        # Defaults implement the trade-off-transfer axis on the
+        # normalized 3x2 task family (see goal_adaptation.py docstring).
+        assert bm.train_task == "task_occ_e05"
+        assert bm.test_task == "task_occ_e0"
         assert bm.run_period == "full_year"
 
     def test_custom_params(self) -> None:
         bm = GoalAdaptation(
             building_type="Warehouse",
-            train_task="task_occ_emed",
-            test_task="task_occ_ehigh",
+            train_task="task_occ_e05",
+            test_task="task_occ_e0",
             run_period="winter",
         )
         assert bm.building_type == "Warehouse"
-        assert bm.train_task == "task_occ_emed"
-        assert bm.test_task == "task_occ_ehigh"
+        assert bm.train_task == "task_occ_e05"
+        assert bm.test_task == "task_occ_e0"
 
 
 @pytest.mark.quick

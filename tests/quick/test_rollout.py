@@ -86,7 +86,7 @@ class TestTrajectoryRoundTrip:
     ) -> None:
         building_info = fixture_registry.get_building_by_id("OfficeSmall", "fixture-0001")
         task_config = api_mod._resolve_task_config(
-            preset=TASK_PRESETS["task_occ_emed"],
+            preset=TASK_PRESETS["task_occ_e05"],
             run_period_cfg=RunPeriodConfig.from_name("winter"),
             timesteps_per_hour=12,
             target_temperature_mode=None,

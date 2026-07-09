@@ -74,7 +74,7 @@ def _env_kwargs(building_type: str) -> dict[str, object]:
         building_type=building_type,
         split="train",
         index=0,
-        task="task_occ_emed",
+        task="task_occ_e05",
         run_period="winter",
         timesteps_per_hour=4,
     )

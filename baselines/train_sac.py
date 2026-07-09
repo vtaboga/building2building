@@ -17,8 +17,8 @@ SAC-specific notes:
 - Tasks use ``NormalizedDeadbandReward`` (``task_*_e0`` family by default)
   with per-bucket ``(τ_T, τ_E)`` constants from
   ``reward_normalizers.yaml``.  ``energy_weight=0`` (``e0``)
-  means the reward measures pure thermal comfort; switch to ``emed``/
-  ``ehigh`` to add an energy penalty.
+  means the reward measures pure thermal comfort; switch to the
+  ``e05`` variant to add an energy penalty.
 - total_timesteps defaults to 2M in experiment=train_sac (vs PPO's 5M)
   because SAC is off-policy and sample-efficient.
 - Multi-seed runs: use Hydra multirun, e.g.
@@ -131,6 +131,7 @@ def train_and_eval(
     seed: int,
     run_period: str = "full_year",
     checkpoint_freq: int = 200_000,
+    normalizer_path: Path | None = None,
 ) -> TrainResult:
     """Train a SAC specialist on one building and run one eval episode.
 
@@ -149,6 +150,7 @@ def train_and_eval(
         run_period=run_period,
         normalize_obs=True,
         rescale_action=True,
+        normalizer_path=normalizer_path,
     )
     env_fns = [env_fn for _ in range(n_envs)]
     vec_env = make_vec_env(env_fns, use_subproc=n_envs > 1)
@@ -200,6 +202,7 @@ def train_and_eval(
         normalize_obs=True,
         rescale_action=True,
         monitor=False,
+        normalizer_path=normalizer_path,
     )()
     try:
         result = run_episode(eval_env, model)
@@ -293,6 +296,13 @@ def main(cfg: DictConfig) -> None:
     seed: int = int(cfg.get("seed", 0))
     run_period: str = str(cfg.get("run_period", "full_year"))
     checkpoint_freq: int = int(cfg.training.get("checkpoint_freq", 200_000))
+    # Optional alternate reward-normalizer YAML (e.g. the reactive-controller
+    # calibration from baselines.compute_reactive_reward_normalizers). None
+    # keeps the packaged default.
+    _np_raw = cfg.get("normalizer_path", None)
+    normalizer_path: Path | None = Path(str(_np_raw)) if _np_raw else None
+    if normalizer_path is not None and not normalizer_path.exists():
+        raise FileNotFoundError(f"normalizer_path does not exist: {normalizer_path}")
 
     output_dir = Path(cfg.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -362,6 +372,7 @@ def main(cfg: DictConfig) -> None:
                         seed=seed,
                         run_period=run_period,
                         checkpoint_freq=checkpoint_freq,
+                        normalizer_path=normalizer_path,
                     )
                     results.append(result)
                     _wandb_log(

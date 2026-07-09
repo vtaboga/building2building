@@ -131,7 +131,7 @@ def test_wrap_env_for_rl_real_env_invariant(
     _patch_registry(monkeypatch, fixture_registry)
     env = api_mod.make_env(
         "OfficeSmall",
-        task="task_occ_emed",
+        task="task_occ_e05",
         reward=_FILLED_REWARD,
         max_episode_steps=4,
     )

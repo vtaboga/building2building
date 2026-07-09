@@ -52,7 +52,7 @@ def test_pad_observation_keeps_non_zone_tail_at_stable_indices(
 
     env = api_mod.make_env(
         "OfficeSmall",
-        task="task_occ_emed",
+        task="task_occ_e05",
         reward=_FILLED_REWARD,
         max_episode_steps=4,
     )

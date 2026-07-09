@@ -26,7 +26,7 @@ defaults:
   - override /policy: ppo
   - override /training: default
 
-task: ???                     # e.g. task_const_e0, task_occ_e0, task_rand_emed
+task: ???                     # e.g. task_const_e0, task_occ_e0, task_rand_e05
 
 # Building types included in the unified sweep
 building_types:

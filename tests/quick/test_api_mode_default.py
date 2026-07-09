@@ -56,7 +56,7 @@ class TestTaskConfigResolution:
 
     def test_explicit_mode_overrides_preset(self) -> None:
         cfg = api_mod._resolve_task_config(
-            preset=TASK_PRESETS["task_occ_emed"],
+            preset=TASK_PRESETS["task_occ_e05"],
             run_period_cfg=RunPeriodConfig.from_name("full_year"),
             timesteps_per_hour=12,
             target_temperature_mode="constant",
@@ -89,7 +89,7 @@ class TestRewardResolution:
 
     def test_explicit_reward_override_wins(self) -> None:
         resolved = api_mod._resolve_effective_reward(
-            preset=TASK_PRESETS["task_occ_emed"],
+            preset=TASK_PRESETS["task_occ_e05"],
             reward_override=_FILLED_REWARD,
             building_type="OfficeSmall",
             building_id="fixture-0001",
@@ -103,7 +103,7 @@ class TestRewardResolution:
     ) -> None:
         _patch_registry(monkeypatch, fixture_registry)
         resolved = api_mod._resolve_effective_reward(
-            preset=TASK_PRESETS["task_occ_emed"],
+            preset=TASK_PRESETS["task_occ_e05"],
             reward_override=None,
             building_type="OfficeSmall",
             building_id="fixture-0001",
@@ -121,7 +121,7 @@ class TestRewardResolution:
         _patch_registry(monkeypatch, fixture_registry)
         with pytest.raises(KeyError):
             api_mod._resolve_effective_reward(
-                preset=TASK_PRESETS["task_occ_emed"],
+                preset=TASK_PRESETS["task_occ_e05"],
                 reward_override=None,
                 building_type="OfficeMedium",
                 building_id="fixture-0001",
@@ -138,7 +138,7 @@ def test_make_env_mode_end_to_end(
     _patch_registry(monkeypatch, fixture_registry)
     env = api_mod.make_env(
         "OfficeSmall",
-        task="task_occ_emed",
+        task="task_occ_e05",
         reward=_FILLED_REWARD,
         max_episode_steps=4,
     )

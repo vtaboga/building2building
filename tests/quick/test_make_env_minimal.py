@@ -52,7 +52,7 @@ def test_make_env_knobs_and_hvac_matrix(
 
     env = api_mod.make_env(
         "OfficeSmall",
-        task="task_occ_emed",
+        task="task_occ_e05",
         reward=RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0),
         run_period=run_period,
         target_temperature_mode=target_temperature_mode,
@@ -95,7 +95,7 @@ def test_make_env_rescale_action_and_max_steps(
     _patch_registry(monkeypatch, fixture_registry)
     env = api_mod.make_env(
         "OfficeSmall",
-        task="task_occ_emed",
+        task="task_occ_e05",
         reward=RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0),
         rescale_action=True,
         max_episode_steps=12,

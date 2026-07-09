@@ -38,7 +38,7 @@ def test_observation_names_snapshot_minimal_officemedium(
     _patch_registry(monkeypatch, fixture_registry)
     env = api_mod.make_env(
         "OfficeSmall",
-        task="task_occ_emed",
+        task="task_occ_e05",
         reward=_FILLED_REWARD,
         target_temperature_mode=target_temperature_mode,
         random_schedule_seed=123,

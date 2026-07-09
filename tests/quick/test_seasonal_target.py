@@ -151,7 +151,7 @@ class TestDynamicTargetTemperatureSeasonal:
 @pytest.mark.quick
 class TestTask3IsSeasonal:
     def test_task3_uses_seasonal_policy(self) -> None:
-        preset = TASK_PRESETS["task_occ_emed"]
+        preset = TASK_PRESETS["task_occ_e05"]
         assert preset.unoccupied_policy == "seasonal"
         assert preset.seasonal_unoccupied_c is not None
         assert preset.seasonal_unoccupied_c["winter"] == 18.0
