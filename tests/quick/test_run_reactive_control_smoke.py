@@ -4,6 +4,8 @@ Covers:
 - Module imports without circular dependencies.
 - ``_select_policy`` correctly dispatches to AirLoop vs UnitaryHvac controller.
 - ``write_csv`` produces the expected columns.
+- ``append_result`` / ``load_completed_keys`` round-trip: an interrupted
+  sweep resumes from the partial CSV instead of re-simulating.
 - ``RunResult`` dataclass has the required fields.
 """
 
@@ -105,6 +107,66 @@ class TestWriteCsv:
         assert "results" in sig.parameters
         assert "path" in sig.parameters
         assert "n_runs" in sig.parameters
+
+
+@pytest.mark.quick
+class TestIncrementalAppendAndResume:
+    @staticmethod
+    def _result(building_id: str, task: str = "task_const_e05"):
+        from baselines.run_reactive_control import RunResult
+
+        return RunResult(
+            building_type="OfficeMedium",
+            building_id=building_id,
+            task=task,
+            run_period="winter",
+            rewards=[-10.0],
+            reward_mean=-10.0,
+        )
+
+    def test_append_result_writes_header_once(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
+        from baselines.run_reactive_control import append_result
+
+        out = tmp_path / "results.csv"
+        append_result(self._result("OfficeMedium-4001"), out, n_runs=1)
+        append_result(self._result("OfficeMedium-4002"), out, n_runs=1)
+
+        with open(out) as fh:
+            rows = list(csv.DictReader(fh))
+
+        assert [r["building_id"] for r in rows] == [
+            "OfficeMedium-4001",
+            "OfficeMedium-4002",
+        ]
+        assert rows[0]["reward_mean"] == "-10.0"
+
+    def test_load_completed_keys_round_trip(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
+        from baselines.run_reactive_control import append_result, load_completed_keys
+
+        out = tmp_path / "results.csv"
+        assert load_completed_keys(out) == set()
+
+        append_result(self._result("OfficeMedium-4001"), out, n_runs=1)
+        assert load_completed_keys(out) == {
+            ("OfficeMedium", "task_const_e05", "winter", "OfficeMedium-4001")
+        }
+
+    def test_append_matches_write_csv_columns(
+        self, tmp_path: pytest.TempPathFactory
+    ) -> None:
+        from baselines.run_reactive_control import append_result, write_csv
+
+        appended = tmp_path / "appended.csv"
+        rewritten = tmp_path / "rewritten.csv"
+        result = self._result("OfficeMedium-4001")
+        append_result(result, appended, n_runs=1)
+        write_csv([result], rewritten, n_runs=1)
+
+        assert appended.read_text() == rewritten.read_text()
 
 
 @pytest.mark.quick

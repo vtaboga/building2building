@@ -199,38 +199,74 @@ def evaluate_building(
     )
 
 
-def write_csv(results: list[RunResult], path: Path, *, n_runs: int) -> None:
-    """Write results to CSV with one row per (building, task, run_period)."""
-    run_cols = [f"reward_run{i + 1}" for i in range(n_runs)]
-    fieldnames = [
+def _csv_fieldnames(n_runs: int) -> list[str]:
+    return [
         "building_type",
         "task",
         "run_period",
         "building_id",
-        *run_cols,
+        *[f"reward_run{i + 1}" for i in range(n_runs)],
         "reward_mean",
     ]
 
+
+def _csv_row(r: RunResult) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "building_type": r.building_type,
+        "task": r.task,
+        "run_period": r.run_period,
+        "building_id": r.building_id,
+        "reward_mean": f"{r.reward_mean:.1f}",
+    }
+    for i, rw in enumerate(r.rewards):
+        row[f"reward_run{i + 1}"] = f"{rw:.1f}"
+    return row
+
+
+def write_csv(results: list[RunResult], path: Path, *, n_runs: int) -> None:
+    """Write results to CSV with one row per (building, task, run_period)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=_csv_fieldnames(n_runs))
         writer.writeheader()
         for r in sorted(
             results,
             key=lambda x: (x.building_type, x.task, x.run_period, x.building_id),
         ):
-            row: dict[str, Any] = {
-                "building_type": r.building_type,
-                "task": r.task,
-                "run_period": r.run_period,
-                "building_id": r.building_id,
-                "reward_mean": f"{r.reward_mean:.1f}",
-            }
-            for i, rw in enumerate(r.rewards):
-                row[f"reward_run{i + 1}"] = f"{rw:.1f}"
-            writer.writerow(row)
+            writer.writerow(_csv_row(r))
 
     logger.info("Wrote %d rows to %s", len(results), path)
+
+
+def load_completed_keys(path: Path) -> set[tuple[str, str, str, str]]:
+    """Keys already present in an existing output CSV.
+
+    Lets an interrupted sweep (SLURM time limit, crash) resume without
+    re-simulating: ``main`` skips any ``(building_type, task, run_period,
+    building_id)`` returned here.
+    """
+    if not path.exists():
+        return set()
+    with path.open(newline="") as f:
+        return {
+            (row["building_type"], row["task"], row["run_period"], row["building_id"])
+            for row in csv.DictReader(f)
+        }
+
+
+def append_result(result: RunResult, path: Path, *, n_runs: int) -> None:
+    """Append one result row, creating the file and header on first write.
+
+    Rows land in completion order (unsorted); ``merge_baseline_returns.py``
+    sorts on merge. ``n_runs`` must match any rows already in the file.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    is_empty = not path.exists() or path.stat().st_size == 0
+    with path.open("a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=_csv_fieldnames(n_runs))
+        if is_empty:
+            writer.writeheader()
+        writer.writerow(_csv_row(result))
 
 
 @hydra.main(config_path="configs", config_name="config", version_base=None)
@@ -276,7 +312,14 @@ def main(cfg: DictConfig) -> None:
         plot_dir.mkdir(parents=True, exist_ok=True)
         logger.info("Trajectory plots will be saved to %s", plot_dir)
 
-    results: list[RunResult] = []
+    completed = load_completed_keys(output_csv)
+    if completed:
+        logger.info(
+            "Resuming: %d rows already in %s; matching evaluations are skipped.",
+            len(completed),
+            output_csv,
+        )
+    n_written = 0
 
     for bt in building_types:
         building_ids = b2b.list_buildings(bt, split=split)
@@ -295,6 +338,8 @@ def main(cfg: DictConfig) -> None:
         for bid in building_ids:
             for task in tasks:
                 for period in run_periods:
+                    if (bt, task, period, bid) in completed:
+                        continue
                     try:
                         result = evaluate_building(
                             bt,
@@ -308,7 +353,10 @@ def main(cfg: DictConfig) -> None:
                             plot_dir=plot_dir,
                             normalizer_path=normalizer_path,
                         )
-                        results.append(result)
+                        # Append immediately so a SLURM time limit or crash
+                        # loses at most the in-flight episode.
+                        append_result(result, output_csv, n_runs=n_runs)
+                        n_written += 1
                     except Exception:
                         logger.exception(
                             "Failed: %s/%s task=%s run_period=%s",
@@ -318,8 +366,13 @@ def main(cfg: DictConfig) -> None:
                             period,
                         )
 
-    if results:
-        write_csv(results, output_csv, n_runs=n_runs)
+    if n_written or completed:
+        logger.info(
+            "Wrote %d new rows to %s (%d already present).",
+            n_written,
+            output_csv,
+            len(completed),
+        )
     else:
         logger.warning("No results to write.")
 
