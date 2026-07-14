@@ -335,7 +335,7 @@ def main(cfg: DictConfig) -> None:
     n_trials: int = int(cfg.get("n_trials", 200))
     n_startup: int = int(cfg.get("n_startup_trials", 20))
     timeout: int | None = cfg.get("timeout_seconds")
-    task: str = cfg.get("reward", {}).get("task_name", "task_occ_emed")
+    task: str = cfg.get("reward", {}).get("task_name", "task_occ_e0")
     run_period_raw = str(cfg.get("run_period", "full_year"))
     allowed_run_periods = {"full_year", "winter", "summer"}
     if run_period_raw not in allowed_run_periods:

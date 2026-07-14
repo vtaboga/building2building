@@ -1,12 +1,7 @@
 """Per-(building_type, climate_zone) reward normalization constants.
 
-This module wraps :file:`reward_normalizers.yaml`, which stores
-``(tau_T, tau_E)`` constants computed from SAC-warmup uniform-random
-policy rollouts on the train split (calibration regime: occupancy-based
-deadband, ``dT=1.0``, seasonal unoccupied policy — i.e. the ``task_occ_*`` regime).
-The random controller was chosen because it is policy-independent —
-it bakes in no RBC-specific bias into the normalizers.  The constants
-are consumed at training time by
+This module wraps :file:`reward_normalizers.yaml`, which stores the
+``(tau_T, tau_E)`` constants consumed at training time by
 :class:`building2building.simulator.rewards.NormalizedDeadbandReward`
 so that
 
@@ -15,20 +10,30 @@ so that
     r = -\\Big(\\frac{\\text{temp\\_penalty}}{\\tau_T}
               + w_E \\cdot \\frac{\\text{power\\_penalty}}{\\tau_E}\\Big)
 
-is approximately balanced (mean-1 on each axis) at the median building
-of each ``(building_type, climate_zone)`` bucket under the calibration
-random policy.
+**Comfort is unnormalized:** ``tau_T = 1`` for every bucket, so
+``temp_penalty / tau_T`` is the raw squared out-of-band deviation in
+degC^2 — the same physical unit in every building, zone and season.
+
+**Energy is normalized per bucket:** ``tau_E`` is the median per-step
+energy penalty of the reference reactive controller
+(:mod:`baselines.run_reactive_control`) on the train split, under the
+occupancy regime (``dT=1.0``, seasonal unoccupied policy — the
+``task_occ_*`` tasks).  Thus ``power_penalty / tau_E = 1`` means "spends
+like the reference controller for this ``(building_type, climate_zone)``
+bucket", and ``w_E`` is a dimensionless price with the same meaning
+everywhere.
+
+``tau_E`` is seasonal (heating vs cooling energy differ), so the YAML has
+one ``constants`` section per run period; a ``run_period`` without a
+section raises at resolution time.
 
 The YAML file is *committed to git* (small) and produced by
-:mod:`baselines.compute_random_policy_reward_normalizers`
-(``--mode aggregate``).
+:mod:`baselines.compute_reactive_reward_normalizers` (``--mode aggregate``).
 
 Numerical floor
 ---------------
-HVAC penalties under the random policy are non-trivial in practice
-(random actions still exercise the HVAC), so neither ``tau_T`` nor
-``tau_E`` should be near zero on the actual calibration data.  As a
-defensive guardrail we clip up to
+As a defensive guardrail against a degenerate ``tau_E`` (a bucket where
+the reference controller spends almost nothing) we clip up to
 ``max(epsilon_abs, epsilon_rel * median(tau over buckets))`` and set a
 ``floor_applied_*`` flag on the resulting :class:`RewardNormalizer`.
 Tests assert that the floor is dormant on the committed YAML.
@@ -89,12 +94,11 @@ class RewardNormalizer:
     """Resolved ``(tau_T, tau_E)`` pair for one ``(bt, cz)`` bucket.
 
     Attributes:
-        tau_T: Comfort-penalty normalizer (mean ``temp_penalty`` of the
-            random policy under the calibration task at the median train
-            building of this bucket).
-        tau_E: Energy-penalty normalizer (mean ``power_penalty`` of the
-            random policy under the calibration task at the median train
-            building of this bucket).
+        tau_T: Comfort-penalty normalizer.  Fixed at ``1.0`` (comfort is
+            unnormalized; ``temp_penalty`` is raw degC^2).
+        tau_E: Energy-penalty normalizer (median ``power_penalty`` of the
+            reference reactive controller under the calibration task at
+            the median train building of this bucket).
         tau_T_iqr: Inter-quartile range of ``tau_T`` across the bucket
             (a tightness measure).
         tau_E_iqr: Inter-quartile range of ``tau_E`` across the bucket.

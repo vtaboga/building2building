@@ -3,25 +3,25 @@
 Training and test environments use the same building and control
 interface, but the reward function / task changes between them.
 
-Three canonical transfer axes ride on top of the normalized 3x3 task
+Two canonical transfer axes ride on top of the normalized 3x2 task
 family (:mod:`building2building.config.tasks`):
 
 * **Trade-off transfer** (orthogonal to setpoint mode): train on
-  ``task_occ_emed``, evaluate on ``task_occ_e0`` or
-  ``task_occ_ehigh``.  All three are in the calibration regime
+  ``task_occ_e05`` (energy priced in), evaluate on ``task_occ_e0``
+  (comfort-only).  Both are in the calibration regime
   (``mode="occupancy"``, ``dT=1.0``), so no calibration-mismatch
   warning fires; the benchmark isolates how a policy generalizes
   across ``w_E``.
 * **Setpoint-mode transfer** (orthogonal to ``w_E``): train on
-  ``task_occ_emed``, evaluate on ``task_const_emed`` or
-  ``task_rand_emed``.  The two test tasks are *outside* the
+  ``task_occ_e05``, evaluate on ``task_const_e05`` or
+  ``task_rand_e05``.  The two test tasks are *outside* the
   calibration regime, so the simulator emits a one-time
   :class:`RuntimeWarning` at env construction.  This benchmark is
   the quantitative measurement of how much the approximate
   calibration costs in policy performance.
 
-The constructor's defaults (``train_task="task_occ_emed"``,
-``test_task="task_occ_ehigh"``) implement the trade-off-transfer axis.
+The constructor's defaults (``train_task="task_occ_e05"``,
+``test_task="task_occ_e0"``) implement the trade-off-transfer axis.
 """
 
 from __future__ import annotations
@@ -44,12 +44,11 @@ class GoalAdaptation(BenchmarkProblem):
         building_type: Building type to use.
         split_index: Index within the train split.
         train_task: Named task preset for training.  Defaults to
-            ``"task_occ_emed"`` (balanced trade-off in the calibration
-            regime).
+            ``"task_occ_e05"`` (energy priced in, calibration regime).
         test_task: Named task preset for testing.  Defaults to
-            ``"task_occ_ehigh"`` (energy-emphasis trade-off in the
-            calibration regime) -- the "trade-off transfer" axis.  See
-            module docstring for the other two canonical axes.
+            ``"task_occ_e0"`` (comfort-only, calibration regime) -- the
+            "trade-off transfer" axis.  See module docstring for the
+            setpoint-mode-transfer axis.
         run_period: Simulation run period.
     """
 
@@ -57,8 +56,8 @@ class GoalAdaptation(BenchmarkProblem):
         self,
         building_type: BuildingType = "OfficeSmall",
         split_index: int = 0,
-        train_task: str = "task_occ_emed",
-        test_task: str = "task_occ_ehigh",
+        train_task: str = "task_occ_e05",
+        test_task: str = "task_occ_e0",
         run_period: str = "full_year",
     ) -> None:
         self.building_type = building_type

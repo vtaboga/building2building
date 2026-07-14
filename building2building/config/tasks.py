@@ -3,7 +3,7 @@
 Each preset fully specifies the reward function, target temperature mode,
 and temperature setpoints for a reproducible benchmark task.
 
-Nine presets form a 3x3 grid parameterized along
+Six presets form a 3x2 grid parameterized along
 ``(setpoint_mode, energy_weight_level)``.  All use
 :class:`~building2building.types.NormalizedDeadbandRewardConfig`
 with ``dT=1.0`` and ``(tau_T, tau_E) = (None, None)`` (the unfilled
@@ -12,9 +12,19 @@ the per-(building_type, climate_zone) constants from
 :file:`building2building/data/reward_normalizers.yaml` at env-build
 time via :func:`make_normalized_deadband_task`.
 
+The reward is ``r = -(temp_penalty / tau_T + w_E * power_penalty / tau_E)``.
+Comfort is left unnormalized (``tau_T = 1``): ``temp_penalty`` is a raw
+squared out-of-band deviation in degC^2, the same physical unit in every
+building, zone and climate.  Only energy is normalized: ``tau_E`` is the
+per-(building_type, climate_zone) energy spend of the reference reactive
+controller, so ``power_penalty / tau_E = 1`` means "spends like the
+reference controller for this building".  ``w_E`` is then a dimensionless
+price with a fixed meaning everywhere: accept 1 degC^2 of out-of-band
+discomfort to save ``w_E`` reference-controller-units of energy.
+
 Naming convention:
 
-* mode component (calibration regime is ``occ``):
+* mode component (the ``tau_E`` calibration regime is ``occ``):
     * ``const`` -- ``target_temperature_mode="constant"``, 21 C / 21 C.
     * ``occ``   -- ``target_temperature_mode="occupancy"`` with the
       seasonal unoccupied policy (winter 18 C / shoulder 21 C /
@@ -22,10 +32,8 @@ Naming convention:
     * ``rand``  -- ``target_temperature_mode="random_schedule"``
       (per-day arrival/departure + setpoints).
 * energy-weight component:
-    * ``e0``    -- ``energy_weight = 0.0`` (comfort-only).
-    * ``emed``  -- ``energy_weight = 1.0`` (balanced under the
-      calibration random policy by construction).
-    * ``ehigh`` -- ``energy_weight = 5.0`` (energy emphasis).
+    * ``e0``    -- ``energy_weight = 0.0`` (comfort-only, no energy penalty).
+    * ``e05``   -- ``energy_weight = 0.5`` (comfort with an energy penalty).
 """
 
 from __future__ import annotations
@@ -43,17 +51,15 @@ from building2building.types import (
 )
 
 SetpointMode = Literal["constant", "occupancy", "random_schedule"]
-WeightLevel = Literal["e0", "emed", "ehigh"]
+WeightLevel = Literal["e0", "e05"]
 ModeShort = Literal["const", "occ", "rand"]
 
-#: Energy-weight values for the 3-level grid.  ``emed = 1.0`` is the
-#: "balanced under the calibration random policy" anchor; the two
-#: endpoints are chosen to span comfort-only and energy-emphasis regimes
-#: without making the comparison degenerate.
+#: Energy-weight values for the 2-level grid.  ``e0`` isolates comfort
+#: (no energy penalty); ``e05`` adds a moderate energy penalty that
+#: prices energy against comfort without collapsing HVAC operation.
 NORMALIZED_WEIGHT_LEVELS: dict[WeightLevel, float] = {
     "e0": 0.0,
-    "emed": 1.0,
-    "ehigh": 5.0,
+    "e05": 0.5,
 }
 
 #: Map between short preset names and full :class:`TaskConfig` modes.
@@ -109,7 +115,7 @@ def _build_normalized_preset(
     mode_short: ModeShort,
     level: WeightLevel,
 ) -> TaskPreset:
-    """Build one of the 9 normalized presets.
+    """Build one of the six normalized presets.
 
     The returned preset stores
     :class:`~building2building.types.NormalizedDeadbandRewardConfig`
@@ -167,7 +173,7 @@ _NORMALIZED_TASK_PRESETS: dict[str, TaskPreset] = {
         mode_short=mode_short, level=level
     )
     for mode_short in ("const", "occ", "rand")
-    for level in ("e0", "emed", "ehigh")
+    for level in ("e0", "e05")
 }
 
 
@@ -179,8 +185,8 @@ def resolve_task_preset(task: str) -> TaskPreset:
 
     Recognised names:
 
-    * Normalized 3x3 family: ``"task_<mode>_<level>"`` where ``mode ∈
-      {const, occ, rand}`` and ``level ∈ {e0, emed, ehigh}`` -- 9
+    * Normalized 3x2 family: ``"task_<mode>_<level>"`` where ``mode ∈
+      {const, occ, rand}`` and ``level ∈ {e0, e05}`` -- 6
       combinations total.
 
     Args:
@@ -211,7 +217,7 @@ def make_normalized_deadband_task(
     """Return a *filled* :class:`TaskPreset` for a normalized deadband task.
 
     Useful for ad-hoc experiments that want to choose ``w_E`` and
-    ``mode`` outside the 9-preset grid (e.g. ``w_E = 2.5`` for a finer
+    ``mode`` outside the six-preset grid (e.g. ``w_E = 2.5`` for a finer
     sweep, or a non-calibration ``dT`` value).
 
     The ``(tau_T, tau_E)`` constants are looked up via

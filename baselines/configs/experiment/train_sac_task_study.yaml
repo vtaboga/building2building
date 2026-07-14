@@ -1,5 +1,5 @@
 # @package _global_
-# Paper-parity SAC sweep across normalized tasks, matching train_ppo_task_study.yaml.
+# SAC sweep across normalized tasks, matching train_ppo_task_study.yaml.
 # Multi-seed runs: use Hydra multirun, e.g.
 #   python -m baselines.train_sac experiment=train_sac_task_study --multirun seed=0,1,2
 name: train_sac_task_study
@@ -19,7 +19,7 @@ building_types:
 split: test
 buildings_per_type: 8
 # Normalized-reward presets with energy_weight=0 (pure comfort).
-# Use emed/ehigh variants to trade off energy vs comfort.
+# Use the e05 variants to trade off energy vs comfort.
 tasks: [task_const_e0, task_occ_e0, task_rand_e0]
 
 training:

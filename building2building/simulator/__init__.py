@@ -63,14 +63,19 @@ def _maybe_warn_normalized_deadband(
     the regime the env will actually run under, not whatever the preset
     originally said.
 
-    Two independent conditions can fire (both, individually, or neither):
+    Comfort is unnormalized (``tau_T = 1``), so only ``tau_E`` is
+    regime-dependent: it is the reference controller's energy spend under
+    the occupancy calibration regime.  Two independent conditions can fire
+    (both, individually, or neither):
 
-    * ``dT != 1.0``       — deadband shape differs from calibration.
-    * ``mode != "occupancy"`` — target signal differs from calibration.
+    * ``dT != 1.0``       — deadband shape differs from the ``tau_E``
+      calibration.
+    * ``mode != "occupancy"`` — target signal differs from the ``tau_E``
+      calibration.
 
-    Both proceed; the simulator is constructed with ``(tau_T, tau_E)``
-    applied as-is.  This is intentional: the calibration is approximate
-    outside the regime, and the cross-task benchmark in
+    Both proceed; the simulator is constructed with ``tau_E`` applied
+    as-is.  This is intentional: the calibration is approximate outside
+    the regime, and the cross-task benchmark in
     :mod:`building2building.benchmarks.goal_adaptation` quantifies the
     cost of that approximation.
     """
@@ -84,16 +89,16 @@ def _maybe_warn_normalized_deadband(
     messages: list[str] = []
     if abs(dT - _CALIBRATION_DT) > 1e-9:
         messages.append(
-            f"calibration regime mismatch: dT={dT!r} but reward_normalizers.yaml "
-            f"was computed under dT={_CALIBRATION_DT!r}; "
-            f"tau_T={tau_T:.6g} for ({bt}, {bid}) applied as-is."
+            f"calibration regime mismatch: dT={dT!r} but tau_E in "
+            f"reward_normalizers.yaml was calibrated under dT={_CALIBRATION_DT!r}; "
+            f"tau_E={tau_E:.6g} for ({bt}, {bid}) applied as-is."
         )
     if mode != _CALIBRATION_TARGET_MODE:
         messages.append(
             f"calibration regime mismatch: target_temperature_mode={mode!r} "
-            f"but reward_normalizers.yaml was computed under "
-            f"{_CALIBRATION_TARGET_MODE!r}; tau_T={tau_T:.6g}, "
-            f"tau_E={tau_E:.6g} for ({bt}, {bid}) applied as-is."
+            f"but tau_E in reward_normalizers.yaml was calibrated under "
+            f"{_CALIBRATION_TARGET_MODE!r}; tau_E={tau_E:.6g} for "
+            f"({bt}, {bid}) applied as-is."
         )
 
     if not messages:

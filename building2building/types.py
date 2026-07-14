@@ -400,7 +400,7 @@ class TaskConfig:
 
 @dataclass(frozen=True)
 class NormalizedDeadbandRewardConfig:
-    """Deadband reward with per-bucket comfort/energy normalizers.
+    """Deadband reward with a fixed comfort unit and a per-bucket energy normalizer.
 
     The reward is
 
@@ -409,18 +409,16 @@ class NormalizedDeadbandRewardConfig:
         r = -\\Big(\\tfrac{\\text{temp\\_penalty}}{\\tau_T}
                   + w_E \\cdot \\tfrac{\\text{power\\_penalty}}{\\tau_E}\\Big)
 
-    where ``(tau_T, tau_E)`` come from a random-policy calibration
-    rollout on the train split (see
-    :file:`building2building/data/reward_normalizers.yaml`).  After
-    normalization, ``mean(temp_penalty / tau_T) ≈ 1`` and
-    ``mean(power_penalty / tau_E) ≈ 1`` at the median train building of
-    each ``(building_type, climate_zone)`` bucket under the calibration
-    random policy, so ``energy_weight`` becomes a *dimensionless*
-    trade-off knob:
-
-    * ``energy_weight < 1`` → temperature priority,
-    * ``energy_weight ≈ 1`` → balanced trade-off,
-    * ``energy_weight > 1`` → energy priority.
+    **Comfort is unnormalized** (``tau_T = 1``): ``temp_penalty`` is a raw
+    squared out-of-band deviation in °C², the same physical unit in every
+    building, zone and season.  **Energy is normalized** by ``tau_E``, the
+    energy spend of the reference reactive controller for this
+    ``(building_type, climate_zone)`` bucket (see
+    :file:`building2building/data/reward_normalizers.yaml`), so
+    ``power_penalty / tau_E = 1`` means "spends like the reference
+    controller".  ``energy_weight`` is then a dimensionless price with a
+    fixed meaning everywhere: accept 1 °C² of out-of-band discomfort to
+    save ``w_E`` reference-controller-units of energy.
 
     Sentinel state
     --------------
@@ -438,9 +436,11 @@ class NormalizedDeadbandRewardConfig:
         dT: Half-width of the temperature deadband (°C).  Calibration
             assumes ``dT = 1.0``; other values are accepted but emit a
             calibration-mismatch :class:`RuntimeWarning` at dispatch.
-        tau_T: Comfort normalizer.  ``None`` means "preset-time
-            sentinel; resolve me at env build time".
-        tau_E: Energy normalizer.  Same convention.
+        tau_T: Comfort normalizer.  Resolves to ``1.0`` (comfort is
+            unnormalized).  ``None`` means "preset-time sentinel; resolve
+            me at env build time".
+        tau_E: Energy normalizer (reference-controller energy spend).
+            Same sentinel convention.
     """
 
     energy_weight: float

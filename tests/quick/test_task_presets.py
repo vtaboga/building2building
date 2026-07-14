@@ -25,8 +25,8 @@ _GRID_NAMES: list[str] = [
 
 
 @pytest.mark.quick
-class TestNineTaskGrid:
-    def test_nine_presets_exist(self) -> None:
+class TestTaskGrid:
+    def test_all_grid_presets_exist(self) -> None:
         for name in _GRID_NAMES:
             assert name in TASK_PRESETS, f"missing preset {name!r}"
 
@@ -46,14 +46,11 @@ class TestNineTaskGrid:
         "name,expected_weight",
         [
             ("task_const_e0", 0.0),
-            ("task_const_emed", 1.0),
-            ("task_const_ehigh", 5.0),
+            ("task_const_e05", 0.5),
             ("task_occ_e0", 0.0),
-            ("task_occ_emed", 1.0),
-            ("task_occ_ehigh", 5.0),
+            ("task_occ_e05", 0.5),
             ("task_rand_e0", 0.0),
-            ("task_rand_emed", 1.0),
-            ("task_rand_ehigh", 5.0),
+            ("task_rand_e05", 0.5),
         ],
     )
     def test_energy_weight(self, name: str, expected_weight: float) -> None:
@@ -65,14 +62,11 @@ class TestNineTaskGrid:
         "name,expected_mode",
         [
             ("task_const_e0", "constant"),
-            ("task_const_emed", "constant"),
-            ("task_const_ehigh", "constant"),
+            ("task_const_e05", "constant"),
             ("task_occ_e0", "occupancy"),
-            ("task_occ_emed", "occupancy"),
-            ("task_occ_ehigh", "occupancy"),
+            ("task_occ_e05", "occupancy"),
             ("task_rand_e0", "random_schedule"),
-            ("task_rand_emed", "random_schedule"),
-            ("task_rand_ehigh", "random_schedule"),
+            ("task_rand_e05", "random_schedule"),
         ],
     )
     def test_setpoint_mode(self, name: str, expected_mode: str) -> None:
@@ -80,7 +74,7 @@ class TestNineTaskGrid:
         assert preset.target_temperature_mode == expected_mode
 
     def test_occ_presets_use_seasonal_unoccupied_policy(self) -> None:
-        for name in ("task_occ_e0", "task_occ_emed", "task_occ_ehigh"):
+        for name in ("task_occ_e0", "task_occ_e05"):
             preset = TASK_PRESETS[name]
             assert preset.unoccupied_policy == "seasonal"
             assert preset.seasonal_unoccupied_c is not None
@@ -114,13 +108,11 @@ class TestMakeNormalizedDeadbandTaskFactory:
     """
 
     def test_factory_lazy_imports_loader(self) -> None:
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
             import sys
             import building2building.config.tasks  # noqa: F401
             assert (
                 "building2building.data.reward_normalizers" not in sys.modules
             ), sorted(m for m in sys.modules if m.startswith("building2building"))
-            """
-        )
+            """)
         subprocess.run([sys.executable, "-c", code], check=True)

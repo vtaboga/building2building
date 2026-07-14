@@ -19,7 +19,10 @@ import building2building as b2b
 
 logger = logging.getLogger(__name__)
 
-CALIBRATION_TASK = "task_occ_emed"
+# tau_E is calibrated under the occupancy regime (dT=1, seasonal
+# policy).  The energy weight is irrelevant to the measured
+# penalties, so the comfort-only occupancy preset defines the regime.
+CALIBRATION_TASK = "task_occ_e0"
 CALIBRATION_SPLIT = "train"
 SCHEMA_VERSION = 1
 DEFAULT_RUN_PERIODS: tuple[str, ...] = ("winter", "summer", "full_year")

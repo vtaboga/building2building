@@ -99,6 +99,7 @@ def train_and_eval(
     output_dir: Path,
     seed: int,
     run_period: str = "full_year",
+    normalizer_path: Path | None = None,
 ) -> TrainResult:
     """Train a PPO specialist on one building and run one eval episode."""
     tag = f"{building_type}/{building_id}/{task}"
@@ -111,6 +112,7 @@ def train_and_eval(
         run_period=run_period,
         normalize_obs=True,
         rescale_action=True,
+        normalizer_path=normalizer_path,
     )
     env_fns = [env_fn for _ in range(n_envs)]
     vec_env = make_vec_env(env_fns, use_subproc=n_envs > 1)
@@ -142,6 +144,7 @@ def train_and_eval(
         normalize_obs=True,
         rescale_action=True,
         monitor=False,
+        normalizer_path=normalizer_path,
     )()
     try:
         result = run_episode(eval_env, model)
@@ -221,6 +224,13 @@ def main(cfg: DictConfig) -> None:
     n_envs: int = int(cfg.training.n_envs)
     seed: int = int(cfg.get("seed", 0))
     run_period: str = str(cfg.get("run_period", "full_year"))
+    # Optional alternate reward-normalizer YAML (e.g. the reactive-controller
+    # calibration from baselines.compute_reactive_reward_normalizers). None
+    # keeps the packaged default.
+    _np_raw = cfg.get("normalizer_path", None)
+    normalizer_path: Path | None = Path(str(_np_raw)) if _np_raw else None
+    if normalizer_path is not None and not normalizer_path.exists():
+        raise FileNotFoundError(f"normalizer_path does not exist: {normalizer_path}")
 
     output_dir = Path(cfg.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -274,6 +284,7 @@ def main(cfg: DictConfig) -> None:
                         output_dir=output_dir,
                         seed=seed,
                         run_period=run_period,
+                        normalizer_path=normalizer_path,
                     )
                     results.append(result)
                     _wandb_log(

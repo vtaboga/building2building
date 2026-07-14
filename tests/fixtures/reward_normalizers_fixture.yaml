@@ -1,7 +1,7 @@
 schema_version: 1
 source:
-  controller: random
-  calibration_task: task_occ_emed
+  controller: reactive
+  calibration_task: task_occ_e0
   run_period: full_year
   split: train
   aggregation: median_over_buildings

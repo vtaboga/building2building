@@ -1,4 +1,4 @@
-"""Dynamics adaptation benchmark (Section 4, Table: Dynamics adaptation).
+"""Dynamics adaptation benchmark.
 
 Reward and action space stay fixed; building dynamics vary between
 training and test sets.

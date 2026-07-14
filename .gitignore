@@ -11,6 +11,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 logs
+# SLURM job logs (--output=%x-%j.out) land in the submit dir (repo root).
+*.out
 container/*.sif
 container/*.sh
 b2b.egg-info/
@@ -41,4 +43,5 @@ dataset/
 # but keep the Python entry points (make_test_small_split.py,
 # merge_baseline_returns.py) tracked.
 baselines/scripts/*.sh
+experiences/
 
