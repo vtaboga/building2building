@@ -17,7 +17,9 @@ from huggingface_hub import hf_hub_download
 logger = logging.getLogger(__name__)
 
 REPO_ID = "vtaboga/building2building_dataset"
-REVISION = "main"
+# Pinned to a specific dataset commit so the data is frozen, not a moving target.
+# This SHA is what `main` pointed to when the transfer experiments were produced.
+REVISION = "b879e1794a0751f91c0558a0b98cf7a84c702cbd"
 
 BuildingType = Literal[
     "SingleFamilyHouse",
