@@ -22,12 +22,22 @@ bench = b2b.benchmarks.CrossDomainGeneralization(difficulty="easy", task="task_c
 scores = []
 for env in bench.make_test_envs():
     traj = b2b.rollout(env, controller=my_policy)
-    scores.append(b2b.compute_normalized_score(traj))
+    scores.append(
+        b2b.compute_normalized_score(
+            cumulative_return=float(traj.rewards.sum()),
+            building_type=bench.test_type,
+            task=bench.task,
+            run_period="full_year",
+            building_id=env.metadata["building_info"].building_id,
+        )
+    )
 mean_score = sum(scores) / len(scores)
 ```
 
-A score of 0.0 matches the reactive-controller baseline on each test building;
-1.0 is perfect.  Cross-domain transfer is harder than dynamics adaptation
+The score is `agent_return / baseline_return` on each test building; both
+returns are negative, so **lower is better**: 1.0 matches the
+reactive-controller baseline and a score below 1.0 beats it.
+Cross-domain transfer is harder than dynamics adaptation
 because the agent must generalise across HVAC topology (different action
 dimension and observation structure).
 
@@ -38,6 +48,10 @@ dimension and observation structure).
 | `easy` | `RetailStandalone` | `OfficeSmall` |
 | `medium` | `RetailStandalone` | `Warehouse` |
 | `hard` | `OfficeSmall` | `OfficeMedium` |
+
+The paper's Table 5 also defines a fourth setting (train on *n* building
+types, test on *m* different types); it has no named difficulty preset —
+compose it manually with `b2b.make_env` across types.
 
 ## API
 
@@ -65,7 +79,11 @@ test_envs = bench.make_test_envs(n=4)
 The cross-domain benchmark uses the **Amorpheus** type-heterogeneous
 transformer policy. Amorpheus leverages the morphology graph to apply
 per-node-type encoders/decoders, enabling a single policy to operate across
-buildings with different observation and action dimensions.
+buildings with different observation and action dimensions. In the paper's
+experiment (the "n types → m types" setting), a single policy is trained
+simultaneously on four building types (retail store, fast-food restaurant,
+small office, medium office) and tested on unseen buildings from the test
+split.
 
 ```bash
 python -m baselines.train_cross_domain experiment=train_cross_domain

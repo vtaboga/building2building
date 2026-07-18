@@ -18,9 +18,10 @@ varying dynamics.
 
 ## What the script covers
 
-1. **Generate baseline returns** (optional pre-step) — run
-   `python -m baselines.run_reactive_control` on the relevant buildings so
-   that `compute_normalized_score` has reference values.
+1. **Baseline returns** — the reactive-controller reference returns used by
+   `compute_normalized_score` ship with the package
+   (`building2building/scores/baseline_returns.csv`).  To regenerate them,
+   run `python -m baselines.run_reactive_control experiment=eval_reactive_control`.
 
 2. **Inspect the benchmark** — `b2b.benchmarks.DynamicsAdaptation(difficulty="easy",
    task="task_const_e0")` exposes `train_building_ids()` and
@@ -35,14 +36,17 @@ varying dynamics.
     ```
 
 4. **Train programmatically** — wrap each training building with
-   `PadObservation` + `AugmentObservationWithBuildingParams` +
-   `NormalizeObservation`; use `ResampleBuildingOnResetWrapper` to cycle
-   across buildings; train with SB3 `PPO`.
+   `PadObservation`, then `wrap_env_for_rl` (observation normalization +
+   action rescaling), then `AugmentObservationWithBuildingParams`; use
+   `ResampleBuildingOnResetWrapper` to cycle across buildings; train with
+   SB3 `PPO`.
 
 5. **Evaluate on test buildings** — for each test building ID, create an env,
    apply the same wrappers, and run one episode with `model.predict(...)`.
 
-6. **Plot results** — `python -m baselines.plotting.plot_dynamics_adaptation`.
+6. **Plot results** — `python -m baselines.plotting.plot_dynamics_adaptation
+   --specialist-csv ... --baseline-csv ... --parameterized-csv ...`
+   (CSVs produced by `baselines.eval_dynamics_adaptation`).
 
 ---
 

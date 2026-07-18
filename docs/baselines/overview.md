@@ -11,8 +11,8 @@ graph TD
     Baselines["baselines/"]
     Controllers["controllers/ (UnitaryHvac, AirLoop)"]
     Models["models/ (Amorpheus)"]
-    Training["train_ppo, train_sac, train_dynamics, train_cross_domain"]
-    Eval["eval_ppo, eval_dynamics, eval_cross_domain"]
+    Training["train_ppo, train_sac, train_dynamics_adaptation, train_cross_domain"]
+    Eval["eval_ppo, eval_dynamics_adaptation, eval_cross_domain"]
     ReactiveControl["run_reactive_control"]
     Tuning["tune_controller, tune_ppo"]
     Plotting["plotting/"]
@@ -46,15 +46,18 @@ baselines/
 │   ├── metadata.py        # Observation/action name helpers
 │   └── callbacks.py       # W&B training callbacks
 ├── plotting/              # Matplotlib figure scripts
+├── analysis/              # Control-behavior analysis scripts
+├── scripts/               # One-off utilities (test_small split, CSV merging)
 ├── configs/               # Hydra configuration
 ├── run_reactive_control.py      # Baseline CSV generation
+├── compute_reactive_reward_normalizers.py  # Regenerates reward_normalizers.yaml
 ├── train_ppo.py           # Per-building PPO specialist (Section 5)
 ├── train_sac.py           # Per-building SAC specialist (Section 5)
 ├── train_dynamics_adaptation.py  # Section 6.1
 ├── train_cross_domain.py  # Section 6.2 (Amorpheus)
 ├── eval_*.py              # Evaluation scripts
 ├── tune_controller.py     # Optuna-based controller tuning
-├── tune_ppo.py            # Optuna-based PPO tuning
+├── tune_ppo.py            # CHS (Orion)-based PPO hyperparameter tuning
 └── README.md
 ```
 
@@ -102,5 +105,5 @@ reference.
 | [PPO & SAC Specialists](ppo-specialist.md) | Per-building PPO/SAC training (Section 5) |
 | [Dynamics Adaptation](dynamics-adaptation.md) | Multi-building training (Section 6.1) |
 | [Cross-Domain Transfer](cross-domain.md) | Amorpheus transformer (Section 6.2) |
-| [Controller Tuning](tuning.md) | Optuna hyperparameter optimization (controllers + PPO) |
+| [Controller Tuning](tuning.md) | Optuna controller tuning and CHS-based PPO tuning |
 | [Plotting](plotting.md) | Paper figure generation |

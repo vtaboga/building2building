@@ -25,7 +25,7 @@ env = b2b.NormalizeObservation(env)
 - `denormalize(observation(x))` round-trips to `x` within float tolerance.
 - Zero-range features (`low == high`) raise `ValueError`.
 - `reset()` rebuilds bounds if an inner wrapper swapped the environment.
-- Test file: [tests/quick/test_normalize_observation.py](https://github.com/placeholder/Building2Building/blob/main/tests/quick/test_normalize_observation.py)
+- Test file: [tests/quick/test_normalize_observation.py](https://github.com/vtaboga/building2building/blob/main/tests/quick/test_normalize_observation.py)
 
 ## PadObservation
 
@@ -44,12 +44,16 @@ env = b2b.PadObservation(env, target_size=40)
 - Zone-name matching is case-insensitive and whitespace-tolerant.
 - Non-zone features are preserved at the tail of the padded vector.
 - `reset()` rebuilds split logic if shape/metadata changes after resampling.
-- Test file: [tests/quick/test_pad_observation.py](https://github.com/placeholder/Building2Building/blob/main/tests/quick/test_pad_observation.py)
+- Test file: [tests/quick/test_pad_observation.py](https://github.com/vtaboga/building2building/blob/main/tests/quick/test_pad_observation.py)
 
 ## AugmentObservationWithBuildingParams
 
 `AugmentObservationWithBuildingParams` appends normalized building metadata
-features to each observation.
+features to each observation (`area`, `warmup_phases`, `num_actuators`,
+`year_built`, `num_units`).  Each parameter is normalized to `[-1, 1]` and
+then divided by `PARAM_OUTPUT_SCALE` (5.0), so the appended dimensions lie in
+`[-0.2, 0.2]` — this keeps their per-batch std in the same ballpark as the
+(normalized) base observation.
 
 ```python
 env = b2b.make_env("OfficeSmall", task="task_const_e0")
@@ -61,12 +65,13 @@ By default (`allow_defaults=False`), missing required metadata raises
 
 ### Tested invariants
 
-- Complete metadata produces finite normalized params in `[-1, 1]`.
+- Complete metadata produces finite normalized params in `[-1, 1]`
+  (scaled by `1 / PARAM_OUTPUT_SCALE` before being appended).
 - Missing metadata raises `KeyError` by default.
 - `allow_defaults=True` preserves warning + default behavior.
 - `reset()` re-extracts metadata and rebuilds the observation space.
 - `denormalize()` strips appended params and delegates to the inner wrapper.
-- Test file: [tests/quick/test_augment_building_params.py](https://github.com/placeholder/Building2Building/blob/main/tests/quick/test_augment_building_params.py)
+- Test file: [tests/quick/test_augment_building_params.py](https://github.com/vtaboga/building2building/blob/main/tests/quick/test_augment_building_params.py)
 
 ## ResampleBuildingOnResetWrapper
 
@@ -95,14 +100,16 @@ next `reset()`.
 - Episode counters reset correctly across episodes.
 - `IndexError` path warns and terminates, then resamples on next `reset()`.
 - W&B logging is a no-op when inactive.
-- Test file: [tests/quick/test_resample_building_wrapper.py](https://github.com/placeholder/Building2Building/blob/main/tests/quick/test_resample_building_wrapper.py)
+- Test file: [tests/quick/test_resample_building_wrapper.py](https://github.com/vtaboga/building2building/blob/main/tests/quick/test_resample_building_wrapper.py)
 
 ## wrap_env_for_rl
 
 `wrap_env_for_rl` is the canonical RL wrapper composition helper:
 
-- optional `RescaleAction(..., -1, 1)` (inner)
-- optional `NormalizeObservation(...)` (outer)
+- optional `RescaleAction(..., -1, 1)` (inner; `rescale_action=False` by
+  default — RL training/eval code must pass `rescale_action=True` unless
+  the env was already built with `make_env(rescale_action=True)`)
+- optional `NormalizeObservation(...)` (outer; `normalize_obs=True` by default)
 
 ```python
 import building2building as b2b
@@ -117,7 +124,7 @@ env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
 - Action round-trip maps policy actions in `[-1, 1]` to engineering-unit bounds.
 - `normalize_obs` and `rescale_action` flags are independent.
 - Wrapped env metadata remains accessible via wrapper fallthrough.
-- Test file: [tests/quick/test_wrap_env_for_rl.py](https://github.com/placeholder/Building2Building/blob/main/tests/quick/test_wrap_env_for_rl.py)
+- Test file: [tests/quick/test_wrap_env_for_rl.py](https://github.com/vtaboga/building2building/blob/main/tests/quick/test_wrap_env_for_rl.py)
 
 ## Recommended wrapper order
 
@@ -126,9 +133,15 @@ For explicit composition outside `wrap_env_for_rl`, use:
 ```python
 env = b2b.make_env("OfficeSmall", task="task_const_e0")
 env = b2b.PadObservation(env, target_size=40)
-env = b2b.AugmentObservationWithBuildingParams(env)
 env = b2b.NormalizeObservation(env)
+env = b2b.AugmentObservationWithBuildingParams(env)
 ```
+
+`AugmentObservationWithBuildingParams` goes **outside** `NormalizeObservation`:
+its appended features are already scaled (to `[-0.2, 0.2]`) and must not be
+re-normalized with the raw observation bounds.  This matches the multi-building
+stack used by `baselines/train_dynamics_adaptation.py`
+(`PadObservation → NormalizeObservation → AugmentObservationWithBuildingParams`).
 
 For RL training/evaluation, prefer `wrap_env_for_rl(...)` for action/observation
 wrapping and add `PadObservation` / `AugmentObservationWithBuildingParams` as

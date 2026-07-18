@@ -29,7 +29,9 @@ def main() -> None:
         task=task,
         run_period=run_period,
     )
-    train_env = b2b.NormalizeObservation(train_env)
+    # Normalize observations to [0, 1] and rescale actions to [-1, 1],
+    # matching the wrapper stack the baselines use for RL training.
+    train_env = b2b.wrap_env_for_rl(train_env, rescale_action=True)
 
     model = PPO(
         "MlpPolicy",
@@ -52,7 +54,7 @@ def main() -> None:
         task=task,
         run_period=run_period,
     )
-    eval_env = b2b.NormalizeObservation(eval_env)
+    eval_env = b2b.wrap_env_for_rl(eval_env, rescale_action=True)
 
     model = PPO.load("ppo_office_small_winter")
     obs, _ = eval_env.reset()
@@ -69,6 +71,8 @@ def main() -> None:
     eval_env.close()
 
     # -- Score --
+    # Both returns are negative (cost-based reward), so lower is better:
+    # a score < 1.0 beats the reactive-controller baseline.
     try:
         score = b2b.compute_normalized_score(
             cumulative_return=total_reward,
@@ -77,11 +81,11 @@ def main() -> None:
             run_period=run_period,
             building_id=eval_building_id,
         )
-        print(f"Normalized score: {score:.3f} (>1.0 = better than baseline)")
-    except FileNotFoundError:
+        print(f"Normalized score: {score:.3f} (<1.0 = better than baseline)")
+    except (FileNotFoundError, KeyError) as exc:
         print(
-            "baseline_returns.csv not found. Run baselines.run_reactive_control first "
-            "to generate it."
+            f"No baseline return available ({exc}). Regenerate with "
+            "`python -m baselines.run_reactive_control experiment=eval_reactive_control`."
         )
 
 

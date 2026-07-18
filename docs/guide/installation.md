@@ -9,7 +9,7 @@
 ## Install the Package
 
 ```bash
-git clone <repo-url> && cd Building2Building
+git clone https://github.com/vtaboga/building2building.git && cd building2building
 python -m venv .venv
 source .venv/bin/activate
 ```
@@ -19,8 +19,9 @@ source .venv/bin/activate
 | Command | What it installs |
 |---|---|
 | `pip install -e .` | Core package only (environments, data, benchmarks) |
-| `pip install -e ".[training]"` | + PyTorch, SB3, Hydra, Optuna, W&B, scipy |
-| `pip install -e ".[test]"` | + pytest, deepdiff, pytest-mock |
+| `pip install -e ".[training]"` | + PyTorch, SB3, Hydra, Optuna, W&B, TensorBoard, matplotlib |
+| `pip install -e ".[test]"` | + pytest, deepdiff, pytest-mock, psutil |
+| `pip install -e ".[test,training]"` | Recommended dev install (the quick test suite imports `baselines`, which needs the training extras) |
 | `pip install -e ".[dev]"` | + black, pyright |
 | `pip install -e ".[docs]"` | + mkdocs-material, mkdocstrings |
 | `pip install -e ".[all]"` | Everything above |
@@ -51,7 +52,9 @@ source .venv/bin/activate
 
 ### Option 1: Automatic
 
-The package can download and cache EnergyPlus automatically. No action needed.
+EnergyPlus 24.1 is downloaded and cached automatically via the `minergym`
+dependency; `setup_energyplus_path()` runs when `building2building` is
+imported. No action needed.
 
 ### Option 2: Manual Install
 
@@ -66,29 +69,21 @@ export ENERGYPLUS_PATH=/usr/local/EnergyPlus-24-1-0
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `ENERGYPLUS_PATH` | Path to EnergyPlus installation | Auto-detected |
-| `STORE_PATH` | Dataset and cache storage location | `~/.cache/building2building` |
+| `ENERGYPLUS_PATH` | Path to an existing EnergyPlus installation | Auto-downloaded |
+| `STORE_PATH` | Cache for the auto-downloaded EnergyPlus and the offline dataset-generation store | `$SCRATCH/b2b` if set, else `~/.cache/b2b` |
+
+The pre-processed building dataset itself is downloaded from HuggingFace into
+`~/.cache/building2building` (this location is fixed, not controlled by
+`STORE_PATH`).
 
 ## Baselines Dependencies
 
-The `baselines/` scripts require training dependencies. If you install via the
-main package extras, everything is covered:
+The `baselines/` scripts require the training dependencies. Install them via
+the main package extras:
 
 ```bash
 pip install -e ".[training]"
 ```
-
-Alternatively, from the baselines directory:
-
-```bash
-pip install -r baselines/requirements.txt
-```
-
-!!! warning
-
-    `baselines/requirements.txt` is incomplete -- it does not list `hydra-core`,
-    `omegaconf`, `optuna`, or `matplotlib`. Use `pip install -e ".[training]"`
-    from the main package instead.
 
 ## Verification
 

@@ -24,12 +24,18 @@ bench = b2b.benchmarks.ActionSpaceTransfer(
     task="task_const_e0",
 )
 traj = b2b.rollout(bench.make_test_env(), controller=my_policy)
-score = b2b.compute_normalized_score(traj)
+score = b2b.compute_normalized_score(
+    cumulative_return=float(traj.rewards.sum()),
+    building_type=bench.building_type,
+    task=bench.task,
+    run_period="full_year",  # ActionSpaceTransfer always simulates the full year
+    building_id=b2b.list_buildings(bench.building_type, bench.split)[bench.split_index],
+)
 ```
 
-Score is normalised against the reactive-controller baseline that also sees
-the test actuator set.  A score above 0.0 outperforms the reactive baseline on
-the larger/smaller action space.
+The score is `agent_return / baseline_return` against the reactive-controller
+baseline.  Both returns are negative, so **lower is better** — a score below
+1.0 outperforms the reactive baseline.
 
 ## Paper Reference (Section 4)
 

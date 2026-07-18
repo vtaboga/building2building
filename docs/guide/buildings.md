@@ -7,12 +7,12 @@ residential archetypes:
 
 | Type | Zones | HVAC | Description |
 |---|---|---|---|
-| `SingleFamilyHouse` | 1 | Unitary | Residential single-zone houses |
+| `SingleFamilyHouse` | 1 | Unitary (heat pump) | Residential single-zone houses |
 | `OfficeSmall` | 5 | Unitary | Small office prototype |
-| `OfficeMedium` | 15+ | VAV air-loop | Medium office with central air handling |
+| `OfficeMedium` | 15 | VAV air-loop | Medium office with central air handling |
 | `RetailStandalone` | 4 | Unitary | Standalone retail store |
-| `RestaurantFastFood` | 2 | Unitary | Fast food restaurant |
-| `Warehouse` | 3 | Unitary | Warehouse prototype |
+| `RestaurantFastFood` | 3 | Unitary | Fast food restaurant |
+| `Warehouse` | 3 | Unitary + heating-only (baseboard) | Warehouse prototype |
 
 ```python
 import building2building as b2b
@@ -24,37 +24,41 @@ print(b2b.list_building_types())
 
 ## Climate Zones
 
-Buildings are distributed across 16 ASHRAE climate zones with real TMY3 weather
-files:
+Commercial buildings are distributed across 16 North American locations
+spanning ASHRAE climate zones 1--8, with real TMY3 weather files:
 
-| Zone | Description | Example City |
-|---|---|---|
-| 1A | Very Hot, Humid | Miami, FL |
-| 2A | Hot, Humid | Houston, TX |
-| 2B | Hot, Dry | Phoenix, AZ |
-| 3A | Warm, Humid | Atlanta, GA |
-| 3B | Warm, Dry | Las Vegas, NV |
-| 3C | Warm, Marine | San Francisco, CA |
-| 4A | Mixed, Humid | Baltimore, MD |
-| 4B | Mixed, Dry | Albuquerque, NM |
-| 4C | Mixed, Marine | Seattle, WA |
-| 5A | Cool, Humid | Chicago, IL |
-| 5B | Cool, Dry | Denver, CO |
-| 6A | Cold, Humid | Minneapolis, MN |
-| 6B | Cold, Dry | Helena, MT |
-| 7 | Very Cold | Duluth, MN |
-| 8 | Subarctic | Fairbanks, AK |
+| Zone | Locations |
+|---|---|
+| 1 | Miami, FL |
+| 2 | Tampa, FL; Tucson, AZ |
+| 3 | Atlanta, GA; El Paso, TX; San Diego, CA |
+| 4 | Albuquerque, NM; New York, NY; Port Angeles, WA; Seattle, WA |
+| 5 | Buffalo, NY; Denver, CO |
+| 6 | Great Falls, MT; Rochester, MN |
+| 7 | International Falls, MN |
+| 8 | Fairbanks, AK |
+
+The registry stores the climate zone as an integer 1--8; use
+`b2b.list_buildings_by_climate_zone()` and `b2b.get_climate_zone()` to query
+it. `SingleFamilyHouse` buildings use per-building Canadian (Québec) weather
+files and have no ASHRAE climate-zone assignment -- climate-zone queries for
+them raise `ClimateZoneUnavailableError`.
 
 ## Parametric Generation
 
-Each building type has **1,000 instances** (6,000 buildings total) generated
-through Latin Hypercube Sampling (LHS) over construction parameters:
+Each building type has **1,000 instances** (6,000 buildings total). Commercial
+buildings are generated through Latin Hypercube Sampling (LHS) over
+construction parameters, with climate-dependent bounds derived from ASHRAE
+90.1-2022:
 
-- Insulation levels (walls, roof, foundation)
-- Window-to-wall ratio
+- Insulation levels (envelope conductivity)
+- Window properties (U-factor, SHGC) and window-to-wall ratio
+- Building size (geometry scaling)
 - Building orientation
-- HVAC equipment sizing
 - Infiltration rates
+
+`SingleFamilyHouse` instances come from a residential building generator
+representing the Québec housing stock.
 
 This parametric variation produces buildings with diverse thermal dynamics
 within each archetype, enabling the dynamics adaptation benchmark.

@@ -13,6 +13,7 @@ and provides per-environment morphology graphs with split/join operations.
         - ENERGY
         - UNITARY_ZONE
         - VAV_ZONE
+        - VAV_ZONE_NO_COOLING
         - VAV_SUPPLY
         - HEATING_ZONE
         - UNCONTROLLED_ZONE

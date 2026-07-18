@@ -15,7 +15,9 @@ source .venv/bin/activate
 pip install -e ".[all]"
 ```
 
-B2B requires **EnergyPlus 24.1**. Set the path:
+B2B requires **EnergyPlus 24.1**. It is downloaded and cached automatically
+(via the `minergym` dependency) the first time you import the package — no
+manual setup is needed. To use an existing installation instead, set:
 
 ```bash
 export ENERGYPLUS_PATH=/usr/local/EnergyPlus-24-1-0
@@ -44,7 +46,7 @@ import building2building as b2b
 
 # List available building types
 print(b2b.list_building_types())
-# ['SingleFamilyHouse', 'OfficeSmall', 'OfficeMedium', ...]
+# ['SingleFamilyHouse', 'Warehouse', 'RetailStandalone', ...]
 
 # List building IDs in a split
 train_ids = b2b.list_buildings("OfficeSmall", split="train")
@@ -68,10 +70,10 @@ Key parameters of `make_env`:
 | Parameter | Description | Default |
 |---|---|---|
 | `building_type` | One of the 6 building types | (required) |
-| `split` | `"train"` or `"test"` | `"train"` |
+| `split` | `"train"`, `"test"`, or `"test_small"` | `"train"` |
 | `index` | Position in the split list | `0` |
 | `building_id` | Explicit building ID (alternative to split+index) | `None` |
-| `task` | preset name (e.g. `"task_const_e0"`) or a `TaskPreset` | `"task_const_e0"` |
+| `task` | preset name (one of the 6 `task_{const,occ,rand}_{e0,e05}` presets) or a `TaskPreset` | `"task_const_e0"` |
 | `run_period` | `"full_year"`, `"winter"`, or `"summer"` | `"full_year"` |
 | `timesteps_per_hour` | Simulation resolution | `12` (5-min steps) |
 
@@ -222,7 +224,8 @@ score = b2b.compute_normalized_score(
     building_id="OfficeSmall-0001",
 )
 print(f"Normalized score: {score:.3f}")
-# > 1.0 means the agent outperforms the reactive baseline
+# Both returns are negative (cost-based reward), so lower is better:
+# < 1.0 means the agent beats the reactive baseline, > 1.0 is worse.
 ```
 
 ---

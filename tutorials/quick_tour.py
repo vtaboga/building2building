@@ -7,8 +7,6 @@ episode, and explores the morphology graph.
 
 from __future__ import annotations
 
-import numpy as np
-
 import building2building as b2b
 
 
@@ -37,7 +35,7 @@ def main() -> None:
 
     print(f"\nHVAC equipment ({len(equipment)} systems):")
     for eq in equipment:
-        print(f"  {type(eq).__name__}: {eq.zone_name}")
+        print(f"  {type(eq).__name__}: zones={eq.zones()}")
 
     # -- Run a random-action episode --
     obs, info = env.reset()

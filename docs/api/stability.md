@@ -43,7 +43,7 @@ require a `CHANGELOG.md` entry and must respect the deprecation window below.
 
 | Symbol | Description |
 |---|---|
-| `benchmarks` | Module exposing `CrossDomain`, `DynamicsAdaptation`, `GoalAdaptation`, `ActionSpaceTransfer` benchmark classes. |
+| `benchmarks` | Module exposing the `CrossDomainGeneralization`, `DynamicsAdaptation`, `GoalAdaptation`, `ActionSpaceTransfer` benchmark classes. |
 
 ### Morphology (structured representation)
 
@@ -52,9 +52,9 @@ require a `CHANGELOG.md` entry and must respect the deprecation window below.
 | `Morphology` | Graph representation of a building's HVAC topology. |
 | `MorphologyEdge` | Edge in the morphology graph. |
 | `MorphologyNode` | Node in the morphology graph. |
-| `NodeType` | Enum of node types. |
-| `build_morphology` | Construct a `Morphology` from a `BuildingConfig`. |
-| `ALL_NODE_TYPES` | Set of all `NodeType` values. |
+| `NodeType` | Node-type definition carrying its local observation/action subspaces. |
+| `build_morphology` | Construct a `Morphology` from the HVAC equipment list and the flat observation/action name lists. |
+| `ALL_NODE_TYPES` | Tuple of all `NodeType` constants. |
 | `CALENDAR`, `ENERGY`, `HEATING_ZONE`, `UNCONTROLLED_ZONE`, `UNITARY_ZONE`, `VAV_SUPPLY`, `VAV_ZONE`, `VAV_ZONE_NO_COOLING`, `WEATHER` | Named `NodeType` constants. |
 
 ### Equipment types
@@ -73,20 +73,20 @@ require a `CHANGELOG.md` entry and must respect the deprecation window below.
 |---|---|
 | `ActuatorDescription` | Dataclass describing an EnergyPlus actuator. |
 | `BuildingConfig` | Dataclass fully specifying a building environment. |
-| `Equipment` | Dataclass representing a piece of HVAC equipment. |
+| `Equipment` | Protocol that all HVAC equipment types satisfy. |
 | `NormalizedDeadbandRewardConfig` | The sole supported reward config; parameterised by `energy_weight`, `dT`, `tau_T`, `tau_E`. |
 | `RewardConfig` | Type alias for `NormalizedDeadbandRewardConfig`. |
-| `TaskConfig` | Dataclass bundling reward config + setpoint mode + run period. |
+| `TaskConfig` | Dataclass bundling run period, setpoint mode, zone target temperatures, and control resolution. |
 
 ### Wrappers
 
 | Symbol | Description |
 |---|---|
 | `AugmentObservationWithBuildingParams` | Appends static building parameters to the observation. |
-| `NormalizeObservation` | Normalises observation to `[0, 1]` based on known sensor ranges. |
+| `NormalizeObservation` | Normalises observations to `[0, 1]` using the observation-space bounds. |
 | `PadObservation` | Zero-pads the observation to a fixed size. |
 | `ResampleBuildingOnResetWrapper` | Resamples a new building from a pool on each `reset()`. |
-| `wrap_env_for_rl` | Convenience wrapper: applies `NormalizeObservation` + action rescaling. |
+| `wrap_env_for_rl` | Convenience wrapper: composes optional action rescaling to `[-1, 1]` and `NormalizeObservation`. |
 
 ---
 

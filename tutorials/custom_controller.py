@@ -16,22 +16,33 @@ from baselines.utils.evaluation import run_episode
 
 
 class ConstantController:
-    """Always requests a fixed supply air temperature and fan speed."""
+    """Always requests a fixed setpoint temperature and fan command."""
 
     def __init__(self, target_temp: float = 21.0, fan_fraction: float = 0.5):
         self.target_temp = target_temp
         self.fan_fraction = fan_fraction
-        self._n_actions: int = 2
+        self._n_actions: int = 0
+        self._fan_indices: list[int] = []
+        self._sat_indices: list[int] = []
 
     def bind_env(self, env: Any) -> None:
-        self._n_actions = env.action_space.shape[0]
+        act_names = env.metadata["action_names"]
+        self._n_actions = len(act_names)
+        self._fan_indices = [
+            i for i, n in enumerate(act_names) if "fan air mass flow rate" in n.lower()
+        ]
+        self._sat_indices = [
+            i for i, n in enumerate(act_names) if "schedule value" in n.lower()
+        ]
 
     def predict(
         self, obs: np.ndarray, deterministic: bool = True
     ) -> tuple[np.ndarray, None]:
         action = np.zeros(self._n_actions, dtype=np.float32)
-        action[0] = self.fan_fraction
-        action[1] = self.target_temp
+        for i in self._fan_indices:
+            action[i] = self.fan_fraction
+        for i in self._sat_indices:
+            action[i] = self.target_temp
         return action, None
 
 
@@ -74,13 +85,6 @@ class ProportionalController:
             action[sat_idx] = self.target_temp
 
         return action, None
-
-    def step_metrics(self, obs: Any, *, action: np.ndarray) -> dict[str, float]:
-        temps = [float(obs[i]) for i in self._temp_indices]
-        return {
-            "target_temp": self.target_temp,
-            "mean_zone_temp": float(np.mean(temps)) if temps else 0.0,
-        }
 
 
 def main() -> None:

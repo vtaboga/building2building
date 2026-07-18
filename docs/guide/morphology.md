@@ -19,9 +19,14 @@ The morphological universe is fixed across all B2B environments:
 | `energy` | 2 | 0 | HVAC electricity, gas |
 | `unitary_zone` | 1 | 2 | Zone temp; fan flow + SAT setpoint |
 | `vav_zone` | 1 | 3 | Zone temp; damper + heating/cooling SP |
-| `vav_supply` | 0 | 1 | Central SAT setpoint |
+| `vav_zone_no_cooling` | 1 | 2 | Zone temp; damper + heating SP (cooling SP fixed) |
+| `vav_supply` | 0 | 2 | Central SAT setpoint + outdoor-air mass flow |
 | `heating_zone` | 1 | 1 | Zone temp; heating setpoint |
 | `uncontrolled_zone` | 1 | 0 | Zone temp (no actuators) |
+
+In the shipped dataset, per-zone VAV cooling setpoints are pinned (fixed at
+40 C) and removed from the agent action space, so VAV terminals typically
+appear as `vav_zone_no_cooling` nodes.
 
 ## Accessing the Morphology
 
@@ -74,11 +79,12 @@ flat_action = morph.join_actions(actions_dict)
 
 The morphology is a directed graph where edges connect related nodes (e.g. a
 VAV supply node connects to its VAV zone nodes). Each `MorphologyEdge` has
-a `source` and `target` node ID.
+a `source` and `target` node ID and an `edge_type` (`"hvac_system"`,
+`"controls"`, or `"thermal_adjacency"`).
 
 ```python
 for edge in morph.edges:
-    print(f"  {edge.source} -> {edge.target}")
+    print(f"  {edge.source} -> {edge.target} ({edge.edge_type})")
 ```
 
 ## Building the Morphology

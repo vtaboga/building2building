@@ -71,33 +71,40 @@ sources of false positives, not maximum integration-test purity.
 tests/
 ├── conftest.py                  # shared fixtures + EnergyPlus path setup
 ├── fixtures/                    # minimal-building matrix (+ manifest), fake dataset, baselines
-├── quick/                       # short rollouts (≤ ~20 steps); EnergyPlus allowed
+├── quick/                       # fast tests; no EnergyPlus simulation required
 ├── long/                        # multi-day rollouts; gated on B2B_RUN_LONG_TESTS=1
 └── release/                     # dataset / artifact integrity against published HF data
 ```
 
 ### Markers and selection
 
-Three pytest markers are declared in `pyproject.toml` and applied via
+Four pytest markers are declared in `pyproject.toml` and applied via
 `conftest.py`:
 
 | Marker    | Meaning                                                                                                                                  |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `quick`   | No rollout, or a short rollout (≤ ~20 steps). EnergyPlus and the cached HuggingFace dataset are allowed. Aim for each test under a few seconds.  |
+| `quick`   | Fast tests that do not require EnergyPlus simulation. This is what CI runs. Aim for each test under a few seconds.                       |
 | `long`    | Multi-day rollouts (hundreds to tens of thousands of steps), or per-cycle leak/lifecycle iteration. Gated on `B2B_RUN_LONG_TESTS=1`.    |
-| `release` | Dataset / artifact integrity checks against the published `vtaboga/building2building_dataset`. Not run on every push; lives in `tests/release/`.  |
+| `release` | Dataset / artifact integrity checks against the published `vtaboga/building2building_dataset`. Excluded by default via `addopts = "-m 'not release'"`; lives in `tests/release/`.  |
+| `api_contract` | Pins the public API surface. A failing `api_contract` test means a breaking API change and requires a `CHANGELOG.md` entry.         |
 
 `conftest.py` auto-tags any uncategorised test as `quick`, so unmarked files
-behave conservatively. Most long tests additionally gate on the environment
-variable `B2B_RUN_LONG_TESTS=1` so that an accidental `pytest tests/long`
-invocation does not blow through a CPU budget.
+behave conservatively, and auto-applies the `api_contract` marker to a fixed
+set of files (`test_api.py`, `test_api_mode_default.py`,
+`test_gym_registration.py`, `test_climate_zones.py`, `test_data_registry.py`,
+`test_selection_and_env_creation.py`, `test_types.py`). Most long tests
+additionally gate on the environment variable `B2B_RUN_LONG_TESTS=1` so that
+an accidental `pytest tests/long` invocation does not blow through a CPU
+budget.
 
 Common invocations:
 
 ```bash
 pytest -m quick                                # default CI-style run
 B2B_RUN_LONG_TESTS=1 pytest -m long            # full long suite (slow!)
+B2B_RUN_LONG_TESTS=1 pytest                    # full suite
 pytest -m release                              # dataset-integrity checks (needs real HF data)
+pytest -m api_contract                         # public-API contract tests
 pytest tests/quick/test_task_presets.py        # one file
 pytest -k "deadband and not legacy"            # keyword filter
 ```
@@ -156,9 +163,9 @@ configured locally.
 
 ## Quick tests (`tests/quick/`)
 
-These tests run a short rollout (≤ ~20 steps) or no rollout at all.
-EnergyPlus startup (~1–3 s) is acceptable. They are the safety net you run
-before pushing.
+These tests are fast and do not require EnergyPlus simulation — they exercise
+config parsing, fixtures, wrappers, and env construction without running the
+simulator. They are what CI runs and the safety net you run before pushing.
 
 ### Public API surface
 
@@ -188,9 +195,9 @@ before pushing.
   `EnvBuildConfig` (the Hydra-friendly wrappers). Includes the
   building-type allow-list (no `HotelSmall`, exactly six types) and the
   frozen-dataclass guarantee.
-- **`test_task_presets.py`** — Documents the nine normalized presets
+- **`test_task_presets.py`** — Documents the six normalized presets
   (`task_<mode>_<level>` for `mode ∈ {const, occ, rand}`,
-  `level ∈ {e0, emed, ehigh}`). Each preset is
+  `level ∈ {e0, e05}`). Each preset is
   inspected for the right reward type, energy weight, setpoint mode, and
   unoccupied policy. Two additional tests guard that:
 
@@ -223,6 +230,12 @@ before pushing.
   (`epsilon_abs`/`epsilon_rel`), and `_cz_key_for` for SFH (which has no
   climate zone). Also asserts that `DEFAULT_REWARD_NORMALIZERS_PATH` points
   to a real YAML inside the installed package.
+- **`test_packaged_reward_normalizers.py`** — Pins the invariants of the
+  committed `building2building/data/reward_normalizers.yaml`: one
+  `constants` section per supported run period (`winter`, `summer`,
+  `full_year`), comfort unnormalized (`tau_T == 1.0` in every bucket),
+  and a strictly positive `tau_E` with the defensive floor dormant on
+  the shipped data.
 
 ### Rewards, schedules, observations
 
@@ -274,6 +287,11 @@ before pushing.
   required equipment type is actually present (not merely permitted), and that
   actuator descriptions survive the `structure → unstructure → structure`
   round-trip element-by-element without loss.
+- **`test_weather_publish_rename.py`** — Pins the weather-file
+  publish-rename helper (`published_weather_filename`): the upstream TMY3
+  San Diego Brown Field file ships with a `San.Deigo` typo; the pipeline
+  publishes it under the corrected spelling so `metadata.parquet` and the
+  per-building `.epw` filename always agree.
 - **`test_officemedium_actuator_set.py`** — Regression test for the
   OfficeMedium OA-mixer actuator. Pins that
   `make_vav_system_controllable` emits exactly one
@@ -292,6 +310,10 @@ before pushing.
   contract: seasonal run periods register a cleanup callback for the
   EnergyPlus staging directory on `env.close()`; full-year periods skip
   the cleanup (the staging dir is reused across episodes).
+- **`test_morphology_coverage.py`** — Builds a real env from each
+  minimal-building fixture and asserts the morphology graph assigns every
+  observation and action slot (no unassigned slots), so the
+  `split`/`join` decomposition covers the full flat vectors.
 
 ### Wrappers and observation layout
 
@@ -492,9 +514,6 @@ coverage with care before relying on them in publications:
   mocked everywhere. There is no integration test that asserts the real
   archive layout matches what `BuildingRegistry` expects — `long`
   tests would hit it implicitly, but only in the happy path.
-- **Morphology graph** (`building2building/morphology.py`) and the
-  per-node observation/action decomposition advertised on the docs
-  landing page have **no tests**.
 - **Hydra/CLI entry points** (`baselines/train_ppo.py`,
   `baselines/eval_*.py`) are imported in `test_eval_path_layout.py` and
   `test_train_sac_smoke.py` but never invoked with real configs.

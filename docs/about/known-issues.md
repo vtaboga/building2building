@@ -1,125 +1,59 @@
 # Known Issues and Limitations
 
-This page documents all verified and potential issues found during review.
+This page documents verified issues and limitations in the current codebase.
+Issues from earlier reviews that have since been fixed (evaluation-script
+argument order, model-path parsing, CSV schema mismatches, incomplete
+`requirements.txt`, hard-coded observation padding) have been removed.
 
 ---
 
-## Confirmed Bugs
+## Behaviour to be aware of
 
-### `compute_normalized_score` argument order in eval scripts
+### Reward-normalizer calibration warnings
 
-**Affected files:** `baselines/eval_ppo.py` (line 58),
-`baselines/eval_dynamics_adaptation.py` (line 68)
+The seasonal energy normalizer `tau_E` in
+`building2building/data/reward_normalizers.yaml` is calibrated with the
+reference reactive controller in **occupancy mode with `dT = 1.0`**. Building
+an env with a normalized task in `constant`/`random_schedule` mode, or with a
+different `dT`, emits a one-shot `RuntimeWarning` from `create_simulator`.
+This is **intentional** — it flags that the energy normalization constants were
+calibrated under a different regime, not that anything is broken.
 
-The call is:
-
-```python
-b2b.compute_normalized_score(building_type, ep.total_reward, task=task)
-```
-
-But the correct signature is:
-
-```python
-compute_normalized_score(cumulative_return, building_type, task, run_period, building_id)
-```
-
-The first two positional arguments are **swapped**. This means the function
-receives a string as `cumulative_return` and will produce incorrect results or
-raise a TypeError.
-
-**Fix:** swap to `b2b.compute_normalized_score(ep.total_reward, building_type, task, run_period, building_id)`.
-
-Note: `baselines/train_ppo.py` (line 106) has the **correct** order.
-
----
-
-### `eval_ppo.py` model path/name mismatch
-
-`train_ppo.py` saves models to:
-
-```
-outputs/.../models/{building_type}/{task}/ppo_{building_id}.zip
-```
-
-`eval_ppo.py` expects flat filenames:
-
-```
-ppo_{building_type}_{building_id}_{task}.zip
-```
-
-The `_parse_model_filename()` function splits on underscores in a way that
-cannot handle the nested directory structure.
-
-**Fix:** either change `eval_ppo.py` to walk subdirectories or change
-`train_ppo.py` to save with the expected flat naming convention.
-
----
-
-### `plot_ppo_specialist.py` CSV schema mismatch
-
-`plot_ppo_specialist.py` uses `load_results_csv()` from `common.py` which
-expects a `reward_mean` column. But `eval_ppo.py` outputs `reward` (no
-`reward_mean`).
-
-**Fix:** add a `reward_mean` column to `eval_ppo.py` output, or update the
-plotting script to use the `reward` column.
-
----
-
-## Missing Dependencies
-
-`baselines/requirements.txt` lists only `stable-baselines3`, `torch`, `wandb`,
-and `tqdm`. It is **missing**:
-
-- `hydra-core` (all training scripts use `@hydra.main`)
-- `omegaconf` (used in every Hydra script)
-- `optuna` (`tune_controller.py`)
-- `matplotlib` (plotting scripts)
-- `pyyaml` (`run_reactive_control.py` loads YAML configs)
-
-These are covered by `pip install -e ".[training]"` from the main package, but
-`requirements.txt` alone is insufficient.
-
----
-
-## Potential Issues and Edge Cases
-
-### Hard-coded pad size in eval_dynamics_adaptation.py
-
-`eval_dynamics_adaptation.py` hard-codes `PadObservation(env, target_size=20)`
-for test evaluation. Training in `train_dynamics_adaptation.py` uses
-`_detect_max_obs_dim()` which may compute a different value. If the trained
-model expects a different observation dimension, inference will fail.
-
-### torch.load compatibility
-
-`eval_cross_domain.py` uses `torch.load(..., weights_only=True)` which
-requires PyTorch >= 2.4. Older versions will raise a TypeError.
-
-### baseline_returns.csv dependency
+### `baseline_returns.csv` dependency
 
 `compute_normalized_score()` in `building2building/scoring.py` reads the
-packaged `building2building/scores/baseline_returns.csv`. If the file does not
-exist, the function raises `FileNotFoundError`.
+packaged `building2building/scores/baseline_returns.csv`. If the file is
+missing (e.g. a broken editable install), it raises `FileNotFoundError` with
+regeneration instructions. Tuples of
+`(building_type, task, run_period, building_id)` that are not in the packaged
+evaluation grid raise a `KeyError` — you must regenerate the CSV (see
+`baselines/run_reactive_control.py`) before scoring outside that grid.
 
-### tune_controller.py return type annotation
+### EnergyPlus native memory growth
 
-`_make_objective()` has a return type annotation of `optuna.Trial` but it
-returns a `Callable[[optuna.Trial], float]`. Functionally harmless but
-misleading for type checkers.
+EnergyPlus retains roughly 14 MB of RSS per create/reset/close cycle that is
+not released back to the OS (measured in `tests/long/test_env_leak.py`).
+Long-running jobs that create many envs in one process should periodically
+recycle the worker process — `tests/long/test_all_buildings_env_smoke.py`
+batches buildings into fresh subprocesses for exactly this reason.
 
-### GAE episode boundary handling
+### Some experiment configs fail to compose
 
-`train_cross_domain.py` does not properly handle episode boundaries within a
-rollout. The GAE computation uses done flags but the environment auto-resets,
-meaning the value bootstrap at episode boundaries may be incorrect. This is a
-common simplification in research code.
+The `baselines/configs/experiment/train_dynamics_*.yaml` (all three) and
+`train_cross_domain.yaml` configs currently contain
+`override /reward: task_const_e0`, but no `reward/` config group exists, so
+`python -m baselines.train_dynamics_adaptation experiment=train_dynamics_baseline`
+(and the `specialist`/`parameterized`/`train_cross_domain` variants) fail at
+Hydra compose time with `Could not override 'reward'`. A fix updating these
+configs to the current task-preset mechanism is in progress. Until it lands,
+remove the stale `override /reward:` line from the experiment config.
 
 ### Hydra `@package _global_` merging
 
-Experiment configs use `@package _global_` which merges keys into the top-level
-config. Some experiment configs define `training:` overrides that merge with
-(not replace) the defaults. This is correct Hydra behavior but can be confusing.
+Experiment configs in `baselines/configs/` use `@package _global_`, which
+merges keys into the top-level config. Some experiment configs define
+`training:` overrides that merge with (not replace) the defaults. This is
+correct Hydra behavior but can be confusing.
 
 ---
 
@@ -127,8 +61,8 @@ config. Some experiment configs define `training:` overrides that merge with
 
 | Area | Coverage |
 |---|---|
-| `building2building/` (core) | Good -- quick tests cover API, registry, scoring, types, benchmarks, config |
-| `baselines/` (scripts) | **No tests** -- controllers, training, evaluation are untested |
+| `building2building/` (core) | Good -- quick tests cover API, registry, scoring, types, benchmarks, config, wrappers, morphology, pipeline |
+| `baselines/` (scripts) | Smoke tests only (`test_train_ppo_smoke.py`, `test_train_sac_smoke.py`, `test_run_reactive_control_smoke.py`, `test_eval_path_layout.py`) -- the Hydra/CLI entry points are never invoked with real configs |
 | Integration pipeline | **No test** for the full train -> eval -> plot pipeline |
 | Hydra config | **No test** for config composition (experiment + policy + reward) |
 | Long tests | Require EnergyPlus and network access (HuggingFace) |
@@ -137,11 +71,6 @@ config. Some experiment configs define `training:` overrides that merge with
 
 ## Roadmap / TODO
 
-- [ ] Fix the three confirmed bugs listed above
-- [ ] Complete `baselines/requirements.txt` with missing dependencies
-- [ ] Add tests for baselines controllers and training scripts
+- [ ] Invoke the baselines training/evaluation entry points with real Hydra configs in tests
 - [ ] Add an integration test for the full experiment pipeline
-- [ ] Publish baseline return regeneration instructions for future benchmark updates
-- [ ] Select and publish a license
-- [ ] Fill in citation details (author, journal)
 - [ ] Add Hydra config composition tests

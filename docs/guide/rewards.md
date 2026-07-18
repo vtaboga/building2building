@@ -3,21 +3,43 @@
 ## Overview
 
 B2B uses one reward function: **NormalizedDeadbandReward**, which penalises
-temperature deviations outside a comfort deadband and optionally penalises
-energy consumption.  Per-bucket `(tau_T, tau_E)` normalizers make
-`energy_weight` dimensionless and comparable across building types and
-climate zones.
+squared deviations of each controlled zone's temperature from its target and
+optionally penalises energy consumption.  A per-bucket energy normalizer
+`tau_E` makes `energy_weight` dimensionless and comparable across building
+types and climate zones.
 
 \[
 r_t = -\left(
-    \frac{1}{\tau_T} \cdot \frac{1}{N_z}\sum_{z=1}^{N_z}(T_z - T_\text{target})^2
+    \frac{1}{\tau_T} \cdot \frac{1}{N_z}\sum_{z=1}^{N_z}(T_z - T^\text{target}_z)^2
     + w_E \cdot \frac{E_t}{\tau_E}
 \right)
 \]
 
-where `(tau_T, tau_E)` are median comfort and energy penalties under a random
-policy for the building's `(building_type, climate_zone)` bucket (stored in
-`building2building/data/reward_normalizers.yaml`).
+where `E_t` is the HVAC energy use per square metre at step `t`.  The
+normalization is asymmetric:
+
+* **Comfort is unnormalized**: `tau_T ≡ 1`, so the comfort term is a raw
+  mean squared deviation in °C² — the same physical unit in every building,
+  zone, and climate.
+* **Only energy is normalized**: `tau_E` is the median per-step energy spend
+  of the reference reactive controller for the building's
+  `(building_type, climate_zone)` bucket, calibrated under the occupancy
+  regime (`task_occ_*`, `dT=1.0`) on the train split.  `power_penalty /
+  tau_E = 1` means "spends like the reference controller for this bucket".
+
+The constants live in `building2building/data/reward_normalizers.yaml`.
+`tau_E` is **seasonal** (heating and cooling energy differ), so the YAML has
+one `constants` section per run period; the packaged file ships `winter`,
+`summer`, and `full_year`.  Requesting a `run_period` that has no section
+raises a clear error at env-build time until that section is calibrated.
+Regenerate the YAML with
+`python -m baselines.compute_reactive_reward_normalizers --mode all`.
+
+Because `tau_E` is calibrated under the occupancy regime, using the
+`const`/`rand` setpoint modes or a non-default `dT` triggers a one-shot
+`RuntimeWarning` at simulator construction.  This is intentional — the
+constants are applied as-is and the calibration is approximate outside its
+regime — not a bug.
 
 **Configuration:**
 
@@ -25,15 +47,16 @@ policy for the building's `(building_type, climate_zone)` bucket (stored in
 from building2building.types import NormalizedDeadbandRewardConfig
 
 reward = NormalizedDeadbandRewardConfig(
-    energy_weight=1.0,  # dimensionless trade-off weight
-    dT=1.0,             # comfort deadband half-width (°C)
+    energy_weight=0.5,  # dimensionless trade-off weight (w_E)
+    dT=1.0,             # calibration deadband half-width (°C)
     tau_T=None,         # None = auto-resolved at env-build time
     tau_E=None,
 )
 ```
 
-`tau_T = tau_E = None` is the *unfilled sentinel state*.  Pass the preset
-name to `make_env` and it resolves the constants automatically:
+`tau_T = tau_E = None` is the *unfilled sentinel state*.  Constructing a
+simulator with an unfilled config raises.  Pass the preset name to
+`make_env` and it resolves the constants automatically:
 
 ```python
 import building2building as b2b
@@ -55,16 +78,15 @@ occupancy is zero.  The unoccupied setpoint may be:
   summer cooling.  The `task_occ_*` family uses the seasonal policy
   (18 / 21 / 26 °C).
 
-!!! warning "Buildings without `People` objects"
+!!! warning "Zones without `People` objects"
     Occupancy-based tasks read EnergyPlus's `Zone People Occupant Count`
-    variable.  If a building's epJSON does not define any `People`
-    objects, that variable is always zero and `task_occ_*` degenerates to a
-    constant "unoccupied" setpoint — i.e. it behaves like a
+    variable.  If a controlled zone has no `People` object, that variable
+    is always zero and `task_occ_*` degenerates to a constant
+    "unoccupied" setpoint for that zone — i.e. it behaves like a
     `constant`-mode task whose target is the seasonal unoccupied value
-    (18 / 21 / 26 °C) instead of 21 °C.  In the bundled dataset,
-    **`SingleFamilyHouse` has no occupancy schedule**.  Prefer
-    `task_rand_*` (random schedule), which drives its own occupancy signal
-    from the Python side and works uniformly across every building type.
+    (18 / 21 / 26 °C) instead of 21 °C.  `task_rand_*` (random schedule)
+    drives its own occupancy signal from the Python side and works
+    uniformly across every building type.
 
 **Random schedule:** each simulated day, a fresh arrival time, departure time,
 occupied setpoint, and unoccupied setpoint are sampled from a per-building-type
@@ -85,28 +107,26 @@ env = b2b.make_env(
 
 ## Energy Weight Levels
 
-The three weight levels in the normalized preset grid:
+The two weight levels in the normalized preset grid:
 
 | Level suffix | `energy_weight` | Behaviour |
 |---|---|---|
 | `e0` | 0.0 | Comfort-only; energy consumption not penalised |
-| `emed` | 1.0 | Balanced; comfort and energy roughly equally weighted |
-| `ehigh` | 5.0 | Energy-emphasis; aggressive energy minimization |
+| `e05` | 0.5 | Comfort with a moderate energy penalty |
 
 ## Task Presets
 
-Nine named presets form a 3×3 grid over `(setpoint_mode, energy_weight)`:
+Six named presets form a 3×2 grid over `(setpoint_mode, energy_weight)`:
 
 | Task | Mode | Energy weight | dT |
 |---|---|---|---|
 | `task_const_e0` | Constant | 0.0 | 1.0 |
-| `task_const_emed` | Constant | 1.0 | 1.0 |
-| `task_const_ehigh` | Constant | 5.0 | 1.0 |
+| `task_const_e05` | Constant | 0.5 | 1.0 |
 | `task_occ_e0` | Occupancy (seasonal) | 0.0 | 1.0 |
-| `task_occ_emed` | Occupancy (seasonal) | 1.0 | 1.0 |
-| `task_occ_ehigh` | Occupancy (seasonal) | 5.0 | 1.0 |
+| `task_occ_e05` | Occupancy (seasonal) | 0.5 | 1.0 |
 | `task_rand_e0` | Random schedule | 0.0 | 1.0 |
-| `task_rand_emed` | Random schedule | 1.0 | 1.0 |
-| `task_rand_ehigh` | Random schedule | 5.0 | 1.0 |
+| `task_rand_e05` | Random schedule | 0.5 | 1.0 |
 
 The default task is `task_const_e0` (constant setpoint, comfort-only).
+For `w_E` or `dT` values outside this grid, build a filled preset with
+`building2building.config.tasks.make_normalized_deadband_task(...)`.

@@ -8,9 +8,9 @@ Reinforcement learning has achieved strong results in control, yet learned
 policies remain brittle to changes in dynamics, action spaces, or reward
 functions. **Building2Building** (B2B) is a large-scale suite of realistic HVAC
 control environments built on EnergyPlus. Starting from ASHRAE 90.1-2022
-building prototypes, B2B parametrically generates **6,000 buildings**
-(5,400 train / 600 test) spanning **6 building types**, **16 climate zones**,
-and **3 distinct HVAC system types**.
+commercial prototypes and residential archetypes, B2B parametrically generates
+**6,000 buildings** (5,400 train / 600 test) spanning **6 building types**,
+**16 climate locations**, and **3 distinct HVAC system types**.
 
 B2B is designed to accelerate research in **transfer learning**, **multi-task
 RL**, and **meta-learning** for building energy management.
@@ -22,7 +22,7 @@ RL**, and **meta-learning** for building energy management.
 - **6,000 parametrically generated buildings** (5,400 train / 600 test, plus an 8-per-type `test_small` split) across commercial and residential archetypes
 - **6 building types**: `SingleFamilyHouse`, `OfficeSmall`, `OfficeMedium`, `RetailStandalone`, `RestaurantFastFood`, `Warehouse`
 - **3 HVAC system types**: VAV (Variable Air Volume), Unitary, and Heating-Only
-- **9 named task presets** (3×3 grid over setpoint mode × energy weight)
+- **6 named task presets** (`task_{const,occ,rand}_{e0,e05}`: 3 setpoint modes × 2 energy weights)
 - **4 benchmark problems**: dynamics adaptation, cross-domain generalization, goal adaptation, action-space transfer
 - **Morphology graph** for structured per-node observation/action decomposition
 - **Normalized scoring** against reactive-controller baselines
@@ -70,6 +70,8 @@ score = b2b.compute_normalized_score(
     run_period="full_year",
     building_id="OfficeSmall-0001",
 )
+# score = agent_return / baseline_return (both negative):
+# lower is better; score < 1.0 beats the reactive baseline.
 ```
 
 ---
@@ -113,11 +115,12 @@ graph TD
 ## Citing B2B
 
 ```bibtex
-@article{b2b2025,
-  title   = {Building2Building: A Large-Scale Benchmark for Transfer and
-             Multi-Task Reinforcement Learning in HVAC Control},
-  author  = {TODO},
-  journal = {TODO},
-  year    = {2025},
+@article{taboga2026building2building,
+  title   = {Building2Building: A Large Scale Benchmark for Generalizable
+             Real-World Reinforcement Learning},
+  author  = {Taboga, Vincent and Veilleux, Justin and Jang, Doseok and
+             Rankawat, Anushree and Bacon, Pierre-Luc},
+  journal = {Reinforcement Learning Journal},
+  year    = {2026},
 }
 ```

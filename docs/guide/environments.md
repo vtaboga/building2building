@@ -39,16 +39,25 @@ env = b2b.make_env(
 | Parameter | Type | Description |
 |---|---|---|
 | `building_type` | `str` | One of the 6 building types |
-| `split` | `"train"` / `"test"` | Dataset split |
+| `split` | `"train"` / `"test"` / `"test_small"` | Dataset split |
 | `index` | `int` | Zero-based index into the split |
 | `building_id` | `str` | Explicit building ID (overrides split+index) |
-| `task` | `str` / `TaskPreset` | preset name (e.g. `"task_const_e0"`) or a `TaskPreset` |
+| `task` | `str` / `TaskPreset` | preset name (one of the 6 `task_{const,occ,rand}_{e0,e05}` presets) or a `TaskPreset` |
 | `reward` | `RewardConfig` | Override reward (default: from task preset) |
 | `run_period` | `str` | `"full_year"`, `"winter"`, or `"summer"` |
+| `normalizer_path` | `Path` | Alternate `reward_normalizers.yaml` for resolving `(tau_T, tau_E)` (default: packaged file) |
 | `timesteps_per_hour` | `int` | Simulation resolution (default: 12 = 5 min) |
-| `target_temperature_mode` | `str` | `"constant"` or `"occupancy"` |
+| `target_temperature_mode` | `str` | `"constant"`, `"occupancy"`, or `"random_schedule"` (default: from task preset) |
+| `random_schedule_seed` | `int` | Base seed for the `task_rand_*` daily schedule generator |
 | `eplus_output_dir` | `str` / `Path` | EnergyPlus output directory |
 | `max_episode_steps` | `int` | Override episode length |
+| `rescale_action` | `bool` | Wrap with `RescaleAction` so actions are in `[-1, 1]` (default: `False`) |
+
+For the 6 task presets, `make_env` auto-fills the reward's `(tau_T, tau_E)`
+normalizers from `building2building/data/reward_normalizers.yaml` for the
+building's `(building_type, climate_zone)` bucket. `tau_E` is calibrated per
+run period; requesting a `run_period` that has no section in that YAML raises
+at env-build time.
 
 ### `make_env_from_config` (config-based)
 
@@ -67,11 +76,25 @@ cfg = EnvBuildConfig(
         split_index=5,
     ),
     task=TaskConfig.from_dict({"run_period": "summer"}),
-    reward=reward_config_from_dict({"reward_type": "NormalizedDeadbandRewardConfig", "energy_weight": 1.0, "dT": 1.0}),
+    reward=reward_config_from_dict(
+        {
+            "reward_type": "NormalizedDeadbandRewardConfig",
+            "energy_weight": 0.5,
+            "dT": 1.0,
+            "tau_T": 1.0,
+            "tau_E": 2.0,
+        }
+    ),
     env_max_steps=8640,
 )
 env = make_env_from_config(cfg, eplus_output_dir="outputs/eplus")
 ```
+
+Unlike `make_env`, this path does **not** auto-fill the reward normalizers:
+`tau_T` and `tau_E` must be given explicitly (an unfilled config raises at
+simulator construction). `tau_T` is always `1.0` (comfort is unnormalized);
+`tau_E` values per `(building_type, climate_zone, run_period)` live in
+`building2building/data/reward_normalizers.yaml`.
 
 ### Gymnasium Registration
 
@@ -100,19 +123,25 @@ env.close()                     # Clean up EnergyPlus process
 - `reset()` starts a new EnergyPlus simulation and runs warmup.
 - `step(action)` advances the simulation by one timestep.
 - `close()` terminates the EnergyPlus process and cleans up.
-- `terminated` is True when the simulation run period ends.
+- Episodes end when the simulated run period completes; `make_env` also wraps
+  the env in a `gym.wrappers.TimeLimit` sized to the run period, so check both
+  `terminated` and `truncated`.
 
 ## Environment Metadata
 
 Every environment provides structured metadata:
 
 ```python
-env.metadata["observation_names"]      # list[str] -- named observation channels
-env.metadata["action_names"]           # list[str] -- named action channels
-env.metadata["hvac_equipment"]         # list[Equipment] -- HVAC equipment descriptions
-env.metadata["morphology"]             # Morphology -- structured graph representation
-env.metadata["total_conditioned_area"] # float -- building floor area (m^2)
-env.metadata["zone_names"]             # list[str] -- thermal zone names
+env.metadata["observation_names"]   # list[str] -- named observation channels
+env.metadata["action_names"]        # list[str] -- named action channels
+env.metadata["hvac_equipment"]      # list[Equipment] -- HVAC equipment descriptions
+env.metadata["morphology"]          # Morphology -- structured graph representation
+env.metadata["area"]                # float -- net conditioned floor area (m^2)
+env.metadata["controlled_zones"]    # list[str] -- fully controlled zone names
+env.metadata["heating_only_zones"]  # list[str] -- heating-only zone names
+env.metadata["uncontrolled_zones"]  # list[str] -- zones without HVAC control
+env.metadata["task_config"]         # TaskConfig -- resolved task specification
+env.metadata["building_info"]       # BuildingInfo -- registry entry for the building
 ```
 
 ## Run Periods

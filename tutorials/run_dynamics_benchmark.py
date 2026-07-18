@@ -8,6 +8,7 @@ on held-out test buildings.
 
 from __future__ import annotations
 
+import gymnasium as gym
 import numpy as np
 from stable_baselines3 import PPO
 
@@ -29,16 +30,19 @@ def main() -> None:
     print(f"Using {len(train_ids)} train buildings, {len(test_ids)} test buildings")
 
     # -- Build multi-building training environment --
-    def make_env(idx: int) -> b2b.ResampleBuildingOnResetWrapper:
+    # Wrapper order matches baselines.train_dynamics_adaptation:
+    # PadObservation -> wrap_env_for_rl (obs normalization + action
+    # rescaling) -> AugmentObservationWithBuildingParams.
+    def make_env(idx: int) -> gym.Env:
         env = b2b.make_env(
             bench.building_type,
-            building_id=train_ids[idx % len(train_ids)],
+            building_id=train_ids[idx],
             task="task_const_e0",
             run_period=RUN_PERIOD,
         )
         env = b2b.PadObservation(env, target_size=PAD_SIZE)
+        env = b2b.wrap_env_for_rl(env, normalize_obs=True, rescale_action=True)
         env = b2b.AugmentObservationWithBuildingParams(env, allow_defaults=True)
-        env = b2b.NormalizeObservation(env)
         return env
 
     env = b2b.ResampleBuildingOnResetWrapper(
@@ -65,10 +69,12 @@ def main() -> None:
             run_period=RUN_PERIOD,
         )
         eval_env = b2b.PadObservation(eval_env, target_size=PAD_SIZE)
+        eval_env = b2b.wrap_env_for_rl(
+            eval_env, normalize_obs=True, rescale_action=True
+        )
         eval_env = b2b.AugmentObservationWithBuildingParams(
             eval_env, allow_defaults=True
         )
-        eval_env = b2b.NormalizeObservation(eval_env)
 
         obs, _ = eval_env.reset()
         total_reward = 0.0

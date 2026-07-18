@@ -13,9 +13,10 @@ See the [Baselines Overview](../baselines/overview.md) for usage instructions.
 | `baselines/controllers/` | Reactive controllers (`UnitaryHvacPolicy`, `AirLoopPolicy`) |
 | `baselines/models/` | Neural-network policy architectures (`AmorpheusPolicy`) |
 | `baselines/utils/` | Shared training / evaluation helpers |
-| `baselines/train_*.py` | Training entry points (PPO, cross-domain, dynamics) |
+| `baselines/train_*.py` | Training entry points (PPO, SAC, cross-domain, dynamics) |
 | `baselines/eval_*.py` | Evaluation scripts |
-| `baselines/tune_controller.py` | Optuna hyperparameter tuning for reactive controllers |
+| `baselines/tune_controller.py`, `baselines/tune_ppo.py` | Optuna hyperparameter tuning (reactive controllers, PPO) |
 | `baselines/run_reactive_control.py` | Run a reactive controller and generate `baseline_returns.csv` |
+| `baselines/compute_reactive_reward_normalizers.py` | Regenerate the packaged `reward_normalizers.yaml` |
 | `baselines/plotting/` | Matplotlib figure generation scripts |
 | `baselines/configs/` | Hydra configuration (experiments, policies, rewards, training) |

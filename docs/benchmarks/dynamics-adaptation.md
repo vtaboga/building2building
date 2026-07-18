@@ -20,14 +20,26 @@ Evaluate with `compute_normalized_score` per test building, then average:
 ```python
 import building2building as b2b
 
+bench = b2b.benchmarks.DynamicsAdaptation(difficulty="easy", task="task_const_e0")
+
 scores = []
-for env in bench.make_test_envs(n=4):
+for building_id, env in zip(bench.test_building_ids(), bench.make_test_envs(n=4)):
     traj = b2b.rollout(env, controller=my_policy)
-    scores.append(b2b.compute_normalized_score(traj))
+    scores.append(
+        b2b.compute_normalized_score(
+            cumulative_return=float(traj.rewards.sum()),
+            building_type=bench.building_type,
+            task=bench.task,
+            run_period="full_year",
+            building_id=building_id,
+        )
+    )
 mean_score = sum(scores) / len(scores)
 ```
 
-A score of 0.0 matches the reactive-controller baseline; 1.0 is perfect.
+The score is `agent_return / baseline_return`. Both returns are negative
+(cost-based reward), so **lower is better**: 1.0 matches the
+reactive-controller baseline and a score below 1.0 beats it.
 
 ## Difficulty Levels
 
@@ -35,7 +47,11 @@ A score of 0.0 matches the reactive-controller baseline; 1.0 is perfect.
 |---|---|---|---|
 | `easy` | `SingleFamilyHouse` | 2 | Single-zone residential |
 | `medium` | `OfficeSmall` | 10 | 5-zone unitary office |
-| `hard` | `OfficeMedium` | ~33 | Multi-zone VAV office |
+| `hard` | `OfficeMedium` | 36 | Multi-zone VAV office |
+
+(The `hard` preset's `action_dim` is 36 in `DYNAMICS_ADAPTATION_PRESETS`;
+the paper's Table 3 lists 33 for the medium-office setting — OfficeMedium
+action dimensions vary per building.)
 
 ## API
 
