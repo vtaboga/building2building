@@ -1,0 +1,117 @@
+site_name: Building2Building
+site_description: >-
+  A large-scale RL benchmark for HVAC control targeting transfer,
+  multi-task, and meta-learning research.
+repo_url: https://github.com/placeholder/Building2Building
+repo_name: Building2Building
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            docstring_style: google
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+  - tables
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - User Guide:
+      - Installation: guide/installation.md
+      - Environments: guide/environments.md
+      - Building Types: guide/buildings.md
+      - HVAC Systems: guide/hvac-systems.md
+      - Observations: guide/observations.md
+      - Actions: guide/actions.md
+      - Rewards: guide/rewards.md
+      - Wrappers: guide/wrappers.md
+      - Morphology Graph: guide/morphology.md
+      - Configuration (Hydra): guide/configuration.md
+  - Benchmarks:
+      - Overview: benchmarks/overview.md
+      - Dynamics Adaptation: benchmarks/dynamics-adaptation.md
+      - Cross-Domain Generalization: benchmarks/cross-domain.md
+      - Goal Adaptation: benchmarks/goal-adaptation.md
+      - Action-Space Transfer: benchmarks/action-transfer.md
+  - Baselines:
+      - Overview: baselines/overview.md
+      - Reactive Controllers: baselines/controllers.md
+      - PPO & SAC Specialists: baselines/ppo-specialist.md
+      - Dynamics Adaptation: baselines/dynamics-adaptation.md
+      - Cross-Domain Transfer: baselines/cross-domain.md
+      - Controller Tuning: baselines/tuning.md
+      - Plotting: baselines/plotting.md
+  - Tutorials:
+      - Quick Tour: tutorials/quick-tour.md
+      - Train a PPO Agent: tutorials/train-ppo.md
+      - Reproduce Dynamics Benchmark: tutorials/dynamics-benchmark.md
+      - Cross-Domain with Amorpheus: tutorials/cross-domain.md
+      - Write a Custom Controller: tutorials/custom-controller.md
+  - API Reference:
+      - building2building.api: api/api.md
+      - building2building.config: api/config.md
+      - building2building.types: api/types.md
+      - building2building.benchmarks: api/benchmarks.md
+      - building2building.scoring: api/scoring.md
+      - building2building.morphology: api/morphology.md
+      - building2building.simulator: api/simulator.md
+      - building2building.envs: api/envs.md
+      - building2building.data: api/data.md
+      - baselines: api/baselines.md
+      - API Stability: api/stability.md
+  - About:
+      - Known Issues: about/known-issues.md
+      - Testing: about/testing.md
+      - Citing: about/citing.md
+      - License: about/license.md

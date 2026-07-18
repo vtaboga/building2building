@@ -1,0 +1,147 @@
+# Known Issues and Limitations
+
+This page documents all verified and potential issues found during review.
+
+---
+
+## Confirmed Bugs
+
+### `compute_normalized_score` argument order in eval scripts
+
+**Affected files:** `baselines/eval_ppo.py` (line 58),
+`baselines/eval_dynamics_adaptation.py` (line 68)
+
+The call is:
+
+```python
+b2b.compute_normalized_score(building_type, ep.total_reward, task=task)
+```
+
+But the correct signature is:
+
+```python
+compute_normalized_score(cumulative_return, building_type, task, run_period, building_id)
+```
+
+The first two positional arguments are **swapped**. This means the function
+receives a string as `cumulative_return` and will produce incorrect results or
+raise a TypeError.
+
+**Fix:** swap to `b2b.compute_normalized_score(ep.total_reward, building_type, task, run_period, building_id)`.
+
+Note: `baselines/train_ppo.py` (line 106) has the **correct** order.
+
+---
+
+### `eval_ppo.py` model path/name mismatch
+
+`train_ppo.py` saves models to:
+
+```
+outputs/.../models/{building_type}/{task}/ppo_{building_id}.zip
+```
+
+`eval_ppo.py` expects flat filenames:
+
+```
+ppo_{building_type}_{building_id}_{task}.zip
+```
+
+The `_parse_model_filename()` function splits on underscores in a way that
+cannot handle the nested directory structure.
+
+**Fix:** either change `eval_ppo.py` to walk subdirectories or change
+`train_ppo.py` to save with the expected flat naming convention.
+
+---
+
+### `plot_ppo_specialist.py` CSV schema mismatch
+
+`plot_ppo_specialist.py` uses `load_results_csv()` from `common.py` which
+expects a `reward_mean` column. But `eval_ppo.py` outputs `reward` (no
+`reward_mean`).
+
+**Fix:** add a `reward_mean` column to `eval_ppo.py` output, or update the
+plotting script to use the `reward` column.
+
+---
+
+## Missing Dependencies
+
+`baselines/requirements.txt` lists only `stable-baselines3`, `torch`, `wandb`,
+and `tqdm`. It is **missing**:
+
+- `hydra-core` (all training scripts use `@hydra.main`)
+- `omegaconf` (used in every Hydra script)
+- `optuna` (`tune_controller.py`)
+- `matplotlib` (plotting scripts)
+- `pyyaml` (`run_reactive_control.py` loads YAML configs)
+
+These are covered by `pip install -e ".[training]"` from the main package, but
+`requirements.txt` alone is insufficient.
+
+---
+
+## Potential Issues and Edge Cases
+
+### Hard-coded pad size in eval_dynamics_adaptation.py
+
+`eval_dynamics_adaptation.py` hard-codes `PadObservation(env, target_size=20)`
+for test evaluation. Training in `train_dynamics_adaptation.py` uses
+`_detect_max_obs_dim()` which may compute a different value. If the trained
+model expects a different observation dimension, inference will fail.
+
+### torch.load compatibility
+
+`eval_cross_domain.py` uses `torch.load(..., weights_only=True)` which
+requires PyTorch >= 2.4. Older versions will raise a TypeError.
+
+### baseline_returns.csv dependency
+
+`compute_normalized_score()` in `building2building/scoring.py` reads the
+packaged `building2building/scores/baseline_returns.csv`. If the file does not
+exist, the function raises `FileNotFoundError`.
+
+### tune_controller.py return type annotation
+
+`_make_objective()` has a return type annotation of `optuna.Trial` but it
+returns a `Callable[[optuna.Trial], float]`. Functionally harmless but
+misleading for type checkers.
+
+### GAE episode boundary handling
+
+`train_cross_domain.py` does not properly handle episode boundaries within a
+rollout. The GAE computation uses done flags but the environment auto-resets,
+meaning the value bootstrap at episode boundaries may be incorrect. This is a
+common simplification in research code.
+
+### Hydra `@package _global_` merging
+
+Experiment configs use `@package _global_` which merges keys into the top-level
+config. Some experiment configs define `training:` overrides that merge with
+(not replace) the defaults. This is correct Hydra behavior but can be confusing.
+
+---
+
+## Test Coverage Gaps
+
+| Area | Coverage |
+|---|---|
+| `building2building/` (core) | Good -- quick tests cover API, registry, scoring, types, benchmarks, config |
+| `baselines/` (scripts) | **No tests** -- controllers, training, evaluation are untested |
+| Integration pipeline | **No test** for the full train -> eval -> plot pipeline |
+| Hydra config | **No test** for config composition (experiment + policy + reward) |
+| Long tests | Require EnergyPlus and network access (HuggingFace) |
+
+---
+
+## Roadmap / TODO
+
+- [ ] Fix the three confirmed bugs listed above
+- [ ] Complete `baselines/requirements.txt` with missing dependencies
+- [ ] Add tests for baselines controllers and training scripts
+- [ ] Add an integration test for the full experiment pipeline
+- [ ] Publish baseline return regeneration instructions for future benchmark updates
+- [ ] Select and publish a license
+- [ ] Fill in citation details (author, journal)
+- [ ] Add Hydra config composition tests
