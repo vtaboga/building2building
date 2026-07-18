@@ -2,8 +2,9 @@ site_name: Building2Building
 site_description: >-
   A large-scale RL benchmark for HVAC control targeting transfer,
   multi-task, and meta-learning research.
-repo_url: https://github.com/placeholder/Building2Building
-repo_name: Building2Building
+site_url: https://vtaboga.github.io/building2building/
+repo_url: https://github.com/vtaboga/building2building
+repo_name: vtaboga/building2building
 
 theme:
   name: material

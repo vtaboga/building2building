@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **Documentation site.** MkDocs Material site under `docs/` (user guide,
+  benchmark descriptions, baseline guides, tutorials, and an mkdocstrings API
+  reference), runnable tutorial scripts under `tutorials/`, and a
+  `.github/workflows/docs.yml` workflow that builds with `mkdocs build --strict`
+  and deploys to GitHub Pages on pushes to `main`. Build locally with
+  `pip install -e ".[docs]" && mkdocs serve`.
+
 ### Changed
 
 - **Task grid is a 3x2 family of six presets** `task_{const,occ,rand}_{e0,e05}`
