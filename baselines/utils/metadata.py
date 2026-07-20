@@ -48,6 +48,27 @@ def find_zone_air_temp_index(observation_names: list[str], zone_name: str) -> in
     raise RuntimeError(f"Could not find Zone Air Temperature for zone {zone_name!r}")
 
 
+def find_target_temp_index(
+    observation_names: list[str], zone_name: str
+) -> int | None:
+    """Find the observation index for a zone's TARGET temperature (setpoint).
+
+    Returns None when the task exposes no per-zone target, so callers can fall
+    back to a fixed setpoint. Shared by the unitary and air-loop baselines so
+    both regulate to the task's (possibly dynamic) setpoint rather than a
+    hard-coded constant.
+    """
+    prefix = "target_temperature"
+    zn = zone_name.strip().lower()
+    for i, name in enumerate(observation_names):
+        nl = name.strip().lower()
+        if nl.startswith(prefix):
+            zone_part = nl[len(prefix):].strip()
+            if zone_part == zn or zn in zone_part or zone_part in zn:
+                return i
+    return None
+
+
 def find_first_zone_air_temp_index(observation_names: list[str]) -> int:
     """Find the first zone air temperature observation."""
     for i, name in enumerate(observation_names):

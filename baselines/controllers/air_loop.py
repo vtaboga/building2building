@@ -19,6 +19,7 @@ import numpy as np
 
 from baselines.utils.metadata import (
     find_obs_index_optional,
+    find_target_temp_index,
     find_zone_air_temp_index,
 )
 
@@ -84,11 +85,39 @@ class _ZoneState:
     flow_act_idx: int
     htg_act_idx: int
     clg_act_idx: int | None
+    # Index of this zone's target_temperature observation, when the task exposes
+    # one. None -> fall back to the fixed cfg.target_temp (previous behaviour).
+    target_obs_idx: int | None = None
 
     integral: float = 0.0
     smooth_error: float = 0.0
     prev_flow: float = 0.4
     prev_reheat_sp: float = 10.0
+
+
+def _zone_target(obs_arr: np.ndarray, z: "_ZoneState", cfg: "AirLoopConfig") -> float:
+    """Setpoint this zone should track.
+
+    The task's dynamic target_temperature when the env exposes one (so the
+    controller follows occupancy setbacks), else the fixed cfg.target_temp.
+    """
+    if z.target_obs_idx is not None and z.target_obs_idx < len(obs_arr):
+        return float(obs_arr[z.target_obs_idx])
+    return cfg.target_temp
+
+
+def _deadband_error(raw: float, deadband: float) -> float:
+    """Signed excess outside +/- deadband; exactly zero inside it.
+
+    The comfort reward is indifferent within its deadband, so a controller that
+    keeps actuating inside the band spends control effort (and, when
+    energy_weight > 0, energy) for no reward in return.
+    """
+    if deadband <= 0.0:
+        return raw
+    if abs(raw) <= deadband:
+        return 0.0
+    return float(raw - deadband * np.sign(raw))
 
 
 @dataclass
@@ -226,6 +255,7 @@ class AirLoopPolicy:
                         flow_act_idx=flow_idx,
                         htg_act_idx=htg_idx,
                         clg_act_idx=clg_idx,
+                        target_obs_idx=find_target_temp_index(obs_names, term.zone),
                         prev_flow=cfg.flow_base,
                         prev_reheat_sp=cfg.reheat_sp_min,
                     )
@@ -275,7 +305,11 @@ class AirLoopPolicy:
             raw_errors = np.array(
                 [
                     (
-                        float(obs_arr[z.temp_obs_idx]) - cfg.target_temp
+                        _deadband_error(
+                            float(obs_arr[z.temp_obs_idx])
+                            - _zone_target(obs_arr, z, cfg),
+                            cfg.deadband,
+                        )
                         if z.temp_obs_idx < len(obs_arr)
                         else 0.0
                     )
@@ -359,7 +393,7 @@ class AirLoopPolicy:
             for i, z in enumerate(loop.zones):
                 err = errors[i]
                 if err < -cfg.reheat_sp_deadband:
-                    sp_target = cfg.target_temp + cfg.reheat_sp_kp * (
+                    sp_target = _zone_target(obs_arr, z, cfg) + cfg.reheat_sp_kp * (
                         -err - cfg.reheat_sp_deadband
                     )
                     sp_target = min(sp_target, cfg.reheat_sp_max)

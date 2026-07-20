@@ -26,6 +26,7 @@ _FAN_ERROR_MODES: tuple[FanErrorMode, ...] = ("nearest_setpoint", "center_of_ban
 from baselines.utils.metadata import (
     find_obs_index,
     find_obs_index_optional,
+    find_target_temp_index,
     find_zone_air_temp_index,
 )
 
@@ -135,18 +136,6 @@ def _match_actuator_index(
         if name == target:
             return i
     raise RuntimeError(f"Could not find action for actuator: {target!r}")
-
-
-def _find_target_temp_index(obs_names: list[str], zone_name: str) -> int | None:
-    prefix = "target_temperature"
-    zn = zone_name.strip().lower()
-    for i, name in enumerate(obs_names):
-        nl = name.strip().lower()
-        if nl.startswith(prefix):
-            zone_part = nl[len(prefix) :].strip()
-            if zone_part == zn or zn in zone_part or zone_part in zn:
-                return i
-    return None
 
 
 def _require_metadata_list_str(env: Any, key: str) -> list[str]:
@@ -277,7 +266,7 @@ class UnitaryHvacPolicy:
                     sat_idx=sat_idx,
                     temp_obs_idx=temp_idx,
                     fan_max=fan_max,
-                    target_obs_idx=_find_target_temp_index(obs_names, sys.zones()[0]),
+                    target_obs_idx=find_target_temp_index(obs_names, sys.zones()[0]),
                     sat_sp=self.sat_initial_c,
                 )
             )
