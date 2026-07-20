@@ -33,7 +33,13 @@ class AirLoopConfig:
     """Tunable parameters for the VAV air-loop baseline."""
 
     target_temp: float = 21.0
-    deadband: float = 1.0
+    # Comfort deadband around the (possibly dynamic) zone target. OFF by default:
+    # it only pays when energy is priced. Under a comfort-only reward
+    # (energy_weight=0) actuating inside the band is free, so a deadband merely
+    # lets the zone drift toward the penalty region -- measured at -35% on
+    # OfficeMedium full-year, wiping out the +24.5% that setpoint tracking gains.
+    # Set > 0 for energy-weighted tasks.
+    deadband: float = 0.0
     sat_aware_flow: bool = True
 
     sat_neutral: float = 20.5
