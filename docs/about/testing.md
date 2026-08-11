@@ -106,7 +106,7 @@ B2B_RUN_LONG_TESTS=1 pytest                    # full suite
 pytest -m release                              # dataset-integrity checks (needs real HF data)
 pytest -m api_contract                         # public-API contract tests
 pytest tests/quick/test_task_presets.py        # one file
-pytest -k "deadband and not legacy"            # keyword filter
+pytest -k "normalized and not legacy"            # keyword filter
 ```
 
 ### Shared fixtures
@@ -186,7 +186,7 @@ simulator. They are what CI runs and the safety net you run before pushing.
 ### Typed config dataclasses
 
 - **`test_types.py`** — Tests `RunPeriodConfig`, `ZoneTargetTemperatureConfig`,
-  `TaskConfig`, `NormalizedDeadbandRewardConfig`, `RandomScheduleConfig` and
+  `TaskConfig`, `NormalizedRewardConfig`, `RandomScheduleConfig` and
   the dispatch function `reward_config_from_dict`.
   Covers default values, `from_dict` parsing, season validation, the seasonal
   unoccupied schedule round-trip, and the `expected_steps` arithmetic for run
@@ -203,7 +203,7 @@ simulator. They are what CI runs and the safety net you run before pushing.
 
   1. Normalized presets are stored *unfilled* (`tau_T = tau_E = None`) so
      that `make_env` resolves them per-building from the YAML.
-  2. The `make_normalized_deadband_task` factory does its YAML import
+  2. The `make_normalized_task` factory does its YAML import
      lazily — importing `config.tasks` must not trigger a metadata
      download.
 
@@ -239,11 +239,11 @@ simulator. They are what CI runs and the safety net you run before pushing.
 
 ### Rewards, schedules, observations
 
-- **`test_normalized_deadband_reward.py`** — Tests
-  `NormalizedDeadbandRewardConfig` (filled vs. unfilled invariants, error
-  cases), `NormalizedDeadbandReward` (halves the temperature contribution when
-  `tau_T = 2.0`), and `_maybe_warn_normalized_deadband` (only the
-  calibration regime — `occupancy` mode with `dT=1` — is silent; everything
+- **`test_normalized_reward.py`** — Tests
+  `NormalizedRewardConfig` (filled vs. unfilled invariants, error
+  cases), `NormalizedReward` (halves the temperature contribution when
+  `tau_T = 2.0`), and `_maybe_warn_normalized_reward` (only the
+  calibration regime — `occupancy` mode — is silent; everything
   else emits a deduplicated `RuntimeWarning`).
 - **`test_random_schedule.py`** — Tests the random daily schedule generator
   used by `task_rand_*` presets: `DailySchedule` invariants, `month_to_season` mapping,

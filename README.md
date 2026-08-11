@@ -1,5 +1,22 @@
 # Building2Building
 
+[![arXiv](https://img.shields.io/badge/arXiv-2607.16534-b31b1b.svg)](https://arxiv.org/abs/2607.16534)
+[![Docs](https://readthedocs.org/projects/building2building/badge/?version=latest)](https://building2building.readthedocs.io/en/latest/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+Official implementation of *"Building2Building: A Large Scale Benchmark for
+Generalizable Real-World Reinforcement Learning"* (Taboga, Veilleux, Jang,
+Rankawat, and Bacon; Reinforcement Learning Journal, 2026).
+
+> **Reproducing the paper.** All results reported in the paper were produced
+> with [`v1.0.0`](https://github.com/vtaboga/building2building/releases/tag/v1.0.0).
+> `main` continues to evolve — check out the tag for exact reproduction:
+>
+> ```bash
+> git clone https://github.com/vtaboga/building2building.git
+> cd building2building && git checkout v1.0.0
+> ```
+
 Building2Building (B2B) is a large-scale reinforcement learning benchmark for
 HVAC control in buildings. It exposes 6,000 parametrically generated
 EnergyPlus building models as Gymnasium environments, spanning 6 building types,
@@ -262,7 +279,7 @@ score = b2b.compute_normalized_score(
 
 ## Documentation
 
-Full documentation is coming soon!
+Full documentation: **https://building2building.readthedocs.io/**
 
 ---
 
@@ -274,6 +291,28 @@ pytest -m quick                           # Fast tests (no EnergyPlus)
 B2B_RUN_LONG_TESTS=1 pytest -m long      # Simulation-heavy tests
 B2B_RUN_LONG_TESTS=1 pytest              # Full suite
 ```
+
+---
+
+## Citation
+
+If you use Building2Building in your research, please cite:
+
+```bibtex
+@article{taboga2026building2building,
+  title   = {Building2Building: A Large Scale Benchmark for Generalizable
+             Real-World Reinforcement Learning},
+  author  = {Taboga, Vincent and Veilleux, Justin and Jang, Doseok and
+             Rankawat, Anushree and Bacon, Pierre-Luc},
+  journal = {Reinforcement Learning Journal},
+  year    = {2026},
+  eprint  = {2607.16534},
+  archivePrefix = {arXiv},
+}
+```
+
+GitHub's "Cite this repository" button reads [`CITATION.cff`](CITATION.cff),
+which also records the software version.
 
 ---
 

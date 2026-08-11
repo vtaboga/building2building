@@ -9,7 +9,7 @@ family (:mod:`building2building.config.tasks`):
 * **Trade-off transfer** (orthogonal to setpoint mode): train on
   ``task_occ_e05`` (energy priced in), evaluate on ``task_occ_e0``
   (comfort-only).  Both are in the calibration regime
-  (``mode="occupancy"``, ``dT=1.0``), so no calibration-mismatch
+  (``mode="occupancy"``), so no calibration-mismatch
   warning fires; the benchmark isolates how a policy generalizes
   across ``w_E``.
 * **Setpoint-mode transfer** (orthogonal to ``w_E``): train on

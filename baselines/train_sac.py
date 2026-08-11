@@ -14,7 +14,7 @@ SAC-specific notes:
   called with ``rescale_action=False`` to avoid a second rescale layer.
 - ``train_freq=1, gradient_steps=-1`` → SB3 performs ``n_envs`` gradient
   steps per environment step, keeping the update-to-data ratio at 1.0.
-- Tasks use ``NormalizedDeadbandReward`` (``task_*_e0`` family by default)
+- Tasks use ``NormalizedReward`` (``task_*_e0`` family by default)
   with per-bucket ``(τ_T, τ_E)`` constants from
   ``reward_normalizers.yaml``.  ``energy_weight=0`` (``e0``)
   means the reward measures pure thermal comfort; switch to the

@@ -20,12 +20,12 @@ from building2building.simulator.observation_spaces import (
     flat_observation_info,
 )
 from building2building.simulator.rewards import (
-    NormalizedDeadbandReward,
+    NormalizedReward,
 )
 from building2building.morphology import build_morphology
 from building2building.types import (
     BuildingConfig,
-    NormalizedDeadbandRewardConfig,
+    NormalizedRewardConfig,
     TaskConfig,
 )
 
@@ -33,21 +33,19 @@ logger = logging.getLogger(__name__)
 
 
 # Calibration regime baked into reward_normalizers.yaml.
-_CALIBRATION_DT: float = 1.0
 _CALIBRATION_TARGET_MODE: str = "occupancy"
 
-# Cap how many distinct (bt, bid, mode, dT) tuples we warn about per
+# Cap how many distinct (bt, bid, mode) tuples we warn about per
 # process.  Long PPO runs with many vec_env workers already deduplicate
 # per process, but a multi-building sweep inside one process should not
 # spam the log either.  The set is process-local; new worker processes
 # emit again, which is the right behavior for SLURM array fan-out.
-_NORMALIZED_REWARD_WARN_SEEN: set[tuple[str, str, str, float]] = set()
+_NORMALIZED_REWARD_WARN_SEEN: set[tuple[str, str, str]] = set()
 
 
-def _maybe_warn_normalized_deadband(
+def _maybe_warn_normalized_reward(
     *,
     task_config: TaskConfig,
-    dT: float,
     building_type: str | None,
     building_id: str | None,
     tau_T: float,
@@ -64,15 +62,11 @@ def _maybe_warn_normalized_deadband(
 
     Comfort is unnormalized (``tau_T = 1``), so only ``tau_E`` is
     regime-dependent: it is the reference controller's energy spend under
-    the occupancy calibration regime.  Two independent conditions can fire
-    (both, individually, or neither):
+    the occupancy calibration regime.  The check fires when
+    ``mode != "occupancy"`` — the target signal differs from the
+    ``tau_E`` calibration.
 
-    * ``dT != 1.0``       — deadband shape differs from the ``tau_E``
-      calibration.
-    * ``mode != "occupancy"`` — target signal differs from the ``tau_E``
-      calibration.
-
-    Both proceed; the simulator is constructed with ``tau_E`` applied
+    The mismatch proceeds; the simulator is constructed with ``tau_E`` applied
     as-is.  This is intentional: the calibration is approximate outside
     the regime, and the cross-task benchmark in
     :mod:`building2building.benchmarks.goal_adaptation` quantifies the
@@ -81,17 +75,11 @@ def _maybe_warn_normalized_deadband(
     bt = building_type or "<unknown>"
     bid = building_id or "<unknown>"
     mode = task_config.target_temperature_mode
-    key = (bt, bid, mode, float(dT))
+    key = (bt, bid, mode)
     if key in _NORMALIZED_REWARD_WARN_SEEN:
         return
 
     messages: list[str] = []
-    if abs(dT - _CALIBRATION_DT) > 1e-9:
-        messages.append(
-            f"calibration regime mismatch: dT={dT!r} but tau_E in "
-            f"reward_normalizers.yaml was calibrated under dT={_CALIBRATION_DT!r}; "
-            f"tau_E={tau_E:.6g} for ({bt}, {bid}) applied as-is."
-        )
     if mode != _CALIBRATION_TARGET_MODE:
         messages.append(
             f"calibration regime mismatch: target_temperature_mode={mode!r} "
@@ -107,7 +95,7 @@ def _maybe_warn_normalized_deadband(
     for msg in messages:
         # ``stacklevel=4`` so ``pytest.warns`` from a test that calls
         # ``make_env`` -> ``create_simulator`` ->
-        # ``_maybe_warn_normalized_deadband`` reports the test frame
+        # ``_maybe_warn_normalized_reward`` reports the test frame
         # rather than this helper.
         warnings.warn(msg, RuntimeWarning, stacklevel=4)
         # Also log so the warning shows up in logs/*.err under the
@@ -240,15 +228,15 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         else controlled_zones
     )
 
-    if not isinstance(building_config.reward_config, NormalizedDeadbandRewardConfig):
+    if not isinstance(building_config.reward_config, NormalizedRewardConfig):
         raise ValueError(
             f"Unsupported reward type: {type(building_config.reward_config).__name__}. "
-            "Only NormalizedDeadbandRewardConfig is supported."
+            "Only NormalizedRewardConfig is supported."
         )
     cfg = building_config.reward_config
     if not cfg.is_filled:
         raise ValueError(
-            "NormalizedDeadbandRewardConfig has unfilled tau_T/tau_E. "
+            "NormalizedRewardConfig has unfilled tau_T/tau_E. "
             "This config is a preset sentinel; call "
             "`building2building.api.make_env(...)` (which auto-fills "
             "the constants from reward_normalizers.yaml) or explicitly "
@@ -257,10 +245,9 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         )
     # ``cfg.is_filled`` guarantees these are positive floats.
     assert cfg.tau_T is not None and cfg.tau_E is not None
-    reward_function = NormalizedDeadbandReward(
+    reward_function = NormalizedReward(
         controlled_zones=reward_zones,
         energy_weight=cfg.energy_weight,
-        dT=cfg.dT,
         tau_T=cfg.tau_T,
         tau_E=cfg.tau_E,
         task_config=task_config,
@@ -270,9 +257,8 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         if isinstance(building_config.source_metadata, dict)
         else {}
     )
-    _maybe_warn_normalized_deadband(
+    _maybe_warn_normalized_reward(
         task_config=task_config,
-        dT=cfg.dT,
         building_type=source_meta.get("building_type"),
         building_id=source_meta.get("building_id"),
         tau_T=cfg.tau_T,

@@ -1,8 +1,17 @@
 name: Docs
 
+# Deployment is handled by Read the Docs (see .readthedocs.yaml); this
+# workflow only checks that the docs build strictly.
+
 on:
   push:
     branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "building2building/**"
+      - ".github/workflows/docs.yml"
+  pull_request:
     paths:
       - "docs/**"
       - "mkdocs.yml"
@@ -12,12 +21,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: docs-deploy
-  cancel-in-progress: true
 
 jobs:
   build:
@@ -35,19 +38,3 @@ jobs:
 
       - name: Build site
         run: mkdocs build --strict
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4

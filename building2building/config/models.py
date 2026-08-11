@@ -11,7 +11,7 @@ from typing import Any, Literal
 
 from building2building.data.download import ALL_BUILDING_TYPES, BuildingType
 from building2building.types import (
-    NormalizedDeadbandRewardConfig,
+    NormalizedRewardConfig,
     RewardConfig,
     TaskConfig,
     reward_config_from_dict,
@@ -418,11 +418,10 @@ def reward_to_dict(reward: RewardConfig) -> dict[str, Any]:
     Raises:
         TypeError: If *reward* is not a known ``RewardConfig`` type.
     """
-    if isinstance(reward, NormalizedDeadbandRewardConfig):
+    if isinstance(reward, NormalizedRewardConfig):
         d: dict[str, Any] = {
-            "reward_type": "NormalizedDeadbandRewardConfig",
+            "reward_type": "NormalizedRewardConfig",
             "energy_weight": reward.energy_weight,
-            "dT": reward.dT,
         }
         if reward.tau_T is not None:
             d["tau_T"] = reward.tau_T

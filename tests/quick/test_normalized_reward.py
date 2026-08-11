@@ -1,4 +1,4 @@
-"""Unit tests for ``NormalizedDeadbandReward`` and its dispatch wiring.
+"""Unit tests for ``NormalizedReward`` and its dispatch wiring.
 
 These tests stub the observation dict directly (no EnergyPlus) and the
 dispatch tests build a minimal :class:`BuildingConfig`-like object that
@@ -14,11 +14,11 @@ from typing import Any
 
 import pytest
 
-from building2building.simulator import _maybe_warn_normalized_deadband
-from building2building.simulator.rewards import NormalizedDeadbandReward
+from building2building.simulator import _maybe_warn_normalized_reward
+from building2building.simulator.rewards import NormalizedReward
 from building2building.types import (
     DEFAULT_SEASONAL_UNOCCUPIED_C,
-    NormalizedDeadbandRewardConfig,
+    NormalizedRewardConfig,
     RunPeriodConfig,
     TaskConfig,
     ZoneTargetTemperatureConfig,
@@ -68,33 +68,33 @@ def _make_obs(
 
 
 @pytest.mark.quick
-class TestNormalizedDeadbandRewardConfig:
+class TestNormalizedRewardConfig:
     def test_unfilled_preset_state_is_valid(self) -> None:
-        cfg = NormalizedDeadbandRewardConfig(energy_weight=1.0, dT=1.0)
+        cfg = NormalizedRewardConfig(energy_weight=1.0)
         assert not cfg.is_filled
         assert cfg.tau_T is None
         assert cfg.tau_E is None
 
     def test_filled_state_is_valid(self) -> None:
-        cfg = NormalizedDeadbandRewardConfig(
-            energy_weight=1.0, dT=1.0, tau_T=0.4, tau_E=0.7
+        cfg = NormalizedRewardConfig(
+            energy_weight=1.0, tau_T=0.4, tau_E=0.7
         )
         assert cfg.is_filled
 
     def test_mixed_unfilled_state_raises(self) -> None:
         with pytest.raises(ValueError, match="must be set together"):
-            NormalizedDeadbandRewardConfig(
-                energy_weight=1.0, dT=1.0, tau_T=0.4, tau_E=None
+            NormalizedRewardConfig(
+                energy_weight=1.0, tau_T=0.4, tau_E=None
             )
 
     def test_zero_or_negative_tau_raises(self) -> None:
         with pytest.raises(ValueError, match="strictly positive"):
-            NormalizedDeadbandRewardConfig(
-                energy_weight=1.0, dT=1.0, tau_T=0.0, tau_E=0.7
+            NormalizedRewardConfig(
+                energy_weight=1.0, tau_T=0.0, tau_E=0.7
             )
 
     def test_filled_method_replaces_taus(self) -> None:
-        cfg = NormalizedDeadbandRewardConfig(energy_weight=1.0, dT=1.0)
+        cfg = NormalizedRewardConfig(energy_weight=1.0)
         filled = cfg.filled(0.4, 0.7)
         assert filled.is_filled
         assert filled.tau_T == 0.4
@@ -104,16 +104,15 @@ class TestNormalizedDeadbandRewardConfig:
 
 
 @pytest.mark.quick
-class TestNormalizedDeadbandRewardFormula:
+class TestNormalizedRewardFormula:
     def test_reward_is_squared_temp_error_plus_scaled_energy(self) -> None:
         # |dev|=1.5: temp_error = 1.5^2 = 2.25; energy = 1.5+0.5 = 2.0
         # reward = -(2.25/1.0 + 0.5 * 2.0/1.0) = -3.25
         task_cfg = _make_task_config(target_temperature_mode="constant")
         obs = _make_obs(temp_c=22.5, target_c=21.0)
-        reward_fn = NormalizedDeadbandReward(
+        reward_fn = NormalizedReward(
             controlled_zones=["z1"],
             energy_weight=0.5,
-            dT=1.0,
             tau_T=1.0,
             tau_E=1.0,
             task_config=task_cfg,
@@ -127,10 +126,9 @@ class TestNormalizedDeadbandRewardFormula:
         obs = _make_obs(
             temp_c=23.5, target_c=21.0, electricity_wh_m2=0.0, natural_gas_wh_m2=0.0
         )
-        reward_fn = NormalizedDeadbandReward(
+        reward_fn = NormalizedReward(
             controlled_zones=["z1"],
             energy_weight=0.0,
-            dT=1.0,
             tau_T=2.0,
             tau_E=1.0,
             task_config=task_cfg,
@@ -140,10 +138,10 @@ class TestNormalizedDeadbandRewardFormula:
 
 @pytest.mark.quick
 class TestCalibrationWarnings:
-    """Tests for ``_maybe_warn_normalized_deadband``.
+    """Tests for ``_maybe_warn_normalized_reward``.
 
     The helper deduplicates per process via a module-level ``set``, so
-    we ensure each test case gets a fresh ``(bt, bid, mode, dT)`` tuple
+    we ensure each test case gets a fresh ``(bt, bid, mode)`` tuple
     by mixing distinct ``building_id`` strings.
     """
 
@@ -151,23 +149,10 @@ class TestCalibrationWarnings:
         task_cfg = _make_task_config(target_temperature_mode="occupancy")
         with warnings.catch_warnings():
             warnings.simplefilter("error", RuntimeWarning)
-            _maybe_warn_normalized_deadband(
+            _maybe_warn_normalized_reward(
                 task_config=task_cfg,
-                dT=1.0,
                 building_type="OfficeMedium",
                 building_id="OfficeMedium-quiet-1",
-                tau_T=0.4,
-                tau_E=0.7,
-            )
-
-    def test_non_unit_dT_warns(self) -> None:
-        task_cfg = _make_task_config(target_temperature_mode="occupancy")
-        with pytest.warns(RuntimeWarning, match="dT"):
-            _maybe_warn_normalized_deadband(
-                task_config=task_cfg,
-                dT=2.0,
-                building_type="OfficeMedium",
-                building_id="OfficeMedium-warn-dt-1",
                 tau_T=0.4,
                 tau_E=0.7,
             )
@@ -175,9 +160,8 @@ class TestCalibrationWarnings:
     def test_non_occupancy_mode_warns(self) -> None:
         task_cfg = _make_task_config(target_temperature_mode="constant")
         with pytest.warns(RuntimeWarning, match="target_temperature_mode"):
-            _maybe_warn_normalized_deadband(
+            _maybe_warn_normalized_reward(
                 task_config=task_cfg,
-                dT=1.0,
                 building_type="OfficeMedium",
                 building_id="OfficeMedium-warn-mode-1",
                 tau_T=0.4,
@@ -187,9 +171,8 @@ class TestCalibrationWarnings:
     def test_random_schedule_mode_warns(self) -> None:
         task_cfg = _make_task_config(target_temperature_mode="random_schedule")
         with pytest.warns(RuntimeWarning, match="target_temperature_mode"):
-            _maybe_warn_normalized_deadband(
+            _maybe_warn_normalized_reward(
                 task_config=task_cfg,
-                dT=1.0,
                 building_type="OfficeMedium",
                 building_id="OfficeMedium-warn-mode-2",
                 tau_T=0.4,
@@ -200,9 +183,8 @@ class TestCalibrationWarnings:
         task_cfg = _make_task_config(target_temperature_mode="constant")
         # First call: warns. Subsequent identical calls: silent.
         with pytest.warns(RuntimeWarning):
-            _maybe_warn_normalized_deadband(
+            _maybe_warn_normalized_reward(
                 task_config=task_cfg,
-                dT=1.0,
                 building_type="OfficeMedium",
                 building_id="OfficeMedium-warn-dedup-1",
                 tau_T=0.4,
@@ -210,9 +192,8 @@ class TestCalibrationWarnings:
             )
         with warnings.catch_warnings():
             warnings.simplefilter("error", RuntimeWarning)
-            _maybe_warn_normalized_deadband(
+            _maybe_warn_normalized_reward(
                 task_config=task_cfg,
-                dT=1.0,
                 building_type="OfficeMedium",
                 building_id="OfficeMedium-warn-dedup-1",
                 tau_T=0.4,

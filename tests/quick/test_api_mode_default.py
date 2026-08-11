@@ -10,12 +10,12 @@ import pytest
 import building2building.api as api_mod
 from building2building.config.tasks import TASK_PRESETS, TaskPreset
 from building2building.types import (
-    NormalizedDeadbandRewardConfig,
+    NormalizedRewardConfig,
     RewardConfig,
     RunPeriodConfig,
 )
 
-_FILLED_REWARD = RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0)
+_FILLED_REWARD = RewardConfig(energy_weight=1.0, tau_T=1.0, tau_E=1.0)
 _REWARD_NORMALIZERS_FIXTURE = (
     Path(__file__).resolve().parents[1] / "fixtures" / "reward_normalizers_fixture.yaml"
 )
@@ -70,7 +70,7 @@ class TestTaskConfigResolution:
 @pytest.mark.quick
 class TestRewardResolution:
     def test_non_normalized_preset_reward_returns_unchanged(self) -> None:
-        custom_reward = RewardConfig(energy_weight=2.0, dT=1.5, tau_T=1.2, tau_E=0.8)
+        custom_reward = RewardConfig(energy_weight=2.0, tau_T=1.2, tau_E=0.8)
         custom_preset = TaskPreset(
             reward=custom_reward,
             target_temperature_mode="constant",
@@ -110,7 +110,7 @@ class TestRewardResolution:
             run_period="full_year",
             normalizer_path=_REWARD_NORMALIZERS_FIXTURE,
         )
-        assert isinstance(resolved, NormalizedDeadbandRewardConfig)
+        assert isinstance(resolved, NormalizedRewardConfig)
         assert resolved.is_filled
         assert resolved.tau_T == pytest.approx(2.0)
         assert resolved.tau_E == pytest.approx(3.0)

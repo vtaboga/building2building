@@ -46,7 +46,7 @@ def test_morphology_has_no_unassigned_slots(
     env = api_mod.make_env(
         building_type,
         task="task_occ_e05",
-        reward=RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0),
+        reward=RewardConfig(energy_weight=1.0, tau_T=1.0, tau_E=1.0),
         run_period="winter",
         target_temperature_mode="constant",
         max_episode_steps=5,

@@ -15,7 +15,7 @@ from building2building.config.tasks import (
     TaskPreset,
     resolve_task_preset,
 )
-from building2building.types import NormalizedDeadbandRewardConfig
+from building2building.types import NormalizedRewardConfig
 
 _GRID_NAMES: list[str] = [
     f"task_{m}_{w}"
@@ -37,10 +37,9 @@ class TestTaskGrid:
     @pytest.mark.parametrize("name", _GRID_NAMES)
     def test_preset_uses_unfilled_normalized_config(self, name: str) -> None:
         preset = TASK_PRESETS[name]
-        assert isinstance(preset.reward, NormalizedDeadbandRewardConfig)
+        assert isinstance(preset.reward, NormalizedRewardConfig)
         # Unfilled sentinel: tau_T/tau_E resolved at env-build time.
         assert not preset.reward.is_filled
-        assert preset.reward.dT == 1.0
 
     @pytest.mark.parametrize(
         "name,expected_weight",
@@ -55,7 +54,7 @@ class TestTaskGrid:
     )
     def test_energy_weight(self, name: str, expected_weight: float) -> None:
         preset = TASK_PRESETS[name]
-        assert isinstance(preset.reward, NormalizedDeadbandRewardConfig)
+        assert isinstance(preset.reward, NormalizedRewardConfig)
         assert preset.reward.energy_weight == expected_weight
 
     @pytest.mark.parametrize(
@@ -96,8 +95,8 @@ class TestResolveTaskPreset:
 
 
 @pytest.mark.quick
-class TestMakeNormalizedDeadbandTaskFactory:
-    """``make_normalized_deadband_task`` is a thin wrapper.
+class TestMakeNormalizedTaskFactory:
+    """``make_normalized_task`` is a thin wrapper.
 
     It must lazily import the loader (so ``import
     building2building.config.tasks`` doesn't pull in dataset I/O), and

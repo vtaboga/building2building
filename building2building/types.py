@@ -4,7 +4,7 @@ Defines task, reward, actuator, and building configuration dataclasses
 used across the simulation and RL pipeline.
 
 The only supported reward type is
-:class:`NormalizedDeadbandRewardConfig`, which carries per-bucket
+:class:`NormalizedRewardConfig`, which carries per-bucket
 ``(tau_T, tau_E)`` normalizers so that ``energy_weight`` is
 dimensionless and comparable across buildings.
 """
@@ -399,8 +399,8 @@ class TaskConfig:
 
 
 @dataclass(frozen=True)
-class NormalizedDeadbandRewardConfig:
-    """Deadband reward with a fixed comfort unit and a per-bucket energy normalizer.
+class NormalizedRewardConfig:
+    """Normalized reward with a fixed comfort unit and a per-bucket energy normalizer.
 
     The reward is
 
@@ -410,14 +410,14 @@ class NormalizedDeadbandRewardConfig:
                   + w_E \\cdot \\tfrac{\\text{power\\_penalty}}{\\tau_E}\\Big)
 
     **Comfort is unnormalized** (``tau_T = 1``): ``temp_penalty`` is a raw
-    squared out-of-band deviation in °C², the same physical unit in every
+    mean squared deviation from target in °C², the same physical unit in every
     building, zone and season.  **Energy is normalized** by ``tau_E``, the
     energy spend of the reference reactive controller for this
     ``(building_type, climate_zone)`` bucket (see
     :file:`building2building/data/reward_normalizers.yaml`), so
     ``power_penalty / tau_E = 1`` means "spends like the reference
     controller".  ``energy_weight`` is then a dimensionless price with a
-    fixed meaning everywhere: accept 1 °C² of out-of-band discomfort to
+    fixed meaning everywhere: accept 1 °C² of squared-deviation discomfort to
     save ``w_E`` reference-controller-units of energy.
 
     Sentinel state
@@ -433,9 +433,6 @@ class NormalizedDeadbandRewardConfig:
     Attributes:
         energy_weight: Dimensionless trade-off weight ``w_E``.  See
             class docstring.
-        dT: Half-width of the temperature deadband (°C).  Calibration
-            assumes ``dT = 1.0``; other values are accepted but emit a
-            calibration-mismatch :class:`RuntimeWarning` at dispatch.
         tau_T: Comfort normalizer.  Resolves to ``1.0`` (comfort is
             unnormalized).  ``None`` means "preset-time sentinel; resolve
             me at env build time".
@@ -444,7 +441,6 @@ class NormalizedDeadbandRewardConfig:
     """
 
     energy_weight: float
-    dT: float
     tau_T: float | None = None
     tau_E: float | None = None
 
@@ -453,7 +449,7 @@ class NormalizedDeadbandRewardConfig:
         # the simulator) are valid; the mixed case is always a bug.
         if (self.tau_T is None) != (self.tau_E is None):
             raise ValueError(
-                "NormalizedDeadbandRewardConfig: tau_T and tau_E must be set "
+                "NormalizedRewardConfig: tau_T and tau_E must be set "
                 "together (both None for an unfilled preset, both float for "
                 f"a filled config). Got tau_T={self.tau_T!r}, tau_E={self.tau_E!r}."
             )
@@ -461,7 +457,7 @@ class NormalizedDeadbandRewardConfig:
             assert self.tau_T is not None and self.tau_E is not None
             if self.tau_T <= 0 or self.tau_E <= 0:
                 raise ValueError(
-                    "NormalizedDeadbandRewardConfig: tau_T and tau_E must be "
+                    "NormalizedRewardConfig: tau_T and tau_E must be "
                     f"strictly positive when filled, got tau_T={self.tau_T!r}, "
                     f"tau_E={self.tau_E!r}."
                 )
@@ -471,17 +467,17 @@ class NormalizedDeadbandRewardConfig:
         """``True`` iff both ``tau_T`` and ``tau_E`` are set."""
         return self.tau_T is not None and self.tau_E is not None
 
-    def filled(self, tau_T: float, tau_E: float) -> "NormalizedDeadbandRewardConfig":
+    def filled(self, tau_T: float, tau_E: float) -> "NormalizedRewardConfig":
         """Return a copy of this config with concrete ``(tau_T, tau_E)``."""
         from dataclasses import replace
 
         return replace(self, tau_T=float(tau_T), tau_E=float(tau_E))
 
 
-RewardConfig = NormalizedDeadbandRewardConfig
+RewardConfig = NormalizedRewardConfig
 
 
-VALID_REWARD_TYPES = frozenset({"NormalizedDeadbandRewardConfig"})
+VALID_REWARD_TYPES = frozenset({"NormalizedRewardConfig"})
 
 
 def reward_config_from_dict(
@@ -489,15 +485,17 @@ def reward_config_from_dict(
 ) -> RewardConfig:
     """Instantiate a reward config from a raw dictionary.
 
-    The ``"reward_type"`` key must be ``"NormalizedDeadbandRewardConfig"``.
+    The ``"reward_type"`` key must be ``"NormalizedRewardConfig"``.
 
     Args:
         reward_section: Dictionary with a mandatory ``"reward_type"`` key
-            and type-specific parameters (``energy_weight``, ``dT``,
-            and optionally ``tau_T`` / ``tau_E``).
+            and type-specific parameters (``energy_weight``, and
+            optionally ``tau_T`` / ``tau_E``).  A legacy ``dT`` key is
+            accepted and ignored (the parameter never entered the
+            reward and was removed in v1.0.0).
 
     Returns:
-        A :class:`NormalizedDeadbandRewardConfig`.
+        A :class:`NormalizedRewardConfig`.
 
     Raises:
         ValueError: If ``"reward_type"`` is missing or not recognised.
@@ -506,10 +504,12 @@ def reward_config_from_dict(
     if reward_type is None:
         raise ValueError(
             "reward.reward_type is required — must be "
-            "'NormalizedDeadbandRewardConfig'. "
+            "'NormalizedRewardConfig'. "
             "Pass an explicit reward config to avoid silent defaults."
         )
-    if reward_type == "NormalizedDeadbandRewardConfig":
+    # "NormalizedDeadbandRewardConfig" is the pre-v1.0.0 name of the
+    # same config; accept it so old serialized configs still load.
+    if reward_type in ("NormalizedRewardConfig", "NormalizedDeadbandRewardConfig"):
         # Both tau_T and tau_E are optional in the dict form: missing
         # values produce an *unfilled* sentinel config (consistent with
         # the preset construction path), so YAML reward configs can
@@ -517,9 +517,8 @@ def reward_config_from_dict(
         # specific (bt, cz) constants.
         raw_tau_T = reward_section.get("tau_T")
         raw_tau_E = reward_section.get("tau_E")
-        return NormalizedDeadbandRewardConfig(
+        return NormalizedRewardConfig(
             energy_weight=float(reward_section.get("energy_weight", 1.0)),
-            dT=float(reward_section.get("dT", 1.0)),
             tau_T=float(raw_tau_T) if raw_tau_T is not None else None,
             tau_E=float(raw_tau_E) if raw_tau_E is not None else None,
         )

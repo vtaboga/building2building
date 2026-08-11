@@ -19,7 +19,7 @@ import building2building as b2b
 
 logger = logging.getLogger(__name__)
 
-# tau_E is calibrated under the occupancy regime (dT=1, seasonal
+# tau_E is calibrated under the occupancy regime (seasonal
 # policy).  The energy weight is irrelevant to the measured
 # penalties, so the comfort-only occupancy preset defines the regime.
 CALIBRATION_TASK = "task_occ_e0"
@@ -55,7 +55,7 @@ class RolloutSpec:
 
 @dataclass(frozen=True)
 class BuildingStats:
-    """Per-building mean deadband penalties for one run period."""
+    """Per-building mean reward penalties for one run period."""
 
     run_period: str
     building_type: str
@@ -394,12 +394,12 @@ def save_calibration_plot(
     plt.close(fig)
 
 
-def mean_deadband_penalties_from_infos(
+def mean_penalties_from_infos(
     infos: list[dict[str, Any]],
     reward_fn: Any,
 ) -> tuple[float, float, int]:
     """Mean ``(temp_penalty, power_penalty)`` from post-step infos."""
-    from building2building.simulator.rewards import _deadband_components
+    from building2building.simulator.rewards import _reward_components
 
     temp_pen: list[float] = []
     power_pen: list[float] = []
@@ -407,8 +407,8 @@ def mean_deadband_penalties_from_infos(
         raw = info.get("raw_observation")
         if raw is None:
             continue
-        tp, pp = _deadband_components(
-            raw, reward_fn.controlled_zones, reward_fn.task_config, reward_fn.dT
+        tp, pp = _reward_components(
+            raw, reward_fn.controlled_zones, reward_fn.task_config
         )
         temp_pen.append(tp)
         power_pen.append(pp)

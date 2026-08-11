@@ -78,9 +78,8 @@ cfg = EnvBuildConfig(
     task=TaskConfig.from_dict({"run_period": "summer"}),
     reward=reward_config_from_dict(
         {
-            "reward_type": "NormalizedDeadbandRewardConfig",
+            "reward_type": "NormalizedRewardConfig",
             "energy_weight": 0.5,
-            "dT": 1.0,
             "tau_T": 1.0,
             "tau_E": 2.0,
         }

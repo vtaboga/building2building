@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from building2building.types import (
-    NormalizedDeadbandRewardConfig,
+    NormalizedRewardConfig,
     RandomScheduleConfig,
     RunPeriodConfig,
     TaskConfig,
@@ -188,30 +188,31 @@ class TestZoneTargetTemperatureConfigExtended:
 
 @pytest.mark.quick
 class TestRewardConfigs:
-    def test_normalized_deadband_reward_config(self) -> None:
-        cfg = NormalizedDeadbandRewardConfig(energy_weight=0.01, dT=1.0)
+    def test_normalized_reward_config(self) -> None:
+        cfg = NormalizedRewardConfig(energy_weight=0.01)
         assert cfg.energy_weight == 0.01
-        assert cfg.dT == 1.0
         assert not cfg.is_filled
 
-    def test_normalized_deadband_reward_config_filled(self) -> None:
-        cfg = NormalizedDeadbandRewardConfig(
-            energy_weight=1.0, dT=1.0, tau_T=0.4, tau_E=0.7
+    def test_normalized_reward_config_filled(self) -> None:
+        cfg = NormalizedRewardConfig(
+            energy_weight=1.0, tau_T=0.4, tau_E=0.7
         )
         assert cfg.is_filled
 
 
 @pytest.mark.quick
 class TestRewardConfigFromDict:
-    def test_normalized_deadband(self) -> None:
+    def test_normalized(self) -> None:
         cfg = reward_config_from_dict(
             {
-                "reward_type": "NormalizedDeadbandRewardConfig",
+                "reward_type": "NormalizedRewardConfig",
                 "energy_weight": 1.0,
+                # Legacy key from configs serialized before v1.0.0;
+                # accepted and ignored.
                 "dT": 1.0,
             }
         )
-        assert isinstance(cfg, NormalizedDeadbandRewardConfig)
+        assert isinstance(cfg, NormalizedRewardConfig)
         assert cfg.energy_weight == 1.0
 
     def test_missing_reward_type_raises(self) -> None:

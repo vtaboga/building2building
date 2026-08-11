@@ -60,7 +60,7 @@ class TestEnvBuildConfig:
         raw = {
             "dataset_selection": {"building_type": "OfficeSmall"},
             "task": {},
-            "reward": {"reward_type": "NormalizedDeadbandRewardConfig"},
+            "reward": {"reward_type": "NormalizedRewardConfig"},
         }
         cfg = EnvBuildConfig.from_dict(raw)
         assert cfg.dataset_selection.building_type == "OfficeSmall"
@@ -71,7 +71,7 @@ class TestEnvBuildConfig:
         raw = {
             "dataset_selection": {"building_type": "Warehouse"},
             "task": {"run_period": "winter"},
-            "reward": {"reward_type": "NormalizedDeadbandRewardConfig"},
+            "reward": {"reward_type": "NormalizedRewardConfig"},
             "env_max_steps": 1000,
         }
         cfg = EnvBuildConfig.from_dict(raw)
@@ -82,7 +82,7 @@ class TestEnvBuildConfig:
         raw = {
             "dataset_selection": {"building_type": "OfficeSmall"},
             "task": {},
-            "reward": {"reward_type": "NormalizedDeadbandRewardConfig"},
+            "reward": {"reward_type": "NormalizedRewardConfig"},
         }
         cfg = EnvBuildConfig.from_dict(raw)
         with pytest.raises(AttributeError):

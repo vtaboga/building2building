@@ -2,7 +2,7 @@
 
 This module wraps :file:`reward_normalizers.yaml`, which stores the
 ``(tau_T, tau_E)`` constants consumed at training time by
-:class:`building2building.simulator.rewards.NormalizedDeadbandReward`
+:class:`building2building.simulator.rewards.NormalizedReward`
 so that
 
 .. math::
@@ -11,13 +11,13 @@ so that
               + w_E \\cdot \\frac{\\text{power\\_penalty}}{\\tau_E}\\Big)
 
 **Comfort is unnormalized:** ``tau_T = 1`` for every bucket, so
-``temp_penalty / tau_T`` is the raw squared out-of-band deviation in
+``temp_penalty / tau_T`` is the raw mean squared deviation from target in
 degC^2 — the same physical unit in every building, zone and season.
 
 **Energy is normalized per bucket:** ``tau_E`` is the median per-step
 energy penalty of the reference reactive controller
 (:mod:`baselines.run_reactive_control`) on the train split, under the
-occupancy regime (``dT=1.0``, seasonal unoccupied policy — the
+occupancy regime (seasonal unoccupied policy — the
 ``task_occ_*`` tasks).  Thus ``power_penalty / tau_E = 1`` means "spends
 like the reference controller for this ``(building_type, climate_zone)``
 bucket", and ``w_E`` is a dimensionless price with the same meaning
@@ -49,7 +49,7 @@ This file is *not* the same thing as
   evaluation time.
 * ``reward_normalizers.yaml`` stores **per-step mean** penalty
   components and is consumed by
-  :class:`~building2building.simulator.rewards.NormalizedDeadbandReward`
+  :class:`~building2building.simulator.rewards.NormalizedReward`
   at training time.
 
 Neither file replaces the other.
@@ -412,7 +412,7 @@ def load_reward_normalizers(
     Raises:
         RewardNormalizersUnavailableError: If the YAML file does not
             exist.  This fires when
-            :class:`~building2building.types.NormalizedDeadbandRewardConfig`
+            :class:`~building2building.types.NormalizedRewardConfig`
             tries to resolve ``(tau_T, tau_E)`` constants.
         ValueError, TypeError: On schema-validation failures.
     """

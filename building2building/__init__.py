@@ -57,7 +57,7 @@ from building2building.types import (
     ActuatorDescription,
     BuildingConfig,
     Equipment,
-    NormalizedDeadbandRewardConfig,
+    NormalizedRewardConfig,
     RewardConfig,
     TaskConfig,
 )
@@ -113,7 +113,7 @@ __all__ = [
     "ActuatorDescription",
     "BuildingConfig",
     "Equipment",
-    "NormalizedDeadbandRewardConfig",
+    "NormalizedRewardConfig",
     "RewardConfig",
     "TaskConfig",
     # Wrappers

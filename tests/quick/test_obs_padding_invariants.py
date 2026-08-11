@@ -20,7 +20,7 @@ from building2building.types import RewardConfig
 
 _TARGET_SIZE = 80
 _NON_ZONE_FEATURES = 7
-_FILLED_REWARD = RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0)
+_FILLED_REWARD = RewardConfig(energy_weight=1.0, tau_T=1.0, tau_E=1.0)
 _TAIL_NON_ZONE_NAMES = [
     "time_of_day",
     "day_of_week",

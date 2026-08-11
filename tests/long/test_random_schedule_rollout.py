@@ -55,7 +55,7 @@ def _make_env(tmp_path: Path, seed: int, *, suffix: str = "") -> "object":
             split_index=0,
         ),
         task=task,
-        reward=RewardConfig(energy_weight=0.0, dT=1.0, tau_T=1.0, tau_E=1.0),
+        reward=RewardConfig(energy_weight=0.0, tau_T=1.0, tau_E=1.0),
         env_max_steps=N_STEPS,
     )
     return make_env_from_config(

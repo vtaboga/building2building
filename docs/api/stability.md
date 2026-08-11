@@ -5,7 +5,7 @@ project's policy for deprecating and removing symbols.
 
 ---
 
-## Public API surface (v0.1.0)
+## Public API surface (v1.0.0)
 
 The following names are exported from `building2building` (i.e. accessible as
 `import building2building as b2b; b2b.<name>`).  Changes to any of these
@@ -74,8 +74,8 @@ require a `CHANGELOG.md` entry and must respect the deprecation window below.
 | `ActuatorDescription` | Dataclass describing an EnergyPlus actuator. |
 | `BuildingConfig` | Dataclass fully specifying a building environment. |
 | `Equipment` | Protocol that all HVAC equipment types satisfy. |
-| `NormalizedDeadbandRewardConfig` | The sole supported reward config; parameterised by `energy_weight`, `dT`, `tau_T`, `tau_E`. |
-| `RewardConfig` | Type alias for `NormalizedDeadbandRewardConfig`. |
+| `NormalizedRewardConfig` | The sole supported reward config; parameterised by `energy_weight`, `tau_T`, `tau_E`. |
+| `RewardConfig` | Type alias for `NormalizedRewardConfig`. |
 | `TaskConfig` | Dataclass bundling run period, setpoint mode, zone target temperatures, and control resolution. |
 
 ### Wrappers

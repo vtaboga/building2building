@@ -143,7 +143,7 @@ def _run_batch(
                 # (the EnvBuildConfig path does not autofill them — only
                 # make_env does).
                 "reward": {
-                    "reward_type": "NormalizedDeadbandRewardConfig",
+                    "reward_type": "NormalizedRewardConfig",
                     "tau_T": 1.0,
                     "tau_E": 1.0,
                 },
