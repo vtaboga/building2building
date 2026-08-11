@@ -9,11 +9,16 @@ If you use Building2Building in your research, please cite our paper:
   author  = {Taboga, Vincent and Veilleux, Justin and Jang, Doseok and
              Rankawat, Anushree and Bacon, Pierre-Luc},
   journal = {Reinforcement Learning Journal},
+  note    = {Presented at the Reinforcement Learning Conference (RLC)},
   year    = {2026},
   eprint  = {2607.16534},
   archivePrefix = {arXiv},
 }
 ```
+
+The paper appears in the proceedings of the Reinforcement Learning
+Conference (RLC) 2026, which are published as the Reinforcement Learning
+Journal — hence the journal citation form.
 
 Preprint: [arXiv:2607.16534](https://arxiv.org/abs/2607.16534)
 

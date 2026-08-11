@@ -305,6 +305,7 @@ If you use Building2Building in your research, please cite:
   author  = {Taboga, Vincent and Veilleux, Justin and Jang, Doseok and
              Rankawat, Anushree and Bacon, Pierre-Luc},
   journal = {Reinforcement Learning Journal},
+  note    = {Presented at the Reinforcement Learning Conference (RLC)},
   year    = {2026},
   eprint  = {2607.16534},
   archivePrefix = {arXiv},

@@ -40,6 +40,8 @@ preferred-citation:
     Building2Building: A Large Scale Benchmark for Generalizable
     Real-World Reinforcement Learning
   journal: Reinforcement Learning Journal
+  conference:
+    name: "Reinforcement Learning Conference (RLC) 2026"
   year: 2026
   identifiers:
     - type: other
