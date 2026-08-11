@@ -1,0 +1,59 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: Building2Building
+abstract: >-
+  A large-scale reinforcement learning benchmark for HVAC control,
+  exposing 6,000 parametrically generated EnergyPlus building models as
+  Gymnasium environments across 6 building types, 16 ASHRAE climate
+  zones, and 3 HVAC system types.
+version: 1.0.0
+date-released: "2026-08-11"
+license: MIT
+repository-code: "https://github.com/vtaboga/building2building"
+url: "https://vtaboga.github.io/building2building/"
+keywords:
+  - reinforcement-learning
+  - benchmark
+  - hvac
+  - building-energy
+  - energyplus
+  - transfer-learning
+authors:
+  - family-names: Taboga
+    given-names: Vincent
+    affiliation: "Mila - Quebec AI Institute, Université de Montréal"
+  - family-names: Veilleux
+    given-names: Justin
+    affiliation: "Mila - Quebec AI Institute, Université de Montréal"
+  - family-names: Jang
+    given-names: Doseok
+    affiliation: "Mila - Quebec AI Institute, Université de Montréal"
+  - family-names: Rankawat
+    given-names: Anushree
+    affiliation: "Mila - Quebec AI Institute, Université de Montréal"
+  - family-names: Bacon
+    given-names: Pierre-Luc
+    affiliation: "Mila - Quebec AI Institute, Université de Montréal"
+preferred-citation:
+  type: article
+  title: >-
+    Building2Building: A Large Scale Benchmark for Generalizable
+    Real-World Reinforcement Learning
+  journal: Reinforcement Learning Journal
+  year: 2026
+  identifiers:
+    - type: other
+      value: "arXiv:2607.16534"
+      description: arXiv preprint
+  url: "https://arxiv.org/abs/2607.16534"
+  authors:
+    - family-names: Taboga
+      given-names: Vincent
+    - family-names: Veilleux
+      given-names: Justin
+    - family-names: Jang
+      given-names: Doseok
+    - family-names: Rankawat
+      given-names: Anushree
+    - family-names: Bacon
+      given-names: Pierre-Luc

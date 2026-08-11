@@ -5,7 +5,7 @@ project's policy for deprecating and removing symbols.
 
 ---
 
-## Public API surface (v0.1.0)
+## Public API surface (v1.0.0)
 
 The following names are exported from `building2building` (i.e. accessible as
 `import building2building as b2b; b2b.<name>`).  Changes to any of these

@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.0.0 — paper release
+
+Version accompanying *"Building2Building: A Large Scale Benchmark for
+Generalizable Real-World Reinforcement Learning"*
+([arXiv:2607.16534](https://arxiv.org/abs/2607.16534), Reinforcement Learning
+Journal 2026).  All results reported in the paper were produced with this tag.
+
+### Added
+
+- `CITATION.cff` for GitHub's "Cite this repository" button, recording the
+  software version alongside the preferred paper citation.
+- README arXiv/docs/license badges, an "official implementation" header, a
+  reproduction note pinning the paper to `v1.0.0`, and a citation section.
+
+### Changed
+
+- Package version bumped `0.1.0` -> `1.0.0`.
+
 ## Unreleased
 
 ### Added
