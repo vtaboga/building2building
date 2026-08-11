@@ -2,7 +2,7 @@
 
 ## Overview
 
-B2B uses one reward function: **NormalizedDeadbandReward**, which penalises
+B2B uses one reward function: **NormalizedReward**, which penalises
 squared deviations of each controlled zone's temperature from its target and
 optionally penalises energy consumption.  A per-bucket energy normalizer
 `tau_E` makes `energy_weight` dimensionless and comparable across building
@@ -44,9 +44,9 @@ regime.
 **Configuration:**
 
 ```python
-from building2building.types import NormalizedDeadbandRewardConfig
+from building2building.types import NormalizedRewardConfig
 
-reward = NormalizedDeadbandRewardConfig(
+reward = NormalizedRewardConfig(
     energy_weight=0.5,  # dimensionless trade-off weight (w_E)
     tau_T=None,         # None = auto-resolved at env-build time
     tau_E=None,
@@ -128,4 +128,4 @@ Six named presets form a 3×2 grid over `(setpoint_mode, energy_weight)`:
 
 The default task is `task_const_e0` (constant setpoint, comfort-only).
 For `w_E` values outside this grid, build a filled preset with
-`building2building.config.tasks.make_normalized_deadband_task(...)`.
+`building2building.config.tasks.make_normalized_task(...)`.

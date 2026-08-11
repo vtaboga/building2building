@@ -62,11 +62,11 @@ def test_parse_benchmark_config_single_type() -> None:
             "building_type": "OfficeSmall",
             "train": {
                 "selection": {"mode": "indices", "indices": [1, 2]},
-                "config": {"reward": {"reward_type": "NormalizedDeadbandRewardConfig"}},
+                "config": {"reward": {"reward_type": "NormalizedRewardConfig"}},
             },
             "test": {
                 "selection": {"mode": "random", "n": 2},
-                "config": {"reward": {"reward_type": "NormalizedDeadbandRewardConfig"}},
+                "config": {"reward": {"reward_type": "NormalizedRewardConfig"}},
             },
         }
     )
@@ -83,7 +83,7 @@ def test_env_build_config_parsing() -> None:
                 "split_index": 0,
             },
             "task": {"run_period": "winter"},
-            "reward": {"reward_type": "NormalizedDeadbandRewardConfig"},
+            "reward": {"reward_type": "NormalizedRewardConfig"},
         }
     )
     assert cfg.task.run_period.name == "winter"

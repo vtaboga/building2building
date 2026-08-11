@@ -10,7 +10,7 @@ import pytest
 import building2building.api as api_mod
 from building2building.config.tasks import TASK_PRESETS, TaskPreset
 from building2building.types import (
-    NormalizedDeadbandRewardConfig,
+    NormalizedRewardConfig,
     RewardConfig,
     RunPeriodConfig,
 )
@@ -110,7 +110,7 @@ class TestRewardResolution:
             run_period="full_year",
             normalizer_path=_REWARD_NORMALIZERS_FIXTURE,
         )
-        assert isinstance(resolved, NormalizedDeadbandRewardConfig)
+        assert isinstance(resolved, NormalizedRewardConfig)
         assert resolved.is_filled
         assert resolved.tau_T == pytest.approx(2.0)
         assert resolved.tau_E == pytest.approx(3.0)

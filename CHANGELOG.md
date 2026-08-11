@@ -17,6 +17,18 @@ Journal 2026).  All results reported in the paper were produced with this tag.
 ### Changed
 
 - Package version bumped `0.1.0` -> `1.0.0`.
+- **Breaking:** the reward API dropped the misleading "deadband" name —
+  the reward has no deadband; its comfort term is a plain mean squared
+  deviation from target. Renames: `NormalizedDeadbandRewardConfig` ->
+  `NormalizedRewardConfig`, `NormalizedDeadbandReward` ->
+  `NormalizedReward`, `normalized_deadband_reward_function` ->
+  `normalized_reward_function`, `make_normalized_deadband_task` ->
+  `make_normalized_task`. The serialized `reward_type` discriminator is
+  now `"NormalizedRewardConfig"`; the legacy
+  `"NormalizedDeadbandRewardConfig"` string is still accepted by
+  `reward_config_from_dict`. The reactive controllers' genuine control
+  deadbands (`demand_deadband`, `reheat_sp_deadband`) and the analysis
+  scripts' deadband comfort diagnostics are unchanged.
 
 ### Removed
 
@@ -24,9 +36,9 @@ Journal 2026).  All results reported in the paper were produced with this tag.
   earlier reward definition but never entered the current reward: the
   comfort term is a plain mean squared deviation, and `tau_T`/`tau_E`
   calibration ignores it too. Removed from
-  `NormalizedDeadbandRewardConfig`, `NormalizedDeadbandReward`,
-  `normalized_deadband_reward_function`,
-  `make_normalized_deadband_task`, and the serialized dict form
+  `NormalizedRewardConfig`, `NormalizedReward`,
+  `normalized_reward_function`,
+  `make_normalized_task`, and the serialized dict form
   (`reward_config_from_dict` still accepts and ignores a legacy `dT`
   key). The `dT != 1.0` calibration-mismatch `RuntimeWarning` is gone
   with it; the `mode != "occupancy"` warning is unchanged. No scores,
@@ -49,7 +61,7 @@ Journal 2026).  All results reported in the paper were produced with this tag.
   (`energy_weight ∈ {0.0, 0.5}`). `e0` is comfort-only; `e05` prices energy
   against comfort.
 - **Asymmetric reward normalization.** Comfort is now unnormalized (`tau_T ≡ 1`,
-  a raw squared out-of-band deviation in °C² — the same physical unit in every
+  a raw mean squared deviation from target in °C² — the same physical unit in every
   building, zone and season). Only energy is normalized: `tau_E` is the
   reference reactive controller's per-`(building_type, climate_zone)` energy
   spend, so `power_penalty / tau_E = 1` means "spends like the reference

@@ -34,7 +34,7 @@ from building2building.data.climate_zones import (
 from building2building.data.download import ALL_BUILDING_TYPES, BuildingType
 from building2building.envs import make_env_from_config
 from building2building.types import (
-    NormalizedDeadbandRewardConfig,
+    NormalizedRewardConfig,
     RandomScheduleConfig,
     RewardConfig,
     RunPeriodConfig,
@@ -104,7 +104,7 @@ def _resolve_effective_reward(
     )
 
     if (
-        isinstance(effective_reward, NormalizedDeadbandRewardConfig)
+        isinstance(effective_reward, NormalizedRewardConfig)
         and not effective_reward.is_filled
     ):
         from building2building.data.reward_normalizers import resolve_reward_normalizer

@@ -12,7 +12,7 @@ The reward has an asymmetric normalization (see
 :mod:`building2building.data.reward_normalizers`):
 
 * **Comfort is unnormalized:** ``tau_T`` is pinned to ``1.0`` for every
-  bucket, so ``temp_penalty`` is a raw squared out-of-band deviation in
+  bucket, so ``temp_penalty`` is a raw mean squared deviation from target in
   degC^2 -- the same physical unit everywhere.
 * **Energy is normalized:** ``tau_E`` is the reference controller's
   energy spend, so ``power_penalty / tau_E = 1`` means "spends like the
@@ -42,7 +42,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from building2building.config.tasks import TaskPreset, resolve_task_preset
-from building2building.types import NormalizedDeadbandRewardConfig
+from building2building.types import NormalizedRewardConfig
 
 from baselines.utils.reward_normalizer_calibration import (
     CALIBRATION_SPLIT,
@@ -56,7 +56,7 @@ from baselines.utils.reward_normalizer_calibration import (
     cz_key_for,
     list_train_buildings,
     load_stats,
-    mean_deadband_penalties_from_infos,
+    mean_penalties_from_infos,
     run_rollouts,
     save_calibration_plot,
     shard_picks,
@@ -98,7 +98,7 @@ def _calibration_task_preset() -> TaskPreset:
     """Calibration preset with tau_T=tau_E=1 so env build needs no YAML."""
     preset = resolve_task_preset(CALIBRATION_TASK)
     reward = preset.reward
-    if isinstance(reward, NormalizedDeadbandRewardConfig) and not reward.is_filled:
+    if isinstance(reward, NormalizedRewardConfig) and not reward.is_filled:
         preset = replace(
             preset,
             reward=reward.filled(
@@ -129,7 +129,7 @@ def _run_single_rollout(spec: RolloutSpec) -> str:
     try:
         policy = _select_policy(spec.building_type, spec.building_id, env)
         result = run_episode(env, policy)
-        mean_t, mean_e, n_steps = mean_deadband_penalties_from_infos(
+        mean_t, mean_e, n_steps = mean_penalties_from_infos(
             result.infos, env.unwrapped.reward_fn
         )
 
