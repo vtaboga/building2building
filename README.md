@@ -6,7 +6,7 @@
 
 Official implementation of *"Building2Building: A Large Scale Benchmark for
 Generalizable Real-World Reinforcement Learning"* (Taboga, Veilleux, Jang,
-Rankawat, and Bacon; Reinforcement Learning Journal, 2026).
+Rankawat, and Bacon; Reinforcement Learning Conference, 2026).
 
 > **Reproducing the paper.** All results reported in the paper were produced
 > with [`v1.0.0`](https://github.com/vtaboga/building2building/releases/tag/v1.0.0).
