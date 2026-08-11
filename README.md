@@ -1,7 +1,7 @@
 # Building2Building
 
 [![arXiv](https://img.shields.io/badge/arXiv-2607.16534-b31b1b.svg)](https://arxiv.org/abs/2607.16534)
-[![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://vtaboga.github.io/building2building/)
+[![Docs](https://readthedocs.org/projects/building2building/badge/?version=latest)](https://building2building.readthedocs.io/en/latest/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Official implementation of *"Building2Building: A Large Scale Benchmark for
@@ -279,7 +279,7 @@ score = b2b.compute_normalized_score(
 
 ## Documentation
 
-Full documentation: **https://vtaboga.github.io/building2building/**
+Full documentation: **https://building2building.readthedocs.io/**
 
 ---
 

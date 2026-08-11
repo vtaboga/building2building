@@ -50,9 +50,10 @@ Journal 2026).  All results reported in the paper were produced with this tag.
 
 - **Documentation site.** MkDocs Material site under `docs/` (user guide,
   benchmark descriptions, baseline guides, tutorials, and an mkdocstrings API
-  reference), runnable tutorial scripts under `tutorials/`, and a
-  `.github/workflows/docs.yml` workflow that builds with `mkdocs build --strict`
-  and deploys to GitHub Pages on pushes to `main`. Build locally with
+  reference), runnable tutorial scripts under `tutorials/`, hosted at
+  <https://building2building.readthedocs.io/> (`.readthedocs.yaml`), with a
+  `.github/workflows/docs.yml` CI check that builds with
+  `mkdocs build --strict`. Build locally with
   `pip install -e ".[docs]" && mkdocs serve`.
 
 ### Changed

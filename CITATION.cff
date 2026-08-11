@@ -10,7 +10,7 @@ version: 1.0.0
 date-released: "2026-08-11"
 license: MIT
 repository-code: "https://github.com/vtaboga/building2building"
-url: "https://vtaboga.github.io/building2building/"
+url: "https://building2building.readthedocs.io/"
 keywords:
   - reinforcement-learning
   - benchmark
