@@ -13,9 +13,9 @@ argument order, model-path parsing, CSV schema mismatches, incomplete
 
 The seasonal energy normalizer `tau_E` in
 `building2building/data/reward_normalizers.yaml` is calibrated with the
-reference reactive controller in **occupancy mode with `dT = 1.0`**. Building
-an env with a normalized task in `constant`/`random_schedule` mode, or with a
-different `dT`, emits a one-shot `RuntimeWarning` from `create_simulator`.
+reference reactive controller in **occupancy mode**. Building an env with a
+normalized task in `constant`/`random_schedule` mode emits a one-shot
+`RuntimeWarning` from `create_simulator`.
 This is **intentional** — it flags that the energy normalization constants were
 calibrated under a different regime, not that anything is broken.
 

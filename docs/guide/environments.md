@@ -80,7 +80,6 @@ cfg = EnvBuildConfig(
         {
             "reward_type": "NormalizedDeadbandRewardConfig",
             "energy_weight": 0.5,
-            "dT": 1.0,
             "tau_T": 1.0,
             "tau_E": 2.0,
         }

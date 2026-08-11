@@ -48,7 +48,7 @@ def test_make_env_registers_staging_dir_cleanup_for_seasonal_period(
     env = api_mod.make_env(
         "OfficeSmall",
         task="task_occ_e05",
-        reward=RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0),
+        reward=RewardConfig(energy_weight=1.0, tau_T=1.0, tau_E=1.0),
         run_period="winter",
         max_episode_steps=5,
     )
@@ -93,7 +93,7 @@ def test_make_env_skips_staging_dir_cleanup_for_full_year(
     env = api_mod.make_env(
         "OfficeSmall",
         task="task_occ_e05",
-        reward=RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0),
+        reward=RewardConfig(energy_weight=1.0, tau_T=1.0, tau_E=1.0),
         run_period="full_year",
         max_episode_steps=5,
     )

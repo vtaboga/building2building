@@ -24,7 +24,7 @@ normalization is asymmetric:
 * **Only energy is normalized**: `tau_E` is the median per-step energy spend
   of the reference reactive controller for the building's
   `(building_type, climate_zone)` bucket, calibrated under the occupancy
-  regime (`task_occ_*`, `dT=1.0`) on the train split.  `power_penalty /
+  regime (`task_occ_*`) on the train split.  `power_penalty /
   tau_E = 1` means "spends like the reference controller for this bucket".
 
 The constants live in `building2building/data/reward_normalizers.yaml`.
@@ -36,7 +36,7 @@ Regenerate the YAML with
 `python -m baselines.compute_reactive_reward_normalizers --mode all`.
 
 Because `tau_E` is calibrated under the occupancy regime, using the
-`const`/`rand` setpoint modes or a non-default `dT` triggers a one-shot
+`const`/`rand` setpoint modes triggers a one-shot
 `RuntimeWarning` at simulator construction.  This is intentional, the
 constants are applied as-is and the calibration is approximate outside its
 regime.
@@ -48,7 +48,6 @@ from building2building.types import NormalizedDeadbandRewardConfig
 
 reward = NormalizedDeadbandRewardConfig(
     energy_weight=0.5,  # dimensionless trade-off weight (w_E)
-    dT=1.0,             # calibration deadband half-width (°C)
     tau_T=None,         # None = auto-resolved at env-build time
     tau_E=None,
 )
@@ -118,15 +117,15 @@ The two weight levels in the normalized preset grid:
 
 Six named presets form a 3×2 grid over `(setpoint_mode, energy_weight)`:
 
-| Task | Mode | Energy weight | dT |
-|---|---|---|---|
-| `task_const_e0` | Constant | 0.0 | 1.0 |
-| `task_const_e05` | Constant | 0.5 | 1.0 |
-| `task_occ_e0` | Occupancy (seasonal) | 0.0 | 1.0 |
-| `task_occ_e05` | Occupancy (seasonal) | 0.5 | 1.0 |
-| `task_rand_e0` | Random schedule | 0.0 | 1.0 |
-| `task_rand_e05` | Random schedule | 0.5 | 1.0 |
+| Task | Mode | Energy weight |
+|---|---|---|
+| `task_const_e0` | Constant | 0.0 |
+| `task_const_e05` | Constant | 0.5 |
+| `task_occ_e0` | Occupancy (seasonal) | 0.0 |
+| `task_occ_e05` | Occupancy (seasonal) | 0.5 |
+| `task_rand_e0` | Random schedule | 0.0 |
+| `task_rand_e05` | Random schedule | 0.5 |
 
 The default task is `task_const_e0` (constant setpoint, comfort-only).
-For `w_E` or `dT` values outside this grid, build a filled preset with
+For `w_E` values outside this grid, build a filled preset with
 `building2building.config.tasks.make_normalized_deadband_task(...)`.

@@ -2,8 +2,8 @@
 
 Rolls out the reference reactive controllers (the same ones behind
 ``baseline_returns.csv`` -- see :mod:`baselines.run_reactive_control`)
-on the calibration task (``task_occ_e0``: occupancy regime, ``dT=1``,
-seasonal unoccupied policy), records the per-building mean
+on the calibration task (``task_occ_e0``: occupancy regime, seasonal
+unoccupied policy), records the per-building mean
 ``(temp_penalty, power_penalty)``, and writes the median per
 ``(building_type, climate_zone)`` bucket into one seasonal YAML section
 per run period.

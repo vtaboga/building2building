@@ -243,7 +243,7 @@ simulator. They are what CI runs and the safety net you run before pushing.
   `NormalizedDeadbandRewardConfig` (filled vs. unfilled invariants, error
   cases), `NormalizedDeadbandReward` (halves the temperature contribution when
   `tau_T = 2.0`), and `_maybe_warn_normalized_deadband` (only the
-  calibration regime — `occupancy` mode with `dT=1` — is silent; everything
+  calibration regime — `occupancy` mode — is silent; everything
   else emits a deduplicated `RuntimeWarning`).
 - **`test_random_schedule.py`** — Tests the random daily schedule generator
   used by `task_rand_*` presets: `DailySchedule` invariants, `month_to_season` mapping,

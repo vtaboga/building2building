@@ -19,7 +19,7 @@ import building2building as b2b
 
 logger = logging.getLogger(__name__)
 
-# tau_E is calibrated under the occupancy regime (dT=1, seasonal
+# tau_E is calibrated under the occupancy regime (seasonal
 # policy).  The energy weight is irrelevant to the measured
 # penalties, so the comfort-only occupancy preset defines the regime.
 CALIBRATION_TASK = "task_occ_e0"
@@ -408,7 +408,7 @@ def mean_deadband_penalties_from_infos(
         if raw is None:
             continue
         tp, pp = _deadband_components(
-            raw, reward_fn.controlled_zones, reward_fn.task_config, reward_fn.dT
+            raw, reward_fn.controlled_zones, reward_fn.task_config
         )
         temp_pen.append(tp)
         power_pen.append(pp)

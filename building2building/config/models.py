@@ -422,7 +422,6 @@ def reward_to_dict(reward: RewardConfig) -> dict[str, Any]:
         d: dict[str, Any] = {
             "reward_type": "NormalizedDeadbandRewardConfig",
             "energy_weight": reward.energy_weight,
-            "dT": reward.dT,
         }
         if reward.tau_T is not None:
             d["tau_T"] = reward.tau_T

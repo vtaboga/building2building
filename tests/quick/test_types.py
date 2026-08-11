@@ -189,14 +189,13 @@ class TestZoneTargetTemperatureConfigExtended:
 @pytest.mark.quick
 class TestRewardConfigs:
     def test_normalized_deadband_reward_config(self) -> None:
-        cfg = NormalizedDeadbandRewardConfig(energy_weight=0.01, dT=1.0)
+        cfg = NormalizedDeadbandRewardConfig(energy_weight=0.01)
         assert cfg.energy_weight == 0.01
-        assert cfg.dT == 1.0
         assert not cfg.is_filled
 
     def test_normalized_deadband_reward_config_filled(self) -> None:
         cfg = NormalizedDeadbandRewardConfig(
-            energy_weight=1.0, dT=1.0, tau_T=0.4, tau_E=0.7
+            energy_weight=1.0, tau_T=0.4, tau_E=0.7
         )
         assert cfg.is_filled
 
@@ -208,6 +207,8 @@ class TestRewardConfigFromDict:
             {
                 "reward_type": "NormalizedDeadbandRewardConfig",
                 "energy_weight": 1.0,
+                # Legacy key from configs serialized before v1.0.0;
+                # accepted and ignored.
                 "dT": 1.0,
             }
         )

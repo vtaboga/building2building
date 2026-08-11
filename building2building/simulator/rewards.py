@@ -31,7 +31,6 @@ def _deadband_components(
     obs: dict[str, Any],
     controlled_zones: list[str],
     task_config: TaskConfig,
-    dT: float,
 ) -> tuple[float, float]:
     """Compute the deadband ``(temp_penalty, power_penalty)`` decomposition."""
     
@@ -53,7 +52,6 @@ def normalized_deadband_reward_function(
     controlled_zones: list[str],
     task_config: TaskConfig,
     energy_weight: float,
-    dT: float,
     tau_T: float,
     tau_E: float,
 ) -> float:
@@ -72,7 +70,7 @@ def normalized_deadband_reward_function(
     for the rationale and calibration regime.
     """
     temp_penalty, power_penalty = _deadband_components(
-        obs, controlled_zones, task_config, dT
+        obs, controlled_zones, task_config
     )
     return -(temp_penalty / tau_T + energy_weight * power_penalty / tau_E)
 
@@ -91,7 +89,6 @@ class NormalizedDeadbandReward:
 
     controlled_zones: list[str]
     energy_weight: float
-    dT: float
     tau_T: float
     tau_E: float
     task_config: TaskConfig
@@ -102,7 +99,6 @@ class NormalizedDeadbandReward:
             controlled_zones=self.controlled_zones,
             task_config=self.task_config,
             energy_weight=self.energy_weight,
-            dT=self.dT,
             tau_T=self.tau_T,
             tau_E=self.tau_E,
         )

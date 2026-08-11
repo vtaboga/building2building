@@ -40,7 +40,6 @@ class TestTaskGrid:
         assert isinstance(preset.reward, NormalizedDeadbandRewardConfig)
         # Unfilled sentinel: tau_T/tau_E resolved at env-build time.
         assert not preset.reward.is_filled
-        assert preset.reward.dT == 1.0
 
     @pytest.mark.parametrize(
         "name,expected_weight",

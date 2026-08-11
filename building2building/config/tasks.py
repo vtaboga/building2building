@@ -6,7 +6,7 @@ and temperature setpoints for a reproducible benchmark task.
 Six presets form a 3x2 grid parameterized along
 ``(setpoint_mode, energy_weight_level)``.  All use
 :class:`~building2building.types.NormalizedDeadbandRewardConfig`
-with ``dT=1.0`` and ``(tau_T, tau_E) = (None, None)`` (the unfilled
+with ``(tau_T, tau_E) = (None, None)`` (the unfilled
 sentinel state); :func:`building2building.api.make_env` resolves
 the per-(building_type, climate_zone) constants from
 :file:`building2building/data/reward_normalizers.yaml` at env-build
@@ -74,7 +74,6 @@ NORMALIZED_MODES: dict[ModeShort, SetpointMode] = {
 #: subgroup in this module's docstring; the actual runtime check
 #: lives in :mod:`building2building.simulator`.
 CALIBRATION_MODE: SetpointMode = "occupancy"
-CALIBRATION_DT: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -121,16 +120,13 @@ def _build_normalized_preset(
     :class:`~building2building.types.NormalizedDeadbandRewardConfig`
     with ``tau_T = tau_E = None``: the env factory fills these in
     based on the resolved ``(building_type, building_id)`` at env-build
-    time.  ``dT`` is fixed at the calibration value (``1.0``) for the
-    preset; users wanting to sweep ``dT`` should construct a custom
-    :class:`TaskPreset` directly.
+    time.
     """
     mode = NORMALIZED_MODES[mode_short]
     energy_weight = NORMALIZED_WEIGHT_LEVELS[level]
 
     reward = NormalizedDeadbandRewardConfig(
         energy_weight=energy_weight,
-        dT=CALIBRATION_DT,
         tau_T=None,
         tau_E=None,
     )
@@ -212,13 +208,12 @@ def make_normalized_deadband_task(
     *,
     w_E: float,
     mode: SetpointMode = "occupancy",
-    dT: float = CALIBRATION_DT,
 ) -> TaskPreset:
     """Return a *filled* :class:`TaskPreset` for a normalized deadband task.
 
     Useful for ad-hoc experiments that want to choose ``w_E`` and
     ``mode`` outside the six-preset grid (e.g. ``w_E = 2.5`` for a finer
-    sweep, or a non-calibration ``dT`` value).
+    sweep).
 
     The ``(tau_T, tau_E)`` constants are looked up via
     :func:`building2building.data.reward_normalizers.resolve_reward_normalizer`
@@ -232,7 +227,6 @@ def make_normalized_deadband_task(
         mode: Setpoint mode.  Calibration assumes ``"occupancy"``;
             other values are accepted but cause the simulator to emit
             a calibration-mismatch :class:`RuntimeWarning`.
-        dT: Comfort deadband (C); same caveat -- calibration uses 1.0.
 
     Returns:
         A :class:`TaskPreset` whose reward is a *filled*
@@ -250,7 +244,6 @@ def make_normalized_deadband_task(
     normalizer = resolve_reward_normalizer(building_type, building_id)
     reward = NormalizedDeadbandRewardConfig(
         energy_weight=float(w_E),
-        dT=float(dT),
         tau_T=None,
         tau_E=None,
     ).filled(normalizer.tau_T, normalizer.tau_E)

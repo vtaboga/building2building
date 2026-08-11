@@ -433,9 +433,6 @@ class NormalizedDeadbandRewardConfig:
     Attributes:
         energy_weight: Dimensionless trade-off weight ``w_E``.  See
             class docstring.
-        dT: Half-width of the temperature deadband (°C).  Calibration
-            assumes ``dT = 1.0``; other values are accepted but emit a
-            calibration-mismatch :class:`RuntimeWarning` at dispatch.
         tau_T: Comfort normalizer.  Resolves to ``1.0`` (comfort is
             unnormalized).  ``None`` means "preset-time sentinel; resolve
             me at env build time".
@@ -444,7 +441,6 @@ class NormalizedDeadbandRewardConfig:
     """
 
     energy_weight: float
-    dT: float
     tau_T: float | None = None
     tau_E: float | None = None
 
@@ -493,8 +489,10 @@ def reward_config_from_dict(
 
     Args:
         reward_section: Dictionary with a mandatory ``"reward_type"`` key
-            and type-specific parameters (``energy_weight``, ``dT``,
-            and optionally ``tau_T`` / ``tau_E``).
+            and type-specific parameters (``energy_weight``, and
+            optionally ``tau_T`` / ``tau_E``).  A legacy ``dT`` key is
+            accepted and ignored (the parameter never entered the
+            reward and was removed in v1.0.0).
 
     Returns:
         A :class:`NormalizedDeadbandRewardConfig`.
@@ -519,7 +517,6 @@ def reward_config_from_dict(
         raw_tau_E = reward_section.get("tau_E")
         return NormalizedDeadbandRewardConfig(
             energy_weight=float(reward_section.get("energy_weight", 1.0)),
-            dT=float(reward_section.get("dT", 1.0)),
             tau_T=float(raw_tau_T) if raw_tau_T is not None else None,
             tau_E=float(raw_tau_E) if raw_tau_E is not None else None,
         )

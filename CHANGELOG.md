@@ -18,6 +18,20 @@ Journal 2026).  All results reported in the paper were produced with this tag.
 
 - Package version bumped `0.1.0` -> `1.0.0`.
 
+### Removed
+
+- **Breaking:** the vestigial `dT` parameter is gone. It survived an
+  earlier reward definition but never entered the current reward: the
+  comfort term is a plain mean squared deviation, and `tau_T`/`tau_E`
+  calibration ignores it too. Removed from
+  `NormalizedDeadbandRewardConfig`, `NormalizedDeadbandReward`,
+  `normalized_deadband_reward_function`,
+  `make_normalized_deadband_task`, and the serialized dict form
+  (`reward_config_from_dict` still accepts and ignores a legacy `dT`
+  key). The `dT != 1.0` calibration-mismatch `RuntimeWarning` is gone
+  with it; the `mode != "occupancy"` warning is unchanged. No scores,
+  normalizer constants, or baselines are affected.
+
 ## Unreleased
 
 ### Added

@@ -20,7 +20,7 @@ import building2building.api as api_mod
 from building2building.simulator.wrappers import NormalizeObservation
 from building2building.types import RewardConfig
 
-_FILLED_REWARD = RewardConfig(energy_weight=1.0, dT=1.0, tau_T=1.0, tau_E=1.0)
+_FILLED_REWARD = RewardConfig(energy_weight=1.0, tau_T=1.0, tau_E=1.0)
 
 
 def _patch_registry(monkeypatch: pytest.MonkeyPatch, fixture_registry: Any) -> None:

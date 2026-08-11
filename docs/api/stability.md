@@ -74,7 +74,7 @@ require a `CHANGELOG.md` entry and must respect the deprecation window below.
 | `ActuatorDescription` | Dataclass describing an EnergyPlus actuator. |
 | `BuildingConfig` | Dataclass fully specifying a building environment. |
 | `Equipment` | Protocol that all HVAC equipment types satisfy. |
-| `NormalizedDeadbandRewardConfig` | The sole supported reward config; parameterised by `energy_weight`, `dT`, `tau_T`, `tau_E`. |
+| `NormalizedDeadbandRewardConfig` | The sole supported reward config; parameterised by `energy_weight`, `tau_T`, `tau_E`. |
 | `RewardConfig` | Type alias for `NormalizedDeadbandRewardConfig`. |
 | `TaskConfig` | Dataclass bundling run period, setpoint mode, zone target temperatures, and control resolution. |
 

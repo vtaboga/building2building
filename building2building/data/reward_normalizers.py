@@ -17,7 +17,7 @@ degC^2 — the same physical unit in every building, zone and season.
 **Energy is normalized per bucket:** ``tau_E`` is the median per-step
 energy penalty of the reference reactive controller
 (:mod:`baselines.run_reactive_control`) on the train split, under the
-occupancy regime (``dT=1.0``, seasonal unoccupied policy — the
+occupancy regime (seasonal unoccupied policy — the
 ``task_occ_*`` tasks).  Thus ``power_penalty / tau_E = 1`` means "spends
 like the reference controller for this ``(building_type, climate_zone)``
 bucket", and ``w_E`` is a dimensionless price with the same meaning
