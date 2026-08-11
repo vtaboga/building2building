@@ -31,7 +31,7 @@ Usage::
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Literal, Sequence
 
 import numpy as np
@@ -59,6 +59,8 @@ def _empty_array() -> np.ndarray:
 
 
 if TYPE_CHECKING:
+    from minergym.ontology import Ontology
+
     from building2building.geometry import ZoneGeometry
     from building2building.types import Equipment
 
@@ -423,9 +425,8 @@ def build_morphology(
     observation_names: list[str],
     action_names: list[str],
     *,
+    ontology: "Ontology",
     controlled_zones: list[str] | None = None,
-    all_zone_names: list[str] | None = None,
-    zone_geometry: dict[str, "ZoneGeometry"] | None = None,
 ) -> Morphology:
     """Build a morphology graph from equipment metadata and obs/action names.
 
@@ -441,30 +442,30 @@ def build_morphology(
         action_names: Flat action slot names
             (``env.metadata["action_names"]``).
         controlled_zones: Zone names served by HVAC equipment.
-        all_zone_names: All thermal zone names in the building model.
-            When provided, zones not in *controlled_zones* are added as
-            ``uncontrolled_zone`` nodes.
-        zone_geometry: Optional mapping ``zone_name -> ZoneGeometry`` from
-            :func:`building2building.geometry.extract_zone_geometry`. When
-            present, zone-typed nodes carry their geometric attributes;
-            otherwise their ``attributes`` array stays empty.
+        ontology: The building's :class:`minergym.ontology.Ontology`. The
+            morphology is completed from it — every thermal zone becomes a
+            node (unserved ones as ``uncontrolled_zone``), zone nodes carry
+            their :class:`~building2building.geometry.ZoneGeometry`
+            attributes, and ``thermal_adjacency`` edges are added between
+            zones that share an interior wall.
 
     Returns:
         A fully-constructed :class:`Morphology`.
     """
+    from building2building.geometry import extract_zone_geometry
+
+    all_zone_names = sorted(str(z) for z in ontology.zones())
+    zone_geometry = extract_zone_geometry(ontology)
+
     nodes: list[MorphologyNode] = []
     edges: list[MorphologyEdge] = []
     assigned_obs: set[int] = set()
 
     def _attrs_for(zone_name: str) -> np.ndarray:
-        """Per-zone attribute array, looked up from `zone_geometry` if
-        supplied; empty otherwise."""
-        if zone_geometry is None:
-            return np.empty(0, dtype=np.float32)
+        """Per-zone attribute array from `zone_geometry`; empty if the zone
+        has no geometry (no surfaces)."""
         zg = zone_geometry.get(zone_name)
-        if zg is None:
-            return np.empty(0, dtype=np.float32)
-        return zg.to_array()
+        return zg.to_array() if zg is not None else np.empty(0, dtype=np.float32)
 
     # -- Global singleton nodes --------------------------------------------
 
@@ -619,25 +620,24 @@ def build_morphology(
 
     # -- Uncontrolled zones (obs-only) -------------------------------------
 
-    if all_zone_names is not None:
-        for zone in all_zone_names:
-            if zone in zones_with_nodes:
-                continue
-            temp_idx = _find_zone_temp_index(observation_names, zone)
-            if temp_idx is None:
-                continue
-            node_id = f"zone:{zone}"
-            nodes.append(
-                MorphologyNode(
-                    node_id,
-                    UNCONTROLLED_ZONE,
-                    (temp_idx,),
-                    (),
-                    attributes=_attrs_for(zone),
-                )
+    for zone in all_zone_names:
+        if zone in zones_with_nodes:
+            continue
+        temp_idx = _find_zone_temp_index(observation_names, zone)
+        if temp_idx is None:
+            continue
+        node_id = f"zone:{zone}"
+        nodes.append(
+            MorphologyNode(
+                node_id,
+                UNCONTROLLED_ZONE,
+                (temp_idx,),
+                (),
+                attributes=_attrs_for(zone),
             )
-            assigned_obs.add(temp_idx)
-            zones_with_nodes.add(zone)
+        )
+        assigned_obs.add(temp_idx)
+        zones_with_nodes.add(zone)
 
     # -- Collect unassigned observations -----------------------------------
 
@@ -672,12 +672,21 @@ def build_morphology(
             unassigned_action_names,
         )
 
-    return Morphology(
+    morphology = Morphology(
         nodes=tuple(nodes),
         edges=tuple(edges),
         unassigned_obs_indices=unassigned,
         unassigned_action_indices=unassigned_actions,
     )
+
+    # Complete the graph with zone thermal adjacency (shared interior walls),
+    # so every edge kind — supply->zone above and adjacency here — is built in
+    # this one factory rather than bolted on by the caller.
+    zone_adjacency = {
+        str(z): [str(a) for a in adj]
+        for z, adj in ontology.zone_adjacency().items()
+    }
+    return add_thermal_adjacency_edges(morphology, zone_adjacency)
 
 
 def add_thermal_adjacency_edges(
@@ -712,8 +721,6 @@ def add_thermal_adjacency_edges(
                 new_edges.append(MorphologyEdge(src_id, tgt_id, "thermal_adjacency"))
                 seen.add(pair)
 
-    return Morphology(
-        nodes=morphology.nodes,
-        edges=tuple(new_edges),
-        unassigned_obs_indices=morphology.unassigned_obs_indices,
-    )
+    # Preserve every other field (nodes, unassigned_obs/action_indices, …)
+    # — only the edge set changes.
+    return replace(morphology, edges=tuple(new_edges))
