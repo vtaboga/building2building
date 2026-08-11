@@ -41,17 +41,13 @@ Cross-domain transfer is harder than dynamics adaptation
 because the agent must generalise across HVAC topology (different action
 dimension and observation structure).
 
-## Difficulty Levels
+## Settings
 
-| Difficulty | Train Type | Test Type |
+| Setting | Train Type | Test Type |
 |---|---|---|
-| `easy` | `RetailStandalone` | `OfficeSmall` |
-| `medium` | `RetailStandalone` | `Warehouse` |
-| `hard` | `OfficeSmall` | `OfficeMedium` |
-
-The paper's Table 5 also defines a fourth setting (train on *n* building
-types, test on *m* different types); it has no named difficulty preset —
-compose it manually with `b2b.make_env` across types.
+| `1` | `RetailStandalone` | `OfficeSmall` |
+| `2` | `RetailStandalone` | `Warehouse` |
+| `3` | `OfficeSmall` | `OfficeMedium` |
 
 ## API
 
@@ -73,21 +69,3 @@ print(f"Test on: {bench.test_type}")
 train_envs = bench.make_train_envs(n=4)
 test_envs = bench.make_test_envs(n=4)
 ```
-
-## Paper Experiments (Section 6.2)
-
-The cross-domain benchmark uses the **Amorpheus** type-heterogeneous
-transformer policy. Amorpheus leverages the morphology graph to apply
-per-node-type encoders/decoders, enabling a single policy to operate across
-buildings with different observation and action dimensions. In the paper's
-experiment (the "n types → m types" setting), a single policy is trained
-simultaneously on four building types (retail store, fast-food restaurant,
-small office, medium office) and tested on unseen buildings from the test
-split.
-
-```bash
-python -m baselines.train_cross_domain experiment=train_cross_domain
-```
-
-See [Baselines: Cross-Domain Transfer](../baselines/cross-domain.md) for
-the full Amorpheus training pipeline.

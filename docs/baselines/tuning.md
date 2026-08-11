@@ -60,16 +60,7 @@ python -m baselines.tune_controller experiment=tune_controller \
     building_type=SingleFamilyHouse climate_zone=0
 ```
 
-## Reproducing the 25-config v2 tune
-
-The reference v2 tune covers **25 `(type, cz)` pairs**:
-
-| Building type | Climate zones | Count |
-|---|---|---:|
-| `SingleFamilyHouse` | `0` | 1 |
-| `RestaurantFastFood` | `1..8` | 8 |
-| `OfficeMedium` | `1..8` | 8 |
-| `OfficeSmall` | `1..8` | 8 |
+## Reproducing
 
 A matching SLURM launcher is not yet committed; the simplest reproduction
 is a shell loop that dispatches 25 independent jobs:
@@ -204,6 +195,8 @@ Key parameters live in `baselines/configs/experiment/tune_ppo.yaml`
 (`n_trials`, `ntune_seeds`, `n_tune_buildings`, `wall_time_hours`,
 `orion_db_dir`, `results_dir`, ...). Re-evaluation summaries can be plotted
 with `python -m baselines.plotting.plot_chs_results`.
+
+**Note** : this part is still a work in progress. 
 
 ## Related pages
 

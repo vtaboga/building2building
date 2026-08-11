@@ -41,17 +41,14 @@ The score is `agent_return / baseline_return`. Both returns are negative
 (cost-based reward), so **lower is better**: 1.0 matches the
 reactive-controller baseline and a score below 1.0 beats it.
 
-## Difficulty Levels
+## Settings
 
-| Difficulty | Building Type | Action Dim | Description |
+| Setting | Building Type | Action Dim | Description |
 |---|---|---|---|
-| `easy` | `SingleFamilyHouse` | 2 | Single-zone residential |
-| `medium` | `OfficeSmall` | 10 | 5-zone unitary office |
-| `hard` | `OfficeMedium` | 36 | Multi-zone VAV office |
+| 1 | `SingleFamilyHouse` | 2 | Single-zone residential |
+| 2 | `OfficeSmall` | 10 | 5-zone unitary office |
+| 3 | `OfficeMedium` | 36 | Multi-zone VAV office |
 
-(The `hard` preset's `action_dim` is 36 in `DYNAMICS_ADAPTATION_PRESETS`;
-the paper's Table 3 lists 33 for the medium-office setting — OfficeMedium
-action dimensions vary per building.)
 
 ## API
 
@@ -74,25 +71,3 @@ train_envs = bench.make_train_envs(n=4)
 test_envs = bench.make_test_envs(n=4)
 ```
 
-## Paper Experiments (Section 6.1)
-
-Three training approaches are compared:
-
-| Approach | Description | Script |
-|---|---|---|
-| **Specialist** | Independent PPO per building | `train_dynamics_specialist` |
-| **Baseline** | Single PPO across all buildings (PadObs + NormObs) | `train_dynamics_baseline` |
-| **Parameterized** | Same + building-parameter augmentation | `train_dynamics_parameterized` |
-
-```bash
-# Specialist
-python -m baselines.train_dynamics_adaptation \
-    experiment=train_dynamics_specialist difficulty=easy
-
-# Parameterized (paper's main result)
-python -m baselines.train_dynamics_adaptation \
-    experiment=train_dynamics_parameterized difficulty=easy
-```
-
-See [Baselines: Dynamics Adaptation](../baselines/dynamics-adaptation.md) for
-full details on reproducing these experiments.

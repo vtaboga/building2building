@@ -1,6 +1,6 @@
 # Dynamics Adaptation Baselines
 
-Baselines for the dynamics adaptation benchmark (Paper Section 6.1).
+Baselines for the dynamics adaptation benchmark.
 
 ## Overview
 

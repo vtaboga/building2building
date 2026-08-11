@@ -12,8 +12,8 @@ commercial prototypes and residential archetypes, B2B parametrically generates
 **6,000 buildings** (5,400 train / 600 test) spanning **6 building types**,
 **16 climate locations**, and **3 distinct HVAC system types**.
 
-B2B is designed to accelerate research in **transfer learning**, **multi-task
-RL**, and **meta-learning** for building energy management.
+B2B is designed to accelerate research in transfer learning, multi-task
+RL, and meta-learning while improving building energy management.
 
 ---
 
@@ -21,6 +21,7 @@ RL**, and **meta-learning** for building energy management.
 
 - **6,000 parametrically generated buildings** (5,400 train / 600 test, plus an 8-per-type `test_small` split) across commercial and residential archetypes
 - **6 building types**: `SingleFamilyHouse`, `OfficeSmall`, `OfficeMedium`, `RetailStandalone`, `RestaurantFastFood`, `Warehouse`
+- **Building generator** to extend the existing 6000 buildings dataset.
 - **3 HVAC system types**: VAV (Variable Air Volume), Unitary, and Heating-Only
 - **6 named task presets** (`task_{const,occ,rand}_{e0,e05}`: 3 setpoint modes × 2 energy weights)
 - **4 benchmark problems**: dynamics adaptation, cross-domain generalization, goal adaptation, action-space transfer

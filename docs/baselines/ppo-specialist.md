@@ -1,6 +1,6 @@
 # PPO & SAC Specialist Training
 
-Per-building PPO and SAC specialists (Paper Section 5, Appendix E.2).
+Per-building PPO and SAC specialists.
 
 ## Overview
 

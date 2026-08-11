@@ -1,6 +1,6 @@
 # Cross-Domain Transfer Baselines
 
-Baselines for the cross-domain generalization benchmark (Paper Section 6.2).
+Baselines for the cross-domain generalization benchmark.
 
 ## Overview
 
@@ -74,14 +74,14 @@ morphology-based split/join operations:
 5. Compute GAE advantages and PPO loss
 6. Update the single shared policy
 
-## Difficulty Levels
+## Settings
 
 The `b2b.benchmarks.CrossDomainGeneralization` benchmark defines three
 train/test building-type pairs (the training script itself takes an explicit
 list of building types):
 
-| Difficulty | Train Type | Test Type |
+| Setting | Train Type | Test Type |
 |---|---|---|
-| `easy` | `RetailStandalone` | `OfficeSmall` |
-| `medium` | `RetailStandalone` | `Warehouse` |
-| `hard` | `OfficeSmall` | `OfficeMedium` |
+| `1` | `RetailStandalone` | `OfficeSmall` |
+| `2` | `RetailStandalone` | `Warehouse` |
+| `3` | `OfficeSmall` | `OfficeMedium` |

@@ -37,7 +37,7 @@ The score is `agent_return / baseline_return` against the reactive-controller
 baseline.  Both returns are negative, so **lower is better** — a score below
 1.0 outperforms the reactive baseline.
 
-## Paper Reference (Section 4)
+## Settings
 
 | System type | Training control | Test control | Action dim |
 |---|---|---|---|

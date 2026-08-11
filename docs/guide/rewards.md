@@ -37,9 +37,9 @@ Regenerate the YAML with
 
 Because `tau_E` is calibrated under the occupancy regime, using the
 `const`/`rand` setpoint modes or a non-default `dT` triggers a one-shot
-`RuntimeWarning` at simulator construction.  This is intentional — the
+`RuntimeWarning` at simulator construction.  This is intentional, the
 constants are applied as-is and the calibration is approximate outside its
-regime — not a bug.
+regime.
 
 **Configuration:**
 
