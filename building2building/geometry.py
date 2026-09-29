@@ -8,16 +8,21 @@ land as :attr:`MorphologyNode.attributes` for zone-typed nodes — see
 :func:`building2building.morphology.build_morphology`.
 
 Reads `BuildingSurface:Detailed` via :class:`minergym.ontology.Ontology`,
-the same EnergyPlus traversal layer used elsewhere in the pipeline.
+the same EnergyPlus traversal layer used elsewhere in the pipeline, and
+places each zone's (relative) vertices in the building frame with the
+`Zone` origin / relative-north fields first (:func:`zone_placements`).
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 from minergym.ontology import Ontology
+
+Point = tuple[float, float, float]
 
 # Names for the per-zone attribute slots, in the order that
 # `ZoneGeometry.to_array` emits them. The corresponding bounds live on
@@ -87,6 +92,103 @@ class ZoneGeometry:
         )
 
 
+@dataclass(frozen=True)
+class ZonePlacement:
+    """Where a zone's *relative* surface coordinates sit in the building
+    frame: the ``Zone`` object's ``x/y/z_origin`` and its
+    ``direction_of_relative_north`` (clockwise degrees)."""
+
+    origin: Point = (0.0, 0.0, 0.0)
+    relative_north_deg: float = 0.0
+
+    def to_building(self, p: Point) -> Point:
+        """Map one zone-relative vertex into the building frame.
+
+        EnergyPlus (``GlobalGeometryRules`` = Relative) interprets a
+        surface vertex as *zone-relative*: rotate it clockwise about the
+        zone origin by ``direction_of_relative_north``, then translate by
+        the zone origin. The building's own ``north_axis`` is a rigid
+        rotation of everything and is deliberately NOT applied, so the
+        attributes stay in the building's frame rather than true north.
+        """
+        x, y, z = p
+        th = math.radians(self.relative_north_deg)
+        if th:
+            c, s_ = math.cos(th), math.sin(th)
+            x, y = x * c + y * s_, -x * s_ + y * c
+        ox, oy, oz = self.origin
+        return (x + ox, y + oy, z + oz)
+
+
+def _coordinate_system_is_relative(ont: Ontology) -> bool:
+    """``GlobalGeometryRules.coordinate_system``: Relative (the default)
+    means zone origins apply; Absolute / World means vertices are
+    already in the building frame."""
+    q = """# -*- mode: sparql -*-
+    SELECT ?cs
+    WHERE {
+      ?rules a "GlobalGeometryRules" .
+      OPTIONAL { ?rules idf:coordinate_system ?cs . }
+    }"""
+    for row in ont.rdf.query(q):
+        cs = str(row.cs).strip().lower() if row.cs is not None else "relative"
+        return cs == "relative"
+    return True
+
+
+def zone_placements(ont: Ontology) -> dict[str, ZonePlacement]:
+    """Per-zone :class:`ZonePlacement` from the ``Zone`` objects, keyed
+    by zone name. Every zone gets an entry; missing fields default to the
+    EnergyPlus defaults (origin 0, relative north 0). When the epJSON
+    declares an Absolute / World coordinate system every placement is
+    the identity."""
+    relative = _coordinate_system_is_relative(ont)
+    q = """# -*- mode: sparql -*-
+    SELECT ?zone ?x ?y ?z ?north
+    WHERE {
+      ?zone a "Zone" .
+      OPTIONAL { ?zone idf:x_origin ?x . }
+      OPTIONAL { ?zone idf:y_origin ?y . }
+      OPTIONAL { ?zone idf:z_origin ?z . }
+      OPTIONAL { ?zone idf:direction_of_relative_north ?north . }
+    }"""
+
+    def f(v: Any) -> float:
+        return float(v.toPython()) if v is not None else 0.0
+
+    out: dict[str, ZonePlacement] = {}
+    for row in ont.rdf.query(q):
+        name = str(row.zone)
+        if not relative:
+            out[name] = ZonePlacement()
+            continue
+        out[name] = ZonePlacement(
+            origin=(f(row.x), f(row.y), f(row.z)),
+            relative_north_deg=f(row.north),
+        )
+    return out
+
+
+def zone_surface_building_vertices(ont: Ontology) -> dict[Any, dict[Any, list[Point]]]:
+    """:meth:`Ontology.zone_surface_point_hierarchy` with every vertex
+    mapped into the building frame (zone origin + relative north
+    applied). This is the hierarchy every geometric attribute must be
+    computed from: the raw hierarchy is zone-relative under the default
+    Relative coordinate system, so zones with a non-zero origin (e.g. the
+    DOE stand-alone retail prototype, where every zone but the first has
+    one) would otherwise all be measured from the same corner."""
+    placements = zone_placements(ont)
+    hierarchy = ont.zone_surface_point_hierarchy()
+    out: dict[Any, dict[Any, list[Point]]] = {}
+    for zone, surfs in hierarchy.items():
+        pl = placements.get(str(zone), ZonePlacement())
+        out[zone] = {
+            surface: [pl.to_building(tuple(float(c) for c in v)) for v in verts]
+            for surface, verts in surfs.items()
+        }
+    return out
+
+
 def _polygon_area_3d(points: list[tuple[float, float, float]]) -> float:
     """Area of an arbitrary planar polygon in 3D, via cross-product sum."""
     if len(points) < 3:
@@ -121,7 +223,7 @@ def extract_zone_geometry(ont: Ontology) -> dict[str, ZoneGeometry]:
         Mapping ``zone_name -> ZoneGeometry``. Zones with no surfaces
         (shouldn't happen for valid EnergyPlus inputs) are omitted.
     """
-    hierarchy = ont.zone_surface_point_hierarchy()
+    hierarchy = zone_surface_building_vertices(ont)
 
     all_pts = np.array(
         [v for surfs in hierarchy.values() for verts in surfs.values() for v in verts],
