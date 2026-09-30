@@ -12,7 +12,7 @@ from urllib.parse import urljoin, urlparse
 import duckdb
 import requests
 from building2building.env import STORE_PATH
-from building2building.store import (
+from store import (
     OUTPUT,
     ChildFile,
     Derivation,

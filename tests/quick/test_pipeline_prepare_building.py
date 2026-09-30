@@ -15,7 +15,7 @@ import pytest
 
 from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import prepare_building
-from building2building.store import realize
+from store import realize
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "pipeline_idfs"
 

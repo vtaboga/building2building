@@ -2,7 +2,7 @@ import json
 import logging
 from pathlib import Path
 
-from building2building.store import Derivation, OUTPUT, derivation
+from store import Derivation, OUTPUT, derivation
 
 logger = logging.getLogger(__name__)
 

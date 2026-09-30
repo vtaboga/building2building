@@ -16,7 +16,7 @@ from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from building2building.store import (
+from store import (
     ChildFile,
     DownloadFile,
     ExtractTarball,

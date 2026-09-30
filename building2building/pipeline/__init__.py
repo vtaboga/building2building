@@ -47,7 +47,7 @@ from building2building.pipeline.steps.outputs import (
 )
 from building2building.pipeline.steps.schedule_files import link_in_schedule
 from building2building.pipeline.steps.surfaces import GlueSurfaces, glue_surfaces
-from building2building.store import Derivation, Expression, Realizable, Rename
+from store import Derivation, Expression, Realizable, Rename
 
 
 def prepare_building(

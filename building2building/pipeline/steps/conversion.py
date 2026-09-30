@@ -8,7 +8,7 @@ from typing import Literal, TypeAlias
 
 from building2building.env import STORE_PATH
 from building2building.pipeline.common import chdir
-from building2building.store import (
+from store import (
     OUTPUT,
     ChildFile,
     Derivation,

@@ -29,7 +29,7 @@ import duckdb
 import pandas as pd
 
 from building2building.env import STORE_PATH
-from building2building.store import (
+from store import (
     OUTPUT,
     Derivation,
     DownloadFile,

@@ -41,7 +41,7 @@ from building2building.pipeline import (
     modify_run_period,
     modify_timestep,
 )
-from building2building.store import (
+from store import (
     OUTPUT,
     Constant,
     Derivation,

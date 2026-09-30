@@ -15,7 +15,7 @@ import pytest
 
 from building2building.env import STORE_PATH
 from building2building.pipeline.actuators import make_controllable
-from building2building.store import realize
+from store import realize
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 

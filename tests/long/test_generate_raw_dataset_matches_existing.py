@@ -94,7 +94,7 @@ def test_generate_raw_dataset_smoke(tmp_path: Path) -> None:
     from building2building.sources.multizones_reference_buildings import (
         dataset_zip,
     )
-    from building2building.store import realize
+    from store import realize
 
     output_dir = tmp_path / "raw_dataset"
     output_dir.mkdir()
@@ -241,7 +241,7 @@ def test_generate_raw_dataset_eplus_smoke(tmp_path: Path) -> None:
     from building2building.sources.multizones_reference_buildings import (
         dataset_zip,
     )
-    from building2building.store import realize
+    from store import realize
 
     # Each E+ run is launched as a subprocess (not through pyenergyplus.api)
     # so its memory is reclaimed between runs.  The in-process API leaks

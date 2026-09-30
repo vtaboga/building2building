@@ -67,7 +67,7 @@ from building2building.sources.ashrae_90_1 import (
     search_buildings,
     search_weathers,
 )
-from building2building.store import LocalFile, realize
+from store import LocalFile, realize
 
 logger = logging.getLogger(__name__)
 

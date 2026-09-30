@@ -12,7 +12,7 @@ from building2building.pipeline.parse_reports import (
     get_warmup_days,
 )
 from building2building.pipeline.steps.outputs import add_all_outputs, modify_run_period
-from building2building.store import (
+from store import (
     OUTPUT,
     Expression,
     Realizable,

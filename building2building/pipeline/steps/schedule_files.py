@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from building2building.store import OUTPUT, derivation
+from store import OUTPUT, derivation
 
 
 @derivation("linked.epjson")

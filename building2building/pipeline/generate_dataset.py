@@ -80,7 +80,7 @@ from building2building.sources.multizones_reference_buildings import (
     dataset_zip,
     table_index,
 )
-from building2building.store import Constant, ExtractFromZip, realize
+from store import Constant, ExtractFromZip, realize
 
 logger = logging.getLogger(__name__)
 
@@ -243,7 +243,7 @@ def generate_one_building(
     # ``info.building_dir / info.weather_file`` (see
     # building2building/envs/factory.py:55 and building2building/api/__init__.py:294).
     # ``realize`` returns the store path ``<derivation_hash>-<basename>``
-    # (see building2building/store.py:73), and the existing HF
+    # (see store.realize(), the hash-named output path), and the existing HF
     # ``metadata.parquet`` ``weather_file`` column (preserved unchanged by
     # ``rebuild_metadata_parquet``) carries exactly that same name from the
     # original Stage-2 run.  Copying with the store basename preserves the

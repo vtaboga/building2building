@@ -11,7 +11,7 @@ import rdflib
 from cattrs import structure, unstructure
 from minergym.ontology import Ontology
 
-from building2building.store import (
+from store import (
     OUTPUT,
     Expression,
     Realizable,

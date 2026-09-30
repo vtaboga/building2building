@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from building2building.store import OUTPUT, ChildFile, Derivation, derivation
+from store import OUTPUT, ChildFile, Derivation, derivation
 
 
 @derivation("simulation-outputs")
