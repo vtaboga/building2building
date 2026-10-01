@@ -94,7 +94,7 @@ def test_generate_raw_dataset_smoke(tmp_path: Path) -> None:
     from building2building.sources.multizones_reference_buildings import (
         dataset_zip,
     )
-    from store import realize
+    from store import LocalExecutor, realize
 
     output_dir = tmp_path / "raw_dataset"
     output_dir.mkdir()
@@ -147,7 +147,7 @@ def test_generate_raw_dataset_smoke(tmp_path: Path) -> None:
     # ``samples_per_type=1000``; this smoke only needs to validate the
     # *convention* — that every base IDF used by the new run also exists
     # in the upstream with the same ``(place, weather_file)`` mapping.
-    upstream_zip_path = realize(STORE_PATH.get(), dataset_zip())
+    upstream_zip_path = realize(STORE_PATH.get(), dataset_zip(), executor=LocalExecutor())
     upstream = _read_upstream_metadata(upstream_zip_path)
     upstream_by_idf: dict[tuple[str, str], dict] = {
         (row["building_type"], row["source_idf"]): row
@@ -241,7 +241,7 @@ def test_generate_raw_dataset_eplus_smoke(tmp_path: Path) -> None:
     from building2building.sources.multizones_reference_buildings import (
         dataset_zip,
     )
-    from store import realize
+    from store import LocalExecutor, realize
 
     # Each E+ run is launched as a subprocess (not through pyenergyplus.api)
     # so its memory is reclaimed between runs.  The in-process API leaks
@@ -250,7 +250,7 @@ def test_generate_raw_dataset_eplus_smoke(tmp_path: Path) -> None:
     # generation pipeline).  Subprocessing is also closer to how
     # production code (e.g. baselines/) invokes E+ end-to-end.
     setup_energyplus_path()
-    ep_install_dir = realize(STORE_PATH.get(), energyplus_path())
+    ep_install_dir = realize(STORE_PATH.get(), energyplus_path(), executor=LocalExecutor())
     ep_binary = Path(ep_install_dir) / "energyplus"
     assert ep_binary.exists(), f"EnergyPlus binary not found at {ep_binary}"
 
@@ -259,7 +259,7 @@ def test_generate_raw_dataset_eplus_smoke(tmp_path: Path) -> None:
     # We need the weather files on disk for E+'s -w flag.
     extract_weather_files(tmp_path)
 
-    upstream_zip_path = realize(STORE_PATH.get(), dataset_zip())
+    upstream_zip_path = realize(STORE_PATH.get(), dataset_zip(), executor=LocalExecutor())
 
     # Group upstream rows by building_type and pick the first n_per_type
     # of each, mirroring the original test's coverage intent (5 buildings

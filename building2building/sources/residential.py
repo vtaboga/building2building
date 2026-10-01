@@ -24,6 +24,7 @@ from building2building.pipeline import (
     prepare_building,
 )
 from store import (
+    LocalExecutor,
     OUTPUT,
     Constant,
     Derivation,
@@ -208,7 +209,7 @@ def search_buildings(
     **query,
 ) -> DataFrame:
     root_zip = dataset_zip()
-    index = realize(STORE_PATH.get(), table_index(root_zip))
+    index = realize(STORE_PATH.get(), table_index(root_zip), executor=LocalExecutor())
     ep = energyplus_path()
     controls = query.get("controls")
 
@@ -318,14 +319,13 @@ def search_configs(
 
             # Get control-ready building with actuators from make_controllable()
             control_derivation = row.derivation_thunk()
-            epjson, hvac_equipment = realize(STORE_PATH.get(), control_derivation)
+            epjson, hvac_equipment = realize(STORE_PATH.get(), control_derivation, executor=LocalExecutor())
 
             metadata = realize(
                 STORE_PATH.get(),
-                extract_discovery_metadata(Constant(epjson), epw_derivation),
-            )
+                extract_discovery_metadata(Constant(epjson), epw_derivation), executor=LocalExecutor())
 
-            epw = realize(STORE_PATH.get(), epw_derivation)
+            epw = realize(STORE_PATH.get(), epw_derivation, executor=LocalExecutor())
 
             area = metadata.net_conditioned_area
             warmup_phases = metadata.warmup_phases

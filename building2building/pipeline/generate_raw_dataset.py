@@ -67,7 +67,7 @@ from building2building.sources.ashrae_90_1 import (
     search_buildings,
     search_weathers,
 )
-from store import LocalFile, realize
+from store import LocalExecutor, LocalFile, realize
 
 logger = logging.getLogger(__name__)
 
@@ -314,7 +314,7 @@ def load_base_buildings(
             source_idf = idf_path.name
             idf_der = LocalFile(idf_path)
             converted = convert_to_epjson(idf_der, ep, src_version="22.1.0")
-            epjson_path = realize(store, converted)
+            epjson_path = realize(store, converted, executor=LocalExecutor())
             with open(epjson_path) as f:
                 epjson_obj = json.load(f)
             bases_by_type[btype].append(

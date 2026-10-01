@@ -42,6 +42,7 @@ from building2building.pipeline import (
     modify_timestep,
 )
 from store import (
+    LocalExecutor,
     OUTPUT,
     Constant,
     Derivation,
@@ -196,7 +197,7 @@ def search_buildings(
     **query: Any,
 ) -> DataFrame:
     root_zip = dataset_zip()
-    index = realize(STORE_PATH.get(), table_index(root_zip))
+    index = realize(STORE_PATH.get(), table_index(root_zip), executor=LocalExecutor())
 
     db = duckdb.from_parquet(str(index))
 
@@ -294,14 +295,13 @@ def search_configs(
             epw_derivation = ExtractFromZip(root_zip, row.weather_file)
 
             control_derivation = row.derivation_thunk()
-            epjson, hvac_equipment = realize(STORE_PATH.get(), control_derivation)
+            epjson, hvac_equipment = realize(STORE_PATH.get(), control_derivation, executor=LocalExecutor())
 
             metadata = realize(
                 STORE_PATH.get(),
-                extract_discovery_metadata(Constant(epjson), epw_derivation),
-            )
+                extract_discovery_metadata(Constant(epjson), epw_derivation), executor=LocalExecutor())
 
-            epw = realize(STORE_PATH.get(), epw_derivation)
+            epw = realize(STORE_PATH.get(), epw_derivation, executor=LocalExecutor())
 
             reward_section = cfg.get("reward", {}) if isinstance(cfg, dict) else {}
             if (

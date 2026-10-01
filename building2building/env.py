@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Literal, get_args
 
 from store import (
+    LocalExecutor,
     ChildFile,
     DownloadFile,
     ExtractTarball,
@@ -120,6 +121,6 @@ def energyplus_path() -> Realizable:
 
 
 def setup_energyplus_path():
-    ep = realize(STORE_PATH.get(), energyplus_path())
+    ep = realize(STORE_PATH.get(), energyplus_path(), executor=LocalExecutor())
 
     sys.path.append(str(ep))

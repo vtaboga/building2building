@@ -30,6 +30,7 @@ import pandas as pd
 
 from building2building.env import STORE_PATH
 from store import (
+    LocalExecutor,
     OUTPUT,
     Derivation,
     DownloadFile,
@@ -134,8 +135,8 @@ def search_buildings(
         - ``path``: absolute filesystem path to the IDF inside the
           extracted, content-hashed store tree (safe to read directly).
     """
-    realize(STORE_PATH.get(), ASHRAE901_all())
-    idx_path = realize(STORE_PATH.get(), _index_buildings(ASHRAE901_all()))
+    realize(STORE_PATH.get(), ASHRAE901_all(), executor=LocalExecutor())
+    idx_path = realize(STORE_PATH.get(), _index_buildings(ASHRAE901_all()), executor=LocalExecutor())
     rel = duckdb.from_parquet(str(idx_path))
     if building_type is not None:
         rel = rel.filter(
@@ -166,8 +167,8 @@ def search_weathers(
         - ``path``: absolute filesystem path to the EPW inside the
           extracted, content-hashed store tree.
     """
-    realize(STORE_PATH.get(), ASHRAE901_all())
-    idx_path = realize(STORE_PATH.get(), _index_weathers(ASHRAE901_all()))
+    realize(STORE_PATH.get(), ASHRAE901_all(), executor=LocalExecutor())
+    idx_path = realize(STORE_PATH.get(), _index_weathers(ASHRAE901_all()), executor=LocalExecutor())
     rel = duckdb.from_parquet(str(idx_path))
     if state is not None:
         rel = rel.filter(

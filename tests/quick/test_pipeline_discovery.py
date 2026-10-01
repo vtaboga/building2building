@@ -16,7 +16,7 @@ import pytest
 from building2building.env import STORE_PATH
 from building2building.pipeline.actuators import make_controllable
 from building2building.pipeline.discovery import extract_discovery_metadata
-from store import realize
+from store import LocalExecutor, realize
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
@@ -64,12 +64,10 @@ def test_extract_discovery_metadata_matches_pinned_fixture_values(
             fixture_dir / "building.epjson",
             fixture_dir / "weather.epw",
             discovery_run_days=1,
-        ),
-    )
+        ), executor=LocalExecutor())
     _, equipment = realize(
         STORE_PATH.get(),
-        make_controllable(fixture_dir / "building.epjson"),
-    )
+        make_controllable(fixture_dir / "building.epjson"), executor=LocalExecutor())
     hvac_actuators = sum(len(eq.actuator_descriptions()) for eq in equipment)
 
     assert metadata.net_conditioned_area == pytest.approx(expected_area, abs=0.01)

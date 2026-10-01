@@ -9,6 +9,7 @@ from typing import Literal, TypeAlias
 from building2building.env import STORE_PATH
 from building2building.pipeline.common import chdir
 from store import (
+    LocalExecutor,
     OUTPUT,
     ChildFile,
     Derivation,
@@ -151,7 +152,7 @@ def upgrade(
 ) -> Derivation:
     # Multi-step upgrade process
 
-    upgraders: DataFrame = realize(STORE_PATH.get(), scan_upgraders(energyplus_path))
+    upgraders: DataFrame = realize(STORE_PATH.get(), scan_upgraders(energyplus_path), executor=LocalExecutor())
 
     # Chain upgrades
     current = input_file

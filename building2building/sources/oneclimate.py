@@ -13,6 +13,7 @@ import duckdb
 import requests
 from building2building.env import STORE_PATH
 from store import (
+    LocalExecutor,
     OUTPUT,
     ChildFile,
     Derivation,
@@ -117,7 +118,7 @@ def canada_zip_urls():
 
 
 def search_weathers(province: ProvinceCode | None = None, city: str | None = None):
-    parquet_path = realize(STORE_PATH.get(), canada_zip_urls())
+    parquet_path = realize(STORE_PATH.get(), canada_zip_urls(), executor=LocalExecutor())
     db = duckdb.from_parquet(str(parquet_path))
 
     if province is not None:

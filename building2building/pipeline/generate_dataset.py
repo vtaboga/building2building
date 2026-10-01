@@ -80,7 +80,7 @@ from building2building.sources.multizones_reference_buildings import (
     dataset_zip,
     table_index,
 )
-from store import Constant, ExtractFromZip, realize
+from store import LocalExecutor, Constant, ExtractFromZip, realize
 
 logger = logging.getLogger(__name__)
 
@@ -206,14 +206,14 @@ def generate_one_building(
         epjson_filename=epjson_filename,
         run_period_name="full_year",
     )
-    epjson_path, equipment_list = realize(STORE_PATH.get(), derivation)
+    epjson_path, equipment_list = realize(STORE_PATH.get(), derivation, executor=LocalExecutor())
 
     shutil.copy(epjson_path, target_dir / "building.epjson")
     with open(target_dir / "equipment.json", "w") as f:
         json.dump(unstructure(list(equipment_list)), f, indent=4)
 
     # Look up the weather file from the multizones_reference_buildings metadata.
-    idx_path = realize(STORE_PATH.get(), table_index(root_zip))
+    idx_path = realize(STORE_PATH.get(), table_index(root_zip), executor=LocalExecutor())
     import duckdb
 
     df_meta = (
@@ -234,7 +234,7 @@ def generate_one_building(
     epw_derivation = ExtractFromZip(root_zip, weather_file)
 
     meta_expr = extract_discovery_metadata(Constant(epjson_path), epw_derivation)
-    meta = realize(STORE_PATH.get(), meta_expr)
+    meta = realize(STORE_PATH.get(), meta_expr, executor=LocalExecutor())
     net_conditioned_area = float(meta.net_conditioned_area)
     warmup_phases = int(meta.warmup_phases)
 
@@ -248,7 +248,7 @@ def generate_one_building(
     # ``rebuild_metadata_parquet``) carries exactly that same name from the
     # original Stage-2 run.  Copying with the store basename preserves the
     # filename contract end-to-end.
-    epw_path = realize(STORE_PATH.get(), epw_derivation)
+    epw_path = realize(STORE_PATH.get(), epw_derivation, executor=LocalExecutor())
     shutil.copy(epw_path, target_dir / epw_path.name)
 
     place = str(df_meta.iloc[0].get("place", ""))

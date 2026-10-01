@@ -15,7 +15,7 @@ import pytest
 
 from building2building.env import STORE_PATH
 from building2building.pipeline.actuators import make_controllable
-from store import realize
+from store import LocalExecutor, realize
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
@@ -51,8 +51,7 @@ def test_make_controllable_by_hvac_type(
 ) -> None:
     epjson_path, equipment = realize(
         STORE_PATH.get(),
-        make_controllable(FIXTURES_DIR / fixture_name / "building.epjson"),
-    )
+        make_controllable(FIXTURES_DIR / fixture_name / "building.epjson"), executor=LocalExecutor())
     epjson = json.loads(epjson_path.read_text())
 
     actuator_pairs = {

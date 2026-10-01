@@ -15,7 +15,7 @@ import pytest
 
 from building2building.env import STORE_PATH, energyplus_path
 from building2building.pipeline import prepare_building
-from store import realize
+from store import LocalExecutor, realize
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "pipeline_idfs"
 
@@ -38,8 +38,7 @@ def test_prepare_building_end_to_end(
             energyplus_path=energyplus_path(),
             src_version="24.1.0",
             timesteps_per_hour=timesteps_per_hour,
-        ),
-    )
+        ), executor=LocalExecutor())
     epjson = json.loads(epjson_path.read_text())
 
     output_meter = epjson.get("Output:Meter", {})
