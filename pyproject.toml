@@ -13,7 +13,7 @@ requires-python = ">=3.10"
 
 dependencies = [
     "minergym @ git+ssh://git@github.com/Terramorpha/minergym@1cc47dea940119e718d140c09966254a1f8d4105",
-    "store @ git+ssh://git@github.com/Terramorpha/store@e33342aea747c1c24f15c8ae2ef0b78e4452b83e",
+    "store @ git+ssh://git@github.com/Terramorpha/store@3c658bd3586e27e3caaa2c64d1d7aa0ff89fe0fa",
     "gitpython>=3.1.0",
     "numpy>=1.24.0",
     "gymnasium>=1.2.0",
