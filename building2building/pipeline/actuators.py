@@ -65,6 +65,13 @@ DEFAULT_SAT_MAX_C = (
 # supply-air flow (~4-6 kg/s) while staying well below the unphysical
 # range; see notes.md § "OfficeMedium OA-mixer fix" Q2.
 OA_MASS_FLOW_MAX_KGS = 5.0
+# Lower bound on the same actuator (kg/s): the DOE OfficeMedium prototype's
+# autosized minimum outdoor-air flow per loop (~1.12 m³/s × 1.225 kg/m³ ≈
+# 1.37 kg/s), the value the reactive AirLoopPolicy pins the mixer at. Exposing
+# 0.0 let learned policies shut the outdoor-air intake (ventilation starvation:
+# a large, unphysical energy "win" on the energy tasks and an easier regulation
+# problem on the comfort ones), so the floor is part of the action space.
+OA_MASS_FLOW_MIN_KGS = 1.37
 
 
 @dataclass(frozen=True)
@@ -84,7 +91,7 @@ VAV_SUPPLY_TEMP_C = Bounds(10.0, 55.0)   # SetpointManager:Scheduled supply-air 
 VAV_HEATING_SP_C = Bounds(10.0, 35.0)    # VAV DualSetpoint heating schedule
 VAV_COOLING_SP_C = Bounds(18.0, 40.0)    # VAV DualSetpoint cooling schedule
 FLOW_FRACTION = Bounds(0.0, 1.0)         # VAV minimum-air-flow fraction schedule
-OA_MASS_FLOW_KGS = Bounds(0.0, OA_MASS_FLOW_MAX_KGS)  # Controller:OutdoorAir mass flow
+OA_MASS_FLOW_KGS = Bounds(OA_MASS_FLOW_MIN_KGS, OA_MASS_FLOW_MAX_KGS)  # Controller:OutdoorAir mass flow (ventilation floor)
 HEATING_ONLY_SP_C = Bounds(10.0, 35.0)   # heating-only zone setpoint schedule
 
 logger = logging.getLogger(__name__)

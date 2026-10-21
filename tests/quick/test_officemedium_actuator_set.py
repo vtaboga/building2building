@@ -23,6 +23,7 @@ import pytest
 
 from building2building.pipeline.actuators import (
     OA_MASS_FLOW_MAX_KGS,
+    OA_MASS_FLOW_MIN_KGS,
     VAVSystem,
     make_all_equipment,
     gensym,
@@ -79,7 +80,7 @@ def test_three_vav_loops_yield_three_oa_actuators(
         assert act.component_type == "Outdoor Air Controller"
         assert act.control_type == "Air Mass Flow Rate"
         assert act.units == "[kg/s]"
-        assert act.lower_bound == 0.0
+        assert act.lower_bound == OA_MASS_FLOW_MIN_KGS
         assert act.upper_bound == OA_MASS_FLOW_MAX_KGS
 
 
