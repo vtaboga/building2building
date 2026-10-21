@@ -3,6 +3,7 @@ import logging
 import shutil
 import tempfile
 from copy import deepcopy
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Sequence
@@ -821,7 +822,14 @@ class VAVSystem:
             out.append(vav.flow_fraction)
             out.append(vav.heating_setpoint)
             out.append(vav.cooling_setpoint)
-        out.append(self.oa_mass_flow)
+        # The ventilation floor is applied here, on the one surface the gym
+        # action space, the simulator and the morphology all read, so that
+        # datasets whose ``equipment.json`` predates the floor (lower_bound
+        # 0.0) still expose [OA_MASS_FLOW_MIN_KGS, OA_MASS_FLOW_MAX_KGS].
+        oa = self.oa_mass_flow
+        if oa.lower_bound < OA_MASS_FLOW_KGS.low:
+            oa = dataclasses.replace(oa, lower_bound=OA_MASS_FLOW_KGS.low)
+        out.append(oa)
         return out
 
     def zones(self) -> list[str]:
