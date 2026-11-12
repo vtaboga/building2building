@@ -10,6 +10,18 @@
   `60 / timesteps_per_hour` minutes, `time_of_day` never goes backwards, and
   the HVAC energy observations cover exactly the step
   (`building2building/simulator/sampling.py`).
+- `building2building.bacnet`: a BACnet layer for B2B environments.
+  `ChannelMap` describes an environment's observations and actuators as
+  role-labelled channels; `PointStore` turns them into BACnet devices,
+  `analog-input` sensors and commandable `analog-value` objects with
+  priority arrays; `BACnetBuilding` runs an environment with the points in
+  the loop (the building's program writes relinquish defaults, clients write
+  at priorities 8 to 16); `Gateway`, `WireClient` and `BACnetLink` serve the
+  points over BACnet/IP with BACpypes3. Supports unitary-system and
+  heating-only equipment (`OfficeSmall`, `RestaurantFastFood`,
+  `RetailStandalone`, `Warehouse`, `SingleFamilyHouse`). New `bacnet` extra
+  (`bacpypes3`), included in `all`. Guide: `docs/guide/bacnet.md`.
+  Use it with `sampling="zone_timestep"`; `BACnetBuilding` warns otherwise.
 
 ### Documentation
 

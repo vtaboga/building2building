@@ -40,6 +40,9 @@ training = [
     "optuna>=4.0.0",
     "matplotlib>=3.7.0",
 ]
+bacnet = [
+    "bacpypes3>=0.0.100",
+]
 test = [
     "deepdiff",
     "psutil",
@@ -55,7 +58,7 @@ docs = [
     "mkdocstrings[python]",
     "pymdown-extensions",
 ]
-all = ["building2building[training,test,dev,docs]"]
+all = ["building2building[training,bacnet,test,dev,docs]"]
 
 
 [tool.setuptools.packages.find]

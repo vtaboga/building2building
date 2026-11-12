@@ -20,6 +20,7 @@ source .venv/bin/activate
 |---|---|
 | `pip install -e .` | Core package only (environments, data, benchmarks) |
 | `pip install -e ".[training]"` | + PyTorch, SB3, Hydra, Optuna, W&B, TensorBoard, matplotlib |
+| `pip install -e ".[bacnet]"` | + BACpypes3, for the [BACnet layer](bacnet.md) over BACnet/IP |
 | `pip install -e ".[test]"` | + pytest, deepdiff, pytest-mock, psutil |
 | `pip install -e ".[test,training]"` | Recommended dev install (the quick test suite imports `baselines`, which needs the training extras) |
 | `pip install -e ".[dev]"` | + black, pyright |
