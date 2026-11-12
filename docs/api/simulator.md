@@ -21,3 +21,7 @@ spaces, action spaces, reward functions, and wrappers.
 ## Wrappers
 
 ::: building2building.simulator.wrappers
+
+## Sampling
+
+::: building2building.simulator.sampling

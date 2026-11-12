@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `sampling` option on `make_env`, `BuildingConfig` and `EnvBuildConfig`,
+  reported in `env.metadata["sampling"]`. `"zone_timestep"` makes `step()`
+  return once per completed EnergyPlus zone timestep: every step is
+  `60 / timesteps_per_hour` minutes, `time_of_day` never goes backwards, and
+  the HVAC energy observations cover exactly the step
+  (`building2building/simulator/sampling.py`).
+
+### Documentation
+
+- Documented that the default `sampling="hvac_timestep"` returns at every
+  HVAC system timestep: steps can be shorter than `60 / timesteps_per_hour`
+  minutes, `time_of_day` can go backwards, and energy is counted again on
+  every extra step. The default is unchanged, so `v1.0.0` results stay
+  reproducible.
+
 ## v1.0.0 — paper release
 
 Version accompanying *"Building2Building: A Large Scale Benchmark for

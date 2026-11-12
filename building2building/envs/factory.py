@@ -67,6 +67,7 @@ def make_env_from_config(
         hvac_equipment=equipment_data,
         task_config=config.task,
         expose_heating_only_zones=config.expose_heating_only_zones,
+        sampling=config.sampling,
     )
 
     env = create_simulator(building_config)
