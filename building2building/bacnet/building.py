@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 import gymnasium as gym
@@ -33,14 +34,18 @@ class BACnetBuilding:
 
     Args:
         env: An environment from :func:`building2building.make_env`, created
-            with ``rescale_action=False``.
+            with ``rescale_action=False`` and ``sampling="zone_timestep"``.
+            With the default HVAC-timestep sampling, steps vary in length,
+            the ``time_of_day`` point can go backwards and the energy points
+            count energy again on every extra step; a ``UserWarning`` says so.
         program: Optional building program, see above.
 
     Example:
         >>> import building2building as b2b
         >>> from building2building.bacnet import BACnetBuilding
         >>> env = b2b.make_env("OfficeSmall", split="test_small", index=0,
-        ...                    task="task_occ_e05", run_period="winter")
+        ...                    task="task_occ_e05", run_period="winter",
+        ...                    sampling="zone_timestep")
         >>> building = BACnetBuilding(env)
         >>> building.reset()
         >>> link = building.serve()          # BACnet/IP on a loopback UDP port
@@ -57,6 +62,15 @@ class BACnetBuilding:
         self.env = env
         self.program = program
         self.channel_map = ChannelMap(env)
+        if env.metadata.get("sampling") != "zone_timestep":
+            warnings.warn(
+                "the environment steps at EnergyPlus HVAC system timesteps: steps "
+                "vary in length, time_of_day can go backwards and energy is counted "
+                "again on every extra step; create it with "
+                'make_env(..., sampling="zone_timestep")',
+                UserWarning,
+                stacklevel=2,
+            )
         self.store: PointStore | None = None
         self.snapshot: dict[str, float] = {}
         self.links: list[Any] = []

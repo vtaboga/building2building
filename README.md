@@ -288,7 +288,8 @@ BACpypes3 gateway (`pip install -e ".[bacnet]"`).
 ```python
 from building2building.bacnet import BACnetBuilding
 
-building = BACnetBuilding(b2b.make_env("OfficeSmall", task="task_occ_e05"))
+env = b2b.make_env("OfficeSmall", task="task_occ_e05", sampling="zone_timestep")
+building = BACnetBuilding(env)
 building.reset()
 link = building.serve()                   # BACnet/IP gateway + client on loopback
 link.discover()                           # Who-Is

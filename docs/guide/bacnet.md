@@ -19,7 +19,8 @@ import building2building as b2b
 from building2building.bacnet import BACnetBuilding
 
 env = b2b.make_env("OfficeSmall", split="test_small", index=0,
-                   task="task_occ_e05", run_period="winter")
+                   task="task_occ_e05", run_period="winter",
+                   sampling="zone_timestep")
 building = BACnetBuilding(env)
 building.reset()
 
@@ -38,7 +39,12 @@ building.close()
 ```
 
 The environment must use actions in engineering units
-(`rescale_action=False`, the default).
+(`rescale_action=False`, the default), and should step once per zone
+timestep (`sampling="zone_timestep"`). With the default HVAC-timestep
+sampling, steps vary in length, the `time_of_day` point can go backwards and
+the energy points count energy again on every extra step (see
+[Step length](environments.md#step-length)); `BACnetBuilding` warns when it
+gets such an environment.
 
 ## Point model
 
