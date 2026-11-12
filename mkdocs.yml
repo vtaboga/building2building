@@ -78,6 +78,7 @@ nav:
       - Rewards: guide/rewards.md
       - Wrappers: guide/wrappers.md
       - Morphology Graph: guide/morphology.md
+      - BACnet Layer: guide/bacnet.md
       - Configuration (Hydra): guide/configuration.md
   - Benchmarks:
       - Overview: benchmarks/overview.md
@@ -109,6 +110,7 @@ nav:
       - building2building.simulator: api/simulator.md
       - building2building.envs: api/envs.md
       - building2building.data: api/data.md
+      - building2building.bacnet: api/bacnet.md
       - baselines: api/baselines.md
       - API Stability: api/stability.md
   - About:

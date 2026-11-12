@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `sampling` option on `make_env`, `BuildingConfig` and `EnvBuildConfig`,
+  reported in `env.metadata["sampling"]`. `"zone_timestep"` makes `step()`
+  return once per completed EnergyPlus zone timestep: every step is
+  `60 / timesteps_per_hour` minutes, `time_of_day` never goes backwards, and
+  the HVAC energy observations cover exactly the step
+  (`building2building/simulator/sampling.py`).
+- `building2building.bacnet`: a BACnet layer for B2B environments.
+  `ChannelMap` describes an environment's observations and actuators as
+  role-labelled channels; `PointStore` turns them into BACnet devices,
+  `analog-input` sensors and commandable `analog-value` objects with
+  priority arrays; `BACnetBuilding` runs an environment with the points in
+  the loop (the building's program writes relinquish defaults, clients write
+  at priorities 8 to 16); `Gateway`, `WireClient` and `BACnetLink` serve the
+  points over BACnet/IP with BACpypes3. Supports unitary-system and
+  heating-only equipment (`OfficeSmall`, `RestaurantFastFood`,
+  `RetailStandalone`, `Warehouse`, `SingleFamilyHouse`). New `bacnet` extra
+  (`bacpypes3`), included in `all`. Guide: `docs/guide/bacnet.md`.
+  Use it with `sampling="zone_timestep"`; `BACnetBuilding` warns otherwise.
+
+### Documentation
+
+- Documented that the default `sampling="hvac_timestep"` returns at every
+  HVAC system timestep: steps can be shorter than `60 / timesteps_per_hour`
+  minutes, `time_of_day` can go backwards, and energy is counted again on
+  every extra step. The default is unchanged, so `v1.0.0` results stay
+  reproducible.
+
 ## v1.0.0 — paper release
 
 Version accompanying *"Building2Building: A Large Scale Benchmark for

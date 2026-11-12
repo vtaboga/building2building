@@ -264,6 +264,7 @@ def make_env(
     eplus_output_dir: str | Path | None = None,
     max_episode_steps: int | None = None,
     rescale_action: bool = False,
+    sampling: str = "hvac_timestep",
 ) -> gym.Env:
     """Create a Gymnasium environment using the unified dataset.
 
@@ -318,6 +319,16 @@ def make_env(
             :func:`building2building.api.rl_wrappers.wrap_env_for_rl`
             or the ``make_rl_env_fn`` helper instead, which set this
             flag and also apply observation normalisation.
+        sampling: When ``step()`` returns. ``"hvac_timestep"`` (default,
+            the behavior v1.0.0 results were produced with) returns at every
+            EnergyPlus HVAC system timestep, which EnergyPlus shortens below
+            ``60 / timesteps_per_hour`` minutes when loads change quickly:
+            steps then vary in length, ``time_of_day`` can go backwards, and
+            energy is counted again on every extra step.
+            ``"zone_timestep"`` returns once per completed zone timestep, so
+            every step is ``60 / timesteps_per_hour`` minutes and the energy
+            meters cover exactly that interval. See
+            :mod:`building2building.simulator.sampling`.
 
     Returns:
         A Gymnasium environment backed by EnergyPlus.
@@ -415,6 +426,7 @@ def make_env(
             "building_id": getattr(info, "building_id", None),
         },
         task_config=task_cfg,
+        sampling=sampling,
     )
 
     env = create_simulator(building_config)
