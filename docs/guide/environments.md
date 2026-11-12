@@ -52,12 +52,40 @@ env = b2b.make_env(
 | `eplus_output_dir` | `str` / `Path` | EnergyPlus output directory |
 | `max_episode_steps` | `int` | Override episode length |
 | `rescale_action` | `bool` | Wrap with `RescaleAction` so actions are in `[-1, 1]` (default: `False`) |
+| `sampling` | `str` | When `step()` returns: `"hvac_timestep"` (default) or `"zone_timestep"`; see [Step length](#step-length) |
 
 For the 6 task presets, `make_env` auto-fills the reward's `(tau_T, tau_E)`
 normalizers from `building2building/data/reward_normalizers.yaml` for the
 building's `(building_type, climate_zone)` bucket. `tau_E` is calibrated per
 run period; requesting a `run_period` that has no section in that YAML raises
 at env-build time.
+
+### Step length
+
+By default (`sampling="hvac_timestep"`, the behaviour of `v1.0.0`), `step()`
+returns at every EnergyPlus **HVAC system timestep**. EnergyPlus shortens those
+below `60 / timesteps_per_hour` minutes whenever loads change quickly, so:
+
+- steps vary in length (1 to 5 minutes at 12 timesteps per hour), and an
+  episode of `task_config.expected_steps()` steps ends before its run period
+  does;
+- `time_of_day` can go backwards from one step to the next;
+- the HVAC energy observations report the whole zone timestep's energy at
+  every system timestep, so energy, and the energy term of the reward, is
+  counted again on every extra step.
+
+`sampling="zone_timestep"` returns once per completed zone timestep instead:
+every step is `60 / timesteps_per_hour` minutes, `time_of_day` is the end of
+that interval, and the energy observations cover exactly that interval. Use it
+whenever a controller relies on time or energy per step.
+
+```python
+env = b2b.make_env("OfficeSmall", task="task_occ_e05", sampling="zone_timestep")
+```
+
+The default stays `"hvac_timestep"` so that results produced with `v1.0.0`,
+including the packaged baseline returns, remain reproducible; scores computed
+under one sampling mode are not comparable with the other.
 
 ### `make_env_from_config` (config-based)
 
@@ -140,6 +168,7 @@ env.metadata["controlled_zones"]    # list[str] -- fully controlled zone names
 env.metadata["heating_only_zones"]  # list[str] -- heating-only zone names
 env.metadata["uncontrolled_zones"]  # list[str] -- zones without HVAC control
 env.metadata["task_config"]         # TaskConfig -- resolved task specification
+env.metadata["sampling"]            # str -- "hvac_timestep" or "zone_timestep"
 env.metadata["building_info"]       # BuildingInfo -- registry entry for the building
 ```
 

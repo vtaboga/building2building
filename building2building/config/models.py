@@ -306,6 +306,9 @@ class EnvBuildConfig:
         actuator_access: Actuator access restrictions.
         env_max_steps: Optional hard cap on episode length. When
             ``None``, the run period's expected step count is used.
+        sampling: When the environment samples EnergyPlus,
+            ``"hvac_timestep"`` (default) or ``"zone_timestep"``. See
+            :mod:`building2building.simulator.sampling`.
     """
 
     dataset_selection: DatasetSelectionConfig
@@ -314,6 +317,7 @@ class EnvBuildConfig:
     actuator_access: ActuatorAccessConfig = field(default_factory=ActuatorAccessConfig)
     env_max_steps: int | None = None
     expose_heating_only_zones: bool = True
+    sampling: str = "hvac_timestep"
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "EnvBuildConfig":
@@ -339,6 +343,7 @@ class EnvBuildConfig:
         max_steps_raw = raw.get("env_max_steps")
         env_max_steps = int(max_steps_raw) if max_steps_raw is not None else None
         expose_heating_only_zones = bool(raw.get("expose_heating_only_zones", True))
+        sampling = str(raw.get("sampling", "hvac_timestep"))
         return cls(
             dataset_selection=dataset_selection,
             task=task,
@@ -346,6 +351,7 @@ class EnvBuildConfig:
             actuator_access=actuator_access,
             env_max_steps=env_max_steps,
             expose_heating_only_zones=expose_heating_only_zones,
+            sampling=sampling,
         )
 
 

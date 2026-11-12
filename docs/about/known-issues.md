@@ -9,6 +9,21 @@ argument order, model-path parsing, CSV schema mismatches, incomplete
 
 ## Behaviour to be aware of
 
+### Steps are HVAC system timesteps by default
+
+With the default `sampling="hvac_timestep"`, `step()` returns at every
+EnergyPlus HVAC system timestep, which EnergyPlus shortens below the zone
+timestep when loads change quickly. Steps then vary in length, `time_of_day`
+can go backwards, and the HVAC energy observations repeat the zone timestep's
+energy at every extra step. On `OfficeSmall-5167` (Miami, `test_small`),
+winter, with constant mid-range actions, 2,016 steps (one week at 5 minutes)
+cover 4.4 days; 37 % of steps are shorter than 5 minutes and the clock goes
+backwards on 325 of them; over the same simulated time, HVAC electricity and
+gas come out 1.59 times what `sampling="zone_timestep"` reports, the ratio of
+step counts. `make_env(..., sampling="zone_timestep")` steps once per
+completed zone timestep. The default is kept for reproducibility of `v1.0.0`
+results; see [Step length](../guide/environments.md#step-length).
+
 ### Reward-normalizer calibration warnings
 
 The seasonal energy normalizer `tau_E` in

@@ -579,6 +579,10 @@ class BuildingConfig:
         source_metadata: Free-form metadata for logging / debugging
             (e.g. dataset row id, original IDF filename).
         task_config: Task specification (run period, target temps, …).
+        sampling: When the environment samples EnergyPlus:
+            ``"hvac_timestep"`` (default, as in v1.0.0) or
+            ``"zone_timestep"``. See
+            :mod:`building2building.simulator.sampling`.
     """
 
     path_to_building: Path
@@ -592,3 +596,4 @@ class BuildingConfig:
     task_config: TaskConfig = field(default_factory=lambda: TaskConfig.from_dict({}))
     expose_heating_only_zones: bool = True
     fixed_actuator_overrides: dict[str, float] = field(default_factory=dict)
+    sampling: str = "hvac_timestep"

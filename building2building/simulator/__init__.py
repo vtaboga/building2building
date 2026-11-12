@@ -22,6 +22,12 @@ from building2building.simulator.observation_spaces import (
 from building2building.simulator.rewards import (
     NormalizedReward,
 )
+from building2building.simulator.sampling import (
+    ZoneClock,
+    ZoneTimestepSimulation,
+    check_sampling,
+    with_zone_clock,
+)
 from building2building.morphology import build_morphology
 from building2building.types import (
     BuildingConfig,
@@ -107,7 +113,12 @@ def _maybe_warn_normalized_reward(
 @dataclass
 class MakeEnergyPlus:
     """This could simply be a closure, but it wouldn't be serializable with
-    pickle."""
+    pickle.
+
+    ``sampling`` selects when the environment samples EnergyPlus; see
+    :mod:`building2building.simulator.sampling`. ``step_minutes`` is the
+    expected zone timestep, used by ``"zone_timestep"`` sampling.
+    """
 
     path_to_building: Path
     path_to_weather: Path
@@ -117,12 +128,22 @@ class MakeEnergyPlus:
     log_dir: Path
     warmup_phases: int
     max_steps: int = 200_000
+    sampling: str = "hvac_timestep"
+    step_minutes: int = 5
 
     def __call__(self) -> EnergyPlusSimulation:
-        sim = EnergyPlusSimulation(
+        check_sampling(self.sampling)
+        simulation_class = EnergyPlusSimulation
+        observation_template = self.observation_template
+        if self.sampling == "zone_timestep":
+            simulation_class = ZoneTimestepSimulation
+            observation_template = with_zone_clock(
+                observation_template, ZoneClock(self.step_minutes)
+            )
+        sim = simulation_class(
             self.path_to_building,
             self.path_to_weather,
-            self.observation_template,
+            observation_template,
             self.action_template,
             verbose=self.verbose,
             log_dir=self.log_dir,
@@ -155,6 +176,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         raise Exception(f"{building_config} should have type BuildingConfig")
 
     eplus_output_dir = building_config.eplus_output_dir
+    check_sampling(building_config.sampling)
 
     with open(building_config.path_to_building, "r") as epjson_file:
         epjson: dict[str, Any] = json.load(epjson_file)
@@ -211,6 +233,12 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
     ]
 
     expected_steps = task_config.expected_steps()
+    timesteps_per_hour = task_config.timesteps_per_hour
+    if building_config.sampling == "zone_timestep" and 60 % timesteps_per_hour:
+        raise ValueError(
+            "zone_timestep sampling needs timesteps_per_hour to divide 60, "
+            f"got {timesteps_per_hour}"
+        )
     make_energyplus = MakeEnergyPlus(
         building_config.path_to_building,
         building_config.path_to_weather,
@@ -220,6 +248,8 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
         log_dir=eplus_output_dir,
         warmup_phases=building_config.warmup_phases,
         max_steps=expected_steps + 1000,
+        sampling=building_config.sampling,
+        step_minutes=60 // timesteps_per_hour,
     )
 
     reward_zones = (
@@ -303,6 +333,7 @@ def create_simulator(building_config: BuildingConfig) -> EnergyPlusEnvironment:
             else {}
         ),
         "target_temperature_mode": task_config.target_temperature_mode,
+        "sampling": building_config.sampling,
         "morphology": morphology,
         "task_config": task_config,
         # ``building_info`` is populated by the env factories
